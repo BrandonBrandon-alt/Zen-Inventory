@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import LoginForm from "@/components/auth/LoginForm";
+import Logo from "@/components/ui/Logo";
 
 export const metadata: Metadata = {
-  title: "Ingresar | OptiPlant",
-  description: "Accede al sistema de gestión de inventario de OptiPlant.",
+  title: "Ingresar | Zen Inventory",
+  description: "Accede al sistema de gestión de inventario de Zen Inventory.",
 };
 
 export default function LoginPage() {
@@ -34,32 +35,26 @@ export default function LoginPage() {
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <div
             style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "10px",
-              background: "var(--brand-500)",
+              width: "40px",
+              height: "40px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0,
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-              <polygon points="12 2 2 7 12 12 22 7 12 2" />
-              <polyline points="2 17 12 22 22 17" />
-              <polyline points="2 12 12 17 22 12" />
-            </svg>
+            <Logo size={36} />
           </div>
           <span
             style={{
               fontSize: "16px",
-              fontWeight: 600,
-              color: "var(--neutral-100)",
+              fontWeight: 700,
+              color: "var(--neutral-50)",
               fontFamily: "var(--font-sans)",
               letterSpacing: "-0.02em",
             }}
           >
-            OptiPlant
+            Zen Inventory
           </span>
         </div>
 
@@ -104,7 +99,7 @@ export default function LoginPage() {
 
         {/* Footer branding */}
         <p style={{ fontSize: "13px", color: "var(--neutral-500)", fontFamily: "var(--font-sans)" }}>
-          © {new Date().getFullYear()} OptiPlant Consultores
+          © {new Date().getFullYear()} Zen Inventory Logic
         </p>
       </div>
 
@@ -130,25 +125,9 @@ export default function LoginPage() {
           }}
           className="show-mobile"
         >
-          <div
-            style={{
-              width: "32px",
-              height: "32px",
-              borderRadius: "8px",
-              background: "var(--brand-500)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-              <polygon points="12 2 2 7 12 12 22 7 12 2" />
-              <polyline points="2 17 12 22 22 17" />
-              <polyline points="2 12 12 17 22 12" />
-            </svg>
-          </div>
-          <span style={{ fontSize: "15px", fontWeight: 600, color: "var(--neutral-100)", letterSpacing: "-0.02em" }}>
-            OptiPlant
+          <Logo size={32} />
+          <span style={{ fontSize: "15px", fontWeight: 700, color: "var(--neutral-100)", letterSpacing: "-0.02em" }}>
+            Zen Inventory
           </span>
         </div>
 
@@ -194,9 +173,9 @@ export default function LoginPage() {
           {/* Demo accounts */}
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
             {[
-              { role: "Admin",    email: "admin@optiplant.co",    pw: "admin123",    dot: "var(--brand-500)" },
-              { role: "Gerente",  email: "gerente@optiplant.co",  pw: "gerente123",  dot: "var(--neutral-400)" },
-              { role: "Operador", email: "operador@optiplant.co", pw: "operador123", dot: "var(--neutral-500)" },
+              { role: "Admin",    email: "admin@zeninventory.co",    pw: "admin123",    dot: "var(--brand-500)" },
+              { role: "Gerente",  email: "gerente@zeninventory.co",  pw: "gerente123",  dot: "var(--neutral-400)" },
+              { role: "Operador", email: "operador@zeninventory.co", pw: "operador123", dot: "var(--neutral-500)" },
             ].map(({ role, email, pw, dot }) => (
               <div
                 key={role}

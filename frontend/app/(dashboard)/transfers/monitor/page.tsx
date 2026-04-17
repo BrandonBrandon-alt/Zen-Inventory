@@ -124,21 +124,33 @@ export default function TransferMonitorPage() {
   const activeTransfers = transfers.filter(t => t.status !== "ENTREGADO").length;
 
   return (
-    <div style={{ padding: "36px 40px", maxWidth: "1200px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "32px", gap: "16px", flexWrap: "wrap" }}>
-        <PageHeader
-          title="Monitor Logístico"
-          description="Seguimiento en tiempo real de todos los traslados de mercancía entre sucursales."
-        />
-        <Card style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px" }}>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--neutral-500)", textTransform: "uppercase" }}>Traslados Activos</span>
-            <span style={{ fontSize: "20px", fontWeight: 700, color: "var(--brand-500)" }}>{activeTransfers}</span>
-          </div>
-          <div style={{ padding: "8px", borderRadius: "8px", background: "var(--brand-900)", color: "var(--brand-400)" }}>
-            <Truck size={20} />
-          </div>
-        </Card>
+    <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
+      <PageHeader
+        title="Monitor Logístico"
+        description="Seguimiento en tiempo real de todos los traslados de mercancía entre sucursales."
+      />
+
+      <div style={{ 
+        display: "flex", 
+        flexDirection: "row", 
+        flexWrap: "wrap",
+        justifyContent: "space-between", 
+        alignItems: "flex-end", 
+        marginBottom: "32px", 
+        gap: "24px" 
+      }}>
+        <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}></div>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <Card style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: "12px", marginBottom: "0px" }}>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--neutral-500)", textTransform: "uppercase" }}>Traslados Activos</span>
+              <span style={{ fontSize: "20px", fontWeight: 700, color: "var(--brand-500)" }}>{activeTransfers}</span>
+            </div>
+            <div style={{ padding: "8px", borderRadius: "8px", background: "var(--brand-900)", color: "var(--brand-400)" }}>
+              <Truck size={20} />
+            </div>
+          </Card>
+        </div>
       </div>
 
       <Card style={{ padding: 0, overflow: "hidden" }}>

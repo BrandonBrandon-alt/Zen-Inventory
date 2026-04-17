@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 /* ============================================================
- * Sistema de Diseño – OptiPlant
+ * Sistema de Diseño – Zen Inventory
  * Estética Minimalista y Funcional
  * Paleta: Carbón cálido + Coral/Terracotta accent
  * ============================================================ */
 
 :root {
   /* Backgrounds – tonos carbón cálidos */
-  --bg-base:    #191917;
+  --bg-base:    #242421;
   --bg-surface: #1f1f1c;
   --bg-card:    #242421;
   --bg-hover:   #2a2a26;

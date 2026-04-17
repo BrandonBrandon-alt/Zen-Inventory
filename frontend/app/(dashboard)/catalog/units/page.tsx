@@ -146,15 +146,27 @@ export default function MasterUnitsPage() {
   ];
 
   return (
-    <div style={{ padding: "36px 40px", maxWidth: "900px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "32px", gap: "16px", flexWrap: "wrap" }}>
-        <PageHeader
-          title="Unidades de Medida"
-          description="Estandariza las unidades (Kg, Unidades, Litros) válidas para todo el sistema."
-        />
-        <Button leftIcon={<Plus size={15} />} onClick={() => handleOpenModal()} style={{ marginTop: "4px" }}>
-          Nueva Unidad
-        </Button>
+    <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
+      <PageHeader
+        title="Unidades de Medida"
+        description="Estandariza las unidades (Kg, Unidades, Litros) válidas para todo el sistema."
+      />
+
+      <div style={{ 
+        display: "flex", 
+        flexDirection: "row", 
+        flexWrap: "wrap",
+        justifyContent: "space-between", 
+        alignItems: "flex-end", 
+        marginBottom: "32px", 
+        gap: "24px" 
+      }}>
+        <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}></div>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <Button leftIcon={<Plus size={15} />} onClick={() => handleOpenModal()} style={{ marginTop: "4px" }}>
+            Nueva Unidad
+          </Button>
+        </div>
       </div>
 
       <Card style={{ padding: 0, overflow: "hidden" }}>

@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import Logo from "@/components/ui/Logo";
 import { logout, getSession, type AuthSession } from "@/api/auth";
 import { apiClient } from "@/api/client";
 import type { components } from "@/api/schema";
@@ -97,6 +98,16 @@ const adminItems = [
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
         <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
         <path d="M22 12A10 10 0 0 0 12 2v10z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/purchases",
+    label: "Compras (B2B)",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+        <circle cx="12" cy="12" r="3" />
       </svg>
     ),
   },
@@ -364,21 +375,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         <div
           style={{
-            width: "32px",
-            height: "32px",
-            borderRadius: "9px",
-            background: "var(--brand-500)",
+            width: "40px",
+            height: "40px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-            <polygon points="12 2 2 7 12 12 22 7 12 2" />
-            <polyline points="2 17 12 22 22 17" />
-            <polyline points="2 12 12 17 22 12" />
-          </svg>
+          <Logo size={40} />
         </div>
         <span
           style={{
@@ -389,7 +394,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             fontFamily: "var(--font-sans)",
           }}
         >
-          OptiPlant
+          Zen Inventory
         </span>
       </div>
 
@@ -496,25 +501,6 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           Cerrar sesión
         </button>
       </div>
-      {/* Close button - solo móvil */}
-      <button
-        onClick={onClose}
-        className="show-mobile"
-        style={{
-          position: "absolute",
-          top: "20px",
-          right: "10px",
-          background: "transparent",
-          border: "none",
-          color: "var(--neutral-400)",
-          cursor: "pointer"
-        }}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
     </aside>
     </>
   );

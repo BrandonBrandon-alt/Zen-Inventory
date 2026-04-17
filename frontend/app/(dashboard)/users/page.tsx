@@ -43,8 +43,33 @@ function CreateUserModal({ open, onClose, roles, branches, onCreated }: {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!values.rolId) return;
+        
+        // --- Validaciones Frontend Importantes ---
+        if (!values.nombre || values.nombre.trim().length < 3) {
+            setServerError("El nombre debe tener al menos 3 caracteres.");
+            return;
+        }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!values.email || !emailRegex.test(values.email)) {
+            setServerError("Debes proporcionar un correo electrónico válido.");
+            return;
+        }
+        if (!values.password || values.password.length < 6) {
+            setServerError("La contraseña debe tener un mínimo de 6 caracteres por seguridad.");
+            return;
+        }
+        if (!values.rolId) {
+            setServerError("El rol del sistema es obligatorio.");
+            return;
+        }
+        // Validación obligatoria requerida por negocio: Seller obligatoriamente tiene sede (Igual Manager)
+        if (Number(values.rolId) !== 1 && (!values.sucursalId || Number(values.sucursalId) === 0)) {
+            setServerError("Es estrictamente obligatorio asignar una sucursal para Vendedores o Administradores Locales.");
+            return;
+        }
+        // ------------------------------------------
 
+        setServerError(null);
         startTransition(async () => {
             const { data, error } = await apiClient.POST("/api/users", {
                 body: {
@@ -97,7 +122,7 @@ function CreateUserModal({ open, onClose, roles, branches, onCreated }: {
                     value={values.email ?? ""}
                     onChange={e => setValues({...values, email: e.target.value})}
                     icon={<Mail size={15} />}
-                    placeholder="juan@optiplant.com"
+                    placeholder="juan@zeninventory.com"
                 />
                 <Input
                     label="Contraseña"
@@ -158,7 +183,32 @@ function EditUserModal({ open, onClose, user, roles, branches, onUpdated }: {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!user?.id) return;
+        
+        // --- Validaciones Frontend Importantes ---
+        if (!values.nombre || values.nombre.trim().length < 3) {
+            setServerError("El nombre debe tener al menos 3 caracteres.");
+            return;
+        }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!values.email || !emailRegex.test(values.email)) {
+            setServerError("Debes proporcionar un correo electrónico válido.");
+            return;
+        }
+        if (values.password && values.password.length < 6) {
+            setServerError("La nueva contraseña debe tener un mínimo de 6 caracteres por seguridad.");
+            return;
+        }
+        if (!values.rolId) {
+            setServerError("El rol del sistema es obligatorio.");
+            return;
+        }
+        if (Number(values.rolId) !== 1 && (!values.sucursalId || Number(values.sucursalId) === 0)) {
+            setServerError("Es estrictamente obligatorio asignar una sucursal para Vendedores o Administradores Locales.");
+            return;
+        }
+        // ------------------------------------------
 
+        setServerError(null);
         startTransition(async () => {
             const { data, error } = await apiClient.PUT("/api/users/{id}", {
                 params: { path: { id: user.id! } },
@@ -362,13 +412,25 @@ export default function UsersPage() {
     ];
 
     return (
-        <div style={{ padding: "36px 40px", maxWidth: "1200px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "32px", gap: "16px", flexWrap: "wrap" }}>
-                <PageHeader 
-                    title="Usuarios y Permisos" 
-                    description="Administra los accesos de tus colaboradores y sus roles en las sucursales."
-                />
-                <Button onClick={() => setShowCreate(true)} style={{ marginTop: "4px" }}>Nuevo Usuario</Button>
+        <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
+             <PageHeader
+                   title="Usuarios y Permisos"
+                   description="Administra los accesos de tus colaboradores y sus roles en las sucursales."
+                 />
+            
+            <div style={{ 
+              display: "flex", 
+              flexDirection: "row", 
+              flexWrap: "wrap",
+              justifyContent: "space-between", 
+              alignItems: "flex-end", 
+              marginBottom: "32px", 
+              gap: "24px" 
+            }}>
+                <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}></div>
+                <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                    <Button onClick={() => setShowCreate(true)} style={{ marginTop: "4px" }}>Nuevo Usuario</Button>
+                </div>
             </div>
 
             <Card style={{ padding: 0, overflow: "hidden" }}>

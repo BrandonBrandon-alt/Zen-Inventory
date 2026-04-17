@@ -11,6 +11,7 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Spinner from "@/components/ui/Spinner";
 import Select from "@/components/ui/Select";
+import PageHeader from "@/components/ui/PageHeader";
 import { Search, ShoppingCart, Tag, Trash2, Plus, Minus, Package, User, Store, CheckCircle, Printer, XCircle, Trash, DollarSign } from "lucide-react";
 import SaleReceipt from "@/components/sales-history/SaleReceipt";
 import type { SaleReceiptData } from "@/components/sales-history/SaleReceipt";
@@ -60,7 +61,7 @@ export default function POSPage() {
 
   // Persistence logic: Load state from localStorage on mount
   useEffect(() => {
-    const savedState = localStorage.getItem("optiplant_pos_state");
+    const savedState = localStorage.getItem("zen_inventory_pos_state");
     if (savedState) {
       try {
         const { cart: savedCart, customerName: savedName, customerDocument: savedDoc, selectedPriceList: savedPList } = JSON.parse(savedState);
@@ -85,7 +86,7 @@ export default function POSPage() {
       customerDocument,
       selectedPriceList
     };
-    localStorage.setItem("optiplant_pos_state", JSON.stringify(stateToSave));
+    localStorage.setItem("zen_inventory_pos_state", JSON.stringify(stateToSave));
   }, [cart, customerName, customerDocument, selectedPriceList, isLoaded]);
 
   useEffect(() => {
@@ -103,7 +104,7 @@ export default function POSPage() {
             params: { path: { branchId: sess.sucursalId } }
           }) : Promise.resolve({ data: null }),
           fetch("http://localhost:8080/api/v1/price-lists", {
-            headers: { Authorization: `Bearer ${localStorage.getItem("optiplant_token")}` }
+            headers: { Authorization: `Bearer ${localStorage.getItem("zen_inventory_token")}` }
           }).catch(() => ({ ok: false, json: () => [] }))
         ]);
 
@@ -135,7 +136,7 @@ export default function POSPage() {
       }
       try {
         const res = await fetch(`http://localhost:8080/api/v1/price-lists/${selectedPriceList}/prices`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("optiplant_token")}` }
+          headers: { Authorization: `Bearer ${localStorage.getItem("zen_inventory_token")}` }
         });
         if (res.ok) {
           const data = await res.json();
@@ -521,17 +522,26 @@ export default function POSPage() {
   );
 
   return (
-    <div className="flex h-screen flex-col bg-neutral-950 text-neutral-50 overflow-hidden">
+    <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
+      
+      <PageHeader 
+        title="Punto de Venta (POS)"
+        description="Registro ágil de transacciones, caja y facturación para clientes locales."
+      />
 
-      <main className="flex flex-1 overflow-hidden p-4 md:p-6 gap-4 md:gap-6 flex-col lg:flex-row">
+      <main className="flex gap-8 flex-col lg:flex-row h-[82vh] animate-in fade-in zoom-in-95 duration-300 mt-8">
         {/* Panel Izquierdo: Catálogo */}
-        <div className="flex flex-[2] flex-col gap-6 overflow-hidden min-w-0">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-neutral-900/50 p-5 rounded-2xl border border-neutral-800 shadow-sm">
+        <div className="flex flex-[3] flex-col gap-5 min-w-0 bg-neutral-900 border border-neutral-800 rounded-3xl p-8 shadow-2xl">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h1 className="text-xl font-black text-white uppercase tracking-tight">Catálogo de Productos</h1>
-              <p className="text-xs text-neutral-500 font-bold uppercase tracking-wider">Inventario Local Disponible</p>
+              <h1 style={{ fontSize: "22px", fontWeight: 900, color: "white", textTransform: "uppercase", letterSpacing: "-0.02em", margin: 0 }}>
+                Catálogo B2C
+              </h1>
+              <p style={{ fontSize: "10px", color: "var(--neutral-500)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", marginTop: "2px" }}>
+                Añade stock local a la orden
+              </p>
             </div>
-            <div className="w-full md:w-80">
+            <div className="w-full md:w-72">
               <Input
                 icon={<Search className="h-4 w-4 text-brand-500" />}
                 placeholder="Buscar por nombre o SKU..."
@@ -566,7 +576,7 @@ export default function POSPage() {
         </div>
 
         {/* Panel Derecho: Carrito */}
-        <div className="flex w-full lg:w-[450px] flex-col rounded-xl border border-neutral-800 bg-neutral-900 shadow-2xl overflow-hidden">
+        <div className="flex w-full lg:w-[480px] flex-col rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl overflow-hidden relative">
           <div className="flex flex-col gap-4 border-b border-neutral-800 px-6 py-5 bg-neutral-900/50">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">

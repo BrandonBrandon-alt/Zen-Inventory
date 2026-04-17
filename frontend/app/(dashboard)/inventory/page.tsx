@@ -113,7 +113,7 @@ export default function InventoryPage() {
 
   // Persistence logic: Load state from localStorage on mount
   useEffect(() => {
-    const savedState = localStorage.getItem("optiplant_inventory_state");
+    const savedState = localStorage.getItem("zen_inventory_inventory_state");
     if (savedState) {
       try {
         const { branchId, tab, search, view } = JSON.parse(savedState);
@@ -138,7 +138,7 @@ export default function InventoryPage() {
       search: searchTerm,
       view: viewMode
     };
-    localStorage.setItem("optiplant_inventory_state", JSON.stringify(stateToSave));
+    localStorage.setItem("zen_inventory_inventory_state", JSON.stringify(stateToSave));
   }, [selectedBranchId, activeTab, searchTerm, viewMode, isLoaded]);
 
   // Initial load

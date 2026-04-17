@@ -14,12 +14,12 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
-      - optiplant-network
+      - zenvory-network
 
   # 2. pgAdmin
   pgadmin:
     image: dpage/pgadmin4
-    container_name: optiplant-pgadmin
+    container_name: zenvory-pgadmin
     restart: always
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
@@ -29,14 +29,14 @@ services:
     depends_on:
       - db
     networks:
-      - optiplant-network
+      - zenvory-network
 
   # 3. Backend (Spring Boot)
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: optiplant-backend
+    container_name: zenvory-backend
     restart: on-failure
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${DB_NAME}
@@ -48,14 +48,14 @@ services:
     depends_on:
       - db
     networks:
-      - optiplant-network
+      - zenvory-network
 
   # 4. Frontend (Next.js)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: optiplant-frontend
+    container_name: zenvory-frontend
     restart: on-failure
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
@@ -64,11 +64,11 @@ services:
     depends_on:
       - backend
     networks:
-      - optiplant-network
+      - zenvory-network
 
 volumes:
   pgdata:
 
 networks:
-  optiplant-network:
+  zenvory-network:
     driver: bridge

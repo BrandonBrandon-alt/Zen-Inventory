@@ -1,11 +1,11 @@
 import { apiClient } from "./client";
 
-const AUTH_TOKEN_KEY = "optiplant_token";
-const AUTH_EMAIL_KEY = "optiplant_email";
-const AUTH_NAME_KEY  = "optiplant_nombre";
-const AUTH_ROLE_KEY      = "optiplant_rol";
-const AUTH_BRANCH_ID_KEY = "optiplant_sucursal_id";
-const AUTH_USER_ID_KEY   = "optiplant_user_id";
+const AUTH_TOKEN_KEY = "zen_inventory_token";
+const AUTH_EMAIL_KEY = "zen_inventory_email";
+const AUTH_NAME_KEY  = "zen_inventory_nombre";
+const AUTH_ROLE_KEY      = "zen_inventory_rol";
+const AUTH_BRANCH_ID_KEY = "zen_inventory_sucursal_id";
+const AUTH_USER_ID_KEY   = "zen_inventory_user_id";
 
 export interface LoginPayload {
   email: string;
@@ -22,7 +22,7 @@ export interface AuthSession {
 }
 
 /**
- * Realiza el Login contra el Backend OptiPlant.
+ * Realiza el Login contra el Backend Zen Inventory.
  * Retorna la sesión (token + email) o lanza un error con mensaje legible.
  */
 export async function login(payload: LoginPayload): Promise<AuthSession> {

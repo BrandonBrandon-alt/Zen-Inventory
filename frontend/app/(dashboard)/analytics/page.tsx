@@ -83,7 +83,7 @@ export default function AnalyticsPage() {
   ];
 
   return (
-    <div style={{ padding: "36px 40px", maxWidth: "1200px" }}>
+    <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
       <PageHeader
         title="Análisis Global"
         description="Rendimiento comparativo y métricas consolidadas de todas las sucursales de la red."

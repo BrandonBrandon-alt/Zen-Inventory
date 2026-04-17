@@ -59,6 +59,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               outline: "none",
               transition: "border-color 0.18s, box-shadow 0.18s",
               fontFamily: "var(--font-sans)",
+              colorScheme: props.type === "date" ? "dark" : undefined,
             }}
             onFocus={(e) => {
               e.currentTarget.style.borderColor = hasError ? "rgba(224,112,112,0.7)" : "rgba(217,99,79,0.5)";

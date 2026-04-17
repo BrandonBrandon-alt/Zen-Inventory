@@ -102,7 +102,7 @@ export default function LoginForm() {
         id="login-email"
         label="Correo electrónico"
         type="email"
-        placeholder="admin@optiplant.co"
+        placeholder="admin@zeninventory.co"
         autoComplete="email"
         value={values.email}
         onChange={handleChange("email")}

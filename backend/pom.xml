@@ -8,7 +8,7 @@
 		<version>3.5.13</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>co.com.optiplant</groupId>
+	<groupId>co.com.zenvory</groupId>
 	<artifactId>backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name/>

@@ -127,16 +127,28 @@ export default function TransfersManagementPage() {
   if (loading) return <Spinner fullPage />;
 
   return (
-    <div style={{ padding: "36px 40px", maxWidth: "1200px" }}>
+    <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
       <PageHeader
         title="Gestión de Traslados"
         description="Solicita y gestiona el movimiento de mercancía entre las sucursales de la red."
-        actions={
+      />
+
+      <div style={{ 
+        display: "flex", 
+        flexDirection: "row", 
+        flexWrap: "wrap",
+        justifyContent: "space-between", 
+        alignItems: "flex-end", 
+        marginBottom: "32px", 
+        gap: "24px" 
+      }}>
+        <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}></div>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <Button variant="primary" onClick={() => setIsNewModalOpen(true)}>
             + Nueva Solicitud
           </Button>
-        }
-      />
+        </div>
+      </div>
 
       <div style={{ display: "flex", gap: "20px", marginBottom: "24px", borderBottom: "1px solid var(--border-default)" }}>
         <button 

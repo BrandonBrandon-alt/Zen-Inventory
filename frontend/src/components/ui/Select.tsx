@@ -118,6 +118,7 @@ export default function Select({
         {/* Dropdown Menu */}
         {isOpen && (
           <div
+            className="custom-scrollbar"
             style={{
               position: "absolute",
               top: "calc(100% + 4px)",

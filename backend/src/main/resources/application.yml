@@ -1,6 +1,6 @@
 spring:
   application:
-    name: optiplant-api
+    name: zen-inventory-api
 
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/inventario_multisucursal}
@@ -25,6 +25,7 @@ spring:
     # Flyway activo: aplica V1__init_schema.sql y V2__catalog_seed_data.sql al arrancar.
     enabled: true
     baseline-on-migrate: true
+    validate-on-migrate: false # Desactivamos para permitir el cambio de nombres en scripts antiguos
     locations: classpath:db/migration
 
 server:
@@ -40,4 +41,4 @@ logging:
   level:
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE # Muestra los valores reales insertados en los '?' del SQL
-    co.com.optiplant.inventario: INFO # Muestra los logs de nuestros Casos de Uso
+    co.com.zenvory.inventario: INFO # Muestra los logs de nuestros Casos de Uso

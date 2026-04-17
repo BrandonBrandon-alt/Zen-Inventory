@@ -43,7 +43,7 @@ export function usePrint() {
         <html>
           <head>
             <meta charset="utf-8" />
-            <title>Factura de Venta - OptiPlant</title>
+            <title>Factura de Venta - Zen Inventory</title>
             <style>
               * { box-sizing: border-box; margin: 0; padding: 0; }
               body {

@@ -10,6 +10,7 @@ import Select from "@/components/ui/Select";
 import Badge from "@/components/ui/Badge";
 import Spinner from "@/components/ui/Spinner";
 import { useToast } from "@/context/ToastContext";
+import { Truck, ShoppingCart, XCircle } from "lucide-react";
 import type { components } from "@/api/schema";
 
 type StockAlertResponse = components["schemas"]["StockAlertResponse"] | any;
@@ -168,26 +169,26 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
         ) : (
           <>
             {/* Tabs de Decisión */}
-            <div style={{ display: "flex", background: "var(--bg-surface)", padding: "4px", borderRadius: "12px", border: "1px solid var(--border-default)" }}>
+            <div style={{ display: "flex", background: "var(--bg-surface)", padding: "4px", borderRadius: "12px", border: "1px solid var(--border-default)", gap: "4px" }}>
               <button 
                 onClick={() => setActiveTab("TRANSFER")}
-                style={{ ...tabStyle, background: activeTab === "TRANSFER" ? "var(--brand-500)" : "transparent", color: activeTab === "TRANSFER" ? "white" : "var(--neutral-400)" }}
+                style={{ ...tabStyle, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", background: activeTab === "TRANSFER" ? "var(--brand-500)" : "transparent", color: activeTab === "TRANSFER" ? "white" : "var(--neutral-400)" }}
               >
-                📥 Traslado Interno
+                <Truck size={16} /> Traslado Interno
               </button>
               {isAdmin && (
                 <button 
                   onClick={() => setActiveTab("PURCHASE")}
-                  style={{ ...tabStyle, background: activeTab === "PURCHASE" ? "var(--brand-500)" : "transparent", color: activeTab === "PURCHASE" ? "white" : "var(--neutral-400)" }}
+                  style={{ ...tabStyle, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", background: activeTab === "PURCHASE" ? "var(--brand-500)" : "transparent", color: activeTab === "PURCHASE" ? "white" : "var(--neutral-400)" }}
                 >
-                  💰 Orden de Compra
+                  <ShoppingCart size={16} /> Orden de Compra
                 </button>
               )}
               <button 
                 onClick={() => setActiveTab("DISMISSED")}
-                style={{ ...tabStyle, background: activeTab === "DISMISSED" ? "var(--brand-500)" : "transparent", color: activeTab === "DISMISSED" ? "white" : "var(--neutral-400)" }}
+                style={{ ...tabStyle, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", background: activeTab === "DISMISSED" ? "var(--brand-500)" : "transparent", color: activeTab === "DISMISSED" ? "white" : "var(--neutral-400)" }}
               >
-                🚫 Descartar
+                <XCircle size={16} /> Descartar
               </button>
             </div>
 

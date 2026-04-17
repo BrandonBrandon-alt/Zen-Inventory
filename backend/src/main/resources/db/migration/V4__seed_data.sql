@@ -16,11 +16,11 @@ INSERT INTO sucursal (nombre, direccion, telefono, activa) VALUES
 -- --------------------------------------------------------
 -- Contraseñas: admin123 / gerente123 / operador123 (BCrypt rounds=10, $2b$ compatible con Spring Security)
 INSERT INTO usuario (nombre, email, password_hash, rol_id, sucursal_id) VALUES
-    ('Administrador Principal', 'admin@optiplant.co',
+    ('Administrador Principal', 'admin@zeninventory.co',
      '$2b$10$LNaiRfIKHhv9WnSFBUQtROubYChmc/d5W6s7eAZzGjlEyO.mTmWCS', 1, 1),
-    ('Gerente Norte', 'gerente@optiplant.co',
+    ('Gerente Norte', 'gerente@zeninventory.co',
      '$2b$10$O5JWPAEBEE.dpBKzOf4/XOjqz13DUg5t35zl4hYgtHHrGneOsOqj6', 2, 2),
-    ('Operador Central', 'operador@optiplant.co',
+    ('Operador Central', 'operador@zeninventory.co',
      '$2b$10$FDEIEVrwkQ6Hq.SxkRlBIe452C4VGAKHVrEfy7TCAXOkm//A1e.Sm', 3, 1);
 
 -- --------------------------------------------------------

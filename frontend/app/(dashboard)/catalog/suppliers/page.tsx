@@ -5,6 +5,9 @@ import { apiClient } from "@/api/client";
 import type { components } from "@/api/schema";
 import { getSession } from "@/api/auth";
 import { useRouter } from "next/navigation";
+import { Plus } from "lucide-react";
+import PageHeader from "@/components/ui/PageHeader";
+import Button from "@/components/ui/Button";
 
 type SupplierResponse = components["schemas"]["SupplierResponse"];
 
@@ -14,6 +17,10 @@ export default function MasterSuppliersPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<SupplierResponse | null>(null);
+  
+  // Nuevo estado para el catálogo
+  const [products, setProducts] = useState<any[]>([]);
+  const [viewCatalogSupplier, setViewCatalogSupplier] = useState<SupplierResponse | null>(null);
 
   const [formData, setFormData] = useState({
     nombre: "",
@@ -32,10 +39,14 @@ export default function MasterSuppliersPage() {
 
   async function fetchData() {
     try {
-      const res = await apiClient.GET("/api/catalog/suppliers");
-      setSuppliers(res.data ?? []);
+      const [supRes, prodRes] = await Promise.all([
+        apiClient.GET("/api/catalog/suppliers"),
+        (apiClient.GET as any)("/api/catalog/products", {})
+      ]);
+      setSuppliers(supRes.data ?? []);
+      if (prodRes.data) setProducts(prodRes.data as any[]);
     } catch (error) {
-      console.error("Error fetching suppliers:", error);
+      console.error("Error fetching data:", error);
     } finally {
       setLoading(false);
     }
@@ -95,31 +106,28 @@ export default function MasterSuppliersPage() {
   if (loading) return <div style={{ padding: "40px", color: "var(--neutral-400)" }}>Cargando directorio de proveedores...</div>;
 
   return (
-    <div style={{ padding: "32px", maxWidth: "1200px", margin: "0 auto" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "32px" }}>
-        <div>
-          <h1 style={{ fontSize: "28px", fontWeight: 700, color: "var(--neutral-50)", marginBottom: "8px" }}>
-            Directorio de Proveedores
-          </h1>
-          <p style={{ color: "var(--neutral-400)", fontSize: "14px" }}>
-            Gestiona los proveedores centralizados que surten a toda la red de sucursales.
-          </p>
+    <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
+      <PageHeader
+        title="Directorio de Proveedores"
+        description="Gestiona los proveedores centralizados que surten a toda la red de sucursales."
+      />
+
+      <div style={{ 
+        display: "flex", 
+        flexDirection: "row", 
+        flexWrap: "wrap",
+        justifyContent: "space-between", 
+        alignItems: "flex-end", 
+        marginBottom: "32px", 
+        gap: "24px" 
+      }}>
+        <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}></div>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <Button leftIcon={<Plus size={15} />} onClick={() => handleOpenModal()} style={{ marginTop: "4px" }}>
+            Nuevo Proveedor
+          </Button>
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          style={{
-            background: "var(--brand-500)",
-            color: "white",
-            border: "none",
-            padding: "10px 20px",
-            borderRadius: "8px",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          + Nuevo Proveedor
-        </button>
-      </header>
+      </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "24px" }}>
         {suppliers.map((s) => (
@@ -130,7 +138,8 @@ export default function MasterSuppliersPage() {
               <span style={{ fontSize: "12px", color: "var(--neutral-500)" }}>
                 Entrega: <span style={{ color: "var(--brand-400)", fontWeight: 600 }}>{s.tiempoEntregaDias} días</span>
               </span>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                <button onClick={() => setViewCatalogSupplier(s)} style={{ background: "rgba(235,108,31,0.1)", border: "1px solid var(--brand-500)", color: "var(--brand-400)", padding: "4px 8px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", fontWeight: "bold" }}>Catálogo</button>
                 <button onClick={() => handleOpenModal(s)} style={{ background: "none", border: "none", color: "var(--brand-500)", cursor: "pointer", fontSize: "13px" }}>Editar</button>
                 <button onClick={() => handleDelete(s.id!)} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "13px" }}>Eliminar</button>
               </div>
@@ -177,6 +186,44 @@ export default function MasterSuppliersPage() {
                 <button type="submit" style={{ background: "var(--brand-500)", border: "none", color: "white", padding: "10px 20px", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>Guardar</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Catálogo del Proveedor */}
+      {viewCatalogSupplier && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000, padding: "20px" }}>
+          <div style={{ background: "var(--bg-card)", padding: "32px", borderRadius: "16px", width: "100%", maxWidth: "600px", border: "1px solid var(--border-default)", display: "flex", flexDirection: "column", maxHeight: "80vh" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px" }}>
+               <div>
+                  <h2 style={{ color: "white", fontSize: "20px", fontWeight: "bold", margin: 0 }}>Catálogo Asociado</h2>
+                  <p style={{ color: "var(--brand-400)", fontSize: "14px", fontWeight: "bold", marginTop: "4px" }}>{viewCatalogSupplier.nombre}</p>
+               </div>
+               <button onClick={() => setViewCatalogSupplier(null)} style={{ background: "none", border: "none", color: "var(--neutral-400)", cursor: "pointer", fontSize: "18px" }}>✖</button>
+            </div>
+            
+            <div className="custom-scrollbar" style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px", paddingRight: "8px" }}>
+               {products.filter(p => p.proveedorId === viewCatalogSupplier.id).length === 0 ? (
+                  <p style={{ color: "var(--neutral-400)", textAlign: "center", padding: "40px" }}>Aún no hay productos comprados o registrados a este proveedor.</p>
+               ) : (
+                  products.filter(p => p.proveedorId === viewCatalogSupplier.id).map(p => (
+                    <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", background: "var(--neutral-900)", border: "1px solid var(--border-default)", borderRadius: "8px" }}>
+                        <div>
+                            <p style={{ color: "white", fontWeight: "bold", fontSize: "14px", margin: 0 }}>{p.nombre}</p>
+                            <span style={{ fontSize: "11px", color: "var(--neutral-500)", fontFamily: "var(--font-mono)" }}>REF: {p.sku}</span>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                            <span style={{ fontSize: "10px", color: "var(--neutral-500)", display: "block", fontWeight: "bold" }}>COSTO REF.</span>
+                            <span style={{ color: "var(--brand-400)", fontWeight: "bold", fontSize: "16px" }}>${p.costoPromedio?.toLocaleString("es-CO")}</span>
+                        </div>
+                    </div>
+                  ))
+               )}
+            </div>
+
+            <div style={{ marginTop: "24px", textAlign: "right" }}>
+                <button onClick={() => setViewCatalogSupplier(null)} style={{ background: "var(--neutral-800)", border: "none", color: "white", padding: "10px 20px", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>Cerrar Portafolio</button>
+            </div>
           </div>
         </div>
       )}

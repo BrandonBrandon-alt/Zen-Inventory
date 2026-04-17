@@ -7,8 +7,13 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swa
 const lora  = Lora({ subsets: ["latin"], variable: "--font-serif", display: "swap", style: ["normal", "italic"] });
 
 export const metadata: Metadata = {
-  title: "OptiPlant – Sistema de Inventario",
-  description: "Plataforma de gestión de inventario multi-sucursal para OptiPlant Consultores.",
+  title: "Zen Inventory – Sistema de Inventario",
+  description: "Plataforma de gestión de inventario multi-sucursal para Zen Inventory.",
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

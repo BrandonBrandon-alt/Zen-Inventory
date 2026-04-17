@@ -73,7 +73,7 @@ export default function MasterProductsPage() {
         apiClient.GET("/api/catalog/suppliers"),
         apiClient.GET("/api/catalog/units"),
         fetch("http://localhost:8080/api/v1/price-lists", {
-          headers: { Authorization: `Bearer ${localStorage.getItem("optiplant_token")}` }
+          headers: { Authorization: `Bearer ${localStorage.getItem("zen_inventory_token")}` }
         }).then(r => r.json()),
       ]);
       setProducts(prodRes.data ?? []);
@@ -108,7 +108,7 @@ export default function MasterProductsPage() {
           await Promise.all(priceLists.map(async (lista) => {
             const res = await fetch(
               `http://localhost:8080/api/v1/price-lists/${lista.id}/products/${product.id}/price`,
-              { headers: { Authorization: `Bearer ${localStorage.getItem("optiplant_token")}` } }
+              { headers: { Authorization: `Bearer ${localStorage.getItem("zen_inventory_token")}` } }
             );
             const data = await res.json();
             if (data.fromList && data.precio != null) {
@@ -162,7 +162,7 @@ export default function MasterProductsPage() {
                 `http://localhost:8080/api/v1/price-lists/${lista.id}/products/${savedProductId}/price`,
                 {
                   method: "PUT",
-                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("optiplant_token")}` },
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("zen_inventory_token")}` },
                   body: JSON.stringify({ precio }),
                 }
               );
@@ -172,7 +172,7 @@ export default function MasterProductsPage() {
                 `http://localhost:8080/api/v1/price-lists/${lista.id}/products/${savedProductId}/price`,
                 {
                   method: "DELETE",
-                  headers: { Authorization: `Bearer ${localStorage.getItem("optiplant_token")}` },
+                  headers: { Authorization: `Bearer ${localStorage.getItem("zen_inventory_token")}` },
                 }
               ).catch(() => {}); // Ignorar error si no existía
             }
@@ -254,15 +254,27 @@ export default function MasterProductsPage() {
   ];
 
   return (
-    <div style={{ padding: "36px 40px", maxWidth: "1200px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "32px", gap: "16px", flexWrap: "wrap" }}>
-        <PageHeader
-          title="Catálogo Maestro"
-          description="Gestiona los productos base que se replican en todas las sucursales del sistema."
-        />
-        <Button leftIcon={<Plus size={15} />} onClick={() => handleOpenModal()} style={{ marginTop: "4px" }}>
-          Nuevo Producto
-        </Button>
+    <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
+      <PageHeader
+        title="Catálogo Maestro"
+        description="Gestiona los productos base que se replican en todas las sucursales del sistema."
+      />
+
+      <div style={{ 
+        display: "flex", 
+        flexDirection: "row", 
+        flexWrap: "wrap",
+        justifyContent: "space-between", 
+        alignItems: "flex-end", 
+        marginBottom: "32px", 
+        gap: "24px" 
+      }}>
+        <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}></div>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <Button leftIcon={<Plus size={15} />} onClick={() => handleOpenModal()} style={{ marginTop: "4px" }}>
+            Nuevo Producto
+          </Button>
+        </div>
       </div>
 
       <Card style={{ padding: 0, overflow: "hidden" }}>

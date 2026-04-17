@@ -164,23 +164,23 @@ export default function DashboardPage() {
   const branchMap = new Map(branches.map(b => [b.id, b.nombre]));
 
   return (
-    <div style={{ padding: "36px 40px", maxWidth: "1200px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px" }}>
-        <div style={{ flex: 1 }}>
-          <PageHeader
-            title="Panel de Control Administrativo"
-            description={
-              <>
-                Bienvenido,{" "}
-                <em style={{ color: "var(--brand-500)", fontStyle: "italic", fontFamily: "var(--font-serif)" }}>
-                  {session?.nombre ?? session?.email ?? "Administrador"}
-                </em>
-                . Visualiza el estado global de tu red de sucursales.
-              </>
-            }
-          />
-        </div>
-        <div style={{ marginTop: "12px", marginLeft: "20px" }}>
+    <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
+      <PageHeader
+        title="Panel de Control Administrativo"
+        description={`Bienvenido, ${session?.nombre ?? session?.email ?? "Administrador"}. Visualiza el estado global de tu red de sucursales.`}
+      />
+
+      <div style={{ 
+        display: "flex", 
+        flexDirection: "row", 
+        flexWrap: "wrap",
+        justifyContent: "space-between", 
+        alignItems: "flex-end", 
+        marginBottom: "32px", 
+        gap: "24px" 
+      }}>
+        <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}></div>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <select 
             value={timeRange} 
             onChange={(e) => setTimeRange(e.target.value as any)}

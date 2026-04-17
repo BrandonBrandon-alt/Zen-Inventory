@@ -379,28 +379,33 @@ export default function BranchesPage() {
   const inactive = branches.filter((b) => !b.activa).length;
 
   return (
-    <div style={{ padding: "36px 40px", maxWidth: "1100px" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "32px", gap: "16px", flexWrap: "wrap" }}>
-        <PageHeader
-          title="Sucursales"
-          description={
-            <>
-              Administra las{" "}
-              <em style={{ color: "var(--brand-500)", fontStyle: "italic", fontFamily: "var(--font-serif)" }}>
-                sedes
-              </em>{" "}
-              de OptiPlant en toda la red.
-            </>
-          }
-        />
-        <Button
-          leftIcon={<Plus size={15} />}
-          onClick={() => setShowCreateModal(true)}
-          style={{ marginTop: "4px", flexShrink: 0 }}
-        >
-          Nueva sucursal
-        </Button>
+    <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
+      <PageHeader
+        title="Sucursales"
+        description="Administra las sedes de Zen Inventory en toda la red."
+      />
+
+      <div style={{ 
+        display: "flex", 
+        flexDirection: "row", 
+        flexWrap: "wrap",
+        justifyContent: "space-between", 
+        alignItems: "flex-end", 
+        marginBottom: "32px", 
+        gap: "24px" 
+      }}>
+        <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}></div>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <Button
+            leftIcon={<Plus size={15} />}
+            onClick={() => setShowCreateModal(true)}
+            style={{ marginTop: "4px", flexShrink: 0 }}
+          >
+            Nueva sucursal
+          </Button>
+        </div>
       </div>
+
 
       {/* Summary badges */}
       {branches.length > 0 && (

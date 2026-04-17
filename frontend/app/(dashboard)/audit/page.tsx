@@ -108,13 +108,23 @@ export default function AuditPage() {
   ];
 
   return (
-    <div style={{ padding: "36px 40px", maxWidth: "1200px" }}>
+    <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
       <PageHeader
         title="Auditoría Global"
-        description="Seguimiento detallado de todos los movimientos de stock realizados en la red OptiPlant."
+        description="Seguimiento detallado de todos los movimientos de stock realizados en la red Zen Inventory."
       />
 
-      <Card style={{ padding: 0, overflow: "hidden", marginTop: "32px" }}>
+      <div style={{ 
+        display: "flex", 
+        flexDirection: "row", 
+        flexWrap: "wrap",
+        justifyContent: "space-between", 
+        alignItems: "flex-end", 
+        marginBottom: "32px", 
+        gap: "24px" 
+      }}></div>
+
+      <Card style={{ padding: 0, overflow: "hidden" }}>
         <DataTable<InventoryMovement>
           columns={columns}
           data={movements}

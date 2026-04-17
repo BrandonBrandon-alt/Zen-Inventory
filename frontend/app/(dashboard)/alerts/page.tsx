@@ -200,45 +200,40 @@ export default function AlertsPage() {
   if (loading) return <Spinner fullPage />;
 
   return (
-    <div style={{ padding: "36px 40px", maxWidth: "1100px" }}>
+    <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          marginBottom: "28px",
-          gap: "16px",
-          flexWrap: "wrap",
-        }}
-      >
-        <PageHeader
-          title="Alertas de Stock"
-          description={
-            <>
-              Monitoreo proactivo de{" "}
-              <em style={{ color: "var(--brand-500)", fontStyle: "italic", fontFamily: "var(--font-serif)" }}>
-                quiebres de inventario
-              </em>{" "}
-              en todas las sedes.
-            </>
-          }
-        />
-        <Button
-          variant="ghost"
-          loading={scanning}
-          onClick={handleScan}
-          style={{ marginTop: "4px", flexShrink: 0 }}
-          leftIcon={
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="23 4 23 10 17 10" />
-              <polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
-          }
-        >
-          {scanning ? "Escaneando…" : "Escanear stock"}
-        </Button>
+      <PageHeader
+        title="Alertas de Stock"
+        description="Monitoreo proactivo de quiebres de inventario en todas las sedes."
+      />
+
+      <div style={{ 
+        display: "flex", 
+        flexDirection: "row", 
+        flexWrap: "wrap",
+        justifyContent: "space-between", 
+        alignItems: "flex-end", 
+        marginBottom: "28px", 
+        gap: "24px" 
+      }}>
+        <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}></div>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <Button
+            variant="ghost"
+            loading={scanning}
+            onClick={handleScan}
+            style={{ marginTop: "4px", flexShrink: 0 }}
+            leftIcon={
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            }
+          >
+            {scanning ? "Escaneando…" : "Escanear stock"}
+          </Button>
+        </div>
       </div>
 
       {/* Scan result banner */}

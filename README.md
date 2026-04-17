@@ -1,4 +1,4 @@
-# OptiPlant - Sistema de Inventario Multi-Sucursal
+# Zen Inventory - Sistema de Inventario Multi-Sucursal
 
 Este proyecto es una solución integral para la gestión de inventarios en organizaciones con múltiples sedes. Diseñado bajo los más altos estándares de arquitectura de software, permite una operación autónoma por sucursal mientras mantiene una visión consolidada para el Administrador Global.
 
@@ -70,8 +70,8 @@ El proyecto está completamente contenedorizado para ejecutarse en entornos Linu
     - **Backend API**: http://localhost:8080/swagger-ui.html (Documentación OpenAPI)
 
 ### Credenciales de Prueba:
-- **Admin**: `admin@optiplant.com` / `admin123`
-- **Operador**: `sede.norte@optiplant.com` / `password123`
+- **Admin**: `admin@zeninventory.co` / `admin123`
+- **Operador**: `sede.norte@zeninventory.co` / `password123`
 
 ## 5. Justificación del Uso de IA
 Consulte el archivo [AI_USAGE.md](file:///home/yep/optiplant-prueba-tecnica/AI_USAGE.md) para ver la documentación detallada sobre cómo se utilizó la Inteligencia Artificial para potenciar el desarrollo de este proyecto.

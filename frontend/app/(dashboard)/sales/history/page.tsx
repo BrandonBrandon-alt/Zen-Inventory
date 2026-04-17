@@ -11,6 +11,7 @@ import HistoryFilters from "@/components/sales-history/HistoryFilters";
 import HistoryTable   from "@/components/sales-history/HistoryTable";
 import { Search, RefreshCcw, History, ClipboardList, Info } from "lucide-react";
 import SaleDetailModal from "@/components/sales-history/SaleDetailModal";
+import PageHeader from "@/components/ui/PageHeader";
 import Input from "@/components/ui/Input";
 
 export default function SalesHistoryPage() {
@@ -26,7 +27,7 @@ export default function SalesHistoryPage() {
 
   // Persistence logic: Load state from localStorage on mount
   useEffect(() => {
-    const savedState = localStorage.getItem("optiplant_history_state");
+    const savedState = localStorage.getItem("zen_inventory_history_state");
     if (savedState) {
       try {
         const { search } = JSON.parse(savedState);
@@ -45,7 +46,7 @@ export default function SalesHistoryPage() {
     const stateToSave = {
       search: searchTerm,
     };
-    localStorage.setItem("optiplant_history_state", JSON.stringify(stateToSave));
+    localStorage.setItem("zen_inventory_history_state", JSON.stringify(stateToSave));
   }, [searchTerm, isLoaded]);
 
   useEffect(() => {
@@ -103,20 +104,24 @@ export default function SalesHistoryPage() {
   }
 
   return (
-    <div style={{ padding: "var(--page-padding)", maxWidth: "1350px", margin: "0 auto" }}>
+    <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
       <div className="animate-fade-in">
         
-        {/* Main Control Hub – Matching Inventory Structure */}
-        <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-            <div>
-                <h1 style={{ fontSize: "24px", fontWeight: 800, color: "var(--neutral-50)", letterSpacing: "-0.03em" }}>
-                    Historial de Ventas
-                </h1>
-                <p style={{ fontSize: "13px", color: "var(--neutral-500)", marginTop: "4px" }}>
-                    Gestión y auditoría de transacciones registradas en el sistema POS.
-                </p>
-            </div>
-            
+        <PageHeader 
+          title="Historial de Ventas"
+          description="Gestión y auditoría de transacciones registradas en el sistema POS."
+        />
+
+        <div style={{ 
+          display: "flex", 
+          flexDirection: "row", 
+          flexWrap: "wrap",
+          justifyContent: "space-between", 
+          alignItems: "flex-end", 
+          marginBottom: "32px", 
+          gap: "24px" 
+        }}>
+            <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}></div>
             <div className="flex items-center gap-3 pb-1">
                 <button 
                   onClick={fetchSales}
