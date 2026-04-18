@@ -23,6 +23,7 @@ INSERT INTO usuario (nombre, email, password_hash, rol_id, sucursal_id) VALUES
     ('Operador Central', 'operador@zeninventory.co',
      '$2b$10$FDEIEVrwkQ6Hq.SxkRlBIe452C4VGAKHVrEfy7TCAXOkm//A1e.Sm', 3, 1);
 
+
 -- --------------------------------------------------------
 -- Proveedores
 -- --------------------------------------------------------

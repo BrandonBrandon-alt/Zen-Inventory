@@ -16,6 +16,7 @@ public record TransferResponse(
         String carrier,
         String receiptNotes,
         Long parentTransferId,
+        String reasonResolution,
         List<TransferDetailResponse> details
 ) {
     public record TransferDetailResponse(
@@ -39,6 +40,7 @@ public record TransferResponse(
                 transfer.getCarrier(),
                 transfer.getReceiptNotes(),
                 transfer.getParentTransferId(),
+                transfer.getReasonResolution(),
                 transfer.getDetails().stream().map(d -> new TransferDetailResponse(
                         d.getId(),
                         d.getProductId(),

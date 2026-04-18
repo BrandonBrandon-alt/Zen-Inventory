@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+    "/api/v1/price-lists/{listaId}/products/{productoId}/price": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getProductPrice"];
+        put: operations["upsertProductPrice"];
+        post?: never;
+        delete: operations["deleteProductPrice"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inventory/branches/{branchId}/products/{productId}/config": {
         parameters: {
             query?: never;
@@ -164,6 +180,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/transfers/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["rejectTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/transfers/{id}/receive": {
         parameters: {
             query?: never;
@@ -251,7 +283,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["getAllOrders"];
         put?: never;
         post: operations["createOrder"];
         delete?: never;
@@ -276,6 +308,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/purchases/{id}/pay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["registerPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/purchases/{id}/dispatch": {
         parameters: {
             query?: never;
@@ -286,6 +334,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["markAsInTransit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchases/{id}/close-shortfall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["closeShortfall"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchases/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancelPurchase"];
         delete?: never;
         options?: never;
         head?: never;
@@ -564,6 +644,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/price-lists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getAllLists"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/price-lists/{listaId}/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPricesForList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inventory/movements": {
         parameters: {
             query?: never;
@@ -660,6 +772,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analytics/sales-trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSalesTrend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analytics/global-summary": {
         parameters: {
             query?: never;
@@ -668,6 +796,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getGlobalSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getDashboard"];
         put?: never;
         post?: never;
         delete?: never;
@@ -728,6 +872,18 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        UpsertPriceRequest: {
+            precio: number;
+        };
+        ProductPriceResponse: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: int64 */
+            listaId?: number;
+            /** Format: int64 */
+            productoId?: number;
+            precio?: number;
+        };
         LocalInventory: {
             /** Format: int64 */
             id?: number;
@@ -736,6 +892,7 @@ export interface components {
             /** Format: int64 */
             productId?: number;
             currentQuantity?: number;
+            committedQuantity?: number;
             minimumStock?: number;
             /** Format: date-time */
             lastUpdated?: string;
@@ -820,6 +977,8 @@ export interface components {
             nombre: string;
             direccion: string;
             telefono?: string;
+            /** Format: int64 */
+            managerId?: number;
         };
         BranchResponse: {
             /** Format: int64 */
@@ -828,6 +987,8 @@ export interface components {
             direccion?: string;
             telefono?: string;
             activa?: boolean;
+            /** Format: int64 */
+            managerId?: number;
         };
         TransferDetailRequest: {
             /** Format: int64 */
@@ -876,7 +1037,13 @@ export interface components {
             receiptNotes?: string;
             /** Format: int64 */
             parentTransferId?: number;
+            reasonResolution?: string;
             details?: components["schemas"]["TransferDetailResponse"][];
+        };
+        ResolutionRequest: {
+            reason: string;
+            /** Format: int64 */
+            userId: number;
         };
         ReceivedItemRequest: {
             /** Format: int64 */
@@ -917,6 +1084,8 @@ export interface components {
             /** Format: int32 */
             quantity: number;
             discountPercentage?: number;
+            /** Format: int64 */
+            priceListId?: number;
         };
         SaleRequest: {
             /** Format: int64 */
@@ -925,6 +1094,9 @@ export interface components {
             userId: number;
             customerName?: string;
             customerDocument?: string;
+            globalDiscountPercentage?: number;
+            /** Format: int64 */
+            priceListId?: number;
             items: components["schemas"]["SaleDetailRequest"][];
         };
         SaleDetailResponse: {
@@ -957,6 +1129,7 @@ export interface components {
             cancellationReason?: string;
             customerName?: string;
             customerDocument?: string;
+            globalDiscountPercentage?: number;
             details?: components["schemas"]["SaleDetailResponse"][];
         };
         PurchaseDetailRequest: {
@@ -964,6 +1137,7 @@ export interface components {
             productId: number;
             quantity: number;
             unitPrice: number;
+            discountPct?: number;
         };
         PurchaseRequest: {
             /** Format: int64 */
@@ -974,6 +1148,8 @@ export interface components {
             branchId: number;
             /** Format: date-time */
             estimatedArrivalDate?: string;
+            /** Format: int32 */
+            paymentDueDays: number;
             items: components["schemas"]["PurchaseDetailRequest"][];
         };
         PurchaseDetailResponse: {
@@ -983,6 +1159,7 @@ export interface components {
             productId?: number;
             quantity?: number;
             unitPrice?: number;
+            discountPct?: number;
             subtotal?: number;
         };
         PurchaseResponse: {
@@ -996,6 +1173,10 @@ export interface components {
             estimatedArrivalDate?: string;
             /** Format: date-time */
             actualArrivalDate?: string;
+            /** Format: int32 */
+            paymentDueDays?: number;
+            /** Format: date-time */
+            paymentDueDate?: string;
             /** Format: int64 */
             supplierId?: number;
             /** Format: int64 */
@@ -1005,7 +1186,32 @@ export interface components {
             /** Format: int64 */
             branchId?: number;
             total?: number;
+            reasonResolution?: string;
             details?: components["schemas"]["PurchaseDetailResponse"][];
+        };
+        ItemReceipt: {
+            /** Format: int64 */
+            detailId: number;
+            quantityReceived: number;
+        };
+        ReceiveOrderRequest: {
+            /** Format: int64 */
+            userId: number;
+            items: components["schemas"]["ItemReceipt"][];
+        };
+        CppImpact: {
+            /** Format: int64 */
+            productId?: number;
+            productName?: string;
+            oldCpp?: number;
+            newCpp?: number;
+            quantityReceived?: number;
+        };
+        PurchaseReceiptResponse: {
+            /** Format: int64 */
+            orderId?: number;
+            status?: string;
+            impacts?: components["schemas"]["CppImpact"][];
         };
         StockRequest: {
             quantity: number;
@@ -1017,6 +1223,8 @@ export interface components {
             referenceId?: number;
             referenceType?: string;
             unitCost?: number;
+            observations?: string;
+            subReason?: string;
         };
         TransferResolutionRequest: {
             /** Format: int64 */
@@ -1068,6 +1276,12 @@ export interface components {
             /** Format: int64 */
             id?: number;
         };
+        PriceListResponse: {
+            /** Format: int64 */
+            id?: number;
+            nombre?: string;
+            descripcion?: string;
+        };
         InventoryMovement: {
             /** Format: int64 */
             id?: number;
@@ -1087,6 +1301,8 @@ export interface components {
             /** Format: int64 */
             referenceId?: number;
             referenceType?: string;
+            observations?: string;
+            subReason?: string;
             finalBalance?: number;
         };
         InventoryProductResponse: {
@@ -1116,6 +1332,11 @@ export interface components {
             productName?: string;
             totalSoldQuantity?: number;
         };
+        SalesTrend: {
+            /** Format: date */
+            saleDate?: string;
+            revenue?: number;
+        };
         GlobalSummary: {
             totalRevenue?: number;
             totalUnitsSold?: number;
@@ -1132,6 +1353,13 @@ export interface components {
             unitsSold?: number;
             /** Format: int64 */
             salesCount?: number;
+        };
+        DashboardAnalyticsResponse: {
+            summary?: components["schemas"]["GlobalSummary"];
+            salesTrend?: components["schemas"]["SalesTrend"][];
+            topProducts?: components["schemas"]["TopSellingProduct"][];
+            valuations?: components["schemas"]["BranchValuation"][];
+            performance?: components["schemas"]["BranchPerformance"][];
         };
         StockAlertResponse: {
             /** Format: int64 */
@@ -1154,6 +1382,79 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getProductPrice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listaId: number;
+                productoId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: Record<string, never>;
+                    };
+                };
+            };
+        };
+    };
+    upsertProductPrice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listaId: number;
+                productoId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertPriceRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductPriceResponse"];
+                };
+            };
+        };
+    };
+    deleteProductPrice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listaId: number;
+                productoId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     updateConfig: {
         parameters: {
             query: {
@@ -1623,6 +1924,30 @@ export interface operations {
             };
         };
     };
+    rejectTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolutionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     receiveTransfer: {
         parameters: {
             query?: never;
@@ -1710,7 +2035,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolutionRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -1767,6 +2096,29 @@ export interface operations {
             };
         };
     };
+    getAllOrders: {
+        parameters: {
+            query?: {
+                supplierId?: number;
+                productId?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PurchaseResponse"][];
+                };
+            };
+        };
+    };
     createOrder: {
         parameters: {
             query?: never;
@@ -1793,9 +2145,33 @@ export interface operations {
     };
     receiveOrder: {
         parameters: {
-            query: {
-                userId: number;
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
             };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiveOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PurchaseReceiptResponse"];
+                };
+            };
+        };
+    };
+    registerPayment: {
+        parameters: {
+            query?: never;
             header?: never;
             path: {
                 id: number;
@@ -1834,6 +2210,54 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["PurchaseResponse"];
                 };
+            };
+        };
+    };
+    closeShortfall: {
+        parameters: {
+            query: {
+                userId: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PurchaseResponse"];
+                };
+            };
+        };
+    };
+    cancelPurchase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolutionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -2387,6 +2811,48 @@ export interface operations {
             };
         };
     };
+    getAllLists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PriceListResponse"][];
+                };
+            };
+        };
+    };
+    getPricesForList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                listaId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductPriceResponse"][];
+                };
+            };
+        };
+    };
     getAllMovements: {
         parameters: {
             query?: never;
@@ -2499,6 +2965,8 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                startDate?: string;
+                endDate?: string;
             };
             header?: never;
             path?: never;
@@ -2517,9 +2985,35 @@ export interface operations {
             };
         };
     };
+    getSalesTrend: {
+        parameters: {
+            query?: {
+                startDate?: string;
+                endDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SalesTrend"][];
+                };
+            };
+        };
+    };
     getGlobalSummary: {
         parameters: {
-            query?: never;
+            query?: {
+                startDate?: string;
+                endDate?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2537,9 +3031,35 @@ export interface operations {
             };
         };
     };
+    getDashboard: {
+        parameters: {
+            query?: {
+                startDate?: string;
+                endDate?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DashboardAnalyticsResponse"];
+                };
+            };
+        };
+    };
     getBranchPerformance: {
         parameters: {
-            query?: never;
+            query?: {
+                startDate?: string;
+                endDate?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2559,8 +3079,8 @@ export interface operations {
     };
     getActiveAlerts: {
         parameters: {
-            query: {
-                branchId: number;
+            query?: {
+                branchId?: number;
             };
             header?: never;
             path?: never;

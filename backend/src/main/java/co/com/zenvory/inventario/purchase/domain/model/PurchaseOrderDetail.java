@@ -8,8 +8,9 @@ public class PurchaseOrderDetail {
     private BigDecimal quantity;
     private BigDecimal unitPrice;
     private BigDecimal discountPct;
+    private BigDecimal receivedQuantity;
 
-    public PurchaseOrderDetail(Long id, Long productId, BigDecimal quantity, BigDecimal unitPrice, BigDecimal discountPct) {
+    public PurchaseOrderDetail(Long id, Long productId, BigDecimal quantity, BigDecimal unitPrice, BigDecimal discountPct, BigDecimal receivedQuantity) {
         if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("La cantidad comprada debe ser mayor a cero.");
         }
@@ -21,10 +22,11 @@ public class PurchaseOrderDetail {
         this.quantity = quantity;
         this.unitPrice = unitPrice;
         this.discountPct = (discountPct != null) ? discountPct : BigDecimal.ZERO;
+        this.receivedQuantity = (receivedQuantity != null) ? receivedQuantity : BigDecimal.ZERO;
     }
 
     public static PurchaseOrderDetail create(Long productId, BigDecimal quantity, BigDecimal unitPrice, BigDecimal discountPct) {
-        return new PurchaseOrderDetail(null, productId, quantity, unitPrice, discountPct);
+        return new PurchaseOrderDetail(null, productId, quantity, unitPrice, discountPct, BigDecimal.ZERO);
     }
 
     public BigDecimal computeSubtotal() {
@@ -38,4 +40,5 @@ public class PurchaseOrderDetail {
     public BigDecimal getQuantity() { return quantity; }
     public BigDecimal getUnitPrice() { return unitPrice; }
     public BigDecimal getDiscountPct() { return discountPct; }
+    public BigDecimal getReceivedQuantity() { return receivedQuantity; }
 }

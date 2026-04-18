@@ -16,22 +16,32 @@ public interface InventoryUseCase {
             Long productId, 
             String productName,
             BigDecimal quantity, 
+            Long unitId,
             MovementReason reason, 
             Long userId, 
             Long referenceId, 
-            String referenceType
+            String referenceType,
+            String observations,
+            String subReason
     );
     
     void addStock(
             Long branchId, 
             Long productId, 
             BigDecimal quantity, 
+            Long unitId,
             MovementReason reason, 
             Long userId, 
             Long referenceId, 
             String referenceType,
-            BigDecimal unitCost
+            BigDecimal unitCost,
+            String observations,
+            String subReason
     );
+
+    void reserveStock(Long branchId, Long productId, BigDecimal quantity);
+    
+    void releaseStock(Long branchId, Long productId, BigDecimal quantity);
 
     List<LocalInventory> getInventoryByBranch(Long branchId);
 

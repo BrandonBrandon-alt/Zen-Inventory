@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import Drawer from "@/components/ui/Drawer";
+import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import SaleReceipt from "./SaleReceipt";
@@ -107,8 +107,8 @@ export default function SaleDetailModal({
       key: "productName",
       render: (d) => (
         <div className="flex flex-col">
-          <span className="text-[13px] font-black text-white uppercase tracking-tight">{d.productName || "Producto"}</span>
-          <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-widest">{formatCurrency(d.unitPriceApplied)} c/u</span>
+          <span className="text-[13px] font-black text-[var(--neutral-50)] uppercase tracking-tight">{d.productName || "Producto"}</span>
+          <span className="text-[11px] font-bold text-[var(--neutral-500)] uppercase tracking-widest">{formatCurrency(d.unitPriceApplied)} c/u</span>
         </div>
       )
     },
@@ -119,7 +119,7 @@ export default function SaleDetailModal({
       width: "80px",
       render: (d) => (
         <div className="flex items-center justify-center">
-            <span className="tabular text-[13px] font-black text-neutral-400 bg-neutral-900/50 px-3 py-1 rounded-lg border border-neutral-800">
+            <span className="tabular text-[13px] font-black text-[var(--neutral-400)] bg-[var(--bg-surface)]/50 px-3 py-1 rounded-lg border border-[var(--neutral-800)]">
                 {d.quantity}
             </span>
         </div>
@@ -131,7 +131,7 @@ export default function SaleDetailModal({
       align: "right",
       width: "120px",
       render: (d) => (
-        <span className="tabular text-[14px] font-black text-brand-400">
+        <span className="tabular text-[14px] font-black text-[var(--brand-400)]">
           {formatCurrency(d.subtotalLine)}
         </span>
       )
@@ -139,20 +139,20 @@ export default function SaleDetailModal({
   ];
 
   return (
-    <Drawer
+    <Modal
       open={isOpen}
       onClose={onClose}
       title="Auditoría de Venta"
       description={`Referencia ERP: #${sale.id}`}
-      width="550px"
+      size="xl"
     >
       <div className="space-y-6 animate-fade-in pb-20">
         {/* Status Indicator - Standardized Card usage */}
-        <Card className="!p-4 bg-neutral-900 shadow-sm border-neutral-800">
+        <Card className="!p-4 bg-[var(--bg-card)] shadow-sm border-[var(--neutral-800)]">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full animate-pulse ${sale.status === 'COMPLETED' ? "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]" : "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]"}`} />
-                    <span className="text-[11px] font-black text-neutral-400 uppercase tracking-widest">
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${sale.status === 'COMPLETED' ? "bg-[var(--color-success)] shadow-[0_0_10px_var(--color-success-glow)]" : "bg-[var(--color-danger)] shadow-[0_0_10px_var(--color-danger-glow)]"}`} />
+                    <span className="text-[11px] font-black text-[var(--neutral-400)] uppercase tracking-widest">
                         {sale.status === 'COMPLETED' ? "Transacción Aprobada" : "Transacción Anulada"}
                     </span>
                 </div>
@@ -170,12 +170,12 @@ export default function SaleDetailModal({
                 { icon: <User size={14} />, label: "Vendedor", value: sale.userName || "Admin" },
                 { icon: <Hash size={14} />, label: "Registro", value: `POS-${sale.id}` }
             ].map((metric, idx) => (
-                <Card key={idx} className="!p-4 flex flex-col gap-2 group hover:border-neutral-700 transition-colors">
+                <Card key={idx} className="!p-4 flex flex-col gap-2 group hover:border-[var(--neutral-700)] transition-colors">
                     <div className="flex items-center gap-2 opacity-60">
-                        <span className="text-brand-400">{metric.icon}</span>
-                        <span className="text-[9px] font-black text-neutral-400 uppercase tracking-widest">{metric.label}</span>
+                        <span className="text-[var(--brand-400)]">{metric.icon}</span>
+                        <span className="text-[9px] font-black text-[var(--neutral-400)] uppercase tracking-widest">{metric.label}</span>
                     </div>
-                    <p className="text-[13px] font-black text-white uppercase truncate">{metric.value}</p>
+                    <p className="text-[13px] font-black text-[var(--neutral-50)] uppercase truncate">{metric.value}</p>
                 </Card>
             ))}
         </div>
@@ -183,16 +183,19 @@ export default function SaleDetailModal({
         {/* Responsible Section - Standardized Card */}
         <Card title="Responsable / Cliente" className="shadow-sm">
             <div className="flex flex-col">
-                <p className="text-lg font-black text-white uppercase tracking-tight">{sale.customerName || "Venta General"}</p>
+                <p className="text-lg font-black text-[var(--neutral-50)] uppercase tracking-tight">{sale.customerName || "Venta General"}</p>
                 <div className="flex items-center gap-2 mt-1">
-                    <CreditCard size={12} className="text-brand-400" />
-                    <p className="tabular text-xs text-neutral-500 font-bold uppercase tracking-widest">DNI: {sale.customerDocument || "PÚBLICO GENERAL"}</p>
+                    <CreditCard size={12} className="text-[var(--brand-400)]" />
+                    <p className="tabular text-xs text-[var(--neutral-500)] font-bold uppercase tracking-widest">DNI: {sale.customerDocument || "PÚBLICO GENERAL"}</p>
                 </div>
             </div>
         </Card>
 
         {/* Itemized Table - Unified DataTable */}
-        <div className="border border-neutral-800 rounded-3xl overflow-hidden bg-neutral-900/30 shadow-2xl">
+        <div 
+            className="border border-[var(--neutral-800)] rounded-3xl overflow-hidden bg-[var(--bg-surface)]/30 shadow-2xl overflow-y-auto custom-scrollbar"
+            style={{ maxHeight: "300px" }}
+        >
             <DataTable<any>
                 columns={columns}
                 data={sale.details ?? []}
@@ -201,21 +204,21 @@ export default function SaleDetailModal({
                 emptyState={{
                     title: "Sin registros",
                     description: "No hay items registrados en esta transacción.",
-                    icon: <Package size={24} className="text-neutral-700" />
+                    icon: <Package size={24} className="text-[var(--neutral-700)]" />
                 }}
             />
         </div>
 
         {/* Financial Recap - Standardized Card with Brand accents */}
-        <Card className="relative overflow-hidden group border-brand-500/20 bg-neutral-900">
+        <Card className="relative overflow-hidden group border-[var(--brand-500)]/20 bg-[var(--bg-card)]">
             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                <CreditCard size={64} className="text-brand-400" />
+                <CreditCard size={64} className="text-[var(--brand-400)]" />
             </div>
             <div className="relative z-10">
-                <p className="text-[10px] font-black text-neutral-500 uppercase tracking-widest mb-1">Total Confirmado de Operación</p>
+                <p className="text-[10px] font-black text-[var(--neutral-500)] uppercase tracking-widest mb-1">Total Confirmado de Operación</p>
                 <div className="flex items-baseline gap-2">
-                    <span className="text-sm font-black text-brand-400 uppercase tracking-widest">COP</span>
-                    <p className="tabular text-4xl font-black text-white tracking-tighter">
+                    <span className="text-sm font-black text-[var(--brand-400)] uppercase tracking-widest">COP</span>
+                    <p className="tabular text-4xl font-black text-[var(--neutral-50)] tracking-tighter">
                         {formatCurrency(sale.totalFinal).replace(/COP|\$/g, "").trim()}
                     </p>
                 </div>
@@ -223,10 +226,10 @@ export default function SaleDetailModal({
         </Card>
 
         {/* Actions - Footer Pattern */}
-        <div className="space-y-3 pt-6 border-t border-neutral-800">
+        <div className="space-y-3 pt-6 border-t border-[var(--neutral-800)]">
             {!showCancelConfirm ? (
                 <>
-                    <Button variant="ghost" fullWidth onClick={handlePrint} leftIcon={<Printer size={16} />} loading={isPrinting}>
+                    <Button variant="primary" fullWidth onClick={handlePrint} leftIcon={<Printer size={16} />} loading={isPrinting} >
                         {isPrinting ? "Preparando..." : "Imprimir Comprobante Fiscal"}
                     </Button>
                     {isAdmin && sale.status === 'COMPLETED' && (
@@ -236,10 +239,10 @@ export default function SaleDetailModal({
                     )}
                 </>
             ) : (
-                <Card className="border-red-500/30 bg-red-500/5 !p-5">
-                    <p className="text-xs font-black text-red-400 uppercase tracking-widest mb-3">Justificación de la anulación</p>
+                <Card className="border-[var(--color-danger)]/30 bg-[var(--color-danger)]/5 !p-5">
+                    <p className="text-xs font-black text-[var(--color-danger)] uppercase tracking-widest mb-3">Justificación de la anulación</p>
                     <textarea 
-                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 text-white text-sm outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/20 transition-all min-h-[100px] mb-4 font-sans"
+                        className="w-full bg-[var(--bg-base)] border border-[var(--neutral-800)] rounded-xl p-4 text-[var(--neutral-50)] text-sm outline-none focus:border-[var(--color-danger)]/50 focus:ring-1 focus:ring-[var(--color-danger)]/20 transition-all min-h-[100px] mb-4 font-sans"
                         placeholder="Describa el motivo detallado..."
                         value={cancelReason}
                         onChange={(e) => setCancelReason(e.target.value)}
@@ -253,6 +256,6 @@ export default function SaleDetailModal({
         </div>
 
       </div>
-    </Drawer>
+    </Modal>
   );
 }

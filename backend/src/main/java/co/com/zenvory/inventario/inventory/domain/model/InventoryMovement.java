@@ -30,5 +30,7 @@ public class InventoryMovement {
     private Long referenceId; // ID de la venta, compra o transferencia
     private String referenceType; // Ej: "VENTA", "COMPRA", "TRANSFERENCIA"
     
+    private String observations;
+    private String subReason;
     private BigDecimal finalBalance; // Saldo después del movimiento
 }

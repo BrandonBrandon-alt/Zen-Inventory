@@ -75,7 +75,7 @@ export default function LoginPage() {
             <em
               style={{
                 color: "var(--brand-500)",
-                fontStyle: "italic",
+                fontStyle: "normal",
                 fontFamily: "var(--font-serif)",
               }}
             >
@@ -176,6 +176,7 @@ export default function LoginPage() {
               { role: "Admin",    email: "admin@zeninventory.co",    pw: "admin123",    dot: "var(--brand-500)" },
               { role: "Gerente",  email: "gerente@zeninventory.co",  pw: "gerente123",  dot: "var(--neutral-400)" },
               { role: "Operador", email: "operador@zeninventory.co", pw: "operador123", dot: "var(--neutral-500)" },
+              { role: "Operador", email: "inventario@zeninventory.co", pw: "operador123", dot: "var(--neutral-500)" },
             ].map(({ role, email, pw, dot }) => (
               <div
                 key={role}

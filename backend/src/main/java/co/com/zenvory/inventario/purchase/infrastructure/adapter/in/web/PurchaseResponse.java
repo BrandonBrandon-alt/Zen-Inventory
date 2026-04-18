@@ -20,6 +20,7 @@ public record PurchaseResponse(
         Long receivingUserId,
         Long branchId,
         BigDecimal total,
+        String reasonResolution,
         List<PurchaseDetailResponse> details
 ) {
     public record PurchaseDetailResponse(
@@ -46,6 +47,7 @@ public record PurchaseResponse(
                 order.getReceivingUserId(),
                 order.getBranchId(),
                 order.getTotal(),
+                order.getReasonResolution(),
                 order.getDetails().stream().map(d -> new PurchaseDetailResponse(
                         d.getId(),
                         d.getProductId(),

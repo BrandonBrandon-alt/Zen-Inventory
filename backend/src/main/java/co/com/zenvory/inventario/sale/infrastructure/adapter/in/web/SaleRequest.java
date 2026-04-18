@@ -32,6 +32,7 @@ public record SaleRequest(
             @Positive(message = "La cantidad debe ser mayor a cero.")
             Integer quantity,
 
-            java.math.BigDecimal discountPercentage
+            java.math.BigDecimal discountPercentage,
+            Long priceListId
     ) {}
 }

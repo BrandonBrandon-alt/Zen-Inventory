@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
+import SearchFilter from "@/components/ui/SearchFilter";
 
 type SupplierResponse = components["schemas"]["SupplierResponse"];
 
@@ -17,6 +18,7 @@ export default function MasterSuppliersPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<SupplierResponse | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   
   // Nuevo estado para el catálogo
   const [products, setProducts] = useState<any[]>([]);
@@ -103,6 +105,11 @@ export default function MasterSuppliersPage() {
     }
   };
 
+  const filteredSuppliers = (suppliers || []).filter(s => 
+    s.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    s.contacto?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (loading) return <div style={{ padding: "40px", color: "var(--neutral-400)" }}>Cargando directorio de proveedores...</div>;
 
   return (
@@ -121,7 +128,14 @@ export default function MasterSuppliersPage() {
         marginBottom: "32px", 
         gap: "24px" 
       }}>
-        <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}></div>
+        <div className="flex-1 max-w-md">
+           <SearchFilter 
+             placeholder="Buscar proveedor por nombre o contacto..."
+             value={searchTerm}
+             onChange={setSearchTerm}
+             containerClassName="w-full"
+           />
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           <Button leftIcon={<Plus size={15} />} onClick={() => handleOpenModal()} style={{ marginTop: "4px" }}>
             Nuevo Proveedor
@@ -130,7 +144,7 @@ export default function MasterSuppliersPage() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "24px" }}>
-        {suppliers.map((s) => (
+        {filteredSuppliers.map((s) => (
           <div key={s.id} style={{ background: "var(--bg-card)", padding: "24px", borderRadius: "12px", border: "1px solid var(--border-default)" }}>
             <h3 style={{ fontSize: "18px", fontWeight: 600, color: "var(--neutral-50)", marginBottom: "8px" }}>{s.nombre}</h3>
             <p style={{ fontSize: "14px", color: "var(--neutral-400)", marginBottom: "16px" }}>{s.contacto}</p>

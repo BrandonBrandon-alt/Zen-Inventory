@@ -40,6 +40,18 @@ public class TransferEntity {
     @Column(name = "parent_transfer_id")
     private Long parentTransferId;
 
+    @Column(name = "motivo_resolucion")
+    private String reasonResolution;
+
+    @Column(name = "resuelto_por_id")
+    private Long resueltoPorId;
+
+    @Column(name = "fecha_resolucion")
+    private LocalDateTime fechaResolucion;
+
+    @Version
+    private Integer version;
+
     @OneToMany(mappedBy = "transfer", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TransferDetailEntity> details = new ArrayList<>();
 
@@ -84,6 +96,18 @@ public class TransferEntity {
 
     public Long getParentTransferId() { return parentTransferId; }
     public void setParentTransferId(Long parentTransferId) { this.parentTransferId = parentTransferId; }
+
+    public String getReasonResolution() { return reasonResolution; }
+    public void setReasonResolution(String reasonResolution) { this.reasonResolution = reasonResolution; }
+
+    public Long getResueltoPorId() { return resueltoPorId; }
+    public void setResueltoPorId(Long resueltoPorId) { this.resueltoPorId = resueltoPorId; }
+
+    public LocalDateTime getFechaResolucion() { return fechaResolucion; }
+    public void setFechaResolucion(LocalDateTime fechaResolucion) { this.fechaResolucion = fechaResolucion; }
+
+    public Integer getVersion() { return version; }
+    public void setVersion(Integer version) { this.version = version; }
 
     public List<TransferDetailEntity> getDetails() { return details; }
     public void setDetails(List<TransferDetailEntity> details) { this.details = details; }

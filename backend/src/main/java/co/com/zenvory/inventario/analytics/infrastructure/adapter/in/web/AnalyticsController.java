@@ -6,6 +6,7 @@ import co.com.zenvory.inventario.analytics.domain.model.BranchValuation;
 import co.com.zenvory.inventario.analytics.domain.model.GlobalSummary;
 import co.com.zenvory.inventario.analytics.domain.model.SalesTrend;
 import co.com.zenvory.inventario.analytics.domain.model.TopSellingProduct;
+import co.com.zenvory.inventario.analytics.domain.model.DashboardAnalyticsResponse;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +26,13 @@ public class AnalyticsController {
 
     public AnalyticsController(AnalyticsUseCase analyticsUseCase) {
         this.analyticsUseCase = analyticsUseCase;
+    }
+
+    @GetMapping("/dashboard")
+    public ResponseEntity<DashboardAnalyticsResponse> getDashboard(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+        return ResponseEntity.ok(analyticsUseCase.getDashboardData(startDate, endDate));
     }
 
     @GetMapping("/top-products")

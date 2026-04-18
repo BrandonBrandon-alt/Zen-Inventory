@@ -36,7 +36,8 @@ public class SaleController {
                         .map(item -> new CreateSaleCommand.Detail(
                                 item.productId(), 
                                 item.quantity(), 
-                                item.discountPercentage()
+                                item.discountPercentage(),
+                                item.priceListId()
                         ))
                         .toList()
         );

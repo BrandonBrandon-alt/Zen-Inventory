@@ -51,6 +51,12 @@ public class InventoryMovementEntity {
     @Column(name = "tipo_referencia", length = 50)
     private String referenceType;
 
+    @Column(name = "observaciones")
+    private String observations;
+
+    @Column(name = "sub_motivo", length = 100)
+    private String subReason;
+
     @Column(name = "saldo_final", precision = 12, scale = 2)
     private BigDecimal finalBalance;
 
@@ -66,6 +72,8 @@ public class InventoryMovementEntity {
                 .userId(userId)
                 .referenceId(referenceId)
                 .referenceType(referenceType)
+                .observations(observations)
+                .subReason(subReason)
                 .finalBalance(finalBalance)
                 .build();
     }
@@ -82,6 +90,8 @@ public class InventoryMovementEntity {
                 .userId(domain.getUserId())
                 .referenceId(domain.getReferenceId())
                 .referenceType(domain.getReferenceType())
+                .observations(domain.getObservations())
+                .subReason(domain.getSubReason())
                 .finalBalance(domain.getFinalBalance())
                 .build();
     }

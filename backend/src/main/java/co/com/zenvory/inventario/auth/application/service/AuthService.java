@@ -2,6 +2,7 @@ package co.com.zenvory.inventario.auth.application.service;
 
 import co.com.zenvory.inventario.auth.application.port.in.AuthUseCase;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
+import co.com.zenvory.inventario.auth.domain.exception.AccountDisabledException;
 import co.com.zenvory.inventario.auth.domain.exception.InvalidCredentialsException;
 import co.com.zenvory.inventario.auth.domain.model.LoginResult;
 import co.com.zenvory.inventario.auth.domain.model.User;
@@ -38,8 +39,9 @@ public class AuthService implements AuthUseCase {
     /**
      * {@inheritDoc}
      *
-     * <p>Siempre lanza {@link InvalidCredentialsException} tanto para email inexistente
-     * como para contraseña incorrecta — evita revelar cuál de los dos falló (enumeración).</p>
+     * <p>Lanza {@link InvalidCredentialsException} tanto para email inexistente
+     * como para contraseña incorrecta (seguridad). Si las credenciales son válidas
+     * pero la cuenta está inactiva, lanza {@link AccountDisabledException}.</p>
      */
     @Override
     public LoginResult login(String email, String password) {
@@ -48,6 +50,10 @@ public class AuthService implements AuthUseCase {
 
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new InvalidCredentialsException();
+        }
+
+        if (user.getActive() != null && !user.getActive()) {
+            throw new AccountDisabledException();
         }
 
         String token = jwtService.generateToken(

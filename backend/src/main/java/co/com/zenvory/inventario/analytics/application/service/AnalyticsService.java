@@ -7,6 +7,7 @@ import co.com.zenvory.inventario.analytics.domain.model.BranchValuation;
 import co.com.zenvory.inventario.analytics.domain.model.GlobalSummary;
 import co.com.zenvory.inventario.analytics.domain.model.TopSellingProduct;
 import co.com.zenvory.inventario.analytics.domain.model.SalesTrend;
+import co.com.zenvory.inventario.analytics.domain.model.DashboardAnalyticsResponse;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -47,5 +48,16 @@ public class AnalyticsService implements AnalyticsUseCase {
     @Override
     public List<SalesTrend> getSalesTrend(LocalDateTime startDate, LocalDateTime endDate) {
         return analyticsRepository.findSalesTrend(startDate, endDate);
+    }
+
+    @Override
+    public DashboardAnalyticsResponse getDashboardData(LocalDateTime startDate, LocalDateTime endDate) {
+        return new DashboardAnalyticsResponse(
+                getGlobalSummary(startDate, endDate),
+                getSalesTrend(startDate, endDate),
+                getTopSellingProducts(5, startDate, endDate),
+                getBranchValuations(),
+                getBranchPerformance(startDate, endDate)
+        );
     }
 }

@@ -49,6 +49,18 @@ public class PurchaseOrderEntity {
     @Column(name = "plazo_pago_dias", nullable = false)
     private Integer paymentDueDays;
 
+    @Column(name = "motivo_resolucion")
+    private String reasonResolution;
+
+    @Column(name = "resuelto_por_id")
+    private Long resueltoPorId;
+
+    @Column(name = "fecha_resolucion")
+    private LocalDateTime fechaResolucion;
+
+    @Version
+    private Integer version;
+
     @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PurchaseDetailEntity> details = new ArrayList<>();
 
@@ -97,6 +109,18 @@ public class PurchaseOrderEntity {
 
     public Integer getPaymentDueDays() { return paymentDueDays; }
     public void setPaymentDueDays(Integer paymentDueDays) { this.paymentDueDays = paymentDueDays; }
+
+    public String getReasonResolution() { return reasonResolution; }
+    public void setReasonResolution(String reasonResolution) { this.reasonResolution = reasonResolution; }
+
+    public Long getResueltoPorId() { return resueltoPorId; }
+    public void setResueltoPorId(Long resueltoPorId) { this.resueltoPorId = resueltoPorId; }
+
+    public LocalDateTime getFechaResolucion() { return fechaResolucion; }
+    public void setFechaResolucion(LocalDateTime fechaResolucion) { this.fechaResolucion = fechaResolucion; }
+
+    public Integer getVersion() { return version; }
+    public void setVersion(Integer version) { this.version = version; }
 
     public List<PurchaseDetailEntity> getDetails() { return details; }
     public void setDetails(List<PurchaseDetailEntity> details) { this.details = details; }

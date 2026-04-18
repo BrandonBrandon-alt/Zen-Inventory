@@ -22,16 +22,19 @@ public class LocalInventory {
     private Long productId;
     
     private BigDecimal currentQuantity;
+    private BigDecimal committedQuantity;
     private BigDecimal minimumStock;
     private LocalDateTime lastUpdated;
 
     /**
-     * Valida si existe stock suficiente para un retiro dado.
+     * Valida si existe stock disponible real (Actual - Comprometido) para un movimiento dado.
      */
     public boolean hasSufficientStock(BigDecimal quantityToWithdraw) {
         if (this.currentQuantity == null || quantityToWithdraw == null) {
             return false;
         }
-        return this.currentQuantity.compareTo(quantityToWithdraw) >= 0;
+        BigDecimal committed = this.committedQuantity != null ? this.committedQuantity : BigDecimal.ZERO;
+        BigDecimal available = this.currentQuantity.subtract(committed);
+        return available.compareTo(quantityToWithdraw) >= 0;
     }
 }

@@ -9,6 +9,8 @@ public record ProductUnitResponse(
         Long id,
         Long productoId,
         Long unidadId,
+        String nombreUnidad,
+        String abreviaturaUnidad,
         BigDecimal factorConversion,
         Boolean esBase
 ) {}

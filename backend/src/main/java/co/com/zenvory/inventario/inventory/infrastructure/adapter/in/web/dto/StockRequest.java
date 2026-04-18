@@ -25,4 +25,9 @@ public class StockRequest {
     /** Costo unitario de adquisición (opcional, para ingresos) */
     @DecimalMin(value = "0.0", message = "El costo no puede ser negativo")
     private BigDecimal unitCost;
+
+    private String observations;
+    private String subReason;
+
+    private Long unitId;
 }

@@ -17,6 +17,14 @@ import co.com.zenvory.inventario.transfer.application.port.in.TransferUseCase;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+import co.com.zenvory.inventario.inventory.domain.event.StockLevelDroppedEvent;
+import co.com.zenvory.inventario.inventory.domain.event.StockLevelRestoredEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -31,6 +39,7 @@ public class AlertService implements AlertUseCase {
     private final BranchUseCase branchUseCase;
     private final TransferUseCase transferUseCase;
     private final PurchaseUseCase purchaseUseCase;
+    private static final Logger log = LoggerFactory.getLogger(AlertService.class);
 
     public AlertService(AlertRepositoryPort alertRepository, 
                         InventoryUseCase inventoryUseCase,
@@ -57,6 +66,33 @@ public class AlertService implements AlertUseCase {
         List<LocalInventory> lowStockInventories = inventoryUseCase.getLowStockInventories();
         for (LocalInventory inv : lowStockInventories) {
             handleLowStockCheck(inv);
+        }
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void onStockLevelDropped(StockLevelDroppedEvent event) {
+        try {
+            log.info("Iniciando procesamiento de alerta de stock bajo... [TX_EVENT]");
+            LocalInventory inv = inventoryUseCase.getInventory(event.getBranchId(), event.getProductId());
+            handleLowStockCheck(inv);
+        } catch (Exception e) {
+            log.error("Error crítico procesando alerta de stock bajo para producto {} en sucursal {}: {}", 
+                    event.getProductId(), event.getBranchId(), e.getMessage());
+        }
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void onStockLevelRestored(StockLevelRestoredEvent event) {
+        try {
+            log.info("Iniciando verificación de restauración de stock... [TX_EVENT]");
+            handleRestoredStockCheck(event.getBranchId(), event.getProductId());
+        } catch (Exception e) {
+            log.error("Error crítico procesando restauración de stock para producto {} en sucursal {}: {}", 
+                    event.getProductId(), event.getBranchId(), e.getMessage());
         }
     }
 

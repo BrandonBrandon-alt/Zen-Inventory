@@ -10,10 +10,16 @@ interface ModalProps {
   description?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl" | "2xl";
 }
 
-const sizeWidths = { sm: "380px", md: "480px", lg: "600px" };
+const sizeWidths = { 
+  sm: "380px", 
+  md: "480px", 
+  lg: "600px", 
+  xl: "850px",
+  "2xl": "1100px"
+};
 
 export default function Modal({
   open,

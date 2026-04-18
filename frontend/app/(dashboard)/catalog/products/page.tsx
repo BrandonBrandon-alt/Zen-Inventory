@@ -9,6 +9,7 @@ import { Package, Plus, Edit, Trash2, Search, Tag, Truck, DollarSign, ChevronDow
 
 import Select from "@/components/ui/Select";
 import Badge from "@/components/ui/Badge";
+import Toolbar from "@/components/ui/Toolbar";
 import { useToast } from "@/context/ToastContext";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
@@ -17,6 +18,7 @@ import DataTable, { Column } from "@/components/ui/DataTable";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Spinner from "@/components/ui/Spinner";
+import SearchFilter from "@/components/ui/SearchFilter";
 
 // Types from schema
 type ProductResponse = components["schemas"]["ProductResponse"];
@@ -38,6 +40,8 @@ export default function MasterProductsPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductResponse | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" | null }>({ key: "nombre", direction: "asc" });
   const [isPending, startTransition] = useTransition();
 
   // Price list state (por lista: { [listaId]: precio })
@@ -49,8 +53,8 @@ export default function MasterProductsPage() {
   const [formData, setFormData] = useState({
     sku: "",
     nombre: "",
-    costoPromedio: 0,
-    precioVenta: 0,
+    costoPromedio: "" as number | "",
+    precioVenta: "" as number | "",
     proveedorId: 0,
     unitId: 0,
   });
@@ -72,9 +76,7 @@ export default function MasterProductsPage() {
         apiClient.GET("/api/catalog/products"),
         apiClient.GET("/api/catalog/suppliers"),
         apiClient.GET("/api/catalog/units"),
-        fetch("http://localhost:8080/api/v1/price-lists", {
-          headers: { Authorization: `Bearer ${localStorage.getItem("zen_inventory_token")}` }
-        }).then(r => r.json()),
+        apiClient.GET("/api/v1/price-lists" as any, {}).then(r => r.data),
       ]);
       setProducts(prodRes.data ?? []);
       setSuppliers(suppRes.data ?? []);
@@ -94,8 +96,8 @@ export default function MasterProductsPage() {
       setFormData({
         sku: product.sku ?? "",
         nombre: product.nombre ?? "",
-        costoPromedio: product.costoPromedio ?? 0,
-        precioVenta: product.precioVenta ?? 0,
+        costoPromedio: product.costoPromedio ?? "",
+        precioVenta: product.precioVenta ?? "",
         proveedorId: product.proveedorId ?? 0,
         unitId: product.unitId ?? 0,
       });
@@ -106,11 +108,10 @@ export default function MasterProductsPage() {
         try {
           const priceMap: Record<number, string> = {};
           await Promise.all(priceLists.map(async (lista) => {
-            const res = await fetch(
-              `http://localhost:8080/api/v1/price-lists/${lista.id}/products/${product.id}/price`,
-              { headers: { Authorization: `Bearer ${localStorage.getItem("zen_inventory_token")}` } }
-            );
-            const data = await res.json();
+            const res = await apiClient.GET("/api/v1/price-lists/{id}/products/{productId}/price" as any, {
+              params: { path: { id: lista.id, productId: product.id } }
+            });
+            const data = (res.data ?? {}) as any;
             if (data.fromList && data.precio != null) {
               priceMap[lista.id] = data.precio.toString();
             } else {
@@ -125,7 +126,14 @@ export default function MasterProductsPage() {
       setShowPriceLists(true);
     } else {
       setEditingProduct(null);
-      setFormData({ sku: "", nombre: "", costoPromedio: 0, precioVenta: 0, proveedorId: suppliers[0]?.id ?? 0, unitId: units[0]?.id ?? 0 });
+      setFormData({ 
+        sku: "", 
+        nombre: "", 
+        costoPromedio: "", 
+        precioVenta: "", 
+        proveedorId: suppliers[0]?.id ?? 0, 
+        unitId: units[0]?.id ?? 0 
+      });
       const defaults: Record<number, string> = {};
       priceLists.forEach(l => { defaults[l.id] = ""; });
       setPriceListValues(defaults);
@@ -143,11 +151,21 @@ export default function MasterProductsPage() {
         if (editingProduct) {
           await apiClient.PUT("/api/catalog/products/{id}", {
             params: { path: { id: editingProduct.id! } },
-            body: formData as any,
+            body: {
+              ...formData,
+              costoPromedio: Number(formData.costoPromedio) || 0,
+              precioVenta: Number(formData.precioVenta) || 0,
+            } as any,
           });
           showToast("Producto actualizado correctamente.", "success", "Cambios guardados");
         } else {
-          const res = await apiClient.POST("/api/catalog/products", { body: formData as any });
+          const res = await apiClient.POST("/api/catalog/products", { 
+            body: {
+              ...formData,
+              costoPromedio: Number(formData.costoPromedio) || 0,
+              precioVenta: Number(formData.precioVenta) || 0,
+            } as any 
+          });
           savedProductId = (res.data as any)?.id;
           showToast("Nuevo producto registrado en el catálogo.", "success", "Registro exitoso");
         }
@@ -158,23 +176,15 @@ export default function MasterProductsPage() {
             const rawVal = priceListValues[lista.id];
             const precio = parseFloat(rawVal);
             if (rawVal && !isNaN(precio) && precio > 0) {
-              await fetch(
-                `http://localhost:8080/api/v1/price-lists/${lista.id}/products/${savedProductId}/price`,
-                {
-                  method: "PUT",
-                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("zen_inventory_token")}` },
-                  body: JSON.stringify({ precio }),
-                }
-              );
+              await apiClient.PUT("/api/v1/price-lists/{id}/products/{productId}/price" as any, {
+                params: { path: { id: lista.id, productId: savedProductId } },
+                body: { precio }
+              });
             } else if (!rawVal || rawVal === "") {
               // Si se borra el campo, eliminar precio de la lista (fallback a precio base)
-              await fetch(
-                `http://localhost:8080/api/v1/price-lists/${lista.id}/products/${savedProductId}/price`,
-                {
-                  method: "DELETE",
-                  headers: { Authorization: `Bearer ${localStorage.getItem("zen_inventory_token")}` },
-                }
-              ).catch(() => {}); // Ignorar error si no existía
+              await apiClient.DELETE("/api/v1/price-lists/{id}/products/{productId}/price" as any, {
+                params: { path: { id: lista.id, productId: savedProductId } }
+              }).catch(() => {}); // Ignorar error si no existía
             }
           }));
         }
@@ -198,27 +208,61 @@ export default function MasterProductsPage() {
     }
   };
 
+  const handleSort = (key: string) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc"
+    }));
+  };
+
+  const filteredAndSortedProducts = (products || []).filter(p => {
+    const term = searchTerm.toLowerCase();
+    const supplierName = suppliers.find(s => s.id === p.proveedorId)?.nombre?.toLowerCase() || "";
+    const unit = (p.unitAbbreviation || "").toLowerCase();
+    const price = (p.precioVenta ?? 0).toString();
+
+    return (
+      p.nombre?.toLowerCase().includes(term) || 
+      p.sku?.toLowerCase().includes(term) ||
+      supplierName.includes(term) ||
+      unit.includes(term) ||
+      price.includes(term)
+    );
+  }).sort((a, b) => {
+    if (!sortConfig.key || !sortConfig.direction) return 0;
+    let valA: any = (a as any)[sortConfig.key];
+    let valB: any = (b as any)[sortConfig.key];
+    
+    if (valA < valB) return sortConfig.direction === "asc" ? -1 : 1;
+    if (valA > valB) return sortConfig.direction === "asc" ? 1 : -1;
+    return 0;
+  });
+
   const columns: Column<ProductResponse>[] = [
     {
       header: "SKU",
       key: "sku",
       width: "120px",
+      sortable: true,
       render: (p: ProductResponse) => <span style={{ fontFamily: "monospace", fontSize: "13px", fontWeight: 600, color: "var(--brand-400)" }}>{p.sku}</span>
     },
     {
       header: "Nombre",
       key: "nombre",
+      sortable: true,
       render: (p: ProductResponse) => <span style={{ fontSize: "14px", fontWeight: 500, color: "var(--neutral-100)" }}>{p.nombre}</span>
     },
     {
       header: "Unidad",
       key: "unitAbbreviation",
       width: "100px",
+      sortable: true,
       render: (p: ProductResponse) => <Badge variant="neutral">{p.unitAbbreviation || "N/A"}</Badge>
     },
     {
       header: "Proveedor",
       key: "proveedorId",
+      sortable: true,
       render: (p: ProductResponse) => (
         <span style={{ fontSize: "13px", color: "var(--neutral-400)" }}>
           {suppliers.find(s => s.id === p.proveedorId)?.nombre ?? "N/A"}
@@ -229,6 +273,7 @@ export default function MasterProductsPage() {
       header: "Precio Base",
       key: "precioVenta",
       align: "right",
+      sortable: true,
       render: (p: ProductResponse) => (
         <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--neutral-200)" }}>
           {formatCurrency(p.precioVenta ?? 0)}
@@ -260,27 +305,28 @@ export default function MasterProductsPage() {
         description="Gestiona los productos base que se replican en todas las sucursales del sistema."
       />
 
-      <div style={{ 
-        display: "flex", 
-        flexDirection: "row", 
-        flexWrap: "wrap",
-        justifyContent: "space-between", 
-        alignItems: "flex-end", 
-        marginBottom: "32px", 
-        gap: "24px" 
-      }}>
-        <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}></div>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <Button leftIcon={<Plus size={15} />} onClick={() => handleOpenModal()} style={{ marginTop: "4px" }}>
+      <Toolbar
+        left={
+          <SearchFilter 
+            placeholder="Buscar por SKU o nombre..."
+            value={searchTerm}
+            onChange={setSearchTerm}
+            containerClassName="w-[450px]"
+          />
+        }
+        right={
+          <Button leftIcon={<Plus size={15} />} onClick={() => handleOpenModal()} className="mt-1">
             Nuevo Producto
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <DataTable<ProductResponse>
           columns={columns}
-          data={products}
+          data={filteredAndSortedProducts}
+          sortConfig={sortConfig}
+          onSort={handleSort}
           isLoading={loading}
           emptyState={{
             title: "Catálogo vacío",
@@ -328,16 +374,18 @@ export default function MasterProductsPage() {
             <Input
               type="number"
               label="Costo Promedio"
-              value={formData.costoPromedio.toString()}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, costoPromedio: Number(e.target.value) })}
+              value={formData.costoPromedio}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, costoPromedio: e.target.value === "" ? "" : Number(e.target.value) })}
               icon={<span style={{ fontSize: "12px", fontWeight: 700 }}>$</span>}
+              placeholder="0"
             />
             <Input
               type="number"
               label="Precio Venta Base (Fallback)"
-              value={formData.precioVenta.toString()}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, precioVenta: Number(e.target.value) })}
+              value={formData.precioVenta}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, precioVenta: e.target.value === "" ? "" : Number(e.target.value) })}
               icon={<span style={{ fontSize: "12px", fontWeight: 700 }}>$</span>}
+              placeholder="0"
             />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>

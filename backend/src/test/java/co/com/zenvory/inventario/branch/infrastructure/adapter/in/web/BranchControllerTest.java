@@ -124,7 +124,7 @@ class BranchControllerTest {
         @Test
         @DisplayName("POST /api/branches: retorna 201 con la sucursal creada")
         void create_returns201WithCreatedBranch() throws Exception {
-                BranchRequest request = new BranchRequest("Sucursal Sur", "Carrera 80 #12-34", "3159876543");
+                BranchRequest request = new BranchRequest("Sucursal Sur", "Carrera 80 #12-34", "3159876543", null);
                 when(branchUseCase.createBranch(any(Branch.class))).thenReturn(sampleBranch);
 
                 mockMvc.perform(post("/api/branches")
@@ -138,7 +138,7 @@ class BranchControllerTest {
         @Test
         @DisplayName("POST /api/branches: pasa el nombre, dirección y teléfono del request al caso de uso")
         void create_passesDtoDataToUseCase() throws Exception {
-                BranchRequest request = new BranchRequest("Nueva Sucursal", "Dirección Test", "3001111111");
+                BranchRequest request = new BranchRequest("Nueva Sucursal", "Dirección Test", "3001111111", null);
 
                 Branch expected = Branch.builder()
                                 .id(5L)

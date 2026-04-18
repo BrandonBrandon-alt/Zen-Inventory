@@ -7,5 +7,6 @@ public enum TransferStatus {
     DELIVERED,
     WITH_ISSUE,
     UNDER_CLAIM,
-    CANCELLED
+    CANCELLED,
+    REJECTED
 }

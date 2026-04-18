@@ -11,7 +11,10 @@ import co.com.zenvory.inventario.inventory.domain.model.MovementReason;
 import co.com.zenvory.inventario.inventory.domain.model.MovementType;
 import co.com.zenvory.inventario.catalog.application.port.in.ProductUseCase;
 import co.com.zenvory.inventario.catalog.domain.model.Product;
+import co.com.zenvory.inventario.catalog.domain.model.ProductUnit;
+import co.com.zenvory.inventario.catalog.application.port.in.UnitOfMeasureUseCase;
 import co.com.zenvory.inventario.inventory.domain.event.StockLevelDroppedEvent;
+import co.com.zenvory.inventario.inventory.domain.event.StockLevelRestoredEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,15 +30,18 @@ public class InventoryService implements InventoryUseCase {
     private final LocalInventoryRepositoryPort localInventoryRepository;
     private final InventoryMovementRepositoryPort inventoryMovementRepository;
     private final ProductUseCase productUseCase;
+    private final UnitOfMeasureUseCase unitOfMeasureUseCase;
     private final ApplicationEventPublisher eventPublisher;
 
     public InventoryService(LocalInventoryRepositoryPort localInventoryRepository,
                             InventoryMovementRepositoryPort inventoryMovementRepository,
                             ProductUseCase productUseCase,
+                            UnitOfMeasureUseCase unitOfMeasureUseCase,
                             ApplicationEventPublisher eventPublisher) {
         this.localInventoryRepository = localInventoryRepository;
         this.inventoryMovementRepository = inventoryMovementRepository;
         this.productUseCase = productUseCase;
+        this.unitOfMeasureUseCase = unitOfMeasureUseCase;
         this.eventPublisher = eventPublisher;
     }
 
@@ -47,27 +53,36 @@ public class InventoryService implements InventoryUseCase {
 
     @Override
     @Transactional
-    public void withdrawStock(Long branchId, Long productId, String productName, BigDecimal quantity, MovementReason reason, Long userId, Long referenceId, String referenceType) {
-        LocalInventory inventory = getInventory(branchId, productId);
-        
-        if (!inventory.hasSufficientStock(quantity)) {
-            throw new InsufficientStockException(productName, quantity, inventory.getCurrentQuantity());
+    public void withdrawStock(Long branchId, Long productId, String productName, BigDecimal quantity, Long unitId, MovementReason reason, Long userId, Long referenceId, String referenceType, String observations, String subReason) {
+        BigDecimal finalQuantity = quantity;
+
+        // Lógica de Conversión de Unidades
+        if (unitId != null) {
+            finalQuantity = applyConversion(productId, unitId, quantity, null).quantity();
         }
 
-        inventory.setCurrentQuantity(inventory.getCurrentQuantity().subtract(quantity));
+        LocalInventory inventory = getInventory(branchId, productId);
+        
+        if (!inventory.hasSufficientStock(finalQuantity)) {
+            throw new InsufficientStockException(productName, finalQuantity, inventory.getCurrentQuantity());
+        }
+
+        inventory.setCurrentQuantity(inventory.getCurrentQuantity().subtract(finalQuantity));
         inventory.setLastUpdated(LocalDateTime.now());
         localInventoryRepository.save(inventory);
 
         InventoryMovement movement = InventoryMovement.builder()
                 .type(MovementType.RETIRO)
                 .reason(reason)
-                .quantity(quantity)
+                .quantity(finalQuantity)
                 .date(LocalDateTime.now())
                 .productId(productId)
                 .branchId(branchId)
                 .userId(userId)
                 .referenceId(referenceId)
                 .referenceType(referenceType)
+                .observations(observations)
+                .subReason(subReason)
                 .finalBalance(inventory.getCurrentQuantity())
                 .build();
         inventoryMovementRepository.save(movement);
@@ -78,7 +93,17 @@ public class InventoryService implements InventoryUseCase {
 
     @Override
     @Transactional
-    public void addStock(Long branchId, Long productId, BigDecimal quantity, MovementReason reason, Long userId, Long referenceId, String referenceType, BigDecimal unitCost) {
+    public void addStock(Long branchId, Long productId, BigDecimal quantity, Long unitId, MovementReason reason, Long userId, Long referenceId, String referenceType, BigDecimal unitCost, String observations, String subReason) {
+        BigDecimal finalQuantity = quantity;
+        BigDecimal finalUnitCost = unitCost;
+
+        // Lógica de Conversión de Unidades
+        if (unitId != null) {
+            var result = applyConversion(productId, unitId, quantity, unitCost);
+            finalQuantity = result.quantity();
+            finalUnitCost = result.unitCost();
+        }
+
         LocalInventory inventory = localInventoryRepository.findByBranchAndProduct(branchId, productId)
                 .orElseGet(() -> LocalInventory.builder()
                         .branchId(branchId)
@@ -88,32 +113,89 @@ public class InventoryService implements InventoryUseCase {
                         .build());
 
         // Recalcular Costo Promedio si se proporciona un costo unitario
-        if (unitCost != null && unitCost.compareTo(BigDecimal.ZERO) > 0) {
-            updateProductAverageCost(productId, quantity, unitCost);
+        if (finalUnitCost != null && finalUnitCost.compareTo(BigDecimal.ZERO) > 0) {
+            updateProductAverageCost(productId, finalQuantity, finalUnitCost);
         }
 
-        inventory.setCurrentQuantity(inventory.getCurrentQuantity().add(quantity));
+        inventory.setCurrentQuantity(inventory.getCurrentQuantity().add(finalQuantity));
         inventory.setLastUpdated(LocalDateTime.now());
         localInventoryRepository.save(inventory);
 
         InventoryMovement movement = InventoryMovement.builder()
                 .type(MovementType.INGRESO)
                 .reason(reason)
-                .quantity(quantity)
+                .quantity(finalQuantity)
                 .date(LocalDateTime.now())
                 .productId(productId)
                 .branchId(branchId)
                 .userId(userId)
                 .referenceId(referenceId)
                 .referenceType(referenceType)
+                .observations(observations)
+                .subReason(subReason)
                 .finalBalance(inventory.getCurrentQuantity())
                 .build();
         inventoryMovementRepository.save(movement);
 
         // Si el stock se ha incrementado, avisamos al sistema por si debe retirar alertas críticas
         if (inventory.getCurrentQuantity().compareTo(inventory.getMinimumStock()) > 0) {
-            eventPublisher.publishEvent(new co.com.zenvory.inventario.inventory.domain.event.StockLevelRestoredEvent(this, branchId, productId));
+            eventPublisher.publishEvent(new StockLevelRestoredEvent(this, branchId, productId));
         }
+    }
+
+    private record ConversionResult(BigDecimal quantity, BigDecimal unitCost) {}
+
+    private ConversionResult applyConversion(Long productId, Long unitId, BigDecimal quantity, BigDecimal unitCost) {
+        List<ProductUnit> units = unitOfMeasureUseCase.getUnitsByProduct(productId);
+        ProductUnit targetUnit = units.stream()
+                .filter(u -> u.getUnitId().equals(unitId))
+                .findFirst()
+                .orElse(null);
+
+        if (targetUnit == null || targetUnit.getConversionFactor() == null) {
+            return new ConversionResult(quantity, unitCost);
+        }
+
+        BigDecimal factor = targetUnit.getConversionFactor();
+        BigDecimal finalQuantity = quantity.multiply(factor);
+        BigDecimal finalUnitCost = unitCost != null 
+                ? unitCost.divide(factor, 4, RoundingMode.HALF_UP) 
+                : null;
+
+        return new ConversionResult(finalQuantity, finalUnitCost);
+    }
+
+    @Override
+    @Transactional
+    public void reserveStock(Long branchId, Long productId, BigDecimal quantity) {
+        LocalInventory inventory = getInventory(branchId, productId);
+        
+        if (!inventory.hasSufficientStock(quantity)) {
+            Product product = productUseCase.getProductById(productId);
+            throw new InsufficientStockException(product.getName(), quantity, 
+                    inventory.getCurrentQuantity().subtract(inventory.getCommittedQuantity() != null ? inventory.getCommittedQuantity() : BigDecimal.ZERO));
+        }
+
+        BigDecimal currentCommitted = inventory.getCommittedQuantity() != null ? inventory.getCommittedQuantity() : BigDecimal.ZERO;
+        inventory.setCommittedQuantity(currentCommitted.add(quantity));
+        inventory.setLastUpdated(LocalDateTime.now());
+        localInventoryRepository.save(inventory);
+    }
+
+    @Override
+    @Transactional
+    public void releaseStock(Long branchId, Long productId, BigDecimal quantity) {
+        LocalInventory inventory = getInventory(branchId, productId);
+        BigDecimal currentCommitted = inventory.getCommittedQuantity() != null ? inventory.getCommittedQuantity() : BigDecimal.ZERO;
+        
+        BigDecimal newCommitted = currentCommitted.subtract(quantity);
+        if (newCommitted.compareTo(BigDecimal.ZERO) < 0) {
+            newCommitted = BigDecimal.ZERO;
+        }
+        
+        inventory.setCommittedQuantity(newCommitted);
+        inventory.setLastUpdated(LocalDateTime.now());
+        localInventoryRepository.save(inventory);
     }
 
     private void updateProductAverageCost(Long productId, BigDecimal newQuantity, BigDecimal unitCost) {

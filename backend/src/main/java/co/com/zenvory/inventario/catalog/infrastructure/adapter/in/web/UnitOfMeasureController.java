@@ -128,6 +128,8 @@ public class UnitOfMeasureController {
                 .id(pu.getId())
                 .productoId(pu.getProductId())
                 .unidadId(pu.getUnitId())
+                .nombreUnidad(pu.getUnitName())
+                .abreviaturaUnidad(pu.getUnitAbbreviation())
                 .factorConversion(pu.getConversionFactor())
                 .esBase(pu.getIsBase())
                 .build();

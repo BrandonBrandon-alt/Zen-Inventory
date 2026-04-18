@@ -88,7 +88,7 @@ export default function HistoryTable({ sales, onOpenDetail, formatCurrency, onRe
 
   const renderMobileCard = (sale: any) => (
     <div 
-      style={{ padding: "20px", background: "var(--bg-base)", borderBottom: "1px solid var(--border-subtle)" }}
+      style={{ padding: "20px", background: "var(--bg-base)", borderBottom: "1px solid var(--neutral-800)" }}
       onClick={() => onOpenDetail(sale)}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
@@ -99,7 +99,7 @@ export default function HistoryTable({ sales, onOpenDetail, formatCurrency, onRe
             fontSize: "9px", 
             fontWeight: 700, 
             textTransform: "uppercase",
-            background: sale.status === 'COMPLETED' ? "rgba(111, 191, 138, 0.1)" : "rgba(224, 112, 112, 0.1)",
+            background: sale.status === 'COMPLETED' ? "color-mix(in srgb, var(--color-success), transparent 90%)" : "color-mix(in srgb, var(--color-danger), transparent 90%)",
             color: sale.status === 'COMPLETED' ? "var(--color-success)" : "var(--color-danger)",
         }}>
           {sale.status === 'COMPLETED' ? "Aprobada" : "Anulada"}

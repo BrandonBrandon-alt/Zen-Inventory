@@ -7,8 +7,15 @@ import java.util.List;
 public interface PurchaseUseCase {
     PurchaseOrder createOrder(CreatePurchaseCommand command);
     PurchaseOrder markAsInTransit(Long orderId);
-    PurchaseOrder receiveOrder(Long orderId, Long userId);
+
+    PurchaseReceiptResult receiveOrder(Long orderId, Long userId, java.util.Map<Long, ItemReceiptInfo> items);
+
+    record ItemReceiptInfo(java.math.BigDecimal quantity, Long unitId) {}
+
+    PurchaseOrder closeShortfall(Long orderId, Long userId);
+
     PurchaseOrder registerPayment(Long orderId);
+    void cancelPurchase(Long orderId, String reason, Long userId);
     PurchaseOrder getOrderById(Long orderId);
     List<PurchaseOrder> getAllOrders();
 }

@@ -20,6 +20,8 @@ public record BranchRequest(
         String direccion,
 
         @Pattern(regexp = "\\d{7,15}", message = "El teléfono debe contener entre 7 y 15 dígitos")
-        String telefono
+        String telefono,
+
+        Long managerId
 
 ) {}

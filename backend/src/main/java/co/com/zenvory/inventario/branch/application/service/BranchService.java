@@ -44,6 +44,7 @@ public class BranchService implements BranchUseCase {
         existing.setName(updated.getName());
         existing.setAddress(updated.getAddress());
         existing.setPhone(updated.getPhone());
+        existing.setManagerId(updated.getManagerId());
         if (updated.getActive() != null) {
             existing.setActive(updated.getActive());
         }

@@ -5,6 +5,7 @@ import co.com.zenvory.inventario.transfer.application.port.in.ReceiveTransferCom
 import co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCommand;
 import co.com.zenvory.inventario.transfer.application.port.in.TransferUseCase;
 import co.com.zenvory.inventario.transfer.domain.model.Transfer;
+import co.com.zenvory.inventario.shared.infrastructure.web.ResolutionRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -102,8 +103,18 @@ public class TransferController {
     }
 
     @PostMapping("/{id}/cancel")
-    public ResponseEntity<Void> cancelTransfer(@PathVariable Long id) {
-        transferUseCase.cancelTransfer(id);
+    public ResponseEntity<Void> cancelTransfer(
+            @PathVariable Long id,
+            @Valid @RequestBody ResolutionRequest request) {
+        transferUseCase.cancelTransfer(id, request.reason(), request.userId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/reject")
+    public ResponseEntity<Void> rejectTransfer(
+            @PathVariable Long id,
+            @Valid @RequestBody ResolutionRequest request) {
+        transferUseCase.rejectTransfer(id, request.reason(), request.userId());
         return ResponseEntity.noContent().build();
     }
 

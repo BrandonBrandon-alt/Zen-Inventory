@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { apiClient } from "@/api/client";
 import { getSession, type AuthSession } from "@/api/auth";
 import { useToast } from "@/context/ToastContext";
@@ -12,18 +12,36 @@ import HistoryTable   from "@/components/sales-history/HistoryTable";
 import { Search, RefreshCcw, History, ClipboardList, Info } from "lucide-react";
 import SaleDetailModal from "@/components/sales-history/SaleDetailModal";
 import PageHeader from "@/components/ui/PageHeader";
-import Input from "@/components/ui/Input";
+import SummaryCards from "@/components/sales-history/SummaryCards";
 
-export default function SalesHistoryPage() {
+// Helper for currency formatting - defined outside to avoid TDZ issues during SSR/Prerendering
+const formatCurrency = (amount: number) =>
+  new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(amount);
+
+
+// Main logic component that uses useSearchParams
+function SalesHistoryContent() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { showToast } = useToast();
+
   const [session, setSession] = useState<AuthSession | null>(null);
   const [sales, setSales] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSale, setSelectedSale] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+
+  // Derive branchId from URL
+  const branchIdParam = searchParams.get("branch");
+  const selectedBranchId = branchIdParam ? parseInt(branchIdParam) : 0;
 
   // Persistence logic: Load state from localStorage on mount
   useEffect(() => {
@@ -56,17 +74,42 @@ export default function SalesHistoryPage() {
       return;
     }
     setSession(sess);
-    fetchSales();
+
+    // Initial data fetch: Branches (if admin)
+    if (sess.rol === "ADMIN") {
+      apiClient.GET("/api/branches").then(res => {
+        setBranches(res.data || []);
+      });
+    }
   }, [router]);
 
-  const fetchSales = async () => {
+  // Load sales when session is ready OR when branchId in URL changes
+  useEffect(() => {
+    if (session) {
+      fetchSales(session, selectedBranchId || undefined);
+    }
+  }, [session, selectedBranchId]);
+
+  const fetchSales = async (currentSession?: AuthSession | null, branchId?: number) => {
+    const authSess = currentSession || session;
+    const targetBranchId = branchId !== undefined ? branchId : (selectedBranchId || undefined);
+    
     setLoading(true);
     try {
-      const { data } = await apiClient.GET("/api/v1/sales", {});
+      const { data } = await apiClient.GET("/api/v1/sales", {
+        params: { query: { branchId: targetBranchId } }
+      });
       if (data) {
-        const sortedSales = [...(data as any[])].sort((a, b) => 
-            new Date(b.date).getTime() - new Date(a.date).getTime()
-        );
+        const sortedSales = [...(data as any[])].sort((a, b) => {
+          // If admin, group by branch first
+          if (authSess?.rol === "ADMIN") {
+            const branchA = (a.branchName || "").toLowerCase();
+            const branchB = (b.branchName || "").toLowerCase();
+            if (branchA !== branchB) return branchA.localeCompare(branchB);
+          }
+          // Then sort by date descending
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        });
         setSales(sortedSales);
       }
     } catch (error: any) {
@@ -87,12 +130,56 @@ export default function SalesHistoryPage() {
     );
   }, [sales, searchTerm]);
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("es-CO", {
-      style: "currency",
-      currency: "COP",
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const metrics = useMemo(() => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    
+    // Last 7 days (including today)
+    const sevenDaysAgo = todayStart - (6 * 24 * 60 * 60 * 1000);
+    
+    // Last 30 days (including today)
+    const thirtyDaysAgo = todayStart - (29 * 24 * 60 * 60 * 1000);
+
+    let daily = 0;
+    let weekly = 0;
+    let monthly = 0;
+    let total = 0;
+
+    sales.forEach(sale => {
+      if (sale.status !== 'COMPLETED') return;
+      
+      const saleDate = new Date(sale.date).getTime();
+      const amount = sale.totalFinal || 0;
+      total += amount;
+
+      if (saleDate >= todayStart) {
+        daily += amount;
+      }
+      if (saleDate >= sevenDaysAgo) {
+        weekly += amount;
+      }
+      if (saleDate >= thirtyDaysAgo) {
+        monthly += amount;
+      }
+    });
+
+    return {
+      daily: formatCurrency(daily),
+      weekly: formatCurrency(weekly),
+      monthly: formatCurrency(monthly),
+      total: formatCurrency(total)
+    };
+  }, [sales]);
+
+  const handleBranchChange = (id: string | number) => {
+    const params = new URLSearchParams(searchParams);
+    if (id && id !== "0" && id !== "all") {
+      params.set("branch", id.toString());
+    } else {
+      params.delete("branch");
+    }
+    router.push(`${pathname}?${params.toString()}`);
+  };
 
   const openDetail = (sale: any) => {
     setSelectedSale(sale);
@@ -112,34 +199,24 @@ export default function SalesHistoryPage() {
           description="Gestión y auditoría de transacciones registradas en el sistema POS."
         />
 
-        <div style={{ 
-          display: "flex", 
-          flexDirection: "row", 
-          flexWrap: "wrap",
-          justifyContent: "space-between", 
-          alignItems: "flex-end", 
-          marginBottom: "32px", 
-          gap: "24px" 
-        }}>
-            <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}></div>
-            <div className="flex items-center gap-3 pb-1">
-                <button 
-                  onClick={fetchSales}
-                  disabled={loading}
-                  className="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 px-4 py-2 rounded-xl border border-neutral-700 transition-all font-bold text-xs uppercase tracking-widest disabled:opacity-50 h-10"
-                >
-                  <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                  Sincronizar
-                </button>
-            </div>
-        </div>
+        {session?.rol === "ADMIN" && (
+          <SummaryCards 
+            daily={metrics.daily}
+            weekly={metrics.weekly}
+            monthly={metrics.monthly}
+            total={metrics.total}
+          />
+        )}
 
         {/* Transaction Table Card – Matching Inventory Matrix style */}
         <Card style={{ padding: 0, overflow: "hidden", border: "1px solid var(--border-default)" }}>
           <HistoryFilters 
             searchTerm={searchTerm}
             onSearchChange={setSearchTerm}
-            onRefresh={fetchSales}
+            isAdmin={session?.rol === "ADMIN"}
+            branches={branches}
+            selectedBranchId={selectedBranchId || "all"}
+            onBranchChange={handleBranchChange}
           />
 
           <HistoryTable 
@@ -159,5 +236,20 @@ export default function SalesHistoryPage() {
         onSaleCanceled={fetchSales}
       />
     </div>
+  );
+}
+
+// Wrapper component to provide Suspense boundary for useSearchParams
+export default function SalesHistoryPage() {
+  return (
+    <Suspense 
+      fallback={
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Spinner />
+        </div>
+      }
+    >
+      <SalesHistoryContent />
+    </Suspense>
   );
 }

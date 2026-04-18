@@ -7,6 +7,7 @@ interface BadgeProps {
   children: React.ReactNode;
   variant?: BadgeVariant;
   dot?: boolean;
+  className?: string; // Permitir estilos externos
 }
 
 const variantTokens: Record<BadgeVariant, { bg: string; color: string; border: string }> = {
@@ -37,10 +38,11 @@ const variantTokens: Record<BadgeVariant, { bg: string; color: string; border: s
   },
 };
 
-export default function Badge({ children, variant = "neutral", dot = false }: BadgeProps) {
+export default function Badge({ children, variant = "neutral", dot = false, className }: BadgeProps) {
   const t = variantTokens[variant];
   return (
     <span
+      className={className}
       style={{
         display: "inline-flex",
         alignItems: "center",

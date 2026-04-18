@@ -18,9 +18,10 @@ interface NewTransferModalProps {
   onSuccess: () => void;
   currentBranchId: number | null;
   isAdmin: boolean;
+  initialProductId?: string | null;
 }
 
-export default function NewTransferModal({ open, onClose, onSuccess, currentBranchId, isAdmin }: NewTransferModalProps) {
+export default function NewTransferModal({ open, onClose, onSuccess, currentBranchId, isAdmin, initialProductId }: NewTransferModalProps) {
   const { showToast } = useToast();
   const [branches, setBranches] = useState<BranchResponse[]>([]);
   const [products, setProducts] = useState<ProductResponse[]>([]);
@@ -54,6 +55,12 @@ export default function NewTransferModal({ open, onClose, onSuccess, currentBran
   }, [open, showToast]);
 
   useEffect(() => {
+    if (open && initialProductId) {
+      setFormData(prev => ({ ...prev, productId: initialProductId }));
+    }
+  }, [open, initialProductId]);
+
+  useEffect(() => {
     if (formData.originBranchId && formData.productId) {
       apiClient.GET("/api/v1/inventory/branches/{branchId}/products/{productId}", {
         params: { path: { branchId: parseInt(formData.originBranchId), productId: parseInt(formData.productId) } }
@@ -75,6 +82,16 @@ export default function NewTransferModal({ open, onClose, onSuccess, currentBran
 
     if (formData.originBranchId === formData.destinationBranchId) {
       showToast("La sucursal de origen y destino no pueden ser la misma", "warning");
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(formData.estimatedArrivalDate);
+    selectedDate.setHours(24, 0, 0, 0); // Consider end of selected day for date inputs
+
+    if (selectedDate < today) {
+      showToast("La fecha estimada de llegada no puede ser anterior a hoy", "warning");
       return;
     }
 
@@ -170,6 +187,7 @@ export default function NewTransferModal({ open, onClose, onSuccess, currentBran
         <Input
           label="Fecha Estimada de Llegada"
           type="date"
+          min={new Date().toISOString().split("T")[0]}
           value={formData.estimatedArrivalDate}
           onChange={(e) => setFormData({ ...formData, estimatedArrivalDate: e.target.value })}
         />

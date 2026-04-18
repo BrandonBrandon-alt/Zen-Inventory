@@ -1,90 +1,57 @@
-"use client";
-
 import React from "react";
-import { Search, RefreshCcw } from "lucide-react";
-import Input from "@/components/ui/Input";
+import SearchFilter from "@/components/ui/SearchFilter";
+import Separator from "@/components/ui/Separator";
+import Select from "@/components/ui/Select";
+import { Building } from "lucide-react";
 
 interface HistoryFiltersProps {
   searchTerm: string;
   onSearchChange: (value: string) => void;
-  onRefresh: () => void;
+  branches?: { id?: number; nombre?: string }[];
+  selectedBranchId: string | number | null;
+  onBranchChange: (value: string | number) => void;
+  isAdmin: boolean;
 }
 
-export default function HistoryFilters({ searchTerm, onSearchChange, onRefresh }: HistoryFiltersProps) {
+export default function HistoryFilters({ 
+  searchTerm, 
+  onSearchChange,
+  branches = [],
+  selectedBranchId,
+  onBranchChange,
+  isAdmin
+}: HistoryFiltersProps) {
   return (
-    <div style={{ 
-      padding: "20px 24px", 
-      borderBottom: "1px solid var(--border-default)", 
-      display: "flex", 
-      flexDirection: "row",
-      flexWrap: "wrap",
-      alignItems: "flex-end", // Align with bottom of inputs
-      justifyContent: "space-between",
-      gap: "16px",
-      background: "var(--bg-surface)"
-    }}>
-      
-      {/* Search Input - Using custom UI Component */}
-      <div style={{ width: "100%", maxWidth: "450px" }}>
-        <Input 
-          label="Búsqueda de Auditoría"
-          placeholder="ID venta, sucursal o cliente..."
-          icon={<Search size={16} />}
-          value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
-        />
-      </div>
-      
-      {/* Functional Controls */}
-      <div style={{ display: "flex", gap: "10px", alignItems: "center", paddingBottom: "2px" }}>
-        <button 
-            onClick={onRefresh}
-            style={{ 
-                padding: "11px", 
-                background: "var(--bg-card)", 
-                border: "1px solid var(--border-default)", 
-                borderRadius: "var(--radius-md)",
-                color: "var(--neutral-500)",
-                cursor: "pointer",
-                transition: "all 0.2s",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-            }}
-            title="Sincronizar Datos"
-            onMouseEnter={(e) => e.currentTarget.style.color = "var(--neutral-200)"}
-            onMouseLeave={(e) => e.currentTarget.style.color = "var(--neutral-500)"}
-        >
-            <RefreshCcw size={16} />
-        </button>
+    <div className="p-6 flex flex-col gap-6 bg-[var(--bg-surface)]">
+      <div className="flex flex-row flex-wrap items-end gap-6">
+        {isAdmin && (
+          <div className="w-full max-w-[280px]">
+            <Select
+              label="Sucursal"
+              value={selectedBranchId || "all"}
+              onChange={(val) => onBranchChange(val === "all" ? 0 : val)}
+              options={[
+                { value: "all", label: "Todas las Sedes" },
+                ...branches.map(b => ({ value: b.id!, label: b.nombre! }))
+              ]}
+              icon={<Building size={14} className="text-[var(--brand-400)]" />}
+            />
+          </div>
+        )}
 
-        <div style={{ 
-            display: "flex", 
-            background: "var(--bg-card)", 
-            padding: "4px", 
-            borderRadius: "var(--radius-md)", 
-            border: "1px solid var(--border-default)" 
-        }}>
-            {['Todas', 'Anuladas'].map((label) => (
-                <button 
-                    key={label}
-                    style={{ 
-                        padding: "8px 16px", 
-                        borderRadius: "6px", 
-                        border: "none", 
-                        cursor: "pointer", 
-                        fontSize: "12px", 
-                        fontWeight: 600,
-                        background: label === 'Todas' ? "var(--brand-500)" : "transparent",
-                        color: label === 'Todas' ? "white" : "var(--neutral-500)",
-                        transition: "all 0.2s"
-                    }}
-                >
-                    {label}
-                </button>
-            ))}
+        <div className="flex-1 max-w-[450px]">
+          <SearchFilter 
+            label="Búsqueda de Auditoría"
+            placeholder="ID venta, sucursal o cliente..."
+            value={searchTerm}
+            onChange={onSearchChange}
+            containerClassName="w-full"
+            className="h-11 shadow-sm"
+          />
         </div>
       </div>
+      
+      <Separator />
     </div>
   );
 }

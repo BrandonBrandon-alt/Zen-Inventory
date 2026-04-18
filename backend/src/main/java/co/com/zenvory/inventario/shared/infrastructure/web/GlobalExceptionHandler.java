@@ -1,5 +1,6 @@
 package co.com.zenvory.inventario.shared.infrastructure.web;
 
+import co.com.zenvory.inventario.auth.domain.exception.AccountDisabledException;
 import co.com.zenvory.inventario.auth.domain.exception.InvalidCredentialsException;
 import co.com.zenvory.inventario.auth.domain.exception.UserNotFoundException;
 import org.slf4j.Logger;
@@ -18,6 +19,7 @@ import co.com.zenvory.inventario.transfer.domain.exception.InvalidTransferStateE
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -49,6 +51,12 @@ public class GlobalExceptionHandler {
     /** 401 – Credenciales incorrectas (email o contraseña inválidos). */
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleInvalidCredentials(InvalidCredentialsException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    /** 401 – Cuenta desactivada. */
+    @ExceptionHandler(AccountDisabledException.class)
+    public ResponseEntity<ErrorResponse> handleAccountDisabled(AccountDisabledException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse(ex.getMessage()));
     }
 
@@ -128,6 +136,14 @@ public class GlobalExceptionHandler {
     }
 
     /** 500 – Fallback para excepciones no manejadas explícitamente. */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLocking(ObjectOptimisticLockingFailureException ex) {
+        log.warn("Optimistic locking failure: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("El documento fue modificado por otro usuario. Por favor, recarga la página e intenta de nuevo."));
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleGeneral(RuntimeException ex) {
         log.error("Internal Server Error: {}", ex.getMessage(), ex);

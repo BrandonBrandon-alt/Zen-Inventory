@@ -1,0 +1,4 @@
+UPDATE rol SET nombre = 'MANAGER' WHERE nombre = 'GERENTE_SUCURSAL';
+UPDATE rol SET nombre = 'SELLER' WHERE nombre = 'VENDEDOR';
+UPDATE rol SET nombre = 'ADMIN' WHERE nombre = 'ADMINISTRADOR';
+INSERT INTO rol (nombre) VALUES ('OPERADOR_INVENTARIO');

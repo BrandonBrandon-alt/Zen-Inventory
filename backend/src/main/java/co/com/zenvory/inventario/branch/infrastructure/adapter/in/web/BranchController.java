@@ -30,6 +30,7 @@ public class BranchController {
                 .name(request.nombre())
                 .address(request.direccion())
                 .phone(request.telefono())
+                .managerId(request.managerId())
                 .build();
 
         // 2. Ejecutar caso de uso
@@ -64,6 +65,7 @@ public class BranchController {
                 .name(request.nombre())
                 .address(request.direccion())
                 .phone(request.telefono())
+                .managerId(request.managerId())
                 .build();
 
         Branch updated = branchUseCase.updateBranch(id, branchData);
@@ -85,6 +87,7 @@ public class BranchController {
                 .direccion(branch.getAddress())
                 .telefono(branch.getPhone())
                 .activa(branch.getActive())
+                .managerId(branch.getManagerId())
                 .build();
     }
 }

@@ -31,6 +31,9 @@ public class LocalInventoryEntity {
     @Column(name = "cantidad_actual", precision = 12, scale = 4)
     private BigDecimal currentQuantity;
 
+    @Column(name = "stock_comprometido", precision = 12, scale = 4)
+    private BigDecimal committedQuantity;
+
     @Column(name = "stock_minimo", precision = 12, scale = 4)
     private BigDecimal minimumStock;
 
@@ -43,6 +46,7 @@ public class LocalInventoryEntity {
                 .branchId(branchId)
                 .productId(productId)
                 .currentQuantity(currentQuantity)
+                .committedQuantity(committedQuantity)
                 .minimumStock(minimumStock)
                 .lastUpdated(lastUpdated)
                 .build();
@@ -54,6 +58,7 @@ public class LocalInventoryEntity {
                 .branchId(domain.getBranchId())
                 .productId(domain.getProductId())
                 .currentQuantity(domain.getCurrentQuantity())
+                .committedQuantity(domain.getCommittedQuantity())
                 .minimumStock(domain.getMinimumStock())
                 .lastUpdated(domain.getLastUpdated())
                 .build();

@@ -1,0 +1,1 @@
+ALTER TABLE sucursal DROP COLUMN manager_id;

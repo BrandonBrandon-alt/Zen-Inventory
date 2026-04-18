@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { apiClient } from "@/api/client";
 import { getSession } from "@/api/auth";
 import type { components } from "@/api/schema";
@@ -11,19 +12,50 @@ import Card       from "@/components/ui/Card";
 import Badge      from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
 import Modal      from "@/components/ui/Modal";
+import Toolbar    from "@/components/ui/Toolbar";
 import Button     from "@/components/ui/Button";
 import Input      from "@/components/ui/Input";
 import Select     from "@/components/ui/Select";
 import DataTable  from "@/components/ui/DataTable";
+import Separator  from "@/components/ui/Separator";
 import { useToast } from "@/context/ToastContext";
-import { Search, LayoutGrid, Table, Info } from "lucide-react";
-import InventoryItemCard from "@/components/inventory/InventoryItemCard";
+import { Search, Info, Lock, ShoppingCart, RotateCcw, Truck, CreditCard, ArrowRight, ShoppingBag, Repeat, AlertTriangle, CheckCircle, MinusCircle, ChevronDown } from "lucide-react";
+import StockStatus from "@/components/ui/StockStatus";
+import { usePersistence } from "@/hooks/usePersistence";
+import SearchFilter from "@/components/ui/SearchFilter";
 
 // ── Types ──────────────────────────────────────────────────
 type ProductResponse  = components["schemas"]["ProductResponse"];
 type LocalInventory   = components["schemas"]["LocalInventory"];
 type BranchResponse   = components["schemas"]["BranchResponse"];
 type InventoryProductResponse = components["schemas"]["InventoryProductResponse"];
+
+const EXTERNAL_MOTIVES: Record<string, { label: string, path: string, description: string, icon: any }> = {
+  COMPRA: {
+    label: "Ir a Compras",
+    path: "/purchases",
+    description: "Para registrar el ingreso de mercancía por compra, debes generar una Orden de Compra formal para afectar correctamente las cuentas por pagar.",
+    icon: <ShoppingCart size={24} />
+  },
+  DEVOLUCION: {
+    label: "Ir a Historial de Ventas",
+    path: "/sales/history",
+    description: "Las devoluciones de clientes deben procesarse desde el historial de ventas para anular la factura y cargar el stock automáticamente.",
+    icon: <RotateCcw size={24} />
+  },
+  TRASLADO: {
+    label: "Ir a Traslados",
+    path: "/transfers",
+    description: "El movimiento de stock entre sedes se gestiona desde el módulo de traslados para asegurar la trazabilidad y el inventario en tránsito.",
+    icon: <Truck size={24} />
+  },
+  VENTA: {
+    label: "Ir al POS",
+    path: "/sales/pos",
+    description: "Las salidas por venta deben realizarse a través del Punto de Venta (POS) para emitir el comprobante y descargar el stock vinculado a la factura.",
+    icon: <CreditCard size={24} />
+  }
+};
 
 interface InventoryMovementExtended {
   id: number;
@@ -36,38 +68,14 @@ interface InventoryMovementExtended {
   userId: number;
   referenceId?: number;
   referenceType?: string;
+  observations?: string;
   finalBalance: number;
-}
-
-// ── Components ─────────────────────────────────────────────
-
-function StockStatus({ current, minimum, unit }: { current: number; minimum: number; unit?: string }) {
-  const isCritical = current <= minimum && minimum > 0;
-  const isEmpty = current === 0;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
-        <span style={{ fontSize: "18px", fontWeight: 800, color: isEmpty ? "var(--color-danger)" : isCritical ? "var(--color-warning)" : "var(--neutral-50)" }}>
-          {current}
-        </span>
-        <span style={{ fontSize: "10px", color: "var(--neutral-500)", fontWeight: 600, textTransform: "uppercase" }}>
-          {unit || "UND"}
-        </span>
-      </div>
-      {isEmpty ? (
-        <Badge variant="danger">Agotado</Badge>
-      ) : isCritical ? (
-        <Badge variant="warning">Suelo Crítico</Badge>
-      ) : (
-        <Badge variant="success">Óptimo</Badge>
-      )}
-    </div>
-  );
+  subReason?: string;
 }
 
 // ── Main Page ──────────────────────────────────────────────
 export default function InventoryPage() {
+  const router = useRouter();
   const { showToast } = useToast();
   const session = typeof window !== "undefined" ? getSession() : null;
   const isAdmin = session?.rol === "ADMIN";
@@ -75,11 +83,23 @@ export default function InventoryPage() {
   const isSeller = session?.rol === "SELLER";
   const myBranchId = session?.sucursalId || null;
 
-  const [activeTab, setActiveTab] = useState<"matrix" | "kardex">("matrix");
+  const [invPageState, setInvPageState, isLoaded] = usePersistence("zen_inventory_inventory_state", {
+    branchId: null as number | null,
+    tab: "matrix" as "matrix" | "kardex",
+    search: ""
+  });
+
+  const selectedBranchId = invPageState.branchId;
+  const activeTab = invPageState.tab;
+  const searchTerm = invPageState.search;
+
+  const setSelectedBranchId = (val: number | null) => setInvPageState(prev => ({ ...prev, branchId: val }));
+  const setActiveTab = (val: "matrix" | "kardex") => setInvPageState(prev => ({ ...prev, tab: val }));
+  const setSearchTerm = (val: string) => setInvPageState(prev => ({ ...prev, search: val }));
+
   const [branches, setBranches] = useState<BranchResponse[]>([]);
   const [products, setProducts] = useState<ProductResponse[]>([]);
   const [inventoryMap, setInventoryMap] = useState<Map<number, InventoryProductResponse>>(new Map());
-  const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
   
   // Kardex specific
   const [kardexMovements, setKardexMovements] = useState<InventoryMovementExtended[]>([]);
@@ -88,58 +108,26 @@ export default function InventoryPage() {
 
   const [loadingInit, setLoadingInit] = useState(true);
   const [loadingInv, setLoadingInv] = useState(false);
-
-  // Search and Sort
-  const [searchTerm, setSearchTerm] = useState("");
-  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
-  const [isLoaded, setIsLoaded] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" | null }>({ key: "stockActual", direction: "desc" });
 
   // Modals state
   const [adjustingProduct, setAdjustingProduct] = useState<ProductResponse | null>(null);
-  const [configProduct, setConfigProduct] = useState<{ p: ProductResponse; inv: LocalInventory } | null>(null);
+  const [configProduct, setConfigProduct] = useState<{ p: ProductResponse; inv: any } | null>(null);
   
   const [adjustData, setAdjustData] = useState({
     type: "INGRESO" as "INGRESO" | "RETIRO",
-    quantity: 0,
+    quantity: "" as number | "",
     reason: "" as any,
-    unitCost: 0,
+    unitCost: "" as number | "",
+    observations: "",
+    subReason: "",
+    unitId: null as number | null,
   });
-  const [minStockValue, setMinStockValue] = useState(0);
+  const [adjustingProductUnits, setAdjustingProductUnits] = useState<any[]>([]);
+  const [minStockValue, setMinStockValue] = useState<number | "">("");
   const [submitting, setSubmitting] = useState(false);
 
   const canEdit = isAdmin || (isManager && selectedBranchId === myBranchId);
-  const isReadOnly = isSeller || (!isAdmin && selectedBranchId !== myBranchId);
-
-  // Persistence logic: Load state from localStorage on mount
-  useEffect(() => {
-    const savedState = localStorage.getItem("zen_inventory_inventory_state");
-    if (savedState) {
-      try {
-        const { branchId, tab, search, view } = JSON.parse(savedState);
-        if (branchId) setSelectedBranchId(branchId);
-        if (tab) setActiveTab(tab);
-        if (search) setSearchTerm(search);
-        if (view) setViewMode(view);
-      } catch (e) {
-        console.error("Error parsing saved Inventory state:", e);
-      }
-    }
-    setIsLoaded(true);
-  }, []);
-
-  // Persistence logic: Save state to localStorage whenever it changes
-  useEffect(() => {
-    if (!isLoaded) return;
-    
-    const stateToSave = {
-      branchId: selectedBranchId,
-      tab: activeTab,
-      search: searchTerm,
-      view: viewMode
-    };
-    localStorage.setItem("zen_inventory_inventory_state", JSON.stringify(stateToSave));
-  }, [selectedBranchId, activeTab, searchTerm, viewMode, isLoaded]);
 
   // Initial load
   useEffect(() => {
@@ -152,9 +140,8 @@ export default function InventoryPage() {
         setBranches(bra.data ?? []);
         setProducts(pro.data ?? []);
         
-        // Default to user branch if exists, otherwise first branch
         const defaultBranch = bra.data?.find(b => b.id === myBranchId) || bra.data?.[0];
-        if (defaultBranch) {
+        if (defaultBranch && !selectedBranchId) {
           setSelectedBranchId(defaultBranch.id ?? null);
         }
       } catch (err) {
@@ -164,7 +151,7 @@ export default function InventoryPage() {
       }
     }
     init();
-  }, [showToast, myBranchId]);
+  }, [showToast, myBranchId, selectedBranchId]);
 
   const refreshInventory = useCallback(async (branchId: number) => {
     setLoadingInv(true);
@@ -188,7 +175,6 @@ export default function InventoryPage() {
     if (!selectedBranchId) return;
     setKardexLoading(true);
     try {
-      // For now, use the global movements if specific kardex route is not handling "all"
       const res = await apiClient.GET("/api/v1/inventory/movements" as any, {});
       const allMovements = (res.data ?? []) as any[];
       
@@ -196,10 +182,7 @@ export default function InventoryPage() {
       if (selectedProductId !== "all") {
         filtered = filtered.filter(m => m.productId === parseInt(selectedProductId));
       }
-      
-      // Sort by date desc
       filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
       setKardexMovements(filtered);
     } catch (err) {
       showToast("Error al cargar el Kardex", "error");
@@ -215,9 +198,27 @@ export default function InventoryPage() {
     }
   }, [selectedBranchId, activeTab, refreshInventory, fetchKardex]);
 
+  const handleSort = (key: string) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc"
+    }));
+  };
+
+  useEffect(() => {
+    if (adjustingProduct) {
+      setAdjustData(prev => ({ ...prev, unitId: null }));
+      // @ts-ignore
+      apiClient.GET(`/api/catalog/products/${adjustingProduct.id}/units`, {})
+        .then(res => setAdjustingProductUnits((res.data ?? []) as any[]))
+        .catch(err => console.error("Error fetching units", err));
+    }
+  }, [adjustingProduct]);
+
   const handleAdjustSubmit = async () => {
     if (!adjustingProduct || !selectedBranchId) return;
-    if (adjustData.quantity <= 0) {
+    const qty = typeof adjustData.quantity === "number" ? adjustData.quantity : 0;
+    if (qty <= 0) {
       showToast("La cantidad debe ser mayor a 0", "warning");
       return;
     }
@@ -235,10 +236,13 @@ export default function InventoryPage() {
       const { error } = await apiClient.POST(endpoint as any, {
         params: { path: { branchId: selectedBranchId, productId: adjustingProduct.id! } },
         body: {
-          quantity: adjustData.quantity,
+          quantity: qty,
+          unitId: adjustData.unitId,
           reason: adjustData.reason,
           userId: session?.id || 1,
-          unitCost: adjustData.type === "INGRESO" ? adjustData.unitCost : undefined,
+          unitCost: adjustData.type === "INGRESO" ? (Number(adjustData.unitCost) || 0) : undefined,
+          observations: adjustData.observations,
+          subReason: adjustData.subReason,
         }
       });
 
@@ -261,7 +265,7 @@ export default function InventoryPage() {
       const { error } = await apiClient.PUT("/api/v1/inventory/branches/{branchId}/products/{productId}/config", {
         params: { 
           path: { branchId: selectedBranchId, productId: configProduct.p.id! },
-          query: { minimumStock: minStockValue }
+          query: { minimumStock: Number(minStockValue) || 0 }
         }
       });
 
@@ -289,8 +293,6 @@ export default function InventoryPage() {
 
   const filteredAndSortedProducts = useMemo(() => {
     let result = [...products];
-
-    // 1. Filter
     if (searchTerm) {
       const lowerSearch = searchTerm.toLowerCase();
       result = result.filter(p => {
@@ -304,14 +306,10 @@ export default function InventoryPage() {
         );
       });
     }
-
-    // 2. Sort
     if (sortConfig.key && sortConfig.direction) {
       result.sort((a, b) => {
         let valA: any = (a as any)[sortConfig.key];
         let valB: any = (b as any)[sortConfig.key];
-
-        // Special handling for inventory-mapped values
         if (sortConfig.key === "stockActual") {
           valA = inventoryMap.get(a.id!)?.stockActual ?? 0;
           valB = inventoryMap.get(b.id!)?.stockActual ?? 0;
@@ -319,22 +317,13 @@ export default function InventoryPage() {
           valA = inventoryMap.get(a.id!)?.stockMinimo ?? 0;
           valB = inventoryMap.get(b.id!)?.stockMinimo ?? 0;
         }
-
         if (valA < valB) return sortConfig.direction === "asc" ? -1 : 1;
         if (valA > valB) return sortConfig.direction === "asc" ? 1 : -1;
         return 0;
       });
     }
-
     return result;
   }, [products, inventoryMap, searchTerm, sortConfig]);
-
-  const handleSort = (key: string) => {
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc"
-    }));
-  };
 
   if (loadingInit) return <Spinner fullPage />;
 
@@ -345,317 +334,305 @@ export default function InventoryPage() {
         description="Gestión inmutable de stock, auditoría de Kardex y niveles críticos por sucursal."
       />
 
-      {/* Selector de Sede y Tabs */}
-      <div style={{ 
-        display: "flex", 
-        flexDirection: "row", 
-        flexWrap: "wrap",
-        justifyContent: "space-between", 
-        alignItems: "flex-end", 
-        marginBottom: "32px", 
-        gap: "24px" 
-      }}>
-        <div style={{ display: "flex", gap: "32px", alignItems: "flex-end" }}>
-          <div style={{ width: "300px" }}>
-            <Select
-              label="Cambiar Sucursal de Consulta"
-              value={selectedBranchId}
-              onChange={(val) => setSelectedBranchId(val)}
-              options={branches.map(b => ({ value: b.id!, label: b.nombre! }))}
-              icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>}
+      <div className="w-full">
+        <Toolbar
+          className="mb-16"
+          left={
+            <>
+              <div className="w-[320px]">
+                <Select
+                  label="Sucursal de Consulta"
+                  value={selectedBranchId}
+                  onChange={(val) => setSelectedBranchId(val)}
+                  options={branches.map(b => ({ value: b.id!, label: b.nombre! }))}
+                  icon={<Info size={14} className="text-[var(--brand-400)]" />}
+                />
+              </div>
+
+                <div className="flex gap-2 bg-[var(--bg-card)] p-1 rounded-xl  shadow-sm">
+                  <Button 
+                    variant={activeTab === "matrix" ? "primary" : "ghost"} 
+                    size="sm"
+                    onClick={() => setActiveTab("matrix")}
+                    style={{ borderRadius: "10px", fontWeight: 800, textTransform: "uppercase", fontSize: "11px", letterSpacing: "1px" }}
+                  >
+                    Matriz de Stock
+                  </Button>
+                  <Button 
+                    variant={activeTab === "kardex" ? "primary" : "ghost"} 
+                    size="sm"
+                    onClick={() => setActiveTab("kardex")}
+                    style={{ borderRadius: "10px", fontWeight: 800, textTransform: "uppercase", fontSize: "11px", letterSpacing: "1px" }}
+                  >
+                    Kardex Histórico
+                  </Button>
+                </div>
+            </>
+          }
+          right={
+            <>
+              {!canEdit && (
+                <div className="px-4 py-2 rounded-xl bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/20 flex items-center gap-2">
+                  <Lock size={12} className="text-[var(--color-danger)]" />
+                  <span className="text-[11px] text-[var(--color-danger)] font-black uppercase tracking-widest leading-none">Solo Lectura</span>
+                </div>
+              )}
+            </>
+          }
+        >
+          {activeTab === "matrix" && (
+            <SearchFilter 
+              placeholder="Buscar por SKU, nombre, unidad o stock..."
+              value={searchTerm}
+              onChange={setSearchTerm}
             />
-          </div>
+          )}
+        </Toolbar>
 
-          <div style={{ display: "flex", background: "var(--bg-surface)", padding: "4px", borderRadius: "12px", border: "1px solid var(--border-default)" }}>
-            <button 
-              onClick={() => setActiveTab("matrix")}
-              style={{ 
-                padding: "8px 20px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 600,
-                background: activeTab === "matrix" ? "var(--brand-500)" : "transparent",
-                color: activeTab === "matrix" ? "white" : "var(--neutral-400)",
-                transition: "all 0.2s"
-              }}
-            >
-              Matriz de Stock
-            </button>
-            <button 
-              onClick={() => setActiveTab("kardex")}
-              style={{ 
-                padding: "8px 20px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 600,
-                background: activeTab === "kardex" ? "var(--brand-500)" : "transparent",
-                color: activeTab === "kardex" ? "white" : "var(--neutral-400)",
-                transition: "all 0.2s"
-              }}
-            >
-              Kardex Histórico
-            </button>
-          </div>
-        </div>
+        <Separator />
 
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{ display: "flex", background: "var(--bg-card)", padding: "4px", borderRadius: "10px", border: "1px solid var(--border-default)" }}>
-                <button 
-                  onClick={() => setViewMode("table")}
-                  style={{ 
-                    padding: "6px 12px", borderRadius: "6px", border: "none", cursor: "pointer",
-                    background: viewMode === "table" ? "var(--neutral-800)" : "transparent",
-                    color: viewMode === "table" ? "var(--brand-400)" : "var(--neutral-500)",
-                    transition: "all 0.2s"
-                  }}
-                >
-                  <Table size={16} />
-                </button>
-                <button 
-                  onClick={() => setViewMode("grid")}
-                  style={{ 
-                    padding: "6px 12px", borderRadius: "6px", border: "none", cursor: "pointer",
-                    background: viewMode === "grid" ? "var(--neutral-800)" : "transparent",
-                    color: viewMode === "grid" ? "var(--brand-400)" : "var(--neutral-500)",
-                    transition: "all 0.2s"
-                  }}
-                >
-                  <LayoutGrid size={16} />
-                </button>
+
+        {activeTab === "matrix" && (
+          <div className="mt-12 outline-none">
+            <Card className="p-0 overflow-hidden border-[var(--neutral-800)] bg-[var(--bg-card)] shadow-2xl">
+              <DataTable<ProductResponse>
+                sortConfig={sortConfig}
+                onSort={handleSort}
+                columns={[
+                  {
+                    header: "SKU",
+                    key: "sku",
+                    width: "120px",
+                    sortable: true,
+                    render: (p) => (
+                      <span className="tabular" style={{ fontSize: "12px", color: "var(--brand-400)", fontWeight: 700 }}>{p.sku}</span>
+                    )
+                  },
+                  {
+                    header: "Producto",
+                    key: "nombre",
+                    sortable: true,
+                    render: (p) => (
+                      <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--neutral-100)", textTransform: "uppercase" }}>{p.nombre}</span>
+                    )
+                  },
+                  {
+                    header: "Unit.",
+                    key: "unitAbbreviation",
+                    align: "center",
+                    sortable: true,
+                    render: (p) => (
+                      <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--neutral-500)", textTransform: "uppercase" }}>{p.unitAbbreviation || "UND"}</span>
+                    )
+                  },
+                  {
+                    header: "Stock Actual",
+                    key: "stockActual",
+                    align: "right",
+                    sortable: true,
+                    render: (p) => {
+                      const inv = inventoryMap.get(p.id!);
+                      const isCritical = inv && (inv.stockActual ?? 0) <= (inv.stockMinimo ?? 0);
+                      return (
+                        <div className="flex flex-col gap-1 items-end">
+                           <div className="flex items-center gap-2">
+                             {isCritical && (
+                               <div className="animate-pulse flex items-center gap-1 bg-[var(--color-danger)]/10 text-[var(--color-danger)] px-2 py-0.5 rounded-md border border-[var(--color-danger)]/20 shadow-sm">
+                                 <AlertTriangle size={10} />
+                                 <span className="text-[9px] font-black uppercase tracking-tighter">Crítico</span>
+                               </div>
+                             )}
+                             <span className="tabular" style={{ fontSize: "16px", fontWeight: 900, color: isCritical ? "var(--color-danger)" : "var(--neutral-50)" }}>
+                              {inv?.stockActual ?? 0}
+                            </span>
+                           </div>
+                          <StockStatus current={inv?.stockActual ?? 0} min={inv?.stockMinimo ?? 10} max={100} size="sm" />
+                        </div>
+                      );
+                    }
+                  },
+                  {
+                    header: "Stock Mín.",
+                    key: "stockMinimo",
+                    align: "right",
+                    sortable: true,
+                    render: (p) => {
+                      const inv = inventoryMap.get(p.id!);
+                      return <span className="tabular" style={{ fontSize: "13px", fontWeight: 600, color: "var(--neutral-400)" }}>{inv?.stockMinimo ?? 0}</span>;
+                    }
+                  },
+                  {
+                    header: "Acciones",
+                    key: "actions",
+                    align: "right",
+                    render: (p) => (
+                      <div className="flex justify-end gap-2">
+                        <Button 
+                          variant="primary"
+                          size="sm"
+                          onClick={() => {
+                            setAdjustingProduct(p);
+                            setAdjustData({ 
+                              type: "INGRESO", 
+                              quantity: "", 
+                              reason: "", 
+                              unitCost: p.costoPromedio ?? "",
+                              observations: "",
+                              subReason: "",
+                              unitId: null
+                            });
+                          }}
+                        >
+                          Acciones
+                        </Button>
+                        <Button 
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const inv = inventoryMap.get(p.id!);
+                            if (inv) {
+                                setConfigProduct({ p, inv });
+                                setMinStockValue(inv.stockMinimo ?? 0);
+                            }
+                          }}
+                        >
+                          Ajustar stock minimo
+                        </Button>
+                      </div>
+                    )
+                  }
+                ]}
+                data={filteredAndSortedProducts}
+                isLoading={loadingInv}
+              />
+            </Card>
+          </div>
+        )}
+
+        {activeTab === "kardex" && (
+          <div className="mt-12 outline-none">
+          <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+            <div style={{ width: "300px" }}>
+              <Select
+                label="Filtrar por Producto"
+                value={selectedProductId}
+                onChange={(val) => setSelectedProductId(val)}
+                options={[
+                  { value: "all", label: "Todos los productos" },
+                  ...products.map(p => ({ value: p.id!.toString(), label: p.nombre! }))
+                ]}
+              />
             </div>
 
-            {!canEdit && (
-              <div style={{ padding: "8px 16px", borderRadius: "8px", background: "rgba(239, 68, 68, 0.1)", border: "1px solid var(--color-danger)", display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "12px", color: "var(--color-danger)", fontWeight: 600 }}>🔒 Modo Solo Lectura</span>
-              </div>
-            )}
-        </div>
-      </div>
-
-      {activeTab === "matrix" && (
-        <div style={{ marginBottom: "20px", maxWidth: "500px" }}>
-          <Input 
-            placeholder="Buscar por SKU, nombre, unidad o stock..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            icon={<Search size={18} />}
-          />
-        </div>
-      )}
-
-      {activeTab === "matrix" ? (
-        viewMode === "table" ? (
-          <Card className="p-0 overflow-hidden border-neutral-800 bg-neutral-900 shadow-2xl">
-            <DataTable<any>
-              columns={[
-                {
-                  header: "SKU",
-                  key: "sku",
-                  width: "120px",
-                  sortable: true,
-                  render: (p: any) => (
-                    <span className="tabular" style={{ fontSize: "12px", color: "var(--brand-400)", fontWeight: 700 }}>{p.sku}</span>
-                  )
-                },
-                {
-                  header: "Producto",
-                  key: "nombre",
-                  sortable: true,
-                  render: (p: any) => (
-                    <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--neutral-100)", textTransform: "uppercase" }}>{p.nombre}</span>
-                  )
-                },
-                {
-                  header: "Unit.",
-                  key: "unitAbbreviation",
-                  align: "center",
-                  sortable: true,
-                  render: (p: any) => (
-                    <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--neutral-500)", textTransform: "uppercase" }}>{p.unitAbbreviation || "UND"}</span>
-                  )
-                },
-                {
-                  header: "Stock Actual",
-                  key: "stockActual",
-                  align: "right",
-                  sortable: true,
-                  render: (p: any) => {
-                    const inv = inventoryMap.get(p.id!);
-                    return <StockStatus current={inv?.stockActual ?? 0} minimum={inv?.stockMinimo ?? 0} unit={p.unitAbbreviation || "UND"} />;
-                  }
-                },
-                {
-                  header: "Stock Mín.",
-                  key: "stockMinimo",
-                  align: "right",
-                  sortable: true,
-                  render: (p: any) => {
-                    const inv = inventoryMap.get(p.id!);
-                    return <span className="tabular" style={{ fontSize: "13px", fontWeight: 600, color: "var(--neutral-400)" }}>{inv?.stockMinimo ?? 0}</span>;
-                  }
-                },
-                {
-                  header: "Costo Prom.",
-                  key: "costoPromedio",
-                  align: "right",
-                  sortable: true,
-                  render: (p: any) => (
-                    <span className="tabular" style={{ fontSize: "14px", fontWeight: 700, color: "var(--neutral-400)" }}>
-                      {formatCurrency(p.costoPromedio || 0)}
-                    </span>
-                  )
-                },
-                {
-                  header: "Precio Venta",
-                  key: "precioVenta",
-                  align: "right",
-                  sortable: true,
-                  render: (p: any) => (
-                    <span className="tabular" style={{ fontSize: "15px", fontWeight: 800, color: "var(--neutral-100)" }}>
-                      {formatCurrency(p.precioVenta || 0)}
-                    </span>
-                  )
-                },
-                {
-                  header: "Última OP",
-                  key: "lastUpdated",
-                  render: (p: any) => {
-                    const inv = inventoryMap.get(p.id!);
-                    return (
-                      <span style={{ fontSize: "11px", color: "var(--neutral-500)", fontWeight: 500, lineBreak: "anywhere" }}>
-                        {inv?.lastUpdated ? new Date(inv.lastUpdated).toLocaleString("es-CO", { hour12: true, dateStyle: 'short', timeStyle: 'short' }) : "---"}
-                      </span>
-                    );
-                  }
-                },
-                ...(canEdit ? [{
-                  header: "Acciones",
-                  key: "actions",
-                  align: "right" as const,
-                  render: (p: any) => {
-                    const inv = inventoryMap.get(p.id!);
-                    return (
-                      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                        {!isSeller && (
-                          <>
-                            <Button variant="ghost" size="sm" onClick={() => {
-                              setAdjustingProduct(p);
-                              setAdjustData({ type: "INGRESO", quantity: 0, reason: "", unitCost: p.costoPromedio ?? 0 });
-                            }}>
-                              Mov.
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => {
-                              setConfigProduct({ p, inv: inv || { productId: p.id, minimumStock: 0, currentQuantity: 0 } });
-                              setMinStockValue(inv?.stockMinimo ?? 0);
-                            }}>
-                              Conf.
-                            </Button>
-                          </>
+            <Card style={{ padding: 0, overflow: "hidden", border: "1px solid var(--border-default)" }}>
+              <DataTable<InventoryMovementExtended>
+                columns={[
+                  {
+                    header: "Fecha y Hora",
+                    key: "date",
+                    render: (m) => <span style={{ fontSize: "13px", color: "var(--neutral-400)" }}>{new Date(m.date).toLocaleString("es-CO", { hour12: true, dateStyle: 'short', timeStyle: 'short' })}</span>
+                  },
+                  {
+                    header: "Producto",
+                    key: "productId",
+                    render: (m) => (
+                      <div className="flex flex-col">
+                        <span style={{ fontSize: "14px", fontWeight: 600 }}>{getProductName(m.productId)}</span>
+                        {m.observations && (
+                          <div className="flex gap-2 items-center flex-wrap">
+                            <span style={{ fontSize: "11px", color: "var(--brand-400)", fontWeight: 700, fontStyle: "italic" }}>
+                              Obs: {m.observations}
+                            </span>
+                          </div>
                         )}
                       </div>
-                    );
-                  }
-                }] : [])
-              ]}
-              data={filteredAndSortedProducts}
-              isLoading={loadingInv}
-              minWidth="1200px"
-              sortConfig={sortConfig}
-              onSort={handleSort}
-              emptyState={{
-                title: "No se encontraron resultados",
-                description: "Prueba con otros términos de búsqueda o filtros.",
-                icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-              }}
-            />
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-            {filteredAndSortedProducts.map(p => {
-               const inv = inventoryMap.get(p.id!);
-               return (
-                  <InventoryItemCard 
-                    key={p.id}
-                    item={{
-                      id: p.id || 0,
-                      productId: p.id || 0,
-                      productoNombre: p.nombre || "---",
-                      sku: p.sku || "---",
-                      stockActual: inv?.stockActual ?? 0,
-                      precioVenta: p.precioVenta || 0
-                    }}
-                    onClick={() => {
-                      setAdjustingProduct(p);
-                      setAdjustData({ type: "INGRESO", quantity: 0, reason: "", unitCost: p.costoPromedio ?? 0 });
-                    }}
-                    mode="view"
-                  />
-               )
-            })}
-          </div>
-        )
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          <div style={{ width: "300px" }}>
-            <Select
-              label="Filtrar por Producto"
-              value={selectedProductId}
-              onChange={(val) => setSelectedProductId(val)}
-              options={[
-                { value: "all", label: "Todos los productos" },
-                ...products.map(p => ({ value: p.id!.toString(), label: p.nombre! }))
-              ]}
-            />
-          </div>
+                    )
+                  },
+                  {
+                    header: "Tipo",
+                    key: "type",
+                    render: (m) => <Badge variant={m.type === "INGRESO" ? "success" : "danger"}>{m.type}</Badge>
+                  },
+                  {
+                    header: "Motivo",
+                    key: "reason",
+                    render: (m) => {
+                      const reasonStyles: Record<string, { color: string, bg: string, icon: any }> = {
+                        COMPRA: { color: "#10b981", bg: "rgba(16, 185, 129, 0.1)", icon: <ShoppingBag size={12} /> },
+                        VENTA: { color: "#3b82f6", bg: "rgba(59, 130, 246, 0.1)", icon: <ShoppingCart size={12} /> },
+                        DEVOLUCION: { color: "#8b5cf6", bg: "rgba(139, 92, 246, 0.1)", icon: <Repeat size={12} /> },
+                        TRASLADO: { color: "#6366f1", bg: "rgba(99, 102, 241, 0.1)", icon: <Truck size={12} /> },
+                        MERMA: { color: "#f43f5e", bg: "rgba(244, 63, 94, 0.1)", icon: <AlertTriangle size={12} /> },
+                        AJUSTE_POSITIVO: { color: "#f59e0b", bg: "rgba(245, 158, 11, 0.1)", icon: <CheckCircle size={12} /> },
+                        AJUSTE_NEGATIVO: { color: "#64748b", bg: "rgba(100, 116, 139, 0.1)", icon: <MinusCircle size={12} /> },
+                      };
 
-          <Card style={{ padding: 0, overflow: "hidden", border: "1px solid var(--border-default)" }}>
-            <DataTable<InventoryMovementExtended>
-              columns={[
-                {
-                  header: "Fecha y Hora",
-                  key: "date",
-                  render: (m) => <span style={{ fontSize: "13px", color: "var(--neutral-400)" }}>{new Date(m.date).toLocaleString("es-CO", { hour12: true, dateStyle: 'short', timeStyle: 'short' })}</span>
-                },
-                {
-                  header: "Producto",
-                  key: "productId",
-                  render: (m) => <span style={{ fontSize: "14px", fontWeight: 600 }}>{getProductName(m.productId)}</span>
-                },
-                {
-                  header: "Tipo",
-                  key: "type",
-                  render: (m) => <Badge variant={m.type === "INGRESO" ? "success" : "danger"}>{m.type}</Badge>
-                },
-                {
-                  header: "Motivo",
-                  key: "reason",
-                },
-                {
-                  header: "Cantidad",
-                  key: "quantity",
-                  align: "right",
-                  render: (m) => (
-                    <span style={{ fontWeight: 700, color: m.type === "INGRESO" ? "var(--color-success)" : "var(--color-danger)" }}>
-                      {m.type === "INGRESO" ? "+" : "-"}{m.quantity}
-                    </span>
-                  )
-                },
-                {
-                  header: "Saldo Resultante",
-                  key: "finalBalance",
-                  align: "right",
-                  render: (m) => (
-                    <span style={{ fontWeight: 800, color: "var(--neutral-100)" }}>
-                      {m.finalBalance} <small style={{ color: "var(--neutral-500)" }}>{getProductUnit(m.productId)}</small>
-                    </span>
-                  )
-                }
-              ]}
-              data={kardexMovements}
-              isLoading={kardexLoading}
-              emptyState={{
-                title: "Sin movimientos",
-                description: "No se han registrado transacciones de inventario para estos filtros.",
-                icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              }}
-            />
-          </Card>
-        </div>
-      )}
+                      const style = reasonStyles[m.reason!] || { color: "var(--neutral-400)", bg: "var(--neutral-800)", icon: null };
+
+                      return (
+                        <div className="flex flex-col items-start gap-1">
+                          <span style={{ 
+                            fontSize: "9px", 
+                            fontWeight: 800, 
+                            padding: "2px 6px", 
+                            borderRadius: "4px",
+                            background: style.bg,
+                            color: style.color,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "3px",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.03em",
+                            border: `1px solid ${style.color}20`
+                          }}>
+                            {style.icon}
+                            {m.reason || "—"}
+                          </span>
+                          {m.subReason && (
+                            <div style={{ transform: 'scale(0.8)', transformOrigin: 'left' }}>
+                              <Badge variant="warning">
+                                {m.subReason.replace("_", " ")}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                  },
+                  {
+                    header: "Cantidad",
+                    key: "quantity",
+                    align: "right",
+                    render: (m) => (
+                      <span style={{ fontWeight: 700, color: m.type === "INGRESO" ? "var(--color-success)" : "var(--color-danger)" }}>
+                        {m.type === "INGRESO" ? "+" : "-"}{m.quantity}
+                      </span>
+                    )
+                  },
+                  {
+                    header: "Saldo Resultante",
+                    key: "finalBalance",
+                    align: "right",
+                    render: (m) => (
+                      <span style={{ fontWeight: 800, color: "var(--neutral-100)" }}>
+                        {m.finalBalance} <small style={{ color: "var(--neutral-500)" }}>{getProductUnit(m.productId)}</small>
+                      </span>
+                    )
+                  }
+                ]}
+                data={kardexMovements}
+                isLoading={kardexLoading}
+                emptyState={{
+                  title: "Sin movimientos",
+                  description: "No se han registrado transacciones de inventario para estos filtros.",
+                  icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                }}
+              />
+            </Card>
+          </div>
+          </div>
+        )}
+      </div>
 
       {/* MODAL: MOVIMIENTO (INGRESO/RETIRO) */}
       <Modal 
@@ -669,8 +646,8 @@ export default function InventoryPage() {
               onClick={() => setAdjustData({...adjustData, type: "INGRESO"})}
               style={{
                 padding: "16px", borderRadius: "12px", border: "2px solid", cursor: "pointer", fontWeight: 700,
-                borderColor: adjustData.type === "INGRESO" ? "var(--color-success)" : "var(--border-default)",
-                background: adjustData.type === "INGRESO" ? "rgba(16, 185, 129, 0.1)" : "transparent",
+                borderColor: adjustData.type === "INGRESO" ? "var(--color-success)" : "var(--neutral-800)",
+                background: adjustData.type === "INGRESO" ? "color-mix(in srgb, var(--color-success), transparent 90%)" : "transparent",
                 color: adjustData.type === "INGRESO" ? "var(--color-success)" : "var(--neutral-500)"
               }}
             >
@@ -680,8 +657,8 @@ export default function InventoryPage() {
               onClick={() => setAdjustData({...adjustData, type: "RETIRO"})}
               style={{
                 padding: "16px", borderRadius: "12px", border: "2px solid", cursor: "pointer", fontWeight: 700,
-                borderColor: adjustData.type === "RETIRO" ? "var(--color-danger)" : "var(--border-default)",
-                background: adjustData.type === "RETIRO" ? "rgba(239, 68, 68, 0.1)" : "transparent",
+                borderColor: adjustData.type === "RETIRO" ? "var(--color-danger)" : "var(--neutral-800)",
+                background: adjustData.type === "RETIRO" ? "color-mix(in srgb, var(--color-danger), transparent 90%)" : "transparent",
                 color: adjustData.type === "RETIRO" ? "var(--color-danger)" : "var(--neutral-500)"
               }}
             >
@@ -689,53 +666,163 @@ export default function InventoryPage() {
             </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-            <Input 
-              label={`Cantidad a ${adjustData.type === "INGRESO" ? "Ingresar" : "Retirar"}`}
-              type="number"
-              value={adjustData.quantity}
-              onChange={(e) => setAdjustData({...adjustData, quantity: Number(e.target.value)})}
-              placeholder="0.00"
-            />
-            <Select
-              label="Motivo Obligatorio"
-              value={adjustData.reason}
-              onChange={(val) => setAdjustData({...adjustData, reason: val})}
-              options={adjustData.type === "INGRESO" ? [
-                { value: "COMPRA", label: "Compra a Proveedor" },
-                { value: "DEVOLUCION", label: "Devolución de Cliente" },
-                { value: "AJUSTE_POSITIVO", label: "Ajuste de Auditoría (+)" },
-                { value: "TRASLADO", label: "Traslado Recibido" }
-              ] : [
-                { value: "VENTA", label: "Venta a Cliente" },
-                { value: "MERMA", label: "Merma / Daño" },
-                { value: "AJUSTE_NEGATIVO", label: "Ajuste de Auditoría (-)" },
-                { value: "TRASLADO", label: "Traslado Enviado" }
-              ]}
-            />
-          </div>
+          <Select
+            label="Motivo del Movimiento"
+            value={adjustData.reason}
+            onChange={(val) => setAdjustData({...adjustData, reason: val})}
+            options={adjustData.type === "INGRESO" ? [
+              { value: "COMPRA", label: "Compra a Proveedor" },
+              { value: "DEVOLUCION", label: "Devolución de Cliente" },
+              { value: "AJUSTE_POSITIVO", label: "Ajuste de Auditoría (+)" },
+              { value: "TRASLADO", label: "Traslado Recibido" }
+            ] : [
+              { value: "VENTA", label: "Venta a Cliente" },
+              { value: "MERMA", label: "Merma / Daño" },
+              { value: "AJUSTE_NEGATIVO", label: "Ajuste de Auditoría (-)" },
+              { value: "TRASLADO", label: "Traslado Enviado" }
+            ]}
+          />
 
-          {adjustData.type === "INGRESO" && (
-            <Input 
-              label="Costo Unitario (Sugerido)"
-              type="number"
-              value={adjustData.unitCost}
-              onChange={(e) => setAdjustData({...adjustData, unitCost: Number(e.target.value)})}
+          {adjustData.reason === "MERMA" && (
+            <Select 
+              label="Categoría de Merma / Daño (Obligatorio)"
+              value={adjustData.subReason}
+              onChange={(val) => setAdjustData({...adjustData, subReason: val})}
+              options={[
+                { value: "CADUCIDAD", label: "Caducidad (Semillas viejas)" },
+                { value: "DAÑO_FISICO", label: "Daño Físico (Bulto roto, accidente)" },
+                { value: "ROBO_PERDIDA", label: "Robo / Pérdida" },
+                { value: "DEFECTO_FABRICA", label: "Defecto de Fábrica (Proveedor)" }
+              ]}
+              placeholder="Seleccione categoría..."
             />
           )}
 
-          <div style={{ display: "flex", gap: "12px" }}>
-            <Button variant="ghost" fullWidth onClick={() => setAdjustingProduct(null)}>Cancelar</Button>
-            <Button 
-              variant="primary" 
-              fullWidth 
-              onClick={handleAdjustSubmit} 
-              loading={submitting}
-              style={{ background: adjustData.type === "INGRESO" ? "var(--color-success)" : "var(--color-danger)" }}
-            >
-              Registrar {adjustData.type === "INGRESO" ? "Entrada" : "Salida"}
-            </Button>
+          {/* Unit Selector */}
+          <div className="space-y-2">
+            <span className="text-[11px] font-black text-[var(--neutral-500)] uppercase tracking-widest block">Unidad del Movimiento</span>
+            <div className="relative">
+              <select 
+                className="w-full bg-[var(--bg-surface)] border border-[var(--neutral-800)] rounded-xl px-4 py-3 text-[13px] font-bold text-[var(--neutral-100)] focus:ring-2 focus:ring-[var(--brand-500)]/20 focus:border-[var(--brand-500)] outline-none transition-all appearance-none cursor-pointer"
+                value={adjustData.unitId || ""}
+                onChange={(e) => setAdjustData({...adjustData, unitId: e.target.value ? Number(e.target.value) : null})}
+              >
+                <option value="">Unidad Base ({adjustingProductUnits.find(u => u.esBase)?.nombreUnidad || 'Sistema'})</option>
+                {adjustingProductUnits.filter(u => !u.esBase).map(u => (
+                  <option key={u.id} value={u.unidadId}>
+                    {u.nombreUnidad} (x{u.factorConversion})
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--neutral-500)]">
+                <ChevronDown size={16} />
+              </div>
+            </div>
           </div>
+
+          {EXTERNAL_MOTIVES[adjustData.reason as string] ? (
+            <div style={{ 
+              padding: "24px", 
+              borderRadius: "16px", 
+              background: "var(--bg-surface)", 
+              border: "1px solid var(--neutral-800)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+              gap: "16px",
+              animation: "fade-in 0.3s ease"
+            }}>
+              <div style={{ 
+                width: "48px", 
+                height: "48px", 
+                borderRadius: "50%", 
+                background: "var(--brand-500-10)", 
+                color: "var(--brand-400)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center"
+              }}>
+                {EXTERNAL_MOTIVES[adjustData.reason as string].icon}
+              </div>
+              <div>
+                <h4 style={{ margin: "0 0 8px 0", color: "var(--neutral-50)" }}>Flujo Protegido</h4>
+                <p style={{ margin: 0, fontSize: "13px", color: "var(--neutral-400)", lineHeight: "1.5" }}>
+                  {EXTERNAL_MOTIVES[adjustData.reason as string].description}
+                </p>
+              </div>
+              <Button 
+                variant="primary" 
+                fullWidth 
+                onClick={() => {
+                  const path = EXTERNAL_MOTIVES[adjustData.reason as string].path;
+                  const productId = adjustingProduct?.id;
+                  setAdjustingProduct(null);
+                  
+                  const params = new URLSearchParams();
+                  if (productId) params.set("productId", productId.toString());
+                  if (selectedBranchId) params.set("branchId", selectedBranchId.toString());
+                  
+                  const query = params.toString();
+                  router.push(`${path}${query ? `?${query}` : ""}`);
+                }}
+                leftIcon={<ArrowRight size={16} />}
+              >
+                {EXTERNAL_MOTIVES[adjustData.reason as string].label}
+              </Button>
+            </div>
+          ) : (
+            <>
+          {(adjustData.reason === "AJUSTE_POSITIVO" || adjustData.reason === "MERMA" || adjustData.reason === "AJUSTE_NEGATIVO") && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <Input 
+                label={`Cantidad a ${adjustData.type === "INGRESO" ? "Ingresar" : "Retirar"}`}
+                type="number"
+                value={adjustData.quantity}
+                onChange={(e) => setAdjustData({...adjustData, quantity: e.target.value === "" ? "" : Number(e.target.value)})}
+                placeholder="0"
+              />
+              {adjustData.type === "INGRESO" && (
+                <Input 
+                  label="Costo Unitario (Sugerido)"
+                  type="number"
+                  value={adjustData.unitCost}
+                  onChange={(e) => setAdjustData({...adjustData, unitCost: e.target.value === "" ? "" : Number(e.target.value)})}
+                  placeholder="0"
+                />
+              )}
+            </div>
+          )}
+
+              {(adjustData.reason === "AJUSTE_POSITIVO" || adjustData.reason === "AJUSTE_NEGATIVO") && (
+                <Input 
+                  label="Justificación del Ajuste (Motivo Detallado)"
+                  value={adjustData.observations}
+                  onChange={(e) => setAdjustData({...adjustData, observations: e.target.value})}
+                  placeholder="Explique el motivo de este ajuste manual..."
+                />
+              )}
+
+              {(adjustData.reason === "AJUSTE_POSITIVO" || adjustData.reason === "MERMA" || adjustData.reason === "AJUSTE_NEGATIVO") && (
+                <div style={{ display: "flex", gap: "12px" }}>
+                  <Button variant="ghost" fullWidth onClick={() => setAdjustingProduct(null)}>Cancelar</Button>
+                  <Button 
+                    variant="primary" 
+                    fullWidth 
+                    onClick={handleAdjustSubmit} 
+                    loading={submitting}
+                    style={{ background: adjustData.type === "INGRESO" ? "var(--color-success)" : "var(--color-danger)" }}
+                  >
+                    Registrar {adjustData.type === "INGRESO" ? "Entrada" : "Salida"}
+                  </Button>
+                </div>
+              )}
+              
+              {!adjustData.reason && (
+                <Button variant="ghost" fullWidth onClick={() => setAdjustingProduct(null)}>Cerrar</Button>
+              )}
+            </>
+          )}
         </div>
       </Modal>
 
@@ -750,7 +837,8 @@ export default function InventoryPage() {
             label="Stock Mínimo para Alerta"
             type="number"
             value={minStockValue}
-            onChange={(e) => setMinStockValue(Number(e.target.value))}
+            onChange={(e) => setMinStockValue(e.target.value === "" ? "" : Number(e.target.value))}
+            placeholder="0"
           />
           <Button variant="primary" fullWidth onClick={handleConfigSubmit} loading={submitting}>Guardar Cambios</Button>
         </div>

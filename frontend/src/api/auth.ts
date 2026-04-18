@@ -31,7 +31,8 @@ export async function login(payload: LoginPayload): Promise<AuthSession> {
   })) as any;
 
   if (error || !data?.token || !data?.email) {
-    throw new Error("Credenciales incorrectas. Inténtalo de nuevo.");
+    const message = (error as any)?.message || "Credenciales incorrectas. Inténtalo de nuevo.";
+    throw new Error(message);
   }
 
   // Persiste en localStorage para navegaciones futuras

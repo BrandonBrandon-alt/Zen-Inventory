@@ -85,10 +85,13 @@ public class InventoryController {
                 productId, 
                 productName,
                 request.getQuantity(), 
+                request.getUnitId(),
                 request.getReason(), 
                 request.getUserId(), 
                 request.getReferenceId(), 
-                request.getReferenceType());
+                request.getReferenceType(),
+                request.getObservations(),
+                request.getSubReason());
                 
         return ResponseEntity.noContent().build();
     }
@@ -104,11 +107,14 @@ public class InventoryController {
                 branchId, 
                 productId, 
                 request.getQuantity(), 
+                request.getUnitId(),
                 request.getReason(), 
                 request.getUserId(), 
                 request.getReferenceId(), 
                 request.getReferenceType(),
-                request.getUnitCost());
+                request.getUnitCost(),
+                request.getObservations(),
+                request.getSubReason());
                 
         return ResponseEntity.noContent().build();
     }

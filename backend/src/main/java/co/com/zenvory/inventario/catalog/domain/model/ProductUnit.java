@@ -38,4 +38,8 @@ public class ProductUnit {
      * Solo puede haber una unidad base por producto.
      */
     private Boolean isBase;
+
+    // Enriched fields for UI
+    private String unitName;
+    private String unitAbbreviation;
 }

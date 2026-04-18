@@ -31,6 +31,9 @@ public class PurchaseDetailEntity {
     @Column(name = "descuento_pct", nullable = false, precision = 5, scale = 2)
     private BigDecimal discountPct;
 
+    @Column(name = "cantidad_recibida", nullable = false, precision = 12, scale = 4)
+    private BigDecimal receivedQuantity = BigDecimal.ZERO;
+
     public PurchaseDetailEntity() {}
 
     public Long getId() { return id; }
@@ -53,4 +56,7 @@ public class PurchaseDetailEntity {
 
     public BigDecimal getDiscountPct() { return discountPct; }
     public void setDiscountPct(BigDecimal discountPct) { this.discountPct = discountPct; }
+
+    public BigDecimal getReceivedQuantity() { return receivedQuantity; }
+    public void setReceivedQuantity(BigDecimal receivedQuantity) { this.receivedQuantity = receivedQuantity; }
 }

@@ -40,7 +40,14 @@ public class UnitOfMeasureService implements UnitOfMeasureUseCase {
 
     @Override
     public List<ProductUnit> getUnitsByProduct(Long productId) {
-        return unitRepositoryPort.findProductUnitsByProductId(productId);
+        List<ProductUnit> productUnits = unitRepositoryPort.findProductUnitsByProductId(productId);
+        productUnits.forEach(pu -> {
+            unitRepositoryPort.findById(pu.getUnitId()).ifPresent(u -> {
+                pu.setUnitName(u.getName());
+                pu.setUnitAbbreviation(u.getAbbreviation());
+            });
+        });
+        return productUnits;
     }
 
     @Override

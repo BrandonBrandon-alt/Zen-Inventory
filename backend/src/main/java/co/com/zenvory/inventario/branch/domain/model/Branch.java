@@ -14,6 +14,7 @@ public class Branch {
     private String name;
     private String address;
     private String phone;
+    private Long managerId;
 
     @Builder.Default
     private Boolean active = true;

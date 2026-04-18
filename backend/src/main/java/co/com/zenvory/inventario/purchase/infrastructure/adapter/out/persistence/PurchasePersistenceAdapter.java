@@ -53,6 +53,10 @@ public class PurchasePersistenceAdapter implements PurchaseRepositoryPort {
         entity.setPaymentDueDate(domain.getPaymentDueDate());
         entity.setPaymentDueDays(domain.getPaymentDueDays());
         entity.setTotal(domain.getTotal());
+        entity.setReasonResolution(domain.getReasonResolution());
+        entity.setResueltoPorId(domain.getResolvedById());
+        entity.setFechaResolucion(domain.getResolutionDate());
+        entity.setVersion(domain.getVersion());
 
         domain.getDetails().forEach(d -> {
             PurchaseDetailEntity dEntity = new PurchaseDetailEntity();
@@ -61,6 +65,7 @@ public class PurchasePersistenceAdapter implements PurchaseRepositoryPort {
             dEntity.setQuantity(d.getQuantity());
             dEntity.setUnitPrice(d.getUnitPrice());
             dEntity.setDiscountPct(d.getDiscountPct());
+            dEntity.setReceivedQuantity(d.getReceivedQuantity());
             dEntity.setSubtotal(d.computeSubtotal());
             entity.addDetail(dEntity);
         });
@@ -70,7 +75,7 @@ public class PurchasePersistenceAdapter implements PurchaseRepositoryPort {
 
     public PurchaseOrder toDomain(PurchaseOrderEntity entity) {
         List<PurchaseOrderDetail> details = entity.getDetails().stream()
-                .map(d -> new PurchaseOrderDetail(d.getId(), d.getProductId(), d.getQuantity(), d.getUnitPrice(), d.getDiscountPct()))
+                .map(d -> new PurchaseOrderDetail(d.getId(), d.getProductId(), d.getQuantity(), d.getUnitPrice(), d.getDiscountPct(), d.getReceivedQuantity()))
                 .toList();
 
         return new PurchaseOrder(
@@ -87,7 +92,11 @@ public class PurchasePersistenceAdapter implements PurchaseRepositoryPort {
                 entity.getPaymentDueDays(),
                 entity.getPaymentDueDate(),
                 entity.getTotal(),
-                details
+                details,
+                entity.getReasonResolution(),
+                entity.getResueltoPorId(),
+                entity.getFechaResolucion(),
+                entity.getVersion()
         );
     }
 }

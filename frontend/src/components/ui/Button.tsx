@@ -26,14 +26,14 @@ export default function Button({
 
   const baseStyles: Record<string, React.CSSProperties> = {
     primary: {
-      background: "var(--brand-500)",
+      background: "var(--brand-400)",
       color: "#fff",
-      border: "1px solid var(--brand-600)",
+      border: "1px solid var(--brand-500)",
     },
     ghost: {
-      background: "var(--bg-card)",
+      background: "transparent",
       color: "var(--neutral-200)",
-      border: "1px solid var(--border-default)",
+      border: "1px solid transparent",
     },
     danger: {
       background: "rgba(224,112,112,0.1)",

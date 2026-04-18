@@ -32,7 +32,7 @@ export default function PageHeader({ title, description, actions }: PageHeaderPr
       
       <style jsx>{`
         .page-header-title em {
-          font-style: italic;
+          font-style: normal;
           color: var(--brand-500);
           font-family: var(--font-serif);
         }
