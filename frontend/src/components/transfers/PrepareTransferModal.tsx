@@ -83,7 +83,7 @@ export default function PrepareTransferModal({ open, onClose, onSuccess, transfe
       header: "Pedido",
       key: "requestedQuantity",
       align: "center",
-      render: (d) => <span style={{ fontWeight: 700, fontFamily: "monospace" }}>{d.requestedQuantity}</span>
+      render: (d) => <span style={{ fontWeight: 800, color: "var(--neutral-50)", fontSize: "14px", fontFamily: "monospace" }}>{d.requestedQuantity}</span>
     },
     {
       header: "En Stock",
@@ -118,6 +118,7 @@ export default function PrepareTransferModal({ open, onClose, onSuccess, transfe
 
         <div style={{ borderRadius: "12px", border: "1px solid var(--border-default)", overflow: "hidden" }}>
           <DataTable<TransferDetailResponse>
+            itemsPerPage={25}
             columns={columns}
             data={transfer.details ?? []}
             density="compact"
@@ -128,7 +129,7 @@ export default function PrepareTransferModal({ open, onClose, onSuccess, transfe
         {Object.values(stockInfo).some((s, idx) => s < (transfer.details?.[idx]?.requestedQuantity || 0)) && (
           <div style={{ padding: "12px", background: "rgba(224,112,112,0.1)", borderRadius: "8px", border: "1px solid rgba(224,112,112,0.2)" }}>
             <p style={{ fontSize: "13px", color: "var(--color-danger)" }}>
-              ⚠️ Tienes menos stock del solicitado en algunos ítems. Podrás ajustar la cantidad real enviada en el siguiente paso (Despacho).
+               Tienes menos stock del solicitado en algunos ítems. Podrás ajustar la cantidad real enviada en el siguiente paso (Despacho).
             </p>
           </div>
         )}

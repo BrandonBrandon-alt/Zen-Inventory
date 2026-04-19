@@ -41,7 +41,7 @@ public class BranchController {
     }
 
     @GetMapping
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<List<BranchResponse>> getAll() {
         List<BranchResponse> response = branchUseCase.getAllBranches().stream()
                 .map(this::mapToResponse)
@@ -50,7 +50,7 @@ public class BranchController {
     }
 
     @GetMapping("/{id}")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<BranchResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(mapToResponse(branchUseCase.getBranchById(id)));
     }

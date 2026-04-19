@@ -29,6 +29,9 @@ public class TransferDetailEntity {
     @Column(name = "faltantes", nullable = false)
     private Integer missingQuantity;
 
+    @Column(name = "producto_nombre")
+    private String productName;
+
     public TransferDetailEntity() {}
 
     public Long getId() { return id; }
@@ -51,4 +54,7 @@ public class TransferDetailEntity {
 
     public Integer getMissingQuantity() { return missingQuantity; }
     public void setMissingQuantity(Integer missingQuantity) { this.missingQuantity = missingQuantity; }
+
+    public String getProductName() { return productName; }
+    public void setProductName(String productName) { this.productName = productName; }
 }

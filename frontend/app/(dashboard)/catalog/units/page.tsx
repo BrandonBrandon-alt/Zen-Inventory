@@ -171,6 +171,7 @@ export default function MasterUnitsPage() {
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <DataTable<UnitOfMeasureResponse>
+          itemsPerPage={25}
           columns={columns}
           data={units}
           isLoading={loading}

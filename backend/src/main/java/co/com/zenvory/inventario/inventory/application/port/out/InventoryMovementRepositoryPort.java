@@ -7,4 +7,5 @@ public interface InventoryMovementRepositoryPort {
     InventoryMovement save(InventoryMovement movement);
     List<InventoryMovement> findByBranchAndProduct(Long branchId, Long productId);
     List<InventoryMovement> findAll();
+    List<InventoryMovement> findByBranchId(Long branchId);
 }

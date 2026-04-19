@@ -5,5 +5,6 @@ import java.util.List;
 
 public interface JpaInventoryMovementRepository extends JpaRepository<InventoryMovementEntity, Long> {
     List<InventoryMovementEntity> findByBranchIdAndProductIdOrderByDateDesc(Long branchId, Long productId);
+    List<InventoryMovementEntity> findByBranchIdOrderByDateDesc(Long branchId);
     List<InventoryMovementEntity> findAllByOrderByDateDesc();
 }

@@ -1,0 +1,1 @@
+ALTER TABLE alertas_stock ADD COLUMN tipo_alerta VARCHAR(50);

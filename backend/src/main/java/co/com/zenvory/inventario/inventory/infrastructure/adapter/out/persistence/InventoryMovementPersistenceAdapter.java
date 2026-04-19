@@ -37,4 +37,12 @@ public class InventoryMovementPersistenceAdapter implements InventoryMovementRep
                 .map(InventoryMovementEntity::toDomain)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public List<InventoryMovement> findByBranchId(Long branchId) {
+        return movementRepository.findByBranchIdOrderByDateDesc(branchId)
+                .stream()
+                .map(InventoryMovementEntity::toDomain)
+                .collect(Collectors.toList());
+    }
 }

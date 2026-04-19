@@ -1,8 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Spinner from "./Spinner";
 import EmptyState from "./EmptyState";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 /**
  * Representa una columna en la tabla.
@@ -48,6 +49,8 @@ interface DataTableProps<T> {
   minWidth?: string;
   /** Densidad del espaciado. */
   density?: "normal" | "compact";
+  /** Activar paginación cliente: Cantidad de items por página. Si no se provee, muestra todo. */
+  itemsPerPage?: number;
 }
 
 /**
@@ -65,7 +68,23 @@ export default function DataTable<T>({
   renderMobileCard,
   minWidth = "100%",
   density = "normal",
+  itemsPerPage,
 }: DataTableProps<T>) {
+
+  // ── Paginación Cliente ───────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Si cambia la data o la cantidad, volver a página 1 para evitar estados inválidos
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [data.length, sortConfig, itemsPerPage]);
+
+  const totalPages = itemsPerPage ? Math.max(1, Math.ceil(data.length / itemsPerPage)) : 1;
+  
+  const currentData = itemsPerPage 
+    ? data.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+    : data;
+
   
   // ── Estados Especiales ───────────────────────────────────────
 
@@ -159,9 +178,9 @@ export default function DataTable<T>({
             </tr>
           </thead>
           <tbody>
-            {data.map((item, index) => (
+            {currentData.map((item, index) => (
               <tr
-                key={index}
+                key={(item as any).id || index}
                 style={{
                   borderBottom: "1px solid var(--border-subtle)",
                   transition: "background 0.1s",
@@ -185,11 +204,49 @@ export default function DataTable<T>({
       {/* Cards Layer (Mobile) */}
       {renderMobileCard && (
         <div className="md:hidden flex flex-col">
-          {data.map((item, index) => (
-            <React.Fragment key={index}>
+          {currentData.map((item, index) => (
+            <React.Fragment key={(item as any).id || index}>
               {renderMobileCard(item)}
             </React.Fragment>
           ))}
+        </div>
+      )}
+
+      {/* Footer Paginación */}
+      {itemsPerPage && data.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderTop: "1px solid var(--border-subtle)", background: "var(--bg-surface)" }}>
+          <p style={{ fontSize: "12px", color: "var(--neutral-500)", fontWeight: 500 }}>
+            Mostrando {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, data.length)} de {data.length} registros
+          </p>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center", width: "28px", height: "28px", borderRadius: "6px",
+                border: "1px solid var(--border-default)", background: currentPage === 1 ? "transparent" : "var(--bg-card)",
+                color: currentPage === 1 ? "var(--neutral-600)" : "var(--neutral-50)", cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <div style={{ display: "flex", alignItems: "center", padding: "0 8px", fontSize: "12px", fontWeight: 600, color: "var(--neutral-100)" }}>
+              {currentPage} / {totalPages}
+            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center", width: "28px", height: "28px", borderRadius: "6px",
+                border: "1px solid var(--border-default)", background: currentPage === totalPages ? "transparent" : "var(--bg-card)",
+                color: currentPage === totalPages ? "var(--neutral-600)" : "var(--neutral-50)", cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
       )}
     </div>

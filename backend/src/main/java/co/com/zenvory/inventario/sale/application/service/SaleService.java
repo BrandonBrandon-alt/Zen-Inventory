@@ -13,6 +13,7 @@ import co.com.zenvory.inventario.sale.domain.model.Sale;
 import co.com.zenvory.inventario.sale.domain.model.SaleDetail;
 import co.com.zenvory.inventario.branch.application.port.in.BranchUseCase;
 import co.com.zenvory.inventario.auth.application.port.in.UserUseCase;
+import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,15 +29,17 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
     private final BranchUseCase branchUseCase;
     private final UserUseCase userUseCase;
     private final PriceListUseCase priceListUseCase;
+    private final AlertUseCase alertUseCase;
 
     public SaleService(SaleRepositoryPort saleRepositoryPort, ProductUseCase productUseCase, InventoryUseCase inventoryUseCase,
-                       BranchUseCase branchUseCase, UserUseCase userUseCase, PriceListUseCase priceListUseCase) {
+                       BranchUseCase branchUseCase, UserUseCase userUseCase, PriceListUseCase priceListUseCase, AlertUseCase alertUseCase) {
         this.saleRepositoryPort = saleRepositoryPort;
         this.productUseCase = productUseCase;
         this.inventoryUseCase = inventoryUseCase;
         this.branchUseCase = branchUseCase;
         this.userUseCase = userUseCase;
         this.priceListUseCase = priceListUseCase;
+        this.alertUseCase = alertUseCase;
     }
 
     @Override
@@ -160,6 +163,18 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
                     detail.getUnitPriceApplied(),
                     "Anulación #" + id + ": " + reason,
                     null
+            );
+        }
+        
+        // Disparar Alerta de Anulación
+        if (!sale.getDetails().isEmpty()) {
+            Long firstProductId = sale.getDetails().get(0).getProductId();
+            alertUseCase.createAlert(
+                sale.getBranchId(), 
+                firstProductId, 
+                "FRAUDE/ANULACIÓN: El empleado " + sale.getUserName() + " anuló la venta REF-" + id + " por COP " + sale.getTotalFinal(),
+                co.com.zenvory.inventario.alert.domain.model.StockAlert.AlertType.VOID_SALE,
+                sale.getId()
             );
         }
     }

@@ -2,6 +2,7 @@ package co.com.zenvory.inventario.transfer.domain.model;
 
 public enum TransferStatus {
     PENDING,
+    APPROVED_DEST,
     PREPARING,
     IN_TRANSIT,
     DELIVERED,

@@ -54,4 +54,5 @@ public interface InventoryUseCase {
     List<LocalInventory> getLowStockInventories();
 
     List<InventoryMovement> getAllMovements();
+    List<InventoryMovement> getMovementsByBranch(Long branchId);
 }

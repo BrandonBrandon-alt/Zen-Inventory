@@ -77,6 +77,9 @@ export default function Modal({
           borderRadius: "var(--radius-xl)",
           width: "100%",
           maxWidth: sizeWidths[size],
+          maxHeight: "calc(100vh - 48px)",
+          display: "flex",
+          flexDirection: "column",
           boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
           animation: "fadeInUp 0.2s cubic-bezier(0.16,1,0.3,1)",
           position: "relative",
@@ -91,6 +94,7 @@ export default function Modal({
             alignItems: "flex-start",
             justifyContent: "space-between",
             gap: "16px",
+            flexShrink: 0,
           }}
         >
           <div>
@@ -145,7 +149,7 @@ export default function Modal({
         </div>
 
         {/* Body */}
-        <div style={{ padding: "24px" }}>{children}</div>
+        <div style={{ padding: "24px", overflowY: "auto", flex: 1 }} className="custom-scrollbar">{children}</div>
 
         {/* Footer */}
         {footer && (
@@ -156,6 +160,7 @@ export default function Modal({
               display: "flex",
               justifyContent: "flex-end",
               gap: "10px",
+              flexShrink: 0,
             }}
           >
             {footer}

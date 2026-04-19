@@ -235,6 +235,7 @@ export default function AnalyticsPage() {
 
           <Card title="Desempeño Comparativo por Sede" style={{ padding: 0, overflow: "hidden" }}>
             <DataTable<BranchPerformance>
+              itemsPerPage={25}
               columns={columns}
               data={performance}
               isLoading={loading}

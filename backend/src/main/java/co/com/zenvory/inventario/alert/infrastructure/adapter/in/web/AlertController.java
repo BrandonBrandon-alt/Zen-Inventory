@@ -8,13 +8,13 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/alerts")
-@org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+@org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
 public class AlertController {
 
     /** Envelope genérico para respuestas de mensaje — garantiza JSON válido. */
     public record MessageResponse(String message) {}
 
-    public record TransferResolutionRequest(Long originBranchId, Integer quantity) {}
+    public record TransferResolutionRequest(Long originBranchId, Integer quantity, Long userId) {}
     public record PurchaseResolutionRequest(java.time.LocalDateTime estimatedArrival, java.math.BigDecimal quantity) {}
     public record DismissResolutionRequest(String reason) {}
 
@@ -25,6 +25,7 @@ public class AlertController {
     }
 
     @PostMapping("/scan")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<MessageResponse> forceScan() {
         alertUseCase.scanForAlerts();
         return ResponseEntity.ok(new MessageResponse("Escaneo de niveles de stock completado exitosamente."));
@@ -46,6 +47,7 @@ public class AlertController {
     }
 
     @PatchMapping("/{id}/resolve")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<MessageResponse> resolveAlert(@PathVariable Long id) {
         alertUseCase.resolveAlert(id);
         return ResponseEntity.ok(new MessageResponse("Alerta #" + id + " marcada como resuelta."));
@@ -55,11 +57,12 @@ public class AlertController {
     public ResponseEntity<MessageResponse> resolveViaTransfer(
             @PathVariable Long id, 
             @RequestBody TransferResolutionRequest request) {
-        alertUseCase.resolveViaTransfer(id, request.originBranchId(), request.quantity());
+        alertUseCase.resolveViaTransfer(id, request.originBranchId(), request.quantity(), request.userId());
         return ResponseEntity.ok(new MessageResponse("Alerta resuelta mediante solicitud de transferencia interna."));
     }
 
     @PostMapping("/{id}/resolve/purchase")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<MessageResponse> resolveViaPurchase(
             @PathVariable Long id, 
             @RequestBody PurchaseResolutionRequest request) {
@@ -68,6 +71,7 @@ public class AlertController {
     }
 
     @PostMapping("/{id}/resolve/dismiss")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<MessageResponse> dismissAlert(
             @PathVariable Long id, 
             @RequestBody DismissResolutionRequest request) {

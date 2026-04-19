@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { apiClient } from "@/api/client";
+import { getSession } from "@/api/auth";
 import { useToast } from "@/context/ToastContext";
 import type { components } from "@/api/schema";
 import { Building, MapPin, Phone, Edit, Trash2, Plus } from "lucide-react";
@@ -291,6 +293,7 @@ function EditBranchModal({
 
 // ── Main Page ──────────────────────────────────────────────
 export default function BranchesPage() {
+  const router = useRouter();
   const [branches, setBranches]   = useState<BranchResponse[]>([]);
   const [loading, setLoading]     = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -299,6 +302,14 @@ export default function BranchesPage() {
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" | null }>({ key: "nombre", direction: "asc" });
   const [, startTransition] = useTransition();
   const { showToast } = useToast();
+
+  // ADMIN-only route guard
+  useEffect(() => {
+    const session = getSession();
+    if (!session || session.rol !== "ADMIN") {
+      router.replace("/dashboard");
+    }
+  }, [router]);
 
   useEffect(() => {
     apiClient.GET("/api/branches").then(({ data }) => {
@@ -461,6 +472,7 @@ export default function BranchesPage() {
       {/* Table Card */}
       <Card delay="0.1s" style={{ padding: 0, overflow: "hidden" }}>
         <DataTable<BranchResponse>
+          itemsPerPage={25}
           columns={columns}
           data={filteredAndSortedBranches}
           sortConfig={sortConfig}

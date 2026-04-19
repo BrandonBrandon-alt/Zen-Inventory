@@ -41,6 +41,10 @@ public class AlertEntity {
     @Column(name = "fecha_resolucion")
     private LocalDateTime resolvedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_alerta", length = 50)
+    private co.com.zenvory.inventario.alert.domain.model.StockAlert.AlertType type;
+
     public AlertEntity() {}
 
     public Long getId() { return id; }
@@ -72,4 +76,7 @@ public class AlertEntity {
 
     public LocalDateTime getResolvedAt() { return resolvedAt; }
     public void setResolvedAt(LocalDateTime resolvedAt) { this.resolvedAt = resolvedAt; }
+
+    public co.com.zenvory.inventario.alert.domain.model.StockAlert.AlertType getType() { return type; }
+    public void setType(co.com.zenvory.inventario.alert.domain.model.StockAlert.AlertType type) { this.type = type; }
 }

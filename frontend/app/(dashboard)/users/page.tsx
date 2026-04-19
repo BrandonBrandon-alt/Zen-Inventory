@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { apiClient } from "@/api/client";
+import { getSession } from "@/api/auth";
 import { useToast } from "@/context/ToastContext";
 import type { components } from "@/api/schema";
 import { User, Mail, Lock, Shield, Building, Edit, Trash2 } from "lucide-react";
@@ -326,6 +328,7 @@ function EditUserModal({ open, onClose, user, roles, branches, onUpdated }: {
 
 // ── Main Page ──────────────────────────────────────────────
 export default function UsersPage() {
+    const router = useRouter();
     const [users, setUsers] = useState<UserResponse[]>([]);
     const [roles, setRoles] = useState<RoleResponse[]>([]);
     const [branches, setBranches] = useState<BranchResponse[]>([]);
@@ -337,6 +340,14 @@ export default function UsersPage() {
 
     const [, startTransition] = useTransition();
     const { showToast } = useToast();
+
+    // ADMIN-only route guard
+    useEffect(() => {
+        const session = getSession();
+        if (!session || session.rol !== "ADMIN") {
+            router.replace("/dashboard");
+        }
+    }, [router]);
 
     const handleSort = (key: string) => {
         setSortConfig(prev => ({
@@ -510,6 +521,7 @@ export default function UsersPage() {
 
             <Card style={{ padding: 0, overflow: "hidden" }}>
                 <DataTable<UserResponse>
+                    itemsPerPage={25}
                     columns={columns}
                     data={filteredAndSortedUsers}
                     sortConfig={sortConfig}

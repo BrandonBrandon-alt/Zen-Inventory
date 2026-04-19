@@ -120,6 +120,7 @@ export default function HistoryTable({ sales, onOpenDetail, formatCurrency, onRe
 
   return (
     <DataTable
+      itemsPerPage={15}
       columns={columns}
       data={sales}
       isLoading={isLoading}

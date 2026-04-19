@@ -5,7 +5,7 @@ import lombok.*;
 /**
  * Modelo de dominio puro que representa un Rol de usuario.
  * Mapea la tabla {@code rol} de la BD.
- * Los roles posibles son: ADMIN, GERENTE_SUCURSAL, OPERADOR_INVENTARIO.
+ * Los roles posibles son: ADMIN, MANAGER, SELLER, OPERADOR_INVENTARIO.
  */
 @Getter
 @Setter

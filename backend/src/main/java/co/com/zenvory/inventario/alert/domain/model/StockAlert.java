@@ -5,6 +5,13 @@ import co.com.zenvory.inventario.alert.domain.exception.AlertAlreadyResolvedExce
 import java.time.LocalDateTime;
 
 public class StockAlert {
+    public enum AlertType {
+        LOW_STOCK,
+        TRANSFER_REQUEST,
+        ISSUE_REPORTED,
+        VOID_SALE
+    }
+
     private Long id;
     private Long branchId;
     private Long productId;
@@ -12,12 +19,13 @@ public class StockAlert {
     private LocalDateTime alertDate;
     private boolean resolved;
     private ResolutionType resolutionType;
+    private AlertType type;
     private Long referenceId;
     private String resolutionReason;
     private LocalDateTime resolvedAt;
 
     public StockAlert(Long id, Long branchId, Long productId, String message, LocalDateTime alertDate, boolean resolved,
-                      ResolutionType resolutionType, Long referenceId, String resolutionReason, LocalDateTime resolvedAt) {
+                      ResolutionType resolutionType, AlertType type, Long referenceId, String resolutionReason, LocalDateTime resolvedAt) {
         if (branchId == null || productId == null) {
             throw new IllegalArgumentException("La sucursal y el producto son obligatorios para una alerta.");
         }
@@ -32,13 +40,18 @@ public class StockAlert {
         this.alertDate = alertDate != null ? alertDate : LocalDateTime.now();
         this.resolved = resolved;
         this.resolutionType = resolutionType;
+        this.type = type != null ? type : AlertType.LOW_STOCK;
         this.referenceId = referenceId;
         this.resolutionReason = resolutionReason;
         this.resolvedAt = resolvedAt;
     }
 
     public static StockAlert create(Long branchId, Long productId, String message) {
-        return new StockAlert(null, branchId, productId, message, LocalDateTime.now(), false, null, null, null, null);
+        return new StockAlert(null, branchId, productId, message, LocalDateTime.now(), false, null, AlertType.LOW_STOCK, null, null, null);
+    }
+
+    public static StockAlert create(Long branchId, Long productId, String message, AlertType type, Long referenceId) {
+        return new StockAlert(null, branchId, productId, message, LocalDateTime.now(), false, null, type, referenceId, null, null);
     }
 
     public void resolve(ResolutionType type, Long refId, String reason) {
@@ -59,6 +72,7 @@ public class StockAlert {
     public LocalDateTime getAlertDate() { return alertDate; }
     public boolean isResolved() { return resolved; }
     public ResolutionType getResolutionType() { return resolutionType; }
+    public AlertType getType() { return type; }
     public Long getReferenceId() { return referenceId; }
     public String getResolutionReason() { return resolutionReason; }
     public LocalDateTime getResolvedAt() { return resolvedAt; }

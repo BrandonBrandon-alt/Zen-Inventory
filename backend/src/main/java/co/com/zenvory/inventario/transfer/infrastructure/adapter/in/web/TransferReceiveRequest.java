@@ -7,9 +7,6 @@ import jakarta.validation.constraints.PositiveOrZero;
 import java.util.List;
 
 public record TransferReceiveRequest(
-        @NotNull(message = "El ID de usuario es obligatorio para la auditoría.")
-        Long userId,
-
         String notes,
 
         @NotEmpty(message = "Debe reportar al menos un detalle de la carga recibida.")

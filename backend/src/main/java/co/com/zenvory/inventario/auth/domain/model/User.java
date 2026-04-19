@@ -20,7 +20,7 @@ public class User {
     private String nombre;
     private String email;
     private String passwordHash;
-    /** ID del rol asignado. Ej: 1=ADMIN, 2=GERENTE_SUCURSAL, 3=OPERADOR. */
+    /** ID del rol asignado. Ej: 1=ADMIN, 2=MANAGER, 4=OPERADOR_INVENTARIO. */
     private Role role;
     /** Sucursal asignada (null para ADMIN general). */
     private Long sucursalId;

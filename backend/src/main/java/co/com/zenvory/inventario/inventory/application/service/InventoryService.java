@@ -279,4 +279,9 @@ public class InventoryService implements InventoryUseCase {
     public List<InventoryMovement> getAllMovements() {
         return inventoryMovementRepository.findAll();
     }
+
+    @Override
+    public List<InventoryMovement> getMovementsByBranch(Long branchId) {
+        return inventoryMovementRepository.findByBranchId(branchId);
+    }
 }

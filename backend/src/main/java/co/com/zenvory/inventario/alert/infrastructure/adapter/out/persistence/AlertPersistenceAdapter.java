@@ -58,6 +58,7 @@ public class AlertPersistenceAdapter implements AlertRepositoryPort {
         entity.setReferenceId(domain.getReferenceId());
         entity.setResolutionReason(domain.getResolutionReason());
         entity.setResolvedAt(domain.getResolvedAt());
+        entity.setType(domain.getType());
         return entity;
     }
 
@@ -70,6 +71,7 @@ public class AlertPersistenceAdapter implements AlertRepositoryPort {
                 entity.getAlertDate(),
                 Boolean.TRUE.equals(entity.getResolved()),
                 entity.getResolutionType(),
+                entity.getType(),
                 entity.getReferenceId(),
                 entity.getResolutionReason(),
                 entity.getResolvedAt()

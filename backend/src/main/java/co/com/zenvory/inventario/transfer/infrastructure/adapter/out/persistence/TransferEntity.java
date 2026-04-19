@@ -2,6 +2,7 @@ package co.com.zenvory.inventario.transfer.infrastructure.adapter.out.persistenc
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,6 +26,9 @@ public class TransferEntity {
     @Column(name = "fecha_real_llegada")
     private LocalDateTime actualArrivalDate;
 
+    @Column(name = "fecha_despacho")
+    private LocalDateTime dispatchDate;
+
     @Column(name = "sucursal_origen_id", nullable = false)
     private Long originBranchId;
 
@@ -40,11 +44,47 @@ public class TransferEntity {
     @Column(name = "parent_transfer_id")
     private Long parentTransferId;
 
+    @Column(name = "prioridad")
+    private String priority;
+
+    @Column(name = "costo_envio")
+    private BigDecimal shippingCost;
+
+    @Column(name = "numero_guia")
+    private String trackingNumber;
+
     @Column(name = "motivo_resolucion")
     private String reasonResolution;
 
-    @Column(name = "resuelto_por_id")
-    private Long resueltoPorId;
+    @Column(name = "solicitante_id")
+    private Long solicitanteId;
+
+    @Column(name = "solicitante_nombre")
+    private String solicitanteNombre;
+
+    @Column(name = "autorizador_id")
+    private Long autorizadorId;
+
+    @Column(name = "autorizador_nombre")
+    private String autorizadorNombre;
+
+    @Column(name = "despachador_id")
+    private Long despachadorId;
+
+    @Column(name = "despachador_nombre")
+    private String despachadorNombre;
+
+    @Column(name = "recibidor_id")
+    private Long recibidorId;
+
+    @Column(name = "recibidor_nombre")
+    private String recibidorNombre;
+
+    @Column(name = "resolutor_id")
+    private Long resolutorId;
+
+    @Column(name = "resolutor_nombre")
+    private String resolutorNombre;
 
     @Column(name = "fecha_resolucion")
     private LocalDateTime fechaResolucion;
@@ -82,6 +122,9 @@ public class TransferEntity {
     public LocalDateTime getActualArrivalDate() { return actualArrivalDate; }
     public void setActualArrivalDate(LocalDateTime actualArrivalDate) { this.actualArrivalDate = actualArrivalDate; }
 
+    public LocalDateTime getDispatchDate() { return dispatchDate; }
+    public void setDispatchDate(LocalDateTime dispatchDate) { this.dispatchDate = dispatchDate; }
+
     public Long getOriginBranchId() { return originBranchId; }
     public void setOriginBranchId(Long originBranchId) { this.originBranchId = originBranchId; }
 
@@ -97,11 +140,47 @@ public class TransferEntity {
     public Long getParentTransferId() { return parentTransferId; }
     public void setParentTransferId(Long parentTransferId) { this.parentTransferId = parentTransferId; }
 
+    public String getPriority() { return priority; }
+    public void setPriority(String priority) { this.priority = priority; }
+
+    public BigDecimal getShippingCost() { return shippingCost; }
+    public void setShippingCost(BigDecimal shippingCost) { this.shippingCost = shippingCost; }
+
+    public String getTrackingNumber() { return trackingNumber; }
+    public void setTrackingNumber(String trackingNumber) { this.trackingNumber = trackingNumber; }
+
     public String getReasonResolution() { return reasonResolution; }
     public void setReasonResolution(String reasonResolution) { this.reasonResolution = reasonResolution; }
 
-    public Long getResueltoPorId() { return resueltoPorId; }
-    public void setResueltoPorId(Long resueltoPorId) { this.resueltoPorId = resueltoPorId; }
+    public Long getSolicitanteId() { return solicitanteId; }
+    public void setSolicitanteId(Long solicitanteId) { this.solicitanteId = solicitanteId; }
+
+    public String getSolicitanteNombre() { return solicitanteNombre; }
+    public void setSolicitanteNombre(String solicitanteNombre) { this.solicitanteNombre = solicitanteNombre; }
+
+    public Long getAutorizadorId() { return autorizadorId; }
+    public void setAutorizadorId(Long autorizadorId) { this.autorizadorId = autorizadorId; }
+
+    public String getAutorizadorNombre() { return autorizadorNombre; }
+    public void setAutorizadorNombre(String autorizadorNombre) { this.autorizadorNombre = autorizadorNombre; }
+
+    public Long getDespachadorId() { return despachadorId; }
+    public void setDespachadorId(Long despachadorId) { this.despachadorId = despachadorId; }
+
+    public String getDespachadorNombre() { return despachadorNombre; }
+    public void setDespachadorNombre(String despachadorNombre) { this.despachadorNombre = despachadorNombre; }
+
+    public Long getRecibidorId() { return recibidorId; }
+    public void setRecibidorId(Long recibidorId) { this.recibidorId = recibidorId; }
+
+    public String getRecibidorNombre() { return recibidorNombre; }
+    public void setRecibidorNombre(String recibidorNombre) { this.recibidorNombre = recibidorNombre; }
+
+    public Long getResolutorId() { return resolutorId; }
+    public void setResolutorId(Long resolutorId) { this.resolutorId = resolutorId; }
+
+    public String getResolutorNombre() { return resolutorNombre; }
+    public void setResolutorNombre(String resolutorNombre) { this.resolutorNombre = resolutorNombre; }
 
     public LocalDateTime getFechaResolucion() { return fechaResolucion; }
     public void setFechaResolucion(LocalDateTime fechaResolucion) { this.fechaResolucion = fechaResolucion; }

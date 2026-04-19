@@ -9,4 +9,5 @@ public interface TransferRepositoryPort {
     Transfer save(Transfer transfer);
     Optional<Transfer> findById(Long id);
     List<Transfer> findAll();
+    List<Transfer> findByBranch(Long branchId);
 }

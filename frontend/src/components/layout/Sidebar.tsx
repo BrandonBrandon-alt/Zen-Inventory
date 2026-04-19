@@ -66,6 +66,17 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    href: "/sales/history",
+    label: "Historial Ventas",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M12 8v4l3 3" />
+        <circle cx="12" cy="12" r="9" />
+        <path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" />
+      </svg>
+    ),
+  },
 ];
 
 const adminItems = [
@@ -124,17 +135,6 @@ const adminItems = [
       </svg>
     ),
   },
-  {
-    href: "/sales/history",
-    label: "Historial Ventas",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M12 8v4l3 3" />
-        <circle cx="12" cy="12" r="9" />
-        <path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" />
-      </svg>
-    ),
-  },
 ];
 
 const masterItems = [
@@ -185,6 +185,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [session, setSession] = useState<AuthSession | null>(null);
   const scrollRef = useRef<HTMLElement>(null);
   const [alertCount, setAlertCount] = useState(0);
+  const [branchName, setBranchName] = useState<string | null>(null);
 
   useEffect(() => {
     setSession(getSession());
@@ -199,8 +200,19 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   useEffect(() => {
     if (!session) return;
 
-    async function fetchAlerts() {
+    async function fetchBranchAndAlerts() {
       try {
+        // 1. Fetch Branch Name
+        if (session?.rol === "ADMIN") {
+          setBranchName("Gestión Global");
+        } else if (session?.sucursalId) {
+          const { data: branch } = await apiClient.GET("/api/branches/{id}", {
+            params: { path: { id: session.sucursalId } }
+          });
+          if (branch) setBranchName(branch.nombre || null);
+        }
+
+        // 2. Fetch Alerts
         let count = 0;
         if (session?.rol === "ADMIN") {
           const { data: branches } = await apiClient.GET("/api/branches");
@@ -220,11 +232,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         }
         setAlertCount(count);
       } catch (e) {
-        console.error("Error fetching alerts for sidebar", e);
+        console.error("Error fetching data for sidebar", e);
       }
     }
 
-    fetchAlerts();
+    fetchBranchAndAlerts();
   }, [session]);
 
   const handleScroll = (e: React.UIEvent<HTMLElement>) => {
@@ -239,17 +251,23 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const isAdmin = session?.rol === "ADMIN";
   const isManager = session?.rol === "MANAGER";
   const isSeller = session?.rol === "SELLER";
+  const isInventory = session?.rol === "OPERADOR_INVENTARIO";
 
   // Definir qué roles ven qué items base
   const visibleNavItems = navItems.filter(item => {
-    if (isSeller) {
-      return item.label === "Terminal POS" || item.label === "Inventario";
-    }
     if (isAdmin) {
-      // Admin no necesita el POS Terminal, su rol es de gestión global
       return item.label !== "Terminal POS";
     }
-    return true; // Manager ve todos los navItems base
+    if (isSeller) {
+      // SELLER: POS as main screen + read-only inventory + own sales history
+      return item.label === "Terminal POS" || item.label === "Inventario" || item.label === "Historial Ventas";
+    }
+    if (isInventory) {
+      // OPERADOR_INVENTARIO: Panel + physical inventory + transfer execution
+      return item.label === "Panel" || item.label === "Inventario" || item.label === "Traslados";
+    }
+    // Managers see everything in base navItems
+    return true;
   });
 
   const NavLink = ({ href, label, icon }: { href: string; label: string; icon: React.ReactNode }) => {
@@ -453,7 +471,45 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         {session && (
           <div style={{ padding: "0 10px", marginBottom: "12px" }}>
             <p style={{ fontSize: "13px", fontWeight: 600, color: "var(--neutral-100)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{session.nombre}</p>
-            <p style={{ fontSize: "11px", color: "var(--neutral-500)" }}>{session.rol}</p>
+            <div style={{ marginTop: "4px", display: "flex", gap: "6px", alignItems: "center" }}>
+              <span style={{ 
+                fontSize: "10px", 
+                fontWeight: 700, 
+                padding: "2px 8px", 
+                borderRadius: "4px",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                background: session.rol === "ADMIN" ? "rgba(var(--brand-500-rgb), 0.15)" : 
+                            session.rol === "MANAGER" ? "rgba(var(--color-success-rgb), 0.15)" : 
+                            session.rol === "OPERADOR_INVENTARIO" ? "rgba(var(--color-warning-rgb), 0.15)" :
+                            session.rol === "SELLER" ? "rgba(var(--color-info-rgb), 0.15)" :
+                            "rgba(var(--neutral-500-rgb), 0.15)",
+                color: session.rol === "ADMIN" ? "var(--brand-400)" : 
+                       session.rol === "MANAGER" ? "var(--color-success)" : 
+                       session.rol === "OPERADOR_INVENTARIO" ? "var(--color-warning)" :
+                       session.rol === "SELLER" ? "var(--color-info)" :
+                       "var(--neutral-400)",
+                border: session.rol === "ADMIN" ? "1px solid rgba(var(--brand-500-rgb), 0.3)" : 
+                        session.rol === "MANAGER" ? "1px solid rgba(var(--color-success-rgb), 0.3)" : 
+                        session.rol === "OPERADOR_INVENTARIO" ? "1px solid rgba(var(--color-warning-rgb), 0.3)" :
+                        session.rol === "SELLER" ? "1px solid rgba(var(--color-info-rgb), 0.3)" :
+                        "1px solid rgba(var(--neutral-500-rgb), 0.3)"
+              }}>
+                {session.rol === "OPERADOR_INVENTARIO" ? "Operador" : session.rol}
+              </span>
+            </div>
+            {branchName && (
+              <p style={{ 
+                fontSize: "10px", 
+                color: "var(--brand-500)", 
+                fontWeight: 600, 
+                marginTop: "2px",
+                textTransform: "uppercase",
+                letterSpacing: "0.02em"
+              }}>
+                {branchName}
+              </p>
+            )}
           </div>
         )}
         <button

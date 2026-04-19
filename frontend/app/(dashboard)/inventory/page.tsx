@@ -80,6 +80,7 @@ export default function InventoryPage() {
   const session = typeof window !== "undefined" ? getSession() : null;
   const isAdmin = session?.rol === "ADMIN";
   const isManager = session?.rol === "MANAGER";
+  const isInventory = session?.rol === "OPERADOR_INVENTARIO";
   const isSeller = session?.rol === "SELLER";
   const myBranchId = session?.sucursalId || null;
 
@@ -92,6 +93,9 @@ export default function InventoryPage() {
   const selectedBranchId = invPageState.branchId;
   const activeTab = invPageState.tab;
   const searchTerm = invPageState.search;
+
+  const canEdit = isAdmin || isInventory || (isManager && selectedBranchId === myBranchId);
+  const canSeeCost = isAdmin || isManager; // INVENTORY & SELLER do not see financial cost columns
 
   const setSelectedBranchId = (val: number | null) => setInvPageState(prev => ({ ...prev, branchId: val }));
   const setActiveTab = (val: "matrix" | "kardex") => setInvPageState(prev => ({ ...prev, tab: val }));
@@ -127,7 +131,8 @@ export default function InventoryPage() {
   const [minStockValue, setMinStockValue] = useState<number | "">("");
   const [submitting, setSubmitting] = useState(false);
 
-  const canEdit = isAdmin || (isManager && selectedBranchId === myBranchId);
+  // Adjust modal validation: INVENTORY must provide a justification (min 15 chars)
+  const observationsRequired = isInventory;
 
   // Initial load
   useEffect(() => {
@@ -140,9 +145,13 @@ export default function InventoryPage() {
         setBranches(bra.data ?? []);
         setProducts(pro.data ?? []);
         
-        const defaultBranch = bra.data?.find(b => b.id === myBranchId) || bra.data?.[0];
-        if (defaultBranch && !selectedBranchId) {
-          setSelectedBranchId(defaultBranch.id ?? null);
+        // Prioritize myBranchId from session to avoid being blocked by empty branch lists
+        if (!selectedBranchId) {
+          if (myBranchId) {
+            setSelectedBranchId(myBranchId);
+          } else if (bra.data && bra.data.length > 0) {
+            setSelectedBranchId(bra.data[0].id ?? null);
+          }
         }
       } catch (err) {
         showToast("Error al inicializar datos", "error");
@@ -224,6 +233,10 @@ export default function InventoryPage() {
     }
     if (!adjustData.reason) {
       showToast("El motivo es obligatorio", "warning");
+      return;
+    }
+    if (observationsRequired && (adjustData.reason === "AJUSTE_POSITIVO" || adjustData.reason === "AJUSTE_NEGATIVO" || adjustData.reason === "MERMA") && adjustData.observations.trim().length < 15) {
+      showToast("Debes justificar el ajuste con al menos 15 caracteres.", "warning");
       return;
     }
 
@@ -396,6 +409,7 @@ export default function InventoryPage() {
           <div className="mt-12 outline-none">
             <Card className="p-0 overflow-hidden border-[var(--neutral-800)] bg-[var(--bg-card)] shadow-2xl">
               <DataTable<ProductResponse>
+                itemsPerPage={25}
                 sortConfig={sortConfig}
                 onSort={handleSort}
                 columns={[
@@ -526,6 +540,7 @@ export default function InventoryPage() {
 
             <Card style={{ padding: 0, overflow: "hidden", border: "1px solid var(--border-default)" }}>
               <DataTable<InventoryMovementExtended>
+                itemsPerPage={25}
                 columns={[
                   {
                     header: "Fecha y Hora",

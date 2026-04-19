@@ -194,9 +194,10 @@ export default function SaleDetailModal({
         {/* Itemized Table - Unified DataTable */}
         <div 
             className="border border-[var(--neutral-800)] rounded-3xl overflow-hidden bg-[var(--bg-surface)]/30 shadow-2xl overflow-y-auto custom-scrollbar"
-            style={{ maxHeight: "300px" }}
+            style={{ maxHeight: "200px" }}
         >
             <DataTable<any>
+                itemsPerPage={25}
                 columns={columns}
                 data={sale.details ?? []}
                 density="compact"

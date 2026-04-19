@@ -73,6 +73,10 @@ function SalesHistoryContent() {
       router.push("/login");
       return;
     }
+    if (sess.rol === "OPERADOR_INVENTARIO") {
+      router.replace("/dashboard");
+      return;
+    }
     setSession(sess);
 
     // Initial data fetch: Branches (if admin)
@@ -95,12 +99,15 @@ function SalesHistoryContent() {
     const targetBranchId = branchId !== undefined ? branchId : (selectedBranchId || undefined);
     
     setLoading(true);
+    // Security enforcement: If manager or seller, always use their sucursalId
+    const effectiveBranchId = (authSess?.rol === "MANAGER" || authSess?.rol === "SELLER") ? authSess.sucursalId : targetBranchId;
+
     try {
       const { data } = await apiClient.GET("/api/v1/sales", {
-        params: { query: { branchId: targetBranchId } }
+        params: { query: { branchId: effectiveBranchId } }
       });
       if (data) {
-        const sortedSales = [...(data as any[])].sort((a, b) => {
+        let sortedSales = [...(data as any[])].sort((a, b) => {
           // If admin, group by branch first
           if (authSess?.rol === "ADMIN") {
             const branchA = (a.branchName || "").toLowerCase();
@@ -110,6 +117,12 @@ function SalesHistoryContent() {
           // Then sort by date descending
           return new Date(b.date).getTime() - new Date(a.date).getTime();
         });
+
+        // Strict SELLER filtering
+        if (authSess?.rol === "SELLER") {
+          sortedSales = sortedSales.filter(s => s.userName === authSess.nombre);
+        }
+
         setSales(sortedSales);
       }
     } catch (error: any) {
@@ -199,7 +212,7 @@ function SalesHistoryContent() {
           description="Gestión y auditoría de transacciones registradas en el sistema POS."
         />
 
-        {session?.rol === "ADMIN" && (
+        {(session?.rol === "ADMIN" || session?.rol === "MANAGER") && (
           <SummaryCards 
             daily={metrics.daily}
             weekly={metrics.weekly}
@@ -215,7 +228,7 @@ function SalesHistoryContent() {
             onSearchChange={setSearchTerm}
             isAdmin={session?.rol === "ADMIN"}
             branches={branches}
-            selectedBranchId={selectedBranchId || "all"}
+            selectedBranchId={(session?.rol === "MANAGER" || session?.rol === "SELLER") ? session.sucursalId! : (selectedBranchId || "all")}
             onBranchChange={handleBranchChange}
           />
 
@@ -232,7 +245,7 @@ function SalesHistoryContent() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         sale={selectedSale}
-        isAdmin={session?.rol === "ADMIN"}
+        isAdmin={session?.rol === "ADMIN" || session?.rol === "MANAGER"}
         onSaleCanceled={fetchSales}
       />
     </div>

@@ -7,8 +7,9 @@ public class TransferDetail {
     private Integer sentQuantity;
     private Integer receivedQuantity;
     private Integer missingQuantity;
+    private String productName;
 
-    public TransferDetail(Long id, Long productId, Integer requestedQuantity, Integer sentQuantity, Integer receivedQuantity, Integer missingQuantity) {
+    public TransferDetail(Long id, Long productId, String productName, Integer requestedQuantity, Integer sentQuantity, Integer receivedQuantity, Integer missingQuantity) {
         if (requestedQuantity == null || requestedQuantity <= 0) {
             throw new IllegalArgumentException("La cantidad solicitada debe ser mayor a cero.");
         }
@@ -18,10 +19,11 @@ public class TransferDetail {
         this.sentQuantity = sentQuantity != null ? sentQuantity : 0;
         this.receivedQuantity = receivedQuantity != null ? receivedQuantity : 0;
         this.missingQuantity = missingQuantity != null ? missingQuantity : 0;
+        this.productName = productName;
     }
 
-    public static TransferDetail create(Long productId, Integer requestedQuantity) {
-        return new TransferDetail(null, productId, requestedQuantity, 0, 0, 0);
+    public static TransferDetail create(Long productId, String productName, Integer requestedQuantity) {
+        return new TransferDetail(null, productId, productName, requestedQuantity, 0, 0, 0);
     }
 
     public void registerDispatch(Integer sent) {
@@ -45,4 +47,5 @@ public class TransferDetail {
     public Integer getSentQuantity() { return sentQuantity; }
     public Integer getReceivedQuantity() { return receivedQuantity; }
     public Integer getMissingQuantity() { return missingQuantity; }
+    public String getProductName() { return productName; }
 }

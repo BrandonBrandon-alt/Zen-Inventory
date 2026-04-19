@@ -8,6 +8,10 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
+import co.com.zenvory.inventario.auth.domain.model.User;
 import java.util.List;
 
 @RestController
@@ -16,10 +20,14 @@ public class SaleController {
 
     private final CreateSaleUseCase createSaleUseCase;
     private final SaleManagementUseCase saleManagementUseCase;
+    private final UserRepositoryPort userRepositoryPort;
 
-    public SaleController(CreateSaleUseCase createSaleUseCase, SaleManagementUseCase saleManagementUseCase) {
+    public SaleController(CreateSaleUseCase createSaleUseCase, 
+                          SaleManagementUseCase saleManagementUseCase,
+                          UserRepositoryPort userRepositoryPort) {
         this.createSaleUseCase = createSaleUseCase;
         this.saleManagementUseCase = saleManagementUseCase;
+        this.userRepositoryPort = userRepositoryPort;
     }
 
     @PostMapping
@@ -47,26 +55,34 @@ public class SaleController {
     }
 
     @GetMapping
-    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER')")
     public ResponseEntity<List<SaleResponse>> getAllSales(@RequestParam(required = false) Long branchId) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        User user = userRepositoryPort.findByEmail(auth.getName()).orElseThrow();
+        
         List<Sale> sales;
-        if (branchId != null) {
+        
+        // REGLA DE SEGURIDAD: Los MANAGER y SELLER solo ven su sede. Los ADMIN pueden ver todo o filtrar.
+        if ("MANAGER".equals(user.getRole().getNombre()) || "SELLER".equals(user.getRole().getNombre())) {
+            sales = saleManagementUseCase.getSalesByBranch(user.getSucursalId());
+        } else if (branchId != null) {
             sales = saleManagementUseCase.getSalesByBranch(branchId);
         } else {
             sales = saleManagementUseCase.getAllSales();
         }
+        
         return ResponseEntity.ok(sales.stream().map(SaleResponse::fromDomain).toList());
     }
 
     @GetMapping("/{id}")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER')")
     public ResponseEntity<SaleResponse> getSale(@PathVariable Long id) {
         Sale sale = saleManagementUseCase.getSaleById(id);
         return ResponseEntity.ok(SaleResponse.fromDomain(sale));
     }
 
     @DeleteMapping("/{id}")
-    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<Void> cancelSale(@PathVariable Long id, @RequestParam String reason) {
         saleManagementUseCase.cancelSale(id, reason);
         return ResponseEntity.noContent().build();

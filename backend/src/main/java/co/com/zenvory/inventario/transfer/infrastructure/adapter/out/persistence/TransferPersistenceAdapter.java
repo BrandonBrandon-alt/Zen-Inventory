@@ -38,6 +38,13 @@ public class TransferPersistenceAdapter implements TransferRepositoryPort {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public List<Transfer> findByBranch(Long branchId) {
+        return jpaTransferRepository.findByOriginBranchIdOrDestinationBranchIdOrderByIdDesc(branchId, branchId).stream()
+                .map(this::toDomain)
+                .collect(Collectors.toList());
+    }
+
     private TransferEntity toEntity(Transfer domain) {
         TransferEntity entity = new TransferEntity();
         entity.setId(domain.getId());
@@ -51,9 +58,22 @@ public class TransferPersistenceAdapter implements TransferRepositoryPort {
         entity.setReceiptNotes(domain.getReceiptNotes());
         entity.setParentTransferId(domain.getParentTransferId());
         entity.setReasonResolution(domain.getReasonResolution());
-        entity.setResueltoPorId(domain.getResolvedById());
+        entity.setSolicitanteId(domain.getSolicitanteId());
+        entity.setSolicitanteNombre(domain.getSolicitanteNombre());
+        entity.setAutorizadorId(domain.getAutorizadorId());
+        entity.setAutorizadorNombre(domain.getAutorizadorNombre());
+        entity.setDespachadorId(domain.getDespachadorId());
+        entity.setDespachadorNombre(domain.getDespachadorNombre());
+        entity.setRecibidorId(domain.getRecibidorId());
+        entity.setRecibidorNombre(domain.getRecibidorNombre());
+        entity.setResolutorId(domain.getResolutorId());
+        entity.setResolutorNombre(domain.getResolutorNombre());
         entity.setFechaResolucion(domain.getResolutionDate());
         entity.setVersion(domain.getVersion());
+        entity.setPriority(domain.getPriority() != null ? domain.getPriority().name() : null);
+        entity.setShippingCost(domain.getShippingCost());
+        entity.setTrackingNumber(domain.getTrackingNumber());
+        entity.setDispatchDate(domain.getDispatchDate());
 
         if (domain.getDetails() != null) {
             for (TransferDetail detail : domain.getDetails()) {
@@ -64,6 +84,7 @@ public class TransferPersistenceAdapter implements TransferRepositoryPort {
                 detailEntity.setSentQuantity(detail.getSentQuantity());
                 detailEntity.setReceivedQuantity(detail.getReceivedQuantity());
                 detailEntity.setMissingQuantity(detail.getMissingQuantity());
+                detailEntity.setProductName(detail.getProductName());
 
                 entity.addDetail(detailEntity);
             }
@@ -85,16 +106,30 @@ public class TransferPersistenceAdapter implements TransferRepositoryPort {
                 entity.getDetails().stream().map(d -> new TransferDetail(
                         d.getId(),
                         d.getProductId(),
+                        d.getProductName(),
                         d.getRequestedQuantity(),
                         d.getSentQuantity(),
                         d.getReceivedQuantity(),
                         d.getMissingQuantity()
                 )).collect(Collectors.toList()),
                 entity.getParentTransferId(),
+                entity.getPriority() != null ? co.com.zenvory.inventario.transfer.domain.model.TransferPriority.valueOf(entity.getPriority()) : null,
+                entity.getShippingCost(),
+                entity.getTrackingNumber(),
                 entity.getReasonResolution(),
-                entity.getResueltoPorId(),
                 entity.getFechaResolucion(),
-                entity.getVersion()
+                entity.getDispatchDate(),
+                entity.getVersion(),
+                entity.getSolicitanteId(),
+                entity.getSolicitanteNombre(),
+                entity.getAutorizadorId(),
+                entity.getAutorizadorNombre(),
+                entity.getDespachadorId(),
+                entity.getDespachadorNombre(),
+                entity.getRecibidorId(),
+                entity.getRecibidorNombre(),
+                entity.getResolutorId(),
+                entity.getResolutorNombre()
         );
     }
 }

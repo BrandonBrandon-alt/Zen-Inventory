@@ -24,7 +24,7 @@ interface AlertResolutionModalProps {
   onSuccess: () => void;
 }
 
-type Tab = "TRANSFER" | "PURCHASE" | "DISMISSED";
+type Tab = "TRANSFER" | "PURCHASE" | "DISMISSED" | "AUTHORIZE";
 
 export default function AlertResolutionModal({ alert, onClose, onSuccess }: AlertResolutionModalProps) {
   const { showToast } = useToast();
@@ -49,6 +49,11 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
 
   useEffect(() => {
     if (alert) {
+      if (alert.type === "TRANSFER_REQUEST") {
+        setActiveTab("AUTHORIZE");
+      } else {
+        setActiveTab("TRANSFER");
+      }
       loadInitialData();
     }
   }, [alert]);
@@ -126,10 +131,18 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
       if (activeTab === "TRANSFER") {
         if (!originBranchId) throw new Error("Debes seleccionar una sucursal de origen.");
         endpoint = `/api/v1/alerts/${alert.id}/resolve/transfer`;
-        body = { originBranchId, quantity };
+        body = { originBranchId, quantity, userId: session?.id };
       } else if (activeTab === "PURCHASE") {
         endpoint = `/api/v1/alerts/${alert.id}/resolve/purchase`;
         body = { estimatedArrival: `${arrivalDate}T12:00:00`, quantity };
+      } else if (activeTab === "AUTHORIZE") {
+        // First authorize the transfer
+        const { error: prepError } = await apiClient.POST(`/api/v1/transfers/${alert.referenceId}/prepare` as any, {});
+        if (prepError) throw prepError;
+
+        // Then resolve the alert
+        endpoint = `/api/v1/alerts/${alert.id}/resolve/dismiss`;
+        body = { reason: "Autorizado desde el Centro de Resoluciones" };
       } else {
         if (!reason) throw new Error("Debes proporcionar un motivo para el descarte.");
         endpoint = `/api/v1/alerts/${alert.id}/resolve/dismiss`;
@@ -170,13 +183,22 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
           <>
             {/* Tabs de Decisión */}
             <div style={{ display: "flex", background: "var(--bg-surface)", padding: "4px", borderRadius: "12px", border: "1px solid var(--border-default)", gap: "4px" }}>
-              <button 
-                onClick={() => setActiveTab("TRANSFER")}
-                style={{ ...tabStyle, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", background: activeTab === "TRANSFER" ? "var(--brand-500)" : "transparent", color: activeTab === "TRANSFER" ? "white" : "var(--neutral-400)" }}
-              >
-                <Truck size={16} /> Traslado Interno
-              </button>
-              {isAdmin && (
+              {alert.type === "TRANSFER_REQUEST" ? (
+                <button 
+                  onClick={() => setActiveTab("AUTHORIZE")}
+                  style={{ ...tabStyle, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", background: activeTab === "AUTHORIZE" ? "var(--brand-500)" : "transparent", color: activeTab === "AUTHORIZE" ? "white" : "var(--neutral-400)" }}
+                >
+                  <Truck size={16} /> Autorizar Salida
+                </button>
+              ) : (
+                <button 
+                  onClick={() => setActiveTab("TRANSFER")}
+                  style={{ ...tabStyle, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", background: activeTab === "TRANSFER" ? "var(--brand-500)" : "transparent", color: activeTab === "TRANSFER" ? "white" : "var(--neutral-400)" }}
+                >
+                  <Truck size={16} /> Traslado Interno
+                </button>
+              )}
+              {isAdmin && alert.type !== "TRANSFER_REQUEST" && (
                 <button 
                   onClick={() => setActiveTab("PURCHASE")}
                   style={{ ...tabStyle, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", background: activeTab === "PURCHASE" ? "var(--brand-500)" : "transparent", color: activeTab === "PURCHASE" ? "white" : "var(--neutral-400)" }}
@@ -211,6 +233,24 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
                     value={quantity}
                     onChange={(e) => setQuantity(Number(e.target.value))}
                   />
+                </div>
+              )}
+
+              {activeTab === "AUTHORIZE" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  <div style={{ background: "rgba(var(--brand-500-rgb), 0.05)", padding: "16px", borderRadius: "12px", border: "1px solid var(--brand-500)" }}>
+                    <p style={{ fontSize: "14px", color: "var(--neutral-100)", fontWeight: 600, marginBottom: "8px" }}>Autorización de Salida</p>
+                    <p style={{ fontSize: "13px", color: "var(--neutral-300)", lineHeight: "1.5" }}>
+                      Al confirmar esta resolución, estarás autorizando formalmente el despacho de la mercancia solicitada por la sucursal vecina.
+                    </p>
+                    <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--border-default)", display: "flex", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: "12px", color: "var(--neutral-500)" }}>Traslado ID:</span>
+                      <Badge variant="info">#{alert.referenceId}</Badge>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: "12px", color: "var(--neutral-500)", textAlign: "center", fontStyle: "italic" }}>
+                    Esto marcará el traslado como "PREPARING" para que el equipo de bodega pueda realizar el despacho físico.
+                  </p>
                 </div>
               )}
 

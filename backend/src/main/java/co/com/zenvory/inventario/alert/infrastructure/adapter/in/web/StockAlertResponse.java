@@ -10,7 +10,9 @@ public record StockAlertResponse(
         Long productId,
         String message,
         LocalDateTime alertDate,
-        boolean resolved
+        boolean resolved,
+        String type,
+        Long referenceId
 ) {
     public static StockAlertResponse fromDomain(StockAlert alert) {
         return new StockAlertResponse(
@@ -19,7 +21,9 @@ public record StockAlertResponse(
                 alert.getProductId(),
                 alert.getMessage(),
                 alert.getAlertDate(),
-                alert.isResolved()
+                alert.isResolved(),
+                alert.getType().name(),
+                alert.getReferenceId()
         );
     }
 }

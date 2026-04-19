@@ -323,6 +323,7 @@ export default function MasterProductsPage() {
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <DataTable<ProductResponse>
+          itemsPerPage={25}
           columns={columns}
           data={filteredAndSortedProducts}
           sortConfig={sortConfig}

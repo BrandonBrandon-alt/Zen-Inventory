@@ -5,4 +5,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface JpaTransferRepository extends JpaRepository<TransferEntity, Long> {
+    java.util.List<TransferEntity> findByOriginBranchIdOrDestinationBranchIdOrderByIdDesc(Long originBranchId, Long destinationBranchId);
 }

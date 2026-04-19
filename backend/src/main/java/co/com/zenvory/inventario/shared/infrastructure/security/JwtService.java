@@ -35,7 +35,7 @@ public class JwtService {
      * Genera un token JWT con el email como subject y el rol como claim adicional.
      *
      * @param email     identificador único del usuario
-     * @param rol       nombre del rol (ADMIN, GERENTE_SUCURSAL, OPERADOR_INVENTARIO)
+     * @param rol         nombre del rol (ADMIN, MANAGER, OPERADOR_INVENTARIO)
      * @param sucursalId ID de la sucursal asignada (puede ser null para ADMIN)
      * @return token JWT firmado con HS256
      */

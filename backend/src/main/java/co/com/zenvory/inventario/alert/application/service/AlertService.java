@@ -138,6 +138,13 @@ public class AlertService implements AlertUseCase {
     }
 
     @Override
+    @Transactional
+    public void createAlert(Long branchId, Long productId, String message, StockAlert.AlertType type, Long referenceId) {
+        StockAlert alert = StockAlert.create(branchId, productId, message, type, referenceId);
+        alertRepository.save(alert);
+    }
+
+    @Override
     public List<StockAlert> getActiveAlerts(Long branchId) {
         return alertRepository.findActiveAlerts(branchId);
     }
@@ -157,13 +164,14 @@ public class AlertService implements AlertUseCase {
 
     @Override
     @Transactional
-    public void resolveViaTransfer(Long alertId, Long originBranchId, Integer quantity) {
+    public void resolveViaTransfer(Long alertId, Long originBranchId, Integer quantity, Long userId) {
         StockAlert alert = findAlert(alertId);
         
         RequestTransferCommand cmd = new RequestTransferCommand(
                 originBranchId,
                 alert.getBranchId(),
-                LocalDateTime.now().plusDays(2), // +2 días sugerido por Tech Lead
+                LocalDateTime.now().plusDays(2),
+                co.com.zenvory.inventario.transfer.domain.model.TransferPriority.HIGH,
                 List.of(new RequestTransferCommand.Detail(alert.getProductId(), quantity))
         );
         

@@ -80,15 +80,13 @@ export default function DashboardPage() {
   const isAdmin = session?.rol === "ADMIN";
   const isManager = session?.rol === "MANAGER";
   const isSeller = session?.rol === "SELLER";
+  const isInventory = session?.rol === "OPERADOR_INVENTARIO";
 
   useEffect(() => {
     if (isSeller) {
       router.push("/sales/pos");
-    } else if (isManager) {
-      // Por ahora redirigimos al Manager al inventario ya que el dashboard es global
-      router.push("/inventory");
     }
-  }, [isSeller, isManager, router]);
+  }, [isSeller, router]);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -144,7 +142,7 @@ export default function DashboardPage() {
         setBranches(branchList);
 
         if (branchList.length > 0) {
-          // @ts-ignore - branchId is now optional in backend, schema pending update
+          // @ts-ignore
           const alertRes = await apiClient.GET("/api/v1/alerts", { params: { query: {} } });
           setAlerts((alertRes.data ?? []).filter(a => !a.resolved));
         }
@@ -154,15 +152,178 @@ export default function DashboardPage() {
         setLoading(false);
       }
     }
-    fetchAll();
-  }, [isAdmin, timeRange]);
+    
+    async function fetchLocal() {
+      try {
+        const [traRes, braRes, salesRes] = await Promise.all([
+           apiClient.GET("/api/v1/transfers"),
+           apiClient.GET("/api/branches"),
+           apiClient.GET("/api/v1/sales", { params: { query: { branchId: session?.sucursalId } } })
+        ]);
+        setBranches(braRes.data ?? []);
+        
+        let branchTransfers = traRes.data ?? [];
+        if (session?.sucursalId) {
+           branchTransfers = branchTransfers.filter((t: any) => 
+               t.originBranchId === session.sucursalId || t.destinationBranchId === session.sucursalId
+           );
+        }
+        setTransfers(branchTransfers.filter((t: any) => t.status !== "RECEIVED"));
+
+        // Compute monthly & daily sales KPIs for manager
+        if (salesRes.data) {
+          const now = new Date();
+          const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+          const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+          const allSales = salesRes.data as any[];
+          const completedSales = allSales.filter((s: any) => s.status === "COMPLETED");
+          const monthRevenue = completedSales
+            .filter((s: any) => new Date(s.date).getTime() >= monthStart)
+            .reduce((acc: number, s: any) => acc + (s.totalFinal || 0), 0);
+          const todayRevenue = completedSales
+            .filter((s: any) => new Date(s.date).getTime() >= todayStart)
+            .reduce((acc: number, s: any) => acc + (s.totalFinal || 0), 0);
+          // Reuse salesTrend state to pass data to manager view
+          setSalesTrend([{ saleDate: "Hoy", revenue: todayRevenue }, { saleDate: "Este Mes", revenue: monthRevenue }]);
+        }
+        
+        if (isManager && session?.sucursalId) {
+           // @ts-ignore
+           const alertRes = await apiClient.GET("/api/v1/alerts", { params: { query: { branchId: session.sucursalId } } });
+           setAlerts((alertRes.data ?? []).filter(a => !a.resolved));
+        }
+      } catch(e) {
+         console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (isAdmin) {
+       fetchAll();
+    } else if (isManager || isInventory) {
+       fetchLocal();
+    } else {
+       setLoading(false);
+    }
+  }, [isAdmin, isManager, isInventory, timeRange, session]);
 
   if (loading) return <Spinner fullPage />;
 
   const activeAlerts = alerts.length;
   const topProduct   = topProducts[0];
-  const branchMap = new Map(branches.map(b => [b.id, b.nombre]));
+  const branchMap = new Map((branches || []).map(b => [b.id, b.nombre]));
 
+  // Operative Dashboard UI for Bodeguero
+  if (isInventory) {
+     const vehiculosPorRecibir = transfers.filter(t => t.destinationBranchId === session?.sucursalId && t.status === "IN_TRANSIT").length;
+     const porEmpacar = transfers.filter(t => t.originBranchId === session?.sucursalId && t.status === "PREPARING").length;
+
+     return (
+        <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
+          <PageHeader
+            title="Panel de Operaciones"
+            description={`Hola ${session?.nombre}. Resumen logístico del día en tu sucursal.`}
+          />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "24px", marginTop: "32px" }}>
+            <Link href="/transfers" style={{ textDecoration: 'none' }} className="transition-transform hover:scale-[1.02]">
+              <Card title="Recibos Pendientes" style={{ border: "1px solid var(--brand-500)", background: "rgba(217, 99, 79, 0.05)" }}>
+                 <div style={{ padding: "20px 0", display: "flex", alignItems: "baseline", gap: "12px" }}>
+                   <span style={{ fontSize: "48px", fontWeight: "900", color: "var(--brand-500)", lineHeight: 1 }}>{vehiculosPorRecibir}</span>
+                   <span style={{ fontSize: "14px", fontWeight: "700", color: "var(--neutral-400)", textTransform: "uppercase" }}>Camiones en ruta</span>
+                 </div>
+              </Card>
+            </Link>
+            <Link href="/transfers" style={{ textDecoration: 'none' }} className="transition-transform hover:scale-[1.02]">
+              <Card title="Despachos por Preparar" style={{ border: "1px solid var(--color-warning)", background: "rgba(245, 158, 11, 0.05)" }}>
+                 <div style={{ padding: "20px 0", display: "flex", alignItems: "baseline", gap: "12px" }}>
+                   <span style={{ fontSize: "48px", fontWeight: "900", color: "var(--color-warning)", lineHeight: 1 }}>{porEmpacar}</span>
+                   <span style={{ fontSize: "14px", fontWeight: "700", color: "var(--neutral-400)", textTransform: "uppercase" }}>Traslados por empacar</span>
+                 </div>
+              </Card>
+            </Link>
+          </div>
+        </div>
+     );
+  }
+
+  // Manager local dashboard
+  if (isManager) {
+    return (
+      <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
+        <PageHeader
+          title="Panel de Gerencia"
+          description={`Bienvenido, ${session?.nombre ?? "Gerente"}. Informaci\u00f3n operativa de tu sede.`}
+        />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "24px", marginBottom: "32px", marginTop: "32px" }}>
+          <Link href="/transfers" style={{ textDecoration: 'none' }} className="transition-transform hover:scale-[1.02]">
+            <KpiCard
+              label="Traslados Pendientes"
+              value={String(transfers.filter(t => t.status === "PENDING").length)}
+              sub="Requieren tu aprobaci\u00f3n"
+              accent="#3b82f6"
+              delay="0.1s"
+              icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>}
+            />
+          </Link>
+          <Link href="/alerts" style={{ textDecoration: 'none' }} className="transition-transform hover:scale-[1.02]">
+            <KpiCard
+              label="Alertas de Stock"
+              value={String(activeAlerts)}
+              sub="Productos en nivel cr\u00edtico"
+              accent={activeAlerts > 0 ? "var(--brand-500)" : "#10b981"}
+              delay="0.2s"
+              icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>}
+            />
+          </Link>
+          <Link href="/purchases" style={{ textDecoration: 'none' }} className="transition-transform hover:scale-[1.02]">
+            <KpiCard
+              label="Traslados en Tr\u00e1nsito"
+              value={String(transfers.filter(t => t.status === "IN_TRANSIT").length)}
+              sub="Por confirmar recepci\u00f3n"
+              accent="#f59e0b"
+              delay="0.3s"
+              icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3m-1 7h-5l-1-1H7l-1 1H1m19-1a4 4 0 1 1-8 0 4 4 0 0 1 8 0z"/></svg>}
+            />
+          </Link>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+          <Card title="Traslados en Curso" delay="0.2s">
+            {transfers.length === 0 ? (
+              <EmptyState title="Sin movimientos" description="No hay traslados activos en tu sede." 
+                icon={<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>}
+              />
+            ) : (
+              transfers.map((t, i) => (
+                <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: i < transfers.length - 1 ? "1px solid var(--border-subtle)" : "none" }}>
+                  <div>
+                    <p style={{ fontSize: "13px", color: "var(--neutral-100)" }}>
+                      {branchMap.get(t.originBranchId!) || "Sede A"} → {branchMap.get(t.destinationBranchId!) || "Sede B"}
+                    </p>
+                    <p style={{ fontSize: "11px", color: "var(--neutral-500)" }}>{t.status}</p>
+                  </div>
+                  <Badge variant={t.status === "IN_TRANSIT" ? "warning" : "neutral"}>ID #{t.id}</Badge>
+                </div>
+              ))
+            )}
+          </Card>
+
+          <Card title="Alertas de Stock" delay="0.3s">
+            {alerts.length === 0 ? (
+              <EmptyState title="Sin alertas" description="El inventario de tu sede est\u00e1 dentro del rango normal." 
+                icon={<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>}
+              />
+            ) : (
+              alerts.slice(0, 5).map(a => <AlertRow key={a.id} alert={a} />)
+            )}
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // ADMIN-only full analytics dashboard
   return (
     <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
       <PageHeader

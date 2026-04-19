@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { apiClient } from "@/api/client";
+import { getSession } from "@/api/auth";
 import type { components } from "@/api/schema";
 import { History, Search, MessageCircle, ShoppingBag, ShoppingCart, Repeat, Truck, AlertTriangle, CheckCircle, MinusCircle } from "lucide-react";
 
@@ -19,6 +21,7 @@ type InventoryMovement = components["schemas"]["InventoryMovement"];
 type UserResponse = components["schemas"]["UserResponse"];
 
 export default function AuditPage() {
+  const router = useRouter();
   const { showToast } = useToast();
   const [movements, setMovements] = useState<any[]>([]);
   const [branches, setBranches] = useState<Map<number, string>>(new Map());
@@ -29,6 +32,14 @@ export default function AuditPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" | null }>({ key: "date", direction: "desc" });
   const [viewingObservation, setViewingObservation] = useState<any | null>(null);
+
+  // ADMIN-only route guard
+  useEffect(() => {
+    const session = getSession();
+    if (!session || session.rol !== "ADMIN") {
+      router.replace("/dashboard");
+    }
+  }, [router]);
 
   useEffect(() => {
     async function fetchData() {
@@ -258,6 +269,7 @@ export default function AuditPage() {
 
       <Card style={{ padding: 0, overflow: "hidden" }}>
         <DataTable<any>
+          itemsPerPage={25}
           columns={columns}
           data={filteredAndSortedMovements}
           sortConfig={sortConfig}
