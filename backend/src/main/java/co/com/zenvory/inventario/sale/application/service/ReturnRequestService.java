@@ -7,6 +7,8 @@ import co.com.zenvory.inventario.sale.application.port.in.ReturnRequestUseCase;
 import co.com.zenvory.inventario.sale.application.port.in.SaleManagementUseCase;
 import co.com.zenvory.inventario.sale.application.port.out.ReturnRequestRepositoryPort;
 import co.com.zenvory.inventario.sale.domain.model.*;
+import co.com.zenvory.inventario.sale.domain.exception.InvalidReturnOperationException;
+import co.com.zenvory.inventario.sale.domain.exception.ReturnRequestNotFoundException;
 import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
 import co.com.zenvory.inventario.alert.domain.model.StockAlert;
 import org.springframework.context.annotation.Lazy;
@@ -66,14 +68,14 @@ public class ReturnRequestService implements ReturnRequestUseCase {
                 .map(item -> {
                     SaleDetail original = originalDetails.get(item.productId());
                     if (original == null) {
-                        throw new IllegalArgumentException("El producto ID " + item.productId() + " no pertenece a la venta original.");
+                        throw new InvalidReturnOperationException("El producto ID " + item.productId() + " no pertenece a la venta original.");
                     }
 
                     int previouslyProcessed = alreadyReturnedOrPending.getOrDefault(item.productId(), 0);
                     int totalAfterThis = previouslyProcessed + item.quantity();
 
                     if (totalAfterThis > original.getQuantity()) {
-                        throw new IllegalArgumentException(
+                        throw new InvalidReturnOperationException(
                             String.format("Cantidad inválida para %s. Comprado: %d, Ya procesado/pendiente: %d, Solicitado ahora: %d",
                                 original.getProductName(), original.getQuantity(), previouslyProcessed, item.quantity()));
                     }
@@ -145,7 +147,7 @@ public class ReturnRequestService implements ReturnRequestUseCase {
     @Override
     public ReturnRequest getRequestById(Long id) {
         return repositoryPort.findById(id)
-                .orElseThrow(() -> new RuntimeException("Solicitud de devolución no encontrada. ID: " + id));
+                .orElseThrow(() -> new ReturnRequestNotFoundException(id));
     }
 
     @Override

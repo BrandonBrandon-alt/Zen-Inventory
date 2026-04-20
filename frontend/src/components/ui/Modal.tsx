@@ -72,8 +72,10 @@ export default function Modal({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 9999, // High z-index to stay above everything
+        zIndex: 9999,
         padding: "24px",
+        // Using opacity instead of transform for the overlay entry
+        animation: "fadeIn 0.2s ease-out forwards", 
       }}
     >
       <div
@@ -86,15 +88,19 @@ export default function Modal({
           borderRadius: "var(--radius-xl)",
           width: "100%",
           maxWidth: sizeWidths[size],
-          maxHeight: "calc(100vh - 48px)",
+          // Flexible height logic
+          height: "auto",
+          maxHeight: "90vh",
           display: "flex",
           flexDirection: "column",
           boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
-          animation: "fadeInUp 0.3s cubic-bezier(0.16,1,0.3,1)",
+          // Use standard animation from globals.css
+          animation: "fadeInUp 0.3s cubic-bezier(0.16,1,0.3,1) forwards",
           position: "relative",
+          overflow: "visible", // Critical for non-portal dropdowns
         }}
       >
-        {/* Header */}
+        {/* Header - Fixed at top */}
         <div
           style={{
             padding: "22px 24px 20px",
@@ -157,12 +163,19 @@ export default function Modal({
           </button>
         </div>
 
-        {/* Body */}
-        <div style={{ padding: "24px", overflowY: "auto" }} className="custom-scrollbar">
+        {/* Body - Scrollable content */}
+        <div 
+          style={{ 
+            padding: "24px", 
+            overflowY: "auto",
+            flex: 1, 
+          }} 
+          className="custom-scrollbar"
+        >
           {children}
         </div>
 
-        {/* Footer */}
+        {/* Footer - Fixed at bottom */}
         {footer && (
           <div
             style={{

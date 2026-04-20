@@ -15,7 +15,11 @@ import co.com.zenvory.inventario.inventory.domain.exception.InventoryNotFoundExc
 import co.com.zenvory.inventario.alert.domain.exception.AlertAlreadyResolvedException;
 import co.com.zenvory.inventario.purchase.domain.exception.InvalidPurchaseStateException;
 import co.com.zenvory.inventario.sale.domain.exception.EmptySaleException;
+import co.com.zenvory.inventario.sale.domain.exception.InvalidReturnOperationException;
+import co.com.zenvory.inventario.sale.domain.exception.ReturnRequestNotFoundException;
+import co.com.zenvory.inventario.sale.domain.exception.SaleNotFoundException;
 import co.com.zenvory.inventario.transfer.domain.exception.InvalidTransferStateException;
+import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -102,6 +106,24 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(new ErrorResponse(ex.getMessage()));
     }
 
+    /** 404 - Venta no encontrada. */
+    @ExceptionHandler(SaleNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleSaleNotFound(SaleNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    /** 404 - Solicitud de devolución no encontrada. */
+    @ExceptionHandler(ReturnRequestNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleReturnRequestNotFound(ReturnRequestNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    /** 422 - Operación de devolución inválida. */
+    @ExceptionHandler(InvalidReturnOperationException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidReturnOperation(InvalidReturnOperationException ex) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(new ErrorResponse(ex.getMessage()));
+    }
+
     /** 409 - Estado de Transferencia Inválido. */
     @ExceptionHandler(InvalidTransferStateException.class)
     public ResponseEntity<ErrorResponse> handleInvalidTransferState(InvalidTransferStateException ex) {
@@ -139,6 +161,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse("No tienes permisos para realizar esta acción."));
+    }
+
+    /** 403 - Acción no autorizada por lógica de negocio (ej: restricción de sede). */
+    @ExceptionHandler(UnauthorizedActionException.class)
+    public ResponseEntity<ErrorResponse> handleUnauthorizedAction(UnauthorizedActionException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse(ex.getMessage()));
     }
 
     /** 500 – Fallback para excepciones no manejadas explícitamente. */

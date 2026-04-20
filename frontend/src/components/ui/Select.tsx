@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 interface Option {
   value: string | number;
@@ -17,7 +18,7 @@ interface SelectProps {
   icon?: React.ReactNode;
   disabled?: boolean;
   className?: string;
-  placement?: "top" | "bottom"; // <--- NUEVO
+  placement?: "top" | "bottom";
 }
 
 export default function Select({
@@ -30,39 +31,69 @@ export default function Select({
   icon,
   disabled = false,
   className = "",
-  placement = "bottom", // <--- NUEVO (Por defecto abre hacia abajo)
+  placement = "bottom",
 }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(""); // NUEVO: Estado para el buscador
+  const [searchTerm, setSearchTerm] = useState("");
+  const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null); // NUEVO: Referencia para el auto-focus
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);  const [menuCoords, setMenuCoords] = useState({ top: 0, bottom: 0, left: 0, width: 0 });
 
   const hasError = Boolean(error);
   const selectedOption = options.find((o) => o.value === value);
 
-  // Filtrar opciones basadas en el texto de búsqueda
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const filteredOptions = options.filter(option => 
     option.label.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Cerrar al hacer clic afuera
+  // Update position when opening
+  const updateCoords = () => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setMenuCoords({
+        top: rect.top,
+        bottom: rect.bottom,
+        left: rect.left,
+        width: rect.width
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      updateCoords();
+      window.addEventListener('scroll', updateCoords, true);
+      window.addEventListener('resize', updateCoords);
+    }
+    return () => {
+      window.removeEventListener('scroll', updateCoords, true);
+      window.removeEventListener('resize', updateCoords);
+    };
+  }, [isOpen]);
+
+  // Close on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
+        const target = event.target as HTMLElement;
+        if (!target.closest('.select-portal-menu')) {
+           setIsOpen(false);
+        }
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Limpiar el buscador cuando se cierra el menú y hacer focus al abrir
   useEffect(() => {
     if (!isOpen) {
-      // Pequeño retraso para que la animación de cierre termine antes de vaciar el texto
       setTimeout(() => setSearchTerm(""), 200); 
     } else {
-      // Auto-focus en el input de búsqueda cuando se abre
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
@@ -72,6 +103,8 @@ export default function Select({
     onChange(option.value);
     setIsOpen(false);
   };
+
+  const menuOpen = isOpen && mounted;
 
   return (
     <div 
@@ -83,7 +116,6 @@ export default function Select({
         gap: "6px", 
         position: "relative", 
         opacity: disabled ? 0.6 : 1,
-        zIndex: isOpen ? 50 : 1,
       }}
     >
       <label
@@ -97,8 +129,8 @@ export default function Select({
       </label>
 
       <div style={{ position: "relative" }}>
-        {/* BOTÓN SELECTOR PRINCIPAL */}
         <div
+          ref={triggerRef}
           onClick={() => !disabled && setIsOpen(!isOpen)}
           style={{
             width: "100%",
@@ -137,33 +169,29 @@ export default function Select({
           </svg>
         </div>
 
-        {/* MENÚ DESPLEGABLE */}
-        {isOpen && (
+        {menuOpen && createPortal(
           <div
-            className="custom-scrollbar"
+            className="select-portal-menu custom-scrollbar"
             style={{
-              position: "absolute",
-              top: placement === "bottom" ? "calc(100% + 4px)" : "auto",
-              bottom: placement === "top" ? "calc(100% + 4px)" : "auto",
-              left: 0,
-              right: 0,
+              position: "fixed",
+              top: placement === "bottom" ? `${menuCoords.bottom + 4}px` : "auto",
+              bottom: placement === "top" ? `${window.innerHeight - menuCoords.top + 4}px` : "auto",
+              left: `${menuCoords.left}px`,
+              width: `${menuCoords.width}px`,
               background: "var(--bg-card)",
               border: "1px solid var(--border-default)",
               borderRadius: "var(--radius-md)",
               boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
-              zIndex: 9999,
+              zIndex: 10000,
               maxHeight: "320px",
               overflowY: "auto",
               padding: "6px",
-              animation: "slideDown 0.15s ease",
+              animation: "slideDown 0.15s ease-out forwards",
               overscrollBehavior: "contain",
-              scrollbarWidth: "thin",
-              scrollbarColor: "var(--neutral-700) transparent",
               display: "flex",
               flexDirection: "column"
             }}
           >
-            {/* NUEVO: INPUT DE BÚSQUEDA STICKY */}
             {options.length > 2 && (
               <div style={{ position: "sticky", top: "-6px", background: "var(--bg-card)", paddingBottom: "6px", zIndex: 10, paddingTop: "6px" }}>
                 <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
@@ -176,7 +204,7 @@ export default function Select({
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    onClick={(e) => e.stopPropagation()} // Evita que hacer clic en el buscador cierre el menú
+                    onClick={(e) => e.stopPropagation()} 
                     placeholder="Buscar..."
                     style={{
                       width: "100%",
@@ -187,17 +215,13 @@ export default function Select({
                       color: "var(--neutral-100)",
                       fontSize: "13px",
                       outline: "none",
-                      transition: "border 0.2s"
                     }}
-                    onFocus={(e) => e.currentTarget.style.borderColor = "var(--brand-500)"}
-                    onBlur={(e) => e.currentTarget.style.borderColor = "var(--neutral-700)"}
                   />
                 </div>
                 <div style={{ height: "1px", background: "var(--neutral-800)", marginTop: "6px" }} />
               </div>
             )}
 
-            {/* LISTA DE OPCIONES FILTRADAS */}
             {filteredOptions.length === 0 ? (
               <div style={{ padding: "16px 12px", fontSize: "13px", color: "var(--neutral-500)", textAlign: "center" }}>
                 No se encontraron resultados
@@ -207,7 +231,10 @@ export default function Select({
                 {filteredOptions.map((option) => (
                   <div
                     key={option.value}
-                    onClick={() => handleSelect(option)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelect(option);
+                    }}
                     style={{
                       padding: "10px 12px",
                       borderRadius: "6px",
@@ -238,7 +265,8 @@ export default function Select({
                 ))}
               </div>
             )}
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 
@@ -250,26 +278,6 @@ export default function Select({
           {error}
         </p>
       )}
-
-      <style jsx>{`
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 5px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: var(--neutral-700);
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: var(--neutral-600);
-        }
-      `}</style>
     </div>
   );
 }

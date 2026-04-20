@@ -15,6 +15,7 @@ import co.com.zenvory.inventario.branch.application.port.in.BranchUseCase;
 import co.com.zenvory.inventario.auth.application.port.in.UserUseCase;
 import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
 import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException;
+import co.com.zenvory.inventario.sale.domain.exception.SaleNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -133,7 +134,7 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
     @Override
     public Sale getSaleById(Long id) {
         return saleRepositoryPort.findById(id)
-                .orElseThrow(() -> new RuntimeException("Venta no encontrada con ID: " + id));
+                .orElseThrow(() -> new SaleNotFoundException(id));
     }
 
     @Override
