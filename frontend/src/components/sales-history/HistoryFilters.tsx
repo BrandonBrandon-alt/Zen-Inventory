@@ -11,6 +11,8 @@ interface HistoryFiltersProps {
   selectedBranchId: string | number | null;
   onBranchChange: (value: string | number) => void;
   isAdmin: boolean;
+  sortOrder: "asc" | "desc";
+  onSortOrderChange: (value: "asc" | "desc") => void;
 }
 
 export default function HistoryFilters({ 
@@ -19,7 +21,9 @@ export default function HistoryFilters({
   branches = [],
   selectedBranchId,
   onBranchChange,
-  isAdmin
+  isAdmin,
+  sortOrder,
+  onSortOrderChange
 }: HistoryFiltersProps) {
   return (
     <div className="p-8 flex flex-col gap-8 bg-[var(--bg-surface)]">
@@ -48,6 +52,19 @@ export default function HistoryFilters({
               onChange={onSearchChange}
               containerClassName="w-full"
               className="h-11 shadow-inner bg-[var(--bg-card)] border-[var(--neutral-800)]"
+            />
+          </div>
+
+          <div className="w-full md:w-60">
+            <Select
+              label="Orden Cronológico"
+              value={sortOrder}
+              onChange={(val) => onSortOrderChange(val as "asc" | "desc")}
+              options={[
+                { value: "desc", label: "Recientes primero" },
+                { value: "asc", label: "Antiguos primero" }
+              ]}
+              icon={<Building size={14} className="text-[var(--brand-500)]" />} // Reusing icon or change to something like Calendar
             />
           </div>
         </div>

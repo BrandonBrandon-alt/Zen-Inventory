@@ -10,8 +10,9 @@ BEGIN;
 -- --------------------------------------------------------
 INSERT INTO rol (id, nombre) VALUES 
     (1, 'ADMIN'), 
-    (2, 'GERENTE_SUCURSAL'), 
-    (3, 'OPERADOR_INVENTARIO')
+    (2, 'MANAGER'), 
+    (3, 'OPERADOR_INVENTARIO'),
+    (4, 'SELLER')
 ON CONFLICT (id) DO NOTHING;
 
 -- --------------------------------------------------------
@@ -35,7 +36,7 @@ INSERT INTO sucursal (id, nombre, direccion, telefono, activa) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- --------------------------------------------------------
--- 4. Usuarios
+-- Usuarios (rol_id: 1=ADMIN, 2=MANAGER, 3=OPERADOR_INVENTARIO, 4=SELLER)
 -- --------------------------------------------------------
 INSERT INTO usuario (id, nombre, email, password_hash, rol_id, sucursal_id, activa) VALUES
     (1, 'Administrador Principal', 'admin@zeninventory.co',

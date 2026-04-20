@@ -35,6 +35,7 @@ function SalesHistoryContent() {
   const [branches, setBranches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectedSale, setSelectedSale] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -48,8 +49,9 @@ function SalesHistoryContent() {
     const savedState = localStorage.getItem("zen_inventory_history_state");
     if (savedState) {
       try {
-        const { search } = JSON.parse(savedState);
+        const { search, sort } = JSON.parse(savedState);
         if (search) setSearchTerm(search);
+        if (sort) setSortOrder(sort);
       } catch (e) {
         console.error("Error parsing saved History state:", e);
       }
@@ -63,6 +65,7 @@ function SalesHistoryContent() {
     
     const stateToSave = {
       search: searchTerm,
+      sort: sortOrder,
     };
     localStorage.setItem("zen_inventory_history_state", JSON.stringify(stateToSave));
   }, [searchTerm, isLoaded]);
@@ -107,23 +110,7 @@ function SalesHistoryContent() {
         params: { query: { branchId: effectiveBranchId } }
       });
       if (data) {
-        let sortedSales = [...(data as any[])].sort((a, b) => {
-          // If admin, group by branch first
-          if (authSess?.rol === "ADMIN") {
-            const branchA = (a.branchName || "").toLowerCase();
-            const branchB = (b.branchName || "").toLowerCase();
-            if (branchA !== branchB) return branchA.localeCompare(branchB);
-          }
-          // Then sort by date descending
-          return new Date(b.date).getTime() - new Date(a.date).getTime();
-        });
-
-        // Strict SELLER filtering
-        if (authSess?.rol === "SELLER") {
-          sortedSales = sortedSales.filter(s => s.userName === authSess.nombre);
-        }
-
-        setSales(sortedSales);
+        setSales(data as any[]);
       }
     } catch (error: any) {
       showToast("Error al cargar el historial de ventas.", "error");
@@ -133,15 +120,39 @@ function SalesHistoryContent() {
   };
 
   const filteredSales = useMemo(() => {
-    if (!searchTerm.trim()) return sales;
-    const term = searchTerm.toLowerCase();
-    return sales.filter(sale => 
-      sale.id.toString().includes(term) ||
-      (sale.customerName && sale.customerName.toLowerCase().includes(term)) ||
-      (sale.branchName && sale.branchName.toLowerCase().includes(term)) ||
-      (sale.userName && sale.userName.toLowerCase().includes(term))
-    );
-  }, [sales, searchTerm]);
+    let result = [...sales];
+    
+    // 1. Filter by seller if role is SELLER
+    if (session?.rol === "SELLER") {
+      result = result.filter(s => s.userName === session.nombre);
+    }
+
+    // 2. Search filtering
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(sale => 
+        sale.id.toString().includes(term) ||
+        (sale.customerName && sale.customerName.toLowerCase().includes(term)) ||
+        (sale.branchName && sale.branchName.toLowerCase().includes(term)) ||
+        (sale.userName && sale.userName.toLowerCase().includes(term))
+      );
+    }
+
+    // 3. Sorting
+    result.sort((a, b) => {
+      // Primary sort: Date
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      const dateDiff = sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+      
+      if (dateDiff !== 0) return dateDiff;
+      
+      // Secondary sort: ID (fixed orientation)
+      return b.id - a.id;
+    });
+
+    return result;
+  }, [sales, searchTerm, sortOrder, session]);
 
   const metrics = useMemo(() => {
     const now = new Date();
@@ -228,8 +239,10 @@ function SalesHistoryContent() {
             onSearchChange={setSearchTerm}
             isAdmin={session?.rol === "ADMIN"}
             branches={branches}
-            selectedBranchId={(session?.rol === "MANAGER" || session?.rol === "SELLER") ? session.sucursalId! : (selectedBranchId || "all")}
+            selectedBranchId={(session?.rol === "MANAGER" || session?.rol === "SELLER" || session?.rol === "OPERADOR_INVENTARIO") ? session.sucursalId! : (selectedBranchId || "all")}
             onBranchChange={handleBranchChange}
+            sortOrder={sortOrder}
+            onSortOrderChange={setSortOrder}
           />
 
           <HistoryTable 

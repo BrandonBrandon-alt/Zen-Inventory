@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Button from "@/components/ui/Button";
 
 interface ModalProps {
@@ -31,6 +32,11 @@ export default function Modal({
   size = "md",
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Close on Escape key
   useEffect(() => {
@@ -44,13 +50,17 @@ export default function Modal({
 
   // Prevent body scroll when open
   useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  const modalContent = (
     <div
       ref={overlayRef}
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
@@ -62,9 +72,8 @@ export default function Modal({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 100,
+        zIndex: 9999, // High z-index to stay above everything
         padding: "24px",
-        animation: "fadeIn 0.15s ease",
       }}
     >
       <div
@@ -81,7 +90,7 @@ export default function Modal({
           display: "flex",
           flexDirection: "column",
           boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
-          animation: "fadeInUp 0.2s cubic-bezier(0.16,1,0.3,1)",
+          animation: "fadeInUp 0.3s cubic-bezier(0.16,1,0.3,1)",
           position: "relative",
         }}
       >
@@ -171,4 +180,6 @@ export default function Modal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

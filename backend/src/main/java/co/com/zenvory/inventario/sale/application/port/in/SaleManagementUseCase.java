@@ -7,6 +7,6 @@ public interface SaleManagementUseCase {
     List<Sale> getAllSales();
     List<Sale> getSalesByBranch(Long branchId);
     Sale getSaleById(Long id);
-    void cancelSale(Long id, String reason);
+    void cancelSale(Long id, String reason, Long restrictedBranchId);
     void updateSaleStatus(Long id, co.com.zenvory.inventario.sale.domain.model.SaleStatus status);
 }

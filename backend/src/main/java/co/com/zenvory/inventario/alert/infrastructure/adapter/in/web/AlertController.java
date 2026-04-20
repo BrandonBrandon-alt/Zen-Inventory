@@ -1,7 +1,11 @@
 package co.com.zenvory.inventario.alert.infrastructure.adapter.in.web;
 
 import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
+import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
+import co.com.zenvory.inventario.auth.domain.model.User;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -36,13 +40,35 @@ public class AlertController {
     public record DismissResolutionRequest(String reason) {}
 
     private final AlertUseCase alertUseCase;
+    private final UserRepositoryPort userRepositoryPort;
 
     /**
-     * Inyección del caso de uso de alertas.
+     * Inyección del caso de uso de alertas y el repositorio de usuarios.
      * @param alertUseCase Puerto de entrada de la lógica de alertas.
+     * @param userRepositoryPort Puerto de salida para acceso a datos de usuario.
      */
-    public AlertController(AlertUseCase alertUseCase) {
+    public AlertController(AlertUseCase alertUseCase, UserRepositoryPort userRepositoryPort) {
         this.alertUseCase = alertUseCase;
+        this.userRepositoryPort = userRepositoryPort;
+    }
+
+    /**
+     * Resuelve el alcance de la consulta basado en el rol del usuario autenticado.
+     * 
+     * <p>Regla de Seguridad:
+     * - ADMIN: Acceso global (puede ver cualquier sucursal).
+     * - MANAGER / OPERADOR_INVENTARIO: Restringido a su sucursalId propia.
+     * </p>
+     */
+    private Long resolveBranchScope() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        User user = userRepositoryPort.findByEmail(auth.getName()).orElseThrow();
+        String roleName = user.getRole().getNombre();
+        
+        if ("ADMIN".equals(roleName)) {
+            return null; // Acceso global
+        }
+        return user.getSucursalId(); // Restricción obligatoria por sede
     }
 
     /**
@@ -67,9 +93,14 @@ public class AlertController {
      */
     @GetMapping
     public ResponseEntity<List<StockAlertResponse>> getActiveAlerts(@RequestParam(required = false) Long branchId) {
+        Long restrictedBranchId = resolveBranchScope();
+        
+        // Si el usuario tiene restricción (Gerente/Operador), usamos su sucursal ignorando el parámetro
+        Long finalBranchId = (restrictedBranchId != null) ? restrictedBranchId : branchId;
+        
         List<StockAlertResponse> responses;
-        if (branchId != null) {
-            responses = alertUseCase.getActiveAlerts(branchId).stream()
+        if (finalBranchId != null) {
+            responses = alertUseCase.getActiveAlerts(finalBranchId).stream()
                     .map(StockAlertResponse::fromDomain)
                     .toList();
         } else {

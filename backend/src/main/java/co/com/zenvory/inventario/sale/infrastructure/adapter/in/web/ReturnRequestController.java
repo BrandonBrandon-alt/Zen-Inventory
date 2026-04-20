@@ -28,7 +28,7 @@ public class ReturnRequestController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_SELLER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_SELLER', 'ROLE_OPERADOR_INVENTARIO')")
     public ResponseEntity<ReturnRequestResponse> create(@Valid @RequestBody CreateReturnRequestCommand command) {
         ReturnRequest request = useCase.createRequest(command);
         return ResponseEntity.status(HttpStatus.CREATED).body(ReturnRequestResponse.fromDomain(request));
@@ -55,7 +55,7 @@ public class ReturnRequestController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_SELLER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_SELLER', 'ROLE_OPERADOR_INVENTARIO')")
     public ResponseEntity<ReturnRequestResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ReturnRequestResponse.fromDomain(useCase.getRequestById(id)));
     }
@@ -68,7 +68,7 @@ public class ReturnRequestController {
     }
 
     @GetMapping("/branch/{branchId}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_SELLER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_SELLER', 'ROLE_OPERADOR_INVENTARIO')")
     public ResponseEntity<List<ReturnRequestResponse>> getByBranch(@PathVariable Long branchId) {
         List<ReturnRequest> requests = useCase.getRequestsByBranch(branchId);
         return ResponseEntity.ok(requests.stream().map(ReturnRequestResponse::fromDomain).toList());

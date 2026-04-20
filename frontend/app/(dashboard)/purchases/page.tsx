@@ -87,6 +87,7 @@ function PurchasesContent() {
   const [receivingItems, setReceivingItems] = useState<Record<number, number>>({});
   const [receivingUnits, setReceivingUnits] = useState<Record<number, number | null>>({});
   const [productUnitsData, setProductUnitsData] = useState<Record<number, any[]>>({});
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchCatalogs();
@@ -285,10 +286,22 @@ function PurchasesContent() {
   }, [receivingOrder]);
 
   const handleSubmitOrder = async () => {
-    if (!supplierId || !branchId || cart.length === 0) {
-      showToast("Faltan datos obligatorios (Proveedor, Sucursal y Productos).", "warning");
+    // 1. Limpiar errores de validación previos
+    setValidationErrors({});
+    
+    // 2. Realizar validación granular
+    const errors: Record<string, string> = {};
+    if (!supplierId) errors.supplierId = "Seleccione un proveedor.";
+    if (!branchId) errors.branchId = "Seleccione una sucursal.";
+    if (cart.length === 0) errors.cart = "Debe añadir al menos un producto al carrito.";
+    
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      const missingFields = Object.values(errors).join(" ");
+      showToast(`Faltan datos obligatorios: ${missingFields}`, "warning");
       return;
     }
+
     const session = getSession();
     if (!session) {
       showToast("Sesión expirada.", "error");
@@ -551,6 +564,7 @@ function PurchasesContent() {
         suppliers={suppliers}
         branches={branches}
         branchDisabled={isBranchRestricted}
+        errors={validationErrors}
       />
     );
   };

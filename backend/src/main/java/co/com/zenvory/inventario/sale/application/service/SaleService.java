@@ -14,6 +14,7 @@ import co.com.zenvory.inventario.sale.domain.model.SaleDetail;
 import co.com.zenvory.inventario.branch.application.port.in.BranchUseCase;
 import co.com.zenvory.inventario.auth.application.port.in.UserUseCase;
 import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
+import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -137,19 +138,24 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
 
     @Override
     @Transactional
-    public void cancelSale(Long id, String reason) {
+    public void cancelSale(Long id, String reason, Long restrictedBranchId) {
         // 1. Obtener la venta
         Sale sale = getSaleById(id);
 
-        // 2. Aplicar lógica de anulación en el dominio
+        // 2. Seguridad: Validar que si hay restricción, la venta pertenezca a la sucursal
+        if (restrictedBranchId != null && !sale.getBranchId().equals(restrictedBranchId)) {
+            throw new UnauthorizedActionException(
+                    "No tiene permisos para anular ventas de otra sucursal."
+            );
+        }
+
+        // 3. Aplicar lógica de anulación en el dominio
         sale.cancel(reason);
 
-        // 3. Persistir cambio de estado
+        // 4. Persistir cambio de estado
         saleRepositoryPort.save(sale);
 
-        // 4. Rollback de Stock: Devolver productos al inventario
-        // Usamos MovementReason.ENTRADA o creamos uno nuevo si fuera necesario, 
-        // pero usaremos una nota descriptiva.
+        // 5. Rollback de Stock: Devolver productos al inventario
         for (SaleDetail detail : sale.getDetails()) {
             inventoryUseCase.addStock(
                     sale.getBranchId(),
@@ -165,8 +171,6 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
                     null
             );
         }
-        
-        // Alertas de anulación desactivadas según petición del usuario
     }
     @Override
     @Transactional

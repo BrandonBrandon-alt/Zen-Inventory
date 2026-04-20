@@ -270,8 +270,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       return item.label === "Terminal POS" || item.label === "Inventario" || item.label === "Historial Ventas";
     }
     if (isInventory) {
-      // OPERADOR_INVENTARIO: Panel + physical inventory + transfer execution
-      return item.label === "Panel" || item.label === "Inventario" || item.label === "Traslados";
+      // OPERADOR_INVENTARIO: Panel + physical inventory + transfers + sales + purchases + returns
+      return ["Panel", "Inventario", "Traslados", "Ventas", "Historial Ventas", "Compras", "Devoluciones"].includes(item.label);
     }
     if (isSeller) {
       // SELLERS: POS + Inventory + Sales History + Returns

@@ -167,12 +167,18 @@ export default function AlertsPage() {
   }, []);
 
   const refreshAlerts = async (branchList = branches) => {
-    const results = await Promise.all(
-      branchList.map((b) =>
-        apiClient.GET("/api/v1/alerts", { params: { query: { branchId: b.id! } } })
-      )
-    );
-    setAlerts(results.flatMap((r) => r.data ?? []));
+    if (isAdmin) {
+      const results = await Promise.all(
+        branchList.map((b) =>
+          apiClient.GET("/api/v1/alerts", { params: { query: { branchId: b.id! } } })
+        )
+      );
+      setAlerts(results.flatMap((r) => r.data ?? []));
+    } else {
+      // Para MANAGER y OPERADOR_INVENTARIO, el backend ya filtra por su sede automáticamente
+      const { data } = await apiClient.GET("/api/v1/alerts");
+      setAlerts(data ?? []);
+    }
   };
 
   // Force scan

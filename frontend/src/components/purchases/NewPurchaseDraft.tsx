@@ -130,6 +130,7 @@ interface NewPurchaseDraftProps {
   suppliers: any[];
   branches: any[];
   branchDisabled?: boolean;
+  errors?: Record<string, string>;
 }
 
 export default function NewPurchaseDraft({
@@ -137,7 +138,8 @@ export default function NewPurchaseDraft({
   supplierId, setSupplierId, branchId, setBranchId, leadTimeDays, 
   setLeadTimeDays, paymentDueDays, setPaymentDueDays, 
   isSubmitting, handleSubmitOrder, financialSummary, suppliers, branches,
-  branchDisabled = false
+  branchDisabled = false,
+  errors = {}
 }: NewPurchaseDraftProps) {
   return (
     <main className="flex gap-8 flex-col lg:flex-row h-[82vh] animate-in fade-in zoom-in-95 duration-300 mt-8">
@@ -150,6 +152,7 @@ export default function NewPurchaseDraft({
             label="Proveedor Estratégico" 
             value={supplierId} 
             onChange={setSupplierId} 
+            error={errors.supplierId}
             options={[
               { value: "", label: "Seleccionar Proveedor" },
               ...suppliers.map(s => ({ value: String(s.id), label: s.nombre }))
@@ -160,6 +163,7 @@ export default function NewPurchaseDraft({
             value={branchId} 
             onChange={setBranchId} 
             disabled={branchDisabled}
+            error={errors.branchId}
             options={[
               { value: "", label: "Seleccionar Sucursal" },
               ...branches.map(b => ({ value: String(b.id), label: b.nombre }))
@@ -243,9 +247,11 @@ export default function NewPurchaseDraft({
           ))}
 
           {cart.length === 0 && (
-            <div className="flex-1 flex flex-col items-center justify-center opacity-40 py-12">
-              <Plus size={40} className="mb-4 text-[var(--neutral-500)]" />
-              <p className="text-xs font-black text-center text-[var(--neutral-500)] uppercase tracking-widest">Carrito de Compras Vacío</p>
+            <div className={`flex-1 flex flex-col items-center justify-center py-12 transition-all ${errors.cart ? 'bg-[var(--color-danger)]/5 border border-dashed border-[var(--color-danger)]/20 rounded-2xl animate-pulse' : 'opacity-40'}`}>
+              <Plus size={40} className={errors.cart ? 'text-[var(--color-danger)] mb-4' : 'mb-4 text-[var(--neutral-500)]'} />
+              <p className={`text-xs font-black text-center uppercase tracking-widest ${errors.cart ? 'text-[var(--color-danger)]' : 'text-[var(--neutral-500)]'}`}>
+                {errors.cart || "Carrito de Compras Vacío"}
+              </p>
             </div>
           )}
         </div>
@@ -297,7 +303,7 @@ export default function NewPurchaseDraft({
           <Button 
             className="w-full h-14 mt-4 font-black tracking-widest shadow-[0_10px_20px_rgba(217,99,79,0.25)] hover:scale-[1.02] active:scale-[0.98] transition-all relative overflow-hidden group border-none"
             style={{ backgroundImage: 'linear-gradient(45deg, var(--brand-600), var(--brand-400))' }}
-            disabled={cart.length === 0 || isSubmitting || !supplierId || !branchId}
+            disabled={isSubmitting}
             onClick={handleSubmitOrder}
           >
             <div className="absolute inset-0 bg-white/20 group-hover:translate-x-full transition-transform duration-500 ease-out -skew-x-12 -translate-x-full" />
