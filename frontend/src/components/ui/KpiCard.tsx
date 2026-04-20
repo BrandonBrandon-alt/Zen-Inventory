@@ -9,19 +9,20 @@ interface KpiCardProps {
   icon: React.ReactNode;
   accent?: string;
   delay?: string;
+  progress?: number; // 0 to 100
 }
 
-export default function KpiCard({ label, value, sub, icon, accent, delay }: KpiCardProps) {
+export default function KpiCard({ label, value, sub, icon, accent, delay, progress }: KpiCardProps) {
   return (
     <div
       style={{
         background: "var(--bg-card)",
         border: "1px solid var(--border-default)",
-        borderRadius: "var(--radius-lg)",
-        padding: "24px",
+        borderRadius: "var(--radius-2xl)",
+        padding: "32px",
         display: "flex",
         flexDirection: "column",
-        gap: "16px",
+        gap: "20px",
         animation: `fadeIn 0.4s ease-out ${delay ?? "0s"} both`,
       }}
     >
@@ -59,6 +60,22 @@ export default function KpiCard({ label, value, sub, icon, accent, delay }: KpiC
         >
           {value}
         </p>
+        
+        {progress !== undefined && (
+          <div style={{ width: "100%", height: "4px", background: "var(--neutral-800)", borderRadius: "2px", overflow: "hidden", margin: "12px 0" }}>
+            <div 
+              style={{ 
+                width: `${progress}%`, 
+                height: "100%", 
+                background: accent ?? "var(--brand-500)", 
+                borderRadius: "2px",
+                boxShadow: accent ? `0 0 10px ${accent}40` : "none",
+                transition: "width 1s cubic-bezier(0.4, 0, 0.2, 1)"
+              }} 
+            />
+          </div>
+        )}
+
         {sub && (
           <p style={{ fontSize: "12px", color: "var(--neutral-500)", fontWeight: 500 }}>{sub}</p>
         )}

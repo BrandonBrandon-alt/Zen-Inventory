@@ -932,6 +932,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analytics/transfers-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getTransferImpact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analytics/top-products": {
         parameters: {
             query?: never;
@@ -956,6 +972,54 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getSalesTrend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/replenishment-insights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getReplenishmentInsights"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/monthly-sales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getMonthlySales"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/inventory-rotation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getInventoryRotation"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1672,6 +1736,12 @@ export interface components {
             branchName?: string;
             totalValue?: number;
         };
+        TransferImpact: {
+            /** Format: int32 */
+            activeTransfersCount?: number;
+            totalItemsInTransit?: number;
+            totalValuationInTransit?: number;
+        };
         TopSellingProduct: {
             /** Format: int64 */
             productId?: number;
@@ -1682,6 +1752,30 @@ export interface components {
             /** Format: date */
             saleDate?: string;
             revenue?: number;
+        };
+        ReplenishmentInsight: {
+            /** Format: int64 */
+            productId?: number;
+            productName?: string;
+            currentStock?: number;
+            minStock?: number;
+            priority?: string;
+        };
+        MonthlySales: {
+            monthName?: string;
+            /** Format: int32 */
+            year?: number;
+            revenue?: number;
+            volume?: number;
+        };
+        InventoryRotation: {
+            /** Format: int64 */
+            productId?: number;
+            productName?: string;
+            soldQuantity?: number;
+            currentStock?: number;
+            rotationRatio?: number;
+            isDeadStock?: boolean;
         };
         GlobalSummary: {
             totalRevenue?: number;
@@ -3554,6 +3648,26 @@ export interface operations {
             };
         };
     };
+    getTransferImpact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransferImpact"];
+                };
+            };
+        };
+    };
     getTopSellingProducts: {
         parameters: {
             query?: {
@@ -3597,6 +3711,66 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["SalesTrend"][];
+                };
+            };
+        };
+    };
+    getReplenishmentInsights: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReplenishmentInsight"][];
+                };
+            };
+        };
+    };
+    getMonthlySales: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MonthlySales"][];
+                };
+            };
+        };
+    };
+    getInventoryRotation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["InventoryRotation"][];
                 };
             };
         };

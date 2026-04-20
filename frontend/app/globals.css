@@ -199,6 +199,21 @@ body {
   animation: spin-slow 8s linear infinite;
 }
 
+@keyframes pulse-soft {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s infinite ease-in-out;
+}
+
+:root {
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 80px;
+  --sidebar-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 /* Page Components */
 .dashboard-grid {
   display: grid;

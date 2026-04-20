@@ -1,12 +1,10 @@
 package co.com.zenvory.inventario.analytics.infrastructure.adapter.out.persistence;
 
 import co.com.zenvory.inventario.analytics.application.port.out.AnalyticsRepositoryPort;
-import co.com.zenvory.inventario.analytics.domain.model.BranchPerformance;
-import co.com.zenvory.inventario.analytics.domain.model.BranchValuation;
-import co.com.zenvory.inventario.analytics.domain.model.GlobalSummary;
-import co.com.zenvory.inventario.analytics.domain.model.TopSellingProduct;
-import co.com.zenvory.inventario.analytics.domain.model.SalesTrend;
+import co.com.zenvory.inventario.analytics.domain.model.*;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -25,14 +23,11 @@ import java.util.List;
 public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
 
     private final JdbcTemplate jdbcTemplate;
+    private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
 
-    /**
-     * Constructor con inyección de JdbcTemplate.
-     * 
-     * @param jdbcTemplate Motor de ejecución de consultas SQL de Spring.
-     */
     public AnalyticsPersistenceAdapter(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        this.namedParameterJdbcTemplate = new NamedParameterJdbcTemplate(jdbcTemplate);
     }
 
     /**
@@ -111,55 +106,63 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
      */
     @Override
     public GlobalSummary findGlobalSummary(LocalDateTime startDate, LocalDateTime endDate, Long branchId) {
-        List<Object> args = new ArrayList<>();
+        MapSqlParameterSource params = new MapSqlParameterSource();
+        
+        String branchFilter = "";
+        if (branchId != null) {
+            branchFilter = " AND sucursal_id = :branchId ";
+            params.addValue("branchId", branchId);
+        }
 
-        String startDateFilter = startDate != null ? " AND fecha >= ? " : "";
-        String endDateFilter   = endDate   != null ? " AND fecha <= ? " : "";
-        String startDateFilterV = startDate != null ? " AND v.fecha >= ? " : "";
-        String endDateFilterV   = endDate   != null ? " AND v.fecha <= ? " : "";
-        String branchSuffix    = branchId != null ? " AND sucursal_id = ? " : "";
-        String branchSuffixV   = branchId != null ? " AND v.sucursal_id = ? " : "";
-        String invBranchFilter = branchId != null ? " AND i.sucursal_id = ? " : "";
-        String statusFilter    = " AND estado = 'COMPLETED' ";
-        String statusFilterV   = " AND v.estado = 'COMPLETED' ";
+        String branchFilterV = "";
+        if (branchId != null) {
+            branchFilterV = " AND v.sucursal_id = :branchId ";
+        }
 
-        // total_revenue
-        if (branchId != null) args.add(branchId);
-        if (startDate != null) args.add(startDate);
-        if (endDate   != null) args.add(endDate);
-        // total_units
-        if (branchId != null) args.add(branchId);
-        if (startDate != null) args.add(startDate);
-        if (endDate   != null) args.add(endDate);
-        // total_value (inventario_local, no date filter)
-        if (branchId != null) args.add(branchId);
-        // avg_ticket
-        if (branchId != null) args.add(branchId);
-        if (startDate != null) args.add(startDate);
-        if (endDate   != null) args.add(endDate);
+        String invBranchFilter = "";
+        if (branchId != null) {
+            invBranchFilter = " AND i.sucursal_id = :branchId ";
+        }
+
+        String dateFilter = "";
+        if (startDate != null) {
+            dateFilter += " AND fecha >= :startDate ";
+            params.addValue("startDate", startDate);
+        }
+        if (endDate != null) {
+            dateFilter += " AND fecha <= :endDate ";
+            params.addValue("endDate", endDate);
+        }
+
+        String dateFilterV = "";
+        if (startDate != null) {
+            dateFilterV += " AND v.fecha >= :startDate ";
+        }
+        if (endDate != null) {
+            dateFilterV += " AND v.fecha <= :endDate ";
+        }
 
         String query = String.format("""
                 SELECT
-                    (SELECT COALESCE(SUM(total_final), 0) FROM ventas WHERE 1=1 %s%s%s) as total_revenue,
-                    (SELECT COALESCE(SUM(dv.cantidad), 0) FROM detalles_venta dv JOIN ventas v ON dv.venta_id = v.id WHERE 1=1 %s%s%s) as total_units,
+                    (SELECT COALESCE(SUM(total_final), 0) FROM ventas WHERE estado = 'COMPLETED' %s %s) as total_revenue,
+                    (SELECT COALESCE(SUM(dv.cantidad), 0) FROM detalles_venta dv JOIN ventas v ON dv.venta_id = v.id WHERE v.estado = 'COMPLETED' %s %s) as total_units,
                     (SELECT COALESCE(SUM(i.cantidad_actual * p.costo_promedio), 0)
                      FROM inventario_local i JOIN producto p ON i.producto_id = p.id WHERE 1=1 %s) as total_value,
-                    (SELECT COALESCE(AVG(total_final), 0) FROM ventas WHERE 1=1 %s%s%s) as avg_ticket,
+                    (SELECT COALESCE(AVG(total_final), 0) FROM ventas WHERE estado = 'COMPLETED' %s %s) as avg_ticket,
                     (SELECT COUNT(*) FROM sucursal WHERE activa = true) as branch_count
                 """,
-                branchSuffix, statusFilter, startDateFilter, endDateFilter,
-                branchSuffixV, statusFilterV, startDateFilterV, endDateFilterV,
+                branchFilter, dateFilter,
+                branchFilterV, dateFilterV,
                 invBranchFilter,
-                branchSuffix, statusFilter, startDateFilter, endDateFilter);
+                branchFilter, dateFilter);
 
-        return jdbcTemplate.queryForObject(query, (rs, rowNum) -> new GlobalSummary(
+        return namedParameterJdbcTemplate.queryForObject(query, params, (rs, rowNum) -> new GlobalSummary(
                 rs.getBigDecimal("total_revenue"),
                 rs.getBigDecimal("total_units"),
                 rs.getBigDecimal("total_value"),
                 rs.getBigDecimal("avg_ticket"),
                 rs.getLong("branch_count")
-        ), args.toArray());
-
+        ));
     }
 
     /**
@@ -252,6 +255,135 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
         return jdbcTemplate.query(query.toString(), (rs, rowNum) -> new SalesTrend(
                 rs.getDate("sale_date").toLocalDate(),
                 rs.getBigDecimal("revenue")
+        ), args.toArray());
+    }
+
+    @Override
+    public List<MonthlySales> findMonthlySales(Long branchId) {
+        StringBuilder query = new StringBuilder("""
+                SELECT 
+                    TO_CHAR(v.fecha, 'Month') as month_name,
+                    EXTRACT(YEAR FROM v.fecha) as year_val,
+                    SUM(v.total_final) as revenue,
+                    SUM(dv.cantidad) as volume
+                FROM ventas v
+                JOIN detalles_venta dv ON v.id = dv.venta_id
+                WHERE v.estado = 'COMPLETED'
+                  AND v.fecha >= CURRENT_DATE - INTERVAL '6 months'
+                """);
+        List<Object> args = new ArrayList<>();
+
+        if (branchId != null) {
+            query.append(" AND v.sucursal_id = ? ");
+            args.add(branchId);
+        }
+
+        query.append(" GROUP BY year_val, month_name, EXTRACT(MONTH FROM v.fecha) ");
+        query.append(" ORDER BY year_val DESC, EXTRACT(MONTH FROM v.fecha) DESC ");
+
+        return jdbcTemplate.query(query.toString(), (rs, rowNum) -> new MonthlySales(
+                rs.getString("month_name").trim(),
+                rs.getInt("year_val"),
+                rs.getBigDecimal("revenue"),
+                rs.getBigDecimal("volume")
+        ), args.toArray());
+    }
+
+    @Override
+    public List<InventoryRotation> findInventoryRotation(Long branchId) {
+        StringBuilder query = new StringBuilder("""
+                SELECT 
+                    p.id as product_id,
+                    p.nombre as product_name,
+                    COALESCE(SUM(dv.cantidad), 0) as sold_qty,
+                    i.cantidad_actual as current_stock,
+                    (CAST(COALESCE(SUM(dv.cantidad), 0) AS DECIMAL) / COALESCE(NULLIF(i.cantidad_actual, 0), 1)) as rotation,
+                    (i.cantidad_actual > 0 AND COALESCE(SUM(dv.cantidad), 0) = 0) as dead_stock
+                FROM producto p
+                JOIN inventario_local i ON p.id = i.producto_id
+                LEFT JOIN detalles_venta dv ON p.id = dv.producto_id
+                LEFT JOIN ventas v ON dv.venta_id = v.id AND v.estado = 'COMPLETED' AND v.fecha >= CURRENT_DATE - INTERVAL '30 days'
+                WHERE 1=1
+                """);
+        List<Object> args = new ArrayList<>();
+
+        if (branchId != null) {
+            query.append(" AND i.sucursal_id = ? ");
+            args.add(branchId);
+        }
+
+        query.append(" GROUP BY p.id, p.nombre, i.cantidad_actual ");
+        query.append(" ORDER BY rotation DESC ");
+
+        return jdbcTemplate.query(query.toString(), (rs, rowNum) -> new InventoryRotation(
+                rs.getLong("product_id"),
+                rs.getString("product_name"),
+                rs.getBigDecimal("sold_qty"),
+                rs.getBigDecimal("current_stock"),
+                rs.getBigDecimal("rotation"),
+                rs.getBoolean("dead_stock")
+        ), args.toArray());
+    }
+
+    @Override
+    public List<ReplenishmentInsight> findReplenishmentInsights(Long branchId) {
+        StringBuilder query = new StringBuilder("""
+                SELECT 
+                    p.id as product_id,
+                    p.nombre as product_name,
+                    i.cantidad_actual as current_stock,
+                    i.stock_minimo as min_stock,
+                    CASE 
+                        WHEN i.cantidad_actual <= i.stock_minimo THEN 'HIGH'
+                        WHEN i.cantidad_actual <= i.stock_minimo * 1.5 THEN 'MEDIUM'
+                        ELSE 'LOW'
+                    END as priority
+                FROM producto p
+                JOIN inventario_local i ON p.id = i.producto_id
+                WHERE i.cantidad_actual <= i.stock_minimo * 1.5
+                """);
+        List<Object> args = new ArrayList<>();
+
+        if (branchId != null) {
+            query.append(" AND i.sucursal_id = ? ");
+            args.add(branchId);
+        }
+
+        query.append(" ORDER BY CAST(i.cantidad_actual AS DECIMAL) / COALESCE(NULLIF(i.stock_minimo, 0), 1) ASC ");
+
+        return jdbcTemplate.query(query.toString(), (rs, rowNum) -> new ReplenishmentInsight(
+                rs.getLong("product_id"),
+                rs.getString("product_name"),
+                rs.getBigDecimal("current_stock"),
+                rs.getBigDecimal("min_stock"),
+                rs.getString("priority")
+        ), args.toArray());
+    }
+
+    @Override
+    public TransferImpact findTransferImpact(Long branchId) {
+        StringBuilder query = new StringBuilder("""
+                SELECT 
+                    COUNT(DISTINCT t.id) as active_count,
+                    COALESCE(SUM(ti.cantidad_solicitada), 0) as total_items,
+                    COALESCE(SUM(ti.cantidad_solicitada * p.costo_promedio), 0) as total_valuation
+                FROM transferencias t
+                JOIN detalles_transferencia ti ON t.id = ti.transferencia_id
+                JOIN producto p ON ti.producto_id = p.id
+                WHERE t.estado IN ('PENDIENTE', 'AUTHORIZED', 'IN_TRANSIT')
+                """);
+        List<Object> args = new ArrayList<>();
+
+        if (branchId != null) {
+            query.append(" AND (t.sucursal_origen_id = ? OR t.sucursal_destino_id = ?) ");
+            args.add(branchId);
+            args.add(branchId);
+        }
+
+        return jdbcTemplate.queryForObject(query.toString(), (rs, rowNum) -> new TransferImpact(
+                rs.getInt("active_count"),
+                rs.getBigDecimal("total_items"),
+                rs.getBigDecimal("total_valuation")
         ), args.toArray());
     }
 }

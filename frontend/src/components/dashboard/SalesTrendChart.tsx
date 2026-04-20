@@ -81,11 +81,12 @@ const SalesTrendChart = memo(function SalesTrendChart({ data, variant = "line" }
           tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
         />
         <Tooltip
+          cursor={{ fill: 'rgba(255,255,255,0.05)' }}
           contentStyle={{
             background: "var(--bg-surface)",
             border: "1px solid var(--border-subtle)",
-            borderRadius: "8px",
-            color: "var(--neutral-100)",
+            borderRadius: "var(--radius-xl)",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
           }}
           formatter={(value: any) => [formatCOP(Number(value) || 0), "Ingresos Netos"]}
           labelFormatter={(label) => `Fecha: ${label}`}
@@ -94,9 +95,9 @@ const SalesTrendChart = memo(function SalesTrendChart({ data, variant = "line" }
           <Line
             type="monotone"
             dataKey="revenue"
-            stroke="#f59e0b"
+            stroke="var(--brand-500)"
             strokeWidth={3}
-            dot={{ r: 4, fill: "#f59e0b", strokeWidth: 0 }}
+            dot={{ r: 4, fill: "var(--brand-500)", strokeWidth: 0 }}
             activeDot={{ r: 7, stroke: "#fff", strokeWidth: 2 }}
           />
         ) : (

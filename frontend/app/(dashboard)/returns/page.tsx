@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import Card from "@/components/ui/Card";
 import DataTable, { Column } from "@/components/ui/DataTable";
 import Badge from "@/components/ui/Badge";
@@ -15,10 +15,15 @@ import {
   Clock, 
   Calendar,
   MessageSquare,
-  Package
+  Package,
+  Info,
+  Lock
 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
-import Input from "@/components/ui/Input";
+import Toolbar from "@/components/ui/Toolbar";
+import SearchFilter from "@/components/ui/SearchFilter";
+
+import PageHeader from "@/components/ui/PageHeader";
 
 export default function ReturnsPage() {
   const { showToast } = useToast();
@@ -29,6 +34,7 @@ export default function ReturnsPage() {
   
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
   
   // Selection for resolution
   const [resolvingRequest, setResolvingRequest] = useState<any>(null);
@@ -84,6 +90,23 @@ export default function ReturnsPage() {
       setProcessing(false);
     }
   };
+
+  const filteredRequests = useMemo(() => {
+    if (!searchTerm) return requests;
+    const lowerSearch = searchTerm.toLowerCase();
+    
+    return requests.filter(r => {
+      const idMatch = r.id?.toString().toLowerCase().includes(lowerSearch) || `ref-${r.id}`.toLowerCase().includes(lowerSearch);
+      const saleMatch = r.saleId?.toString().toLowerCase().includes(lowerSearch);
+      const reasonMatch = r.motivoGeneral?.toLowerCase().includes(lowerSearch);
+      const statusMatch = r.estado?.toLowerCase().includes(lowerSearch);
+      const itemMatch = r.items?.some((it: any) => 
+        it.productoId?.toString().toLowerCase().includes(lowerSearch)
+      );
+      
+      return idMatch || saleMatch || reasonMatch || statusMatch || itemMatch;
+    });
+  }, [requests, searchTerm]);
 
   const columns: Column<any>[] = [
     {
@@ -144,7 +167,7 @@ export default function ReturnsPage() {
                 onClick={() => setResolvingRequest(r)}
                 leftIcon={<RotateCcw size={14} />}
              >
-               Resolver
+                Resolver
              </Button>
            ) : (
              <div className="text-[var(--neutral-600)] italic text-[11px]">Cerrado</div>
@@ -155,35 +178,54 @@ export default function ReturnsPage() {
   ];
 
   return (
-    <div className="p-8 space-y-8 animate-fade-in">
-      <header className="flex items-center justify-between">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-[var(--brand-500)]/10 rounded-lg">
-              <RotateCcw className="text-[var(--brand-400)]" size={20} />
+    <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }} className="animate-fade-in">
+      <PageHeader 
+        title="Gestión de Devoluciones" 
+        description="Control jerárquico de retornos y ajustes de inventario por sede."
+      />
+
+      <div className="w-full">
+        <Toolbar
+          className="mb-16"
+          left={
+            <div className="flex items-center gap-4">
+              <div className="px-4 py-2 bg-[var(--bg-card)] rounded-xl border border-[var(--border-default)] flex items-center gap-3">
+                 <Info size={14} className="text-[var(--brand-400)]" />
+                 <span className="text-[11px] font-bold text-[var(--neutral-400)] uppercase tracking-wider">Sucursal: {session?.sucursalId || '—'}</span>
+              </div>
+              
+              {!isApprover && (
+                <div className="px-4 py-2 rounded-xl bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/20 flex items-center gap-2">
+                  <Lock size={12} className="text-[var(--color-danger)]" />
+                  <span className="text-[11px] text-[var(--color-danger)] font-black uppercase tracking-widest leading-none">Solo Lectura</span>
+                </div>
+              )}
             </div>
-            <h1 className="text-2xl font-black text-[var(--neutral-50)] uppercase tracking-tight">Gestión de Devoluciones</h1>
-          </div>
-          <p className="text-[var(--neutral-500)] text-sm font-medium">Control jerárquico de retornos y ajustes de inventario.</p>
-        </div>
-      </header>
+          }
+        >
+          <SearchFilter 
+            placeholder="Buscar por REF, venta, motivo o producto..."
+            value={searchTerm}
+            onChange={setSearchTerm}
+          />
+        </Toolbar>
 
       <div className="grid grid-cols-1 gap-6">
-        <Card title="Solicitudes del Sistema">
-            <p className="text-[var(--neutral-500)] text-xs mb-4">Historial de devoluciones solicitadas en esta sede.</p>
+        <Card>
             <div className="overflow-x-auto">
                 <DataTable 
                     columns={columns}
-                    data={requests}
+                    data={filteredRequests}
                     isLoading={loading}
                     emptyState={{
                         title: "Sin devoluciones",
-                        description: "No se han registrado solicitudes de devolución recientemente.",
+                        description: searchTerm ? "No se encontraron resultados para tu búsqueda." : "No se han registrado solicitudes de devolución recientemente.",
                         icon: <RotateCcw size={48} className="opacity-10" />
                     }}
                 />
             </div>
         </Card>
+      </div>
       </div>
 
       {/* RESOLUTION MODAL */}
@@ -273,7 +315,7 @@ export default function ReturnsPage() {
                 leftIcon={<XCircle size={18} />}
                 className="!py-6 rounded-3xl !border-[var(--neutral-800)] hover:!bg-[var(--color-danger)]/5 hover:!text-[var(--color-danger)]"
              >
-               Rechazar
+                Rechazar
              </Button>
              <Button 
                 variant="primary" 
@@ -283,7 +325,7 @@ export default function ReturnsPage() {
                 leftIcon={<CheckCircle size={18} />}
                 className="!py-6 rounded-3xl shadow-[0_10px_30px_rgba(var(--brand-rgb),0.3)]"
              >
-               Aprobar Solicitud
+                Aprobar Solicitud
              </Button>
           </div>
         </div>

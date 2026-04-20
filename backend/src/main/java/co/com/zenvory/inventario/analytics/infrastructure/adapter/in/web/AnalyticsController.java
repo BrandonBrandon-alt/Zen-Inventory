@@ -1,12 +1,7 @@
 package co.com.zenvory.inventario.analytics.infrastructure.adapter.in.web;
 
 import co.com.zenvory.inventario.analytics.application.port.in.AnalyticsUseCase;
-import co.com.zenvory.inventario.analytics.domain.model.BranchPerformance;
-import co.com.zenvory.inventario.analytics.domain.model.BranchValuation;
-import co.com.zenvory.inventario.analytics.domain.model.GlobalSummary;
-import co.com.zenvory.inventario.analytics.domain.model.SalesTrend;
-import co.com.zenvory.inventario.analytics.domain.model.TopSellingProduct;
-import co.com.zenvory.inventario.analytics.domain.model.DashboardAnalyticsResponse;
+import co.com.zenvory.inventario.analytics.domain.model.*;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
 import co.com.zenvory.inventario.auth.domain.model.User;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -140,16 +135,44 @@ public class AnalyticsController {
 
     /**
      * Proporciona la curva de tendencia de ventas por periodo.
-     * 
-     * @param startDate Filtro de fecha inicio.
-     * @param endDate Filtro de fecha fin.
-     * @return Serie de tiempo con los datos de ventas.
      */
     @GetMapping("/sales-trend")
     public ResponseEntity<List<SalesTrend>> getSalesTrend(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
         return ResponseEntity.ok(analyticsUseCase.getSalesTrend(startDate, endDate, resolveBranchScope()));
+    }
+
+    /**
+     * Recupera la comparativa de ventas mensuales (últimos 6 meses).
+     */
+    @GetMapping("/monthly-sales")
+    public ResponseEntity<List<MonthlySales>> getMonthlySales() {
+        return ResponseEntity.ok(analyticsUseCase.getMonthlySales(resolveBranchScope()));
+    }
+
+    /**
+     * Calcula la rotación de inventario y detecta productos sin movimiento.
+     */
+    @GetMapping("/inventory-rotation")
+    public ResponseEntity<List<InventoryRotation>> getInventoryRotation() {
+        return ResponseEntity.ok(analyticsUseCase.getInventoryRotation(resolveBranchScope()));
+    }
+
+    /**
+     * Identifica productos que requieren reabastecimiento proactivo.
+     */
+    @GetMapping("/replenishment-insights")
+    public ResponseEntity<List<ReplenishmentInsight>> getReplenishmentInsights() {
+        return ResponseEntity.ok(analyticsUseCase.getReplenishmentInsights(resolveBranchScope()));
+    }
+
+    /**
+     * Calcula el impacto monetario y operativo de los traslados activos.
+     */
+    @GetMapping("/transfers-impact")
+    public ResponseEntity<TransferImpact> getTransferImpact() {
+        return ResponseEntity.ok(analyticsUseCase.getTransferImpact(resolveBranchScope()));
     }
 }
 

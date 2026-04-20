@@ -11,7 +11,7 @@ import Spinner from "@/components/ui/Spinner";
 import PageHeader from "@/components/ui/PageHeader";
 import KpiCard from "@/components/ui/KpiCard";
 import Card from "@/components/ui/Card";
-import EmptyState from "@/components/ui/EmptyState";
+import Badge from "@/components/ui/Badge";
 
 import BranchPerformanceChart from "@/components/dashboard/BranchPerformanceChart";
 import TopProductsList from "@/components/dashboard/TopProductsList";
@@ -19,7 +19,23 @@ import SalesTrendChart from "@/components/dashboard/SalesTrendChart";
 import AlertsList from "@/components/dashboard/AlertsList";
 import ActiveTransfersList from "@/components/dashboard/ActiveTransfersList";
 
-type BranchValuation = components["schemas"]["BranchValuation"];
+// New Advanced Components
+import MonthlyComparisonChart from "@/components/dashboard/MonthlyComparisonChart";
+import InventoryInsightTable from "@/components/dashboard/InventoryInsightTable";
+import ReplenishmentGrid from "@/components/dashboard/ReplenishmentGrid";
+import TransfersImpactDisplay from "@/components/dashboard/TransfersImpactDisplay";
+
+import { 
+  LineChart as LineChartIcon, 
+  LayoutGrid, 
+  Zap, 
+  BarChart3, 
+  PackageSearch,
+  ShoppingCart,
+  Boxes,
+  TrendingUp
+} from "lucide-react";
+
 type TopProduct = components["schemas"]["TopSellingProduct"];
 type StockAlert = components["schemas"]["StockAlertResponse"];
 type BranchResponse = components["schemas"]["BranchResponse"];
@@ -30,13 +46,32 @@ const formatCOP = (v: number) =>
   new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(v);
 
 export default function DashboardPage() {
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
-  const [alerts, setAlerts] = useState<StockAlert[]>([]);
-  const [branches, setBranches] = useState<BranchResponse[]>([]);
-  const [transfers, setTransfers] = useState<TransferResponse[]>([]);
-  const [performance, setPerformance] = useState<components["schemas"]["BranchPerformance"][]>([]);
-  const [salesTrend, setSalesTrend] = useState<SalesTrend[]>([]);
-  const [global, setGlobal] = useState<components["schemas"]["GlobalSummary"] | null>(null);
+  const [dashboardData, setDashboardData] = useState<{
+    topProducts: TopProduct[];
+    alerts: StockAlert[];
+    branches: BranchResponse[];
+    transfers: TransferResponse[];
+    performance: components["schemas"]["BranchPerformance"][];
+    salesTrend: SalesTrend[];
+    global: components["schemas"]["GlobalSummary"] | null;
+    monthlySales: any[];
+    inventoryRotation: any[];
+    replenishment: any[];
+    transferImpact: any | null;
+  }>({
+    topProducts: [],
+    alerts: [],
+    branches: [],
+    transfers: [],
+    performance: [],
+    salesTrend: [],
+    global: null,
+    monthlySales: [],
+    inventoryRotation: [],
+    replenishment: [],
+    transferImpact: null,
+  });
+
   const [timeRange, setTimeRange] = useState<"today" | "7d" | "month" | "all">("all");
   const [loading, setLoading] = useState(true);
 
@@ -54,12 +89,12 @@ export default function DashboardPage() {
   }, [isSeller, router]);
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!isAdmin && !isManager && !isInventory) {
       setLoading(false);
       return;
     }
 
-    async function fetchAll() {
+    async function fetchData() {
       try {
         let startDate: string | undefined = undefined;
         let endDate: string | undefined = undefined;
@@ -77,36 +112,47 @@ export default function DashboardPage() {
           startDate = startMonth.toISOString();
         }
 
-        const dateQuery = { startDate, endDate };
-        const cleanQuery = Object.fromEntries(Object.entries(dateQuery).filter(([_, v]) => v != null));
+        const cleanQuery = { startDate, endDate };
 
-        const [top, bra, glo, perf, tra, trendRes] = await Promise.all([
-          // @ts-ignore
-          apiClient.GET("/api/v1/analytics/top-products", { params: { query: { limit: 5, ...cleanQuery } } }),
+        const basePromises = [
+          apiClient.GET("/api/v1/analytics/top-products", { params: { query: { limit: 5, ...cleanQuery } } } as any),
           apiClient.GET("/api/branches"),
-          // @ts-ignore
-          apiClient.GET("/api/v1/analytics/global-summary", { params: { query: { ...cleanQuery } } }),
-          // @ts-ignore
-          apiClient.GET("/api/v1/analytics/branch-performance", { params: { query: { ...cleanQuery } } }),
+          apiClient.GET("/api/v1/analytics/global-summary", { params: { query: { ...cleanQuery } } } as any),
+          apiClient.GET("/api/v1/analytics/sales-trend", { params: { query: cleanQuery } } as any),
+          isAdmin ? apiClient.GET("/api/v1/analytics/branch-performance", { params: { query: { ...cleanQuery } } } as any) : Promise.resolve({ data: [] }),
           apiClient.GET("/api/v1/transfers"),
-          // @ts-ignore
-          (apiClient as any).GET("/api/v1/analytics/sales-trend", { params: { query: cleanQuery } }),
-        ]);
+          apiClient.GET("/api/v1/analytics/monthly-sales" as any, {}),
+          apiClient.GET("/api/v1/analytics/inventory-rotation" as any, {}),
+          apiClient.GET("/api/v1/analytics/replenishment-insights" as any, {}),
+          apiClient.GET("/api/v1/analytics/transfers-impact" as any, {}),
+          apiClient.GET("/api/v1/alerts", { params: { query: isManager ? { branchId: session?.sucursalId } : {} } } as any)
+        ];
 
-        setTopProducts(top.data ?? []);
-        setGlobal(glo.data ?? null);
-        setPerformance(perf.data ?? []);
-        setTransfers((tra.data ?? []).filter(t => t.status !== "RECEIVED"));
-        setSalesTrend(trendRes?.data ?? []);
+        const [top, bra, glo, trend, perf, tra, monthly, rotation, repl, impact, alertRes] = await Promise.all(basePromises);
 
-        const branchList = bra.data ?? [];
-        setBranches(branchList);
-
-        if (branchList.length > 0) {
-          // @ts-ignore
-          const alertRes = await apiClient.GET("/api/v1/alerts", { params: { query: {} } });
-          setAlerts((alertRes.data ?? []).filter(a => !a.resolved));
+        const transfersData = (tra?.data ?? []) as any[];
+        let filteredTransfers = transfersData;
+        if (isManager && session?.sucursalId) {
+          const myBranchId = Number(session.sucursalId);
+          filteredTransfers = transfersData.filter((t: any) =>
+            Number(t.originBranchId) === myBranchId || Number(t.destinationBranchId) === myBranchId
+          );
         }
+
+        setDashboardData({
+          topProducts: top?.data ?? [],
+          branches: bra?.data ?? [],
+          global: glo?.data ?? null,
+          salesTrend: trend?.data ?? [],
+          performance: perf?.data ?? [],
+          transfers: filteredTransfers.filter((t: any) => t.status !== "RECEIVED"),
+          monthlySales: monthly?.data ?? [],
+          inventoryRotation: rotation?.data ?? [],
+          replenishment: repl?.data ?? [],
+          transferImpact: impact?.data ?? null,
+          alerts: (alertRes?.data ?? []).filter((a: any) => !a.resolved),
+        });
+
       } catch (e) {
         console.error("Dashboard fetch error:", e);
       } finally {
@@ -114,327 +160,193 @@ export default function DashboardPage() {
       }
     }
 
-    async function fetchLocal() {
-      try {
-        let startDate: string | undefined = undefined;
-        let endDate: string | undefined = undefined;
-        const now = new Date();
-
-        if (timeRange === "today") {
-          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          startDate = today.toISOString();
-          endDate = new Date(today.getTime() + 86400000 - 1).toISOString();
-        } else if (timeRange === "7d") {
-          const past = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-          startDate = past.toISOString();
-        } else if (timeRange === "month") {
-          const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-          startDate = startMonth.toISOString();
-        }
-
-        const dateQuery = { startDate, endDate };
-        const cleanQuery = Object.fromEntries(Object.entries(dateQuery).filter(([_, v]) => v != null));
-
-        const [traRes, braRes, gloRes, topRes, trendRes] = await Promise.all([
-          apiClient.GET("/api/v1/transfers"),
-          apiClient.GET("/api/branches"),
-          // @ts-ignore
-          apiClient.GET("/api/v1/analytics/global-summary", { params: { query: { ...cleanQuery } } }),
-          // @ts-ignore
-          apiClient.GET("/api/v1/analytics/top-products", { params: { query: { limit: 5, ...cleanQuery } } }),
-          // @ts-ignore
-          (apiClient as any).GET("/api/v1/analytics/sales-trend", { params: { query: cleanQuery } }),
-        ]);
-
-        setBranches(braRes.data ?? []);
-        setTopProducts(topRes.data ?? []);
-        setGlobal(gloRes.data ?? null);
-        setSalesTrend(trendRes?.data ?? []);
-
-        let branchTransfers = traRes.data ?? [];
-        if (session?.sucursalId) {
-          const myBranchId = Number(session.sucursalId);
-          branchTransfers = branchTransfers.filter((t: any) =>
-            Number(t.originBranchId) === myBranchId || Number(t.destinationBranchId) === myBranchId
-          );
-        }
-        setTransfers(branchTransfers.filter((t: any) => t.status !== "RECEIVED"));
-
-        if (session?.sucursalId) {
-          // @ts-ignore
-          const alertRes = await apiClient.GET("/api/v1/alerts", { params: { query: { branchId: session.sucursalId } } });
-          setAlerts((alertRes.data ?? []).filter(a => !a.resolved));
-        }
-      } catch (e) {
-        console.error("Manager dashboard fetch error:", e);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    if (isAdmin) {
-      fetchAll();
-    } else if (isManager || isInventory) {
-      fetchLocal();
-    } else {
-      setLoading(false);
-    }
+    fetchData();
   }, [isAdmin, isManager, isInventory, timeRange, session]);
 
-  // Derived state with useMemo
   const branchMap = useMemo(() => {
     const map = new Map<number, string>();
-    (branches || []).forEach(b => {
+    (dashboardData.branches || []).forEach(b => {
       if (b.id !== undefined && b.nombre !== undefined) {
         map.set(b.id, b.nombre);
       }
     });
     return map;
-  }, [branches]);
-  const activeAlerts = alerts.length;
+  }, [dashboardData.branches]);
 
   if (loading) return <Spinner fullPage />;
 
-  // ─────────────────────────────────────────────────────────────
-  // 1. Dashboard Operativo (Bodeguero)
-  // ─────────────────────────────────────────────────────────────
-  if (isInventory) {
-    const myBranch = Number(session?.sucursalId);
-    const vehiculosPorRecibir = transfers.filter(t => Number(t.destinationBranchId) === myBranch && t.status === "IN_TRANSIT").length;
-    const porEmpacar = transfers.filter(t => Number(t.originBranchId) === myBranch && (t.status === "PREPARING" || t.status === "AUTHORIZED")).length;
+  const rangeButtons = (
+    <div className="flex items-center gap-4 bg-[var(--bg-card)] p-1.5 rounded-2xl border border-[var(--border-subtle)] shadow-sm">
+      {["today", "7d", "month", "all"].map((range) => (
+        <button
+          key={range}
+          onClick={() => setTimeRange(range as any)}
+          className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase transition-all ${
+            timeRange === range 
+              ? "bg-[var(--brand-500)] text-white shadow-lg" 
+              : "text-[var(--neutral-400)] hover:text-[var(--neutral-200)]"
+          }`}
+        >
+          {range === "today" ? "Hoy" : range === "7d" ? "7D" : range === "month" ? "Mes" : "Total"}
+        </button>
+      ))}
+    </div>
+  );
 
-    return (
-      <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
-        <PageHeader title="Panel de Operaciones" description={`Hola ${session?.nombre}. Resumen logístico del día en tu sucursal.`} />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "24px", marginTop: "32px" }}>
-          <Link href="/transfers" style={{ textDecoration: 'none' }} className="transition-transform hover:scale-[1.02]">
-            <Card title="Recibos Pendientes" style={{ border: "1px solid var(--brand-500)", background: "rgba(217, 99, 79, 0.05)" }}>
-              <div style={{ padding: "20px 0", display: "flex", alignItems: "baseline", gap: "12px" }}>
-                <span style={{ fontSize: "48px", fontWeight: "900", color: "var(--brand-500)", lineHeight: 1 }}>{vehiculosPorRecibir}</span>
-                <span style={{ fontSize: "14px", fontWeight: "700", color: "var(--neutral-400)", textTransform: "uppercase" }}>Camiones en ruta</span>
-              </div>
-            </Card>
-          </Link>
-          <Link href="/transfers" style={{ textDecoration: 'none' }} className="transition-transform hover:scale-[1.02]">
-            <Card title="Despachos por Preparar" style={{ border: "1px solid var(--color-warning)", background: "rgba(245, 158, 11, 0.05)" }}>
-              <div style={{ padding: "20px 0", display: "flex", alignItems: "baseline", gap: "12px" }}>
-                <span style={{ fontSize: "48px", fontWeight: "900", color: "var(--color-warning)", lineHeight: 1 }}>{porEmpacar}</span>
-                <span style={{ fontSize: "14px", fontWeight: "700", color: "var(--neutral-400)", textTransform: "uppercase" }}>Traslados por empacar</span>
-              </div>
-            </Card>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // 2. Dashboard Gerencial (Sede)
-  // ─────────────────────────────────────────────────────────────
-  if (isManager) {
-    return (
-      <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
-        <PageHeader title="Panel de Gerencia" description={`Bienvenido, ${session?.nombre ?? "Gerente"}. Información operativa y analítica de tu sede.`} />
-        
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "24px", marginTop: "16px" }}>
-          <select
-            value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value as any)}
-            style={{
-              padding: '8px 12px',
-              borderRadius: '8px',
-              border: '1px solid var(--border-subtle)',
-              background: 'var(--bg-card)',
-              color: 'var(--neutral-100)',
-              outline: 'none',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '13px',
-            }}
-          >
-            <option value="today">Ventas de Hoy</option>
-            <option value="7d">Últimos 7 Días</option>
-            <option value="month">Este Mes</option>
-            <option value="all">Histórico Completo</option>
-          </select>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "24px", marginBottom: "32px" }}>
-          <KpiCard
-            label="Ventas Netas"
-            value={formatCOP(global?.totalRevenue ?? 0)}
-            sub={`Ticket Promedio: ${formatCOP(global?.averageTicket ?? 0)}`}
-            accent="#10b981"
-            icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>}
-          />
-          <KpiCard
-            label="Valor Inventario Local"
-            value={formatCOP(global?.totalInventoryValue ?? 0)}
-            sub="Basado en stock actual"
-            accent="#f59e0b"
-            icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 8l-9-4-9 4m18 8l-9 4-9-4m18-4l-9 4-9-4m9-11v11" /></svg>}
-          />
-          <Link href="/transfers" style={{ textDecoration: 'none' }} className="transition-transform hover:scale-[1.02]">
-            <KpiCard
-              label="Traslados Pendientes"
-              value={String(transfers.filter(t => t.status === "PENDING").length)}
-              sub="Requieren tu aprobación"
-              accent="#3b82f6"
-              icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="16 3 21 3 21 8" /><line x1="4" y1="20" x2="21" y2="3" /><polyline points="21 16 21 21 16 21" /><line x1="15" y1="15" x2="21" y2="21" /><line x1="4" y1="4" x2="9" y2="9" /></svg>}
-            />
-          </Link>
-          <Link href="/alerts" style={{ textDecoration: 'none' }} className="transition-transform hover:scale-[1.02]">
-            <KpiCard
-              label="Alertas de Stock"
-              value={String(activeAlerts)}
-              sub="Productos en nivel crítico"
-              accent={activeAlerts > 0 ? "var(--brand-500)" : "#10b981"}
-              icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>}
-            />
-          </Link>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "24px", marginBottom: "32px" }}>
-          <Card title="Tendencia de Facturación">
-            <div style={{ width: '100%', height: 300, paddingTop: '16px' }}>
-              <SalesTrendChart data={salesTrend} variant="line" />
-            </div>
-          </Card>
-          <Card title="Productos más vendidos (Sede)">
-            <TopProductsList products={topProducts} />
-          </Card>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: "24px" }}>
-          <Card title="Traslados en Curso">
-            <ActiveTransfersList transfers={transfers} branchMap={branchMap} />
-          </Card>
-          <Card title="Alertas de Stock">
-            <AlertsList alerts={alerts} />
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // 3. Dashboard Administrativo (Panel Global)
-  // ─────────────────────────────────────────────────────────────
   return (
-    <div style={{ padding: "var(--page-padding)", maxWidth: "1400px", margin: "0 auto" }}>
-      <PageHeader
-        title="Panel de Control Administrativo"
-        description={`Bienvenido, ${session?.nombre ?? session?.email ?? "Administrador"}. Visualiza el estado global de tu red.`}
+    <div style={{ padding: "var(--page-padding)", maxWidth: "1600px", margin: "0 auto" }} className="space-y-12">
+      <PageHeader 
+        title={isAdmin ? "Executive Intelligence" : "Dashboard de Gestión"} 
+        description={isAdmin ? `Bienvenido, ${session?.nombre}. Resumen consolidado.` : `Hola ${session?.nombre}. Estado operativo.`} 
+        actions={rangeButtons}
       />
 
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "32px" }}>
-        <select
-          value={timeRange}
-          onChange={(e) => setTimeRange(e.target.value as any)}
-          style={{
-            padding: '10px 16px',
-            borderRadius: '8px',
-            border: '1px solid var(--border-subtle)',
-            background: 'var(--bg-surface)',
-            color: 'var(--neutral-100)',
-            outline: 'none',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: '14px',
-          }}
-        >
-          <option value="today">Ventas de Hoy</option>
-          <option value="7d">Últimos 7 Días</option>
-          <option value="month">Este Mes</option>
-          <option value="all">Histórico Completo</option>
-        </select>
-      </div>
-
-      <div style={{ marginBottom: '32px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--neutral-100)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
-          Visión Global
-        </h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "24px", marginBottom: "36px" }}>
-          <KpiCard
-            label="Ventas Netas"
-            value={formatCOP(global?.totalRevenue ?? 0)}
-            sub={`Ticket Promedio: ${formatCOP(global?.averageTicket ?? 0)}`}
-            accent="#10b981"
-            icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>}
-          />
-          <KpiCard
-            label="Valor Inventario"
-            value={formatCOP(global?.totalInventoryValue ?? 0)}
-            sub={`${branches.length} sedes operativas`}
-            accent="#f59e0b"
-            icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 8l-9-4-9 4m18 8l-9 4-9-4m18-4l-9 4-9-4m9-11v11" /></svg>}
-          />
-          <Link href="/transfers" style={{ textDecoration: 'none' }} className="transition-transform hover:scale-[1.02]">
-            <KpiCard
-              label="Traslados Activos"
-              value={String(transfers.length)}
-              sub="Movimientos en proceso"
-              accent="#3b82f6"
-              icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="16 3 21 3 21 8" /><line x1="4" y1="20" x2="21" y2="3" /><polyline points="21 16 21 21 16 21" /><line x1="15" y1="15" x2="21" y2="21" /><line x1="4" y1="4" x2="9" y2="9" /></svg>}
-            />
-          </Link>
-          <Link href="/alerts" style={{ textDecoration: 'none' }} className="transition-transform hover:scale-[1.02]">
-            <KpiCard
-              label="Alertas Críticas"
-              value={String(activeAlerts)}
-              sub="Acciones requeridas"
-              accent={activeAlerts > 0 ? "var(--brand-500)" : "#10b981"}
-              icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>}
-            />
-          </Link>
+      {isInventory ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-8 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <Link href="/transfers" className="group">
+                <div className="bg-[var(--bg-card)] p-8 rounded-[32px] border border-[var(--brand-500)] shadow-2xl transition-all hover:-translate-y-1">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="p-3 bg-[var(--brand-500)]/10 rounded-2xl">
+                      <Boxes className="text-[var(--brand-500)]" size={28} />
+                    </div>
+                    <Badge variant="info">Recibos</Badge>
+                  </div>
+                  <h3 className="text-[18px] font-black text-[var(--neutral-50)] mb-1 uppercase tracking-tight">En Ruta</h3>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[52px] font-black text-[var(--brand-500)] leading-none">
+                      {dashboardData.transfers.filter(t => Number(t.destinationBranchId) === Number(session?.sucursalId) && t.status === "IN_TRANSIT").length}
+                    </span>
+                    <span className="text-[12px] font-bold text-[var(--neutral-500)] uppercase">Traslados</span>
+                  </div>
+                </div>
+              </Link>
+              <Link href="/transfers" className="group">
+                <div className="bg-[var(--bg-card)] p-8 rounded-[32px] border border-[var(--color-warning)] shadow-2xl transition-all hover:-translate-y-1">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="p-3 bg-[var(--color-warning)]/10 rounded-2xl">
+                      <Zap className="text-[var(--color-warning)]" size={28} />
+                    </div>
+                    <Badge variant="warning">Packing</Badge>
+                  </div>
+                  <h3 className="text-[18px] font-black text-[var(--neutral-50)] mb-1 uppercase tracking-tight">Pendientes</h3>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[52px] font-black text-[var(--color-warning)] leading-none">
+                      {dashboardData.transfers.filter(t => Number(t.originBranchId) === Number(session?.sucursalId) && (t.status === "PREPARING" || t.status === "AUTHORIZED")).length}
+                    </span>
+                    <span className="text-[12px] font-bold text-[var(--neutral-500)] uppercase">Traslados</span>
+                  </div>
+                </div>
+              </Link>
+            </div>
+            <Card title="Productos para Reabastecimiento" headerRight={<ShoppingCart size={18} className="text-[var(--neutral-500)]" />}>
+              <ReplenishmentGrid data={dashboardData.replenishment} />
+            </Card>
+          </div>
+          <div className="lg:col-span-4 space-y-8">
+            {dashboardData.transferImpact && <TransfersImpactDisplay data={dashboardData.transferImpact} />}
+            <Card title="Alertas Críticas">
+              <AlertsList alerts={dashboardData.alerts} />
+            </Card>
+          </div>
         </div>
-      </div>
-
-      <div style={{ marginBottom: '32px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--neutral-100)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg>
-          Análisis Comparativo
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '24px' }}>
-          
-          <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-            <Card title="Rendimiento por Sucursal">
-              <div style={{ width: '100%', height: 320, padding: "10px 0" }}>
-                <BranchPerformanceChart data={performance} />
-              </div>
-            </Card>
-
-            <Card title="Top Productos más vendidos">
-              <TopProductsList products={topProducts} />
-            </Card>
+      ) : (
+        <div className="space-y-12 pb-12">
+          {/* Layer 1: Executive Pulse (KPIs) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            <KpiCard
+              label="Ventas Netas"
+              value={formatCOP(dashboardData.global?.totalRevenue ?? 0)}
+              sub={`Ticket Promedio: ${formatCOP(dashboardData.global?.averageTicket ?? 0)}`}
+              accent="var(--color-success)"
+              progress={75}
+              icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>}
+            />
+            <KpiCard
+              label="Valor Inventario"
+              value={formatCOP(dashboardData.global?.totalInventoryValue ?? 0)}
+              sub={isAdmin ? `${dashboardData.branches.length} sedes` : "Local"}
+              accent="var(--color-warning)"
+              progress={45}
+              icon={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 8l-9-4-9 4m18 8l-9 4-9-4m18-4l-9 4-9-4m9-11v11" /></svg>}
+            />
+            <KpiCard
+              label="Rotación Global"
+              value={`${((dashboardData.inventoryRotation.reduce((a, b) => a + (b.rotationRatio || 0), 0) / (dashboardData.inventoryRotation.length || 1)) * 100).toFixed(1)}%`}
+              sub="Eficiencia catálogo"
+              accent="var(--brand-500)"
+              progress={62}
+              icon={<BarChart3 size={22} strokeWidth={2.5} />}
+            />
+            <KpiCard
+              label="Acciones Críticas"
+              value={String(dashboardData.alerts.length)}
+              sub="Pendientes"
+              accent={dashboardData.alerts.length > 0 ? "var(--color-danger)" : "var(--color-success)"}
+              progress={dashboardData.alerts.length > 0 ? 85 : 0}
+              icon={<Zap size={22} strokeWidth={2.5} />}
+            />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-            <Card title="Traslados en Curso">
-              <ActiveTransfersList transfers={transfers} branchMap={branchMap} />
-            </Card>
-
-            <Card title="Alertas de Stock">
-              <AlertsList alerts={alerts} />
-            </Card>
+          {/* Layer 2: Commercial Intelligence (2/3 + 1/3) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="lg:col-span-8">
+              <Card title="Tendencia de Ingresos" headerRight={<LineChartIcon size={18} className="text-[var(--neutral-500)]" />}>
+                <div className="h-[360px] w-full pt-4">
+                  <SalesTrendChart data={dashboardData.salesTrend} variant="area" />
+                </div>
+              </Card>
+            </div>
+            <div className="lg:col-span-4">
+              <Card title="Comparativa Mensual" headerRight={<BarChart3 size={18} className="text-[var(--neutral-500)]" />}>
+                <div className="h-[360px] w-full pt-4">
+                  <MonthlyComparisonChart data={dashboardData.monthlySales} />
+                </div>
+              </Card>
+            </div>
           </div>
 
+          {/* Layer 3: Inventory & Logistics Deep Dive (3/5 + 2/5 approx 7/12) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="lg:col-span-7">
+              <Card title="Análisis de Eficiencia y Rotación" headerRight={<PackageSearch size={18} className="text-[var(--neutral-500)]" />}>
+                <InventoryInsightTable data={dashboardData.inventoryRotation} />
+              </Card>
+            </div>
+            <div className="lg:col-span-5 space-y-8">
+              {dashboardData.transferImpact && <TransfersImpactDisplay data={dashboardData.transferImpact} />}
+              <Card title="Velocidad de Productos" headerRight={<TrendingUp size={16} className="text-[var(--brand-500)]" />}>
+                <TopProductsList products={dashboardData.topProducts} />
+              </Card>
+            </div>
+          </div>
+
+          {/* Layer 4: Operations & Control (5/12 + 7/12) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div className="lg:col-span-5">
+              <Card title="Gestión de Reabastecimiento" headerRight={<ShoppingCart size={18} className="text-[var(--neutral-500)]" />}>
+                <ReplenishmentGrid data={dashboardData.replenishment} />
+              </Card>
+            </div>
+            <div className="lg:col-span-7 space-y-8">
+               <Card title="Monitoreo de Alertas Stock" headerRight={<Zap size={18} className="text-[var(--color-danger)]" />}>
+                <AlertsList alerts={dashboardData.alerts} />
+              </Card>
+              <Card title="Traslados en Curso" headerRight={<Badge variant="info">Logística</Badge>}>
+                <ActiveTransfersList transfers={dashboardData.transfers} branchMap={branchMap} />
+              </Card>
+              {isAdmin && (
+                <Card title="Rendimiento Global de Sedes">
+                  <div className="h-[300px] py-4">
+                    <BranchPerformanceChart data={dashboardData.performance} />
+                  </div>
+                </Card>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-
-      <div style={{ marginBottom: "40px" }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--neutral-100)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-          Desempeño Cronológico
-        </h2>
-        <Card title="Tendencia de Ventas en el Tiempo (Facturación por Día)">
-          <div style={{ width: '100%', height: 350, paddingTop: '16px' }}>
-            <SalesTrendChart data={salesTrend} variant="line" />
-          </div>
-        </Card>
-      </div>
-
+      )}
     </div>
   );
 }

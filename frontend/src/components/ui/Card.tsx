@@ -15,8 +15,8 @@ export default function Card({ children, title, headerRight, delay, style, class
       style={{
         background: "var(--bg-card)",
         border: "1px solid var(--border-default)",
-        borderRadius: "var(--radius-lg)",
-        padding: "22px 24px",
+        borderRadius: "var(--radius-2xl)",
+        padding: "32px",
         animation: `fadeInUp 0.4s ease ${delay ?? "0s"} both`,
         ...style,
       }}

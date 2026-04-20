@@ -2,12 +2,7 @@ package co.com.zenvory.inventario.analytics.application.service;
 
 import co.com.zenvory.inventario.analytics.application.port.in.AnalyticsUseCase;
 import co.com.zenvory.inventario.analytics.application.port.out.AnalyticsRepositoryPort;
-import co.com.zenvory.inventario.analytics.domain.model.BranchPerformance;
-import co.com.zenvory.inventario.analytics.domain.model.BranchValuation;
-import co.com.zenvory.inventario.analytics.domain.model.GlobalSummary;
-import co.com.zenvory.inventario.analytics.domain.model.TopSellingProduct;
-import co.com.zenvory.inventario.analytics.domain.model.SalesTrend;
-import co.com.zenvory.inventario.analytics.domain.model.DashboardAnalyticsResponse;
+import co.com.zenvory.inventario.analytics.domain.model.*;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -64,6 +59,26 @@ public class AnalyticsService implements AnalyticsUseCase {
     @Override
     public List<SalesTrend> getSalesTrend(LocalDateTime startDate, LocalDateTime endDate, Long branchId) {
         return analyticsRepository.findSalesTrend(startDate, endDate, branchId);
+    }
+
+    @Override
+    public List<MonthlySales> getMonthlySales(Long branchId) {
+        return analyticsRepository.findMonthlySales(branchId);
+    }
+
+    @Override
+    public List<InventoryRotation> getInventoryRotation(Long branchId) {
+        return analyticsRepository.findInventoryRotation(branchId);
+    }
+
+    @Override
+    public List<ReplenishmentInsight> getReplenishmentInsights(Long branchId) {
+        return analyticsRepository.findReplenishmentInsights(branchId);
+    }
+
+    @Override
+    public TransferImpact getTransferImpact(Long branchId) {
+        return analyticsRepository.findTransferImpact(branchId);
     }
 
     /**

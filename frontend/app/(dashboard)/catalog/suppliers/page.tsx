@@ -9,11 +9,13 @@ import { Plus, X } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import SearchFilter from "@/components/ui/SearchFilter";
+import { useToast } from "@/context/ToastContext";
 
 type SupplierResponse = components["schemas"]["SupplierResponse"];
 
 export default function MasterSuppliersPage() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [suppliers, setSuppliers] = useState<SupplierResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -57,6 +59,7 @@ export default function MasterSuppliersPage() {
       setProducts(data ?? []);
     } catch (error) {
       console.error("Error fetching catalog:", error);
+      showToast("Error al cargar el catálogo de productos.", "error");
     } finally {
       setCatalogLoading(false);
     }
@@ -68,6 +71,7 @@ export default function MasterSuppliersPage() {
       setSuppliers(supRes.data ?? []);
     } catch (error) {
       console.error("Error fetching data:", error);
+      showToast("Error al cargar la lista de proveedores.", "error");
     } finally {
       setLoading(false);
     }
@@ -100,27 +104,31 @@ export default function MasterSuppliersPage() {
           params: { path: { id: editingSupplier.id! } },
           body: formData,
         });
+        showToast("Proveedor actualizado correctamente", "success");
       } else {
         await apiClient.POST("/api/catalog/suppliers", {
           body: formData,
         });
+        showToast("Nuevo proveedor creado con éxito", "success");
       }
       setShowModal(false);
       fetchData();
     } catch (error) {
-      alert("Error al guardar el proveedor.");
+      showToast("Error al procesar la solicitud del proveedor.", "error");
     }
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm("¿Estás seguro de eliminar este proveedor?")) return;
     try {
-      await apiClient.DELETE("/api/catalog/suppliers/{id}", {
+      const { error } = await apiClient.DELETE("/api/catalog/suppliers/{id}", {
         params: { path: { id } },
       });
+      if (error) throw error;
+      showToast("Proveedor eliminado de la base de datos", "success");
       fetchData();
     } catch (error) {
-      alert("No se puede eliminar el proveedor. Probablemente tenga productos asociados.");
+      showToast("No se puede eliminar el proveedor. Probablemente tenga productos asociados.", "error");
     }
   };
 
