@@ -3,8 +3,10 @@ package co.com.zenvory.inventario.catalog.domain.model;
 import lombok.*;
 
 /**
- * Modelo de dominio que representa una Unidad de Medida (tabla {@code unidad_medida}).
- * Ej: Kilogramo (kg), Litro (L), Unidad (und), Caja (caj).
+ * Modelo de dominio que representa una Unidad de Medida en el catálogo.
+ * 
+ * <p>Define las magnitudes estándar para el control de inventario 
+ * (e.g., Kilogramo, Litro, Unidad).</p>
  */
 @Getter
 @Setter
@@ -13,11 +15,13 @@ import lombok.*;
 @AllArgsConstructor
 public class UnitOfMeasure {
 
+    /** Identificador único de la unidad de medida. */
     private Long id;
 
-    /** Nombre completo de la unidad. Ej: "Kilogramo". */
+    /** Nombre descriptivo completo (e.g., "Kilogramo"). */
     private String name;
 
-    /** Abreviatura estandarizada. Ej: "kg". */
+    /** Representación abreviada (e.g., "kg"). */
     private String abbreviation;
 }
+

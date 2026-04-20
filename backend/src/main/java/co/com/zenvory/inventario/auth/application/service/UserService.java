@@ -11,28 +11,52 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Servicio de aplicación que implementa la lógica de gestión de usuarios.
+ * 
+ * <p>Coordina las operaciones de creación, actualización y consulta de usuarios,
+ * asegurando el cifrado de contraseñas mediante {@link PasswordEncoder} y la 
+ * integridad referencial de los roles asignados.</p>
+ */
 @Service
 public class UserService implements UserUseCase {
 
     private final UserRepositoryPort userRepositoryPort;
     private final PasswordEncoder passwordEncoder;
 
+    /**
+     * Constructor con inyección de dependencias.
+     * 
+     * @param userRepositoryPort Puerto de salida para persistencia de usuarios.
+     * @param passwordEncoder Componente para el hash de contraseñas.
+     */
     public UserService(UserRepositoryPort userRepositoryPort, PasswordEncoder passwordEncoder) {
         this.userRepositoryPort = userRepositoryPort;
         this.passwordEncoder = passwordEncoder;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<User> getAllUsers() {
         return userRepositoryPort.findAll();
     }
 
+    /**
+     * {@inheritDoc}
+     * @throws UserNotFoundException Si el identificador no corresponde a ningún usuario activo.
+     */
     @Override
     public User getUserById(Long id) {
         return userRepositoryPort.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>Este método cifra la contraseña recibida antes de proceder al guardado físico.</p>
+     */
     @Override
     public User createUser(User user, String plainPassword) {
         user.setPasswordHash(passwordEncoder.encode(plainPassword));
@@ -47,6 +71,10 @@ public class UserService implements UserUseCase {
         return userRepositoryPort.save(user);
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>Permite la actualización parcial. Si plainPassword es nulo o vacío, se preserva el hash existente.</p>
+     */
     @Override
     public User updateUser(Long id, User updated, String plainPassword) {
         User existing = userRepositoryPort.findById(id)
@@ -73,6 +101,10 @@ public class UserService implements UserUseCase {
         return userRepositoryPort.save(existing);
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>Implementa una desactivación lógica para preservar la integridad de trazabilidad en auditorías.</p>
+     */
     @Override
     public void deactivateUser(Long id) {
         User existing = userRepositoryPort.findById(id)
@@ -81,8 +113,12 @@ public class UserService implements UserUseCase {
         userRepositoryPort.save(existing);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public List<Role> getAllRoles() {
         return userRepositoryPort.findAllRoles();
     }
 }
+

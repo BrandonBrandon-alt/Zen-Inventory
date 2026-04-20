@@ -10,14 +10,29 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Servicio de aplicación que implementa la lógica de negocio para la gestión de listas de precios.
+ * 
+ * <p>Actúa como mediador entre los puertos de entrada y salida, asegurando la 
+ * validación de parámetros y coordinando las operaciones de persistencia. 
+ * Implementa la lógica de resolución de precios y actualización de catálogos 
+ * diferenciados.</p>
+ */
 @Service
 public class PriceListService implements PriceListUseCase {
 
+    /** Puerto de salida para la persistencia de datos. */
     private final PriceListRepositoryPort repositoryPort;
 
+    /**
+     * Constructor con inyección de dependencias.
+     * 
+     * @param repositoryPort Adaptador de persistencia inyectado.
+     */
     public PriceListService(PriceListRepositoryPort repositoryPort) {
         this.repositoryPort = repositoryPort;
     }
+
 
     @Override
     public List<PriceList> getAllActiveLists() {

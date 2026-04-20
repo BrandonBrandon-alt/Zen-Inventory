@@ -7,11 +7,24 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Adaptador de salida (Secondary Adapter) para la persistencia de alertas.
+ * 
+ * <p>Implementa la interfaz {@code AlertRepositoryPort} y actúa como puente 
+ * entre la capa de aplicación y el repositorio de datos (JPA).</p>
+ * 
+ * <p>Responsabilidad: Realizar la traducción (mapping) entre objetos de 
+ * dominio {@code StockAlert} y entidades de persistencia {@code AlertEntity}.</p>
+ */
 @Component
 public class AlertPersistenceAdapter implements AlertRepositoryPort {
 
     private final JpaAlertRepository repository;
 
+    /**
+     * Inyección del repositorio de Spring Data JPA.
+     * @param repository Interfaz de bajo nivel para operaciones SQL.
+     */
     public AlertPersistenceAdapter(JpaAlertRepository repository) {
         this.repository = repository;
     }
@@ -46,6 +59,12 @@ public class AlertPersistenceAdapter implements AlertRepositoryPort {
                 .stream().map(this::toDomain).toList();
     }
 
+    /**
+     * Convierte un objeto de dominio a una entidad de persistencia.
+     * 
+     * @param domain Modelo de dominio.
+     * @return Entidad JPA lista para ser guardada.
+     */
     private AlertEntity toEntity(StockAlert domain) {
         AlertEntity entity = new AlertEntity();
         entity.setId(domain.getId());
@@ -62,6 +81,12 @@ public class AlertPersistenceAdapter implements AlertRepositoryPort {
         return entity;
     }
 
+    /**
+     * Convierte una entidad de persistencia a un objeto de dominio.
+     * 
+     * @param entity Entidad recuperada de la base de datos.
+     * @return Modelo de dominio con lógica de negocio.
+     */
     private StockAlert toDomain(AlertEntity entity) {
         return new StockAlert(
                 entity.getId(),

@@ -4,7 +4,6 @@ import co.com.zenvory.inventario.inventory.application.port.in.InventoryUseCase;
 import co.com.zenvory.inventario.inventory.application.port.out.InventoryMovementRepositoryPort;
 import co.com.zenvory.inventario.inventory.application.port.out.LocalInventoryRepositoryPort;
 import co.com.zenvory.inventario.inventory.domain.exception.InsufficientStockException;
-import co.com.zenvory.inventario.inventory.domain.exception.InventoryNotFoundException;
 import co.com.zenvory.inventario.inventory.domain.model.InventoryMovement;
 import co.com.zenvory.inventario.inventory.domain.model.LocalInventory;
 import co.com.zenvory.inventario.inventory.domain.model.MovementReason;
@@ -24,15 +23,41 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Servicio de aplicación que implementa la lógica de negocio para la gestión de inventarios.
+ * 
+ * <p>Orquesta las operaciones de control de existencias, asegurando la consistencia 
+ * entre los saldos locales y el rastro de auditoría (Kardex). Maneja la lógica de 
+ * conversión de unidades de medida, recalculo de costo promedio ponderado y 
+ * publicación de eventos de stock crítico.</p>
+ */
 @Service
 public class InventoryService implements InventoryUseCase {
 
+    /** Repositorio de saldos de inventario por sucursal. */
     private final LocalInventoryRepositoryPort localInventoryRepository;
+
+    /** Repositorio de historial de movimientos (Kardex). */
     private final InventoryMovementRepositoryPort inventoryMovementRepository;
+
+    /** Puerto para consultar información técnica de productos. */
     private final ProductUseCase productUseCase;
+
+    /** Puerto para gestionar conversiones de unidades de medida. */
     private final UnitOfMeasureUseCase unitOfMeasureUseCase;
+
+    /** Publicador de eventos para notificaciones transversales (e.g., Alertas de stock bajo). */
     private final ApplicationEventPublisher eventPublisher;
 
+    /**
+     * Constructor con inyección de dependencias.
+     * 
+     * @param localInventoryRepository Repositorio de saldos locales.
+     * @param inventoryMovementRepository Repositorio de movimientos.
+     * @param productUseCase Servicio de productos.
+     * @param unitOfMeasureUseCase Servicio de unidades de medida.
+     * @param eventPublisher Publicador de eventos de aplicación.
+     */
     public InventoryService(LocalInventoryRepositoryPort localInventoryRepository,
                             InventoryMovementRepositoryPort inventoryMovementRepository,
                             ProductUseCase productUseCase,
@@ -44,6 +69,7 @@ public class InventoryService implements InventoryUseCase {
         this.unitOfMeasureUseCase = unitOfMeasureUseCase;
         this.eventPublisher = eventPublisher;
     }
+
 
     @Override
     public LocalInventory getInventory(Long branchId, Long productId) {
@@ -149,8 +175,20 @@ public class InventoryService implements InventoryUseCase {
         }
     }
 
+    /**
+     * Registro auxiliar para encapsular el resultado de una conversión técnica.
+     */
     private record ConversionResult(BigDecimal quantity, BigDecimal unitCost) {}
 
+    /**
+     * Aplica la lógica de conversión desde una unidad secundaria a la unidad base del producto.
+     * 
+     * @param productId ID del producto.
+     * @param unitId ID de la unidad en la que se reporta la transacción.
+     * @param quantity Cantidad en la unidad reportada.
+     * @param unitCost Costo en la unidad reportada (opcional).
+     * @return Resultado con cantidad y costo normalizados a la unidad base.
+     */
     private ConversionResult applyConversion(Long productId, Long unitId, BigDecimal quantity, BigDecimal unitCost) {
         List<ProductUnit> units = unitOfMeasureUseCase.getUnitsByProduct(productId);
         ProductUnit targetUnit = units.stream()
@@ -204,6 +242,15 @@ public class InventoryService implements InventoryUseCase {
         localInventoryRepository.save(inventory);
     }
 
+    /**
+     * Actualiza el costo promedio ponderado de un producto tras un nuevo ingreso.
+     * 
+     * <p>Utiliza la fórmula: (CostoActual * StockTotal + CostoNuevo * CantidadNueva) / (StockTotal + CantidadNueva)</p>
+     * 
+     * @param productId ID del producto a actualizar.
+     * @param newQuantity Cantidad que ingresa al sistema (normalizada).
+     * @param unitCost Costo unitario de la nueva entrada (normalizado).
+     */
     private void updateProductAverageCost(Long productId, BigDecimal newQuantity, BigDecimal unitCost) {
         Product product = productUseCase.getProductById(productId);
         

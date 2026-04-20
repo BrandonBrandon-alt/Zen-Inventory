@@ -5,9 +5,15 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
- * DTO de entrada para crear una sucursal.
- * Las validaciones están aquí (capa de infraestructura) y no en el dominio,
- * porque son reglas del protocolo HTTP, no invariantes de negocio.
+ * Objeto de transferencia (DTO) para la creación o actualización de una sucursal.
+ * 
+ * <p>Define los criterios de validación sintáctica para el ingreso de datos 
+ * desde la API REST.</p>
+ * 
+ * @param nombre Nombre comercial de la sede (obligatorio, máx 100 caracteres).
+ * @param direccion Ubicación física (obligatorio, máx 200 caracteres).
+ * @param telefono Número de contacto (opcional, entre 7 y 15 dígitos).
+ * @param managerId ID del usuario gestor encargado de la sucursal (opcional).
  */
 public record BranchRequest(
 

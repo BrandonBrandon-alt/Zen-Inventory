@@ -14,24 +14,33 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Adaptador de entrada REST para Unidades de Medida.
- *
- * <p>Expone dos grupos de endpoints:
- * <ul>
- *   <li>{@code /api/catalog/units} — CRUD del catálogo de unidades.</li>
- *   <li>{@code /api/catalog/products/{productId}/units} — Gestión de unidades por producto.</li>
- * </ul>
+ * Adaptador de entrada (Primary Adapter) para la gestión de unidades de medida.
+ * 
+ * <p>Expone endpoints para administrar el catálogo global de unidades 
+ * y la asociación de estas con productos específicos (factores de conversión).
+ * Centraliza la lógica de comunicación para el nomenclador de magnitudes físicas.</p>
  */
 @RestController
 public class UnitOfMeasureController {
 
+    /** Puerto de entrada para las operaciones de negocio sobre unidades. */
     private final UnitOfMeasureUseCase unitUseCase;
 
+    /**
+     * Constructor para inyección de dependencias.
+     * 
+     * @param unitUseCase Implementación del puerto de entrada.
+     */
     public UnitOfMeasureController(UnitOfMeasureUseCase unitUseCase) {
         this.unitUseCase = unitUseCase;
     }
 
-    /** GET /api/catalog/units — Lista todas las unidades de medida disponibles. */
+
+    /**
+     * Obtiene todas las unidades de medida disponibles en el sistema.
+     * 
+     * @return Lista de unidades globales.
+     */
     @GetMapping("/api/catalog/units")
     public ResponseEntity<List<UnitOfMeasureResponse>> getAll() {
         return ResponseEntity.ok(
@@ -40,13 +49,24 @@ public class UnitOfMeasureController {
                         .collect(Collectors.toList()));
     }
 
-    /** GET /api/catalog/units/{id} — Obtiene una unidad por ID. */
+    /**
+     * Busca una unidad de medida por su ID.
+     * 
+     * @param id ID de la unidad.
+     * @return Datos de la unidad encontrada.
+     */
     @GetMapping("/api/catalog/units/{id}")
     public ResponseEntity<UnitOfMeasureResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(mapToResponse(unitUseCase.getUnitById(id)));
     }
 
-    /** POST /api/catalog/units — Crea una nueva unidad de medida. */
+    /**
+     * Registra una nueva unidad de medida en el catálogo global.
+     * 
+     * @param request Datos de la nueva unidad.
+     * @return La unidad creada.
+     * @status 201 Created si es exitoso.
+     */
     @PostMapping("/api/catalog/units")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UnitOfMeasureResponse> create(@Valid @RequestBody UnitOfMeasureRequest request) {
@@ -54,7 +74,13 @@ public class UnitOfMeasureController {
         return ResponseEntity.status(HttpStatus.CREATED).body(mapToResponse(created));
     }
 
-    /** PUT /api/catalog/units/{id} — Actualiza una unidad de medida. */
+    /**
+     * Actualiza una unidad de medida global.
+     * 
+     * @param id ID de la unidad a modificar.
+     * @param request Nuevos datos.
+     * @return La unidad actualizada.
+     */
     @PutMapping("/api/catalog/units/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UnitOfMeasureResponse> update(
@@ -64,7 +90,12 @@ public class UnitOfMeasureController {
         return ResponseEntity.ok(mapToResponse(updated));
     }
 
-    /** DELETE /api/catalog/units/{id} — Elimina una unidad de medida. */
+    /**
+     * Elimina una unidad de medida del catálogo global.
+     * 
+     * @param id ID de la unidad a retirar.
+     * @return Respuesta vacía.
+     */
     @DeleteMapping("/api/catalog/units/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
@@ -73,8 +104,10 @@ public class UnitOfMeasureController {
     }
 
     /**
-     * GET /api/catalog/products/{productId}/units
-     * Retorna todas las unidades de medida asignadas a un producto específico.
+     * Obtiene todas las unidades de medida asociadas a un producto.
+     * 
+     * @param productId ID del producto de referencia.
+     * @return Lista de unidades con sus factores de conversión para el producto.
      */
     @GetMapping("/api/catalog/products/{productId}/units")
     public ResponseEntity<List<ProductUnitResponse>> getByProduct(@PathVariable Long productId) {
@@ -85,8 +118,12 @@ public class UnitOfMeasureController {
     }
 
     /**
-     * POST /api/catalog/products/{productId}/units
-     * Asocia una unidad de medida a un producto con su factor de conversión.
+     * Asocia una nueva unidad de medida a un producto.
+     * 
+     * @param productId ID del producto.
+     * @param request Datos de la asociación (factor de conversión, si es base).
+     * @return La asociación persistida.
+     * @status 201 Created si es exitoso.
      */
     @PostMapping("/api/catalog/products/{productId}/units")
     @PreAuthorize("hasRole('ADMIN')")
@@ -97,8 +134,9 @@ public class UnitOfMeasureController {
         return ResponseEntity.status(HttpStatus.CREATED).body(mapProductUnitToResponse(created));
     }
 
-    // ── Mappers ─────────────────────────────────────────────────────────────
-
+    /**
+     * Mapea un DTO de solicitud al modelo de dominio {@link UnitOfMeasure}.
+     */
     private UnitOfMeasure mapToDomain(UnitOfMeasureRequest req) {
         return UnitOfMeasure.builder()
                 .name(req.nombre())
@@ -106,6 +144,9 @@ public class UnitOfMeasureController {
                 .build();
     }
 
+    /**
+     * Mapea el modelo de dominio {@link UnitOfMeasure} al DTO de respuesta.
+     */
     private UnitOfMeasureResponse mapToResponse(UnitOfMeasure unit) {
         return UnitOfMeasureResponse.builder()
                 .id(unit.getId())
@@ -114,6 +155,9 @@ public class UnitOfMeasureController {
                 .build();
     }
 
+    /**
+     * Mapea un DTO de solicitud al modelo de dominio {@link ProductUnit}.
+     */
     private ProductUnit mapProductUnitToDomain(Long productId, ProductUnitRequest req) {
         return ProductUnit.builder()
                 .productId(productId)
@@ -123,6 +167,9 @@ public class UnitOfMeasureController {
                 .build();
     }
 
+    /**
+     * Mapea el modelo de dominio {@link ProductUnit} al DTO de respuesta.
+     */
     private ProductUnitResponse mapProductUnitToResponse(ProductUnit pu) {
         return ProductUnitResponse.builder()
                 .id(pu.getId())
@@ -135,3 +182,4 @@ public class UnitOfMeasureController {
                 .build();
     }
 }
+

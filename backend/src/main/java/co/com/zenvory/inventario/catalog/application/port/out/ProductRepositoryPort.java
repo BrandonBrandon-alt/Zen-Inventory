@@ -6,45 +6,49 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Puerto de salida (Output Port) para la persistencia del catálogo de productos.
- *
- * <p>Esta interfaz es requerida por el dominio para interactuar con el almacenamiento,
- * sin saber si detrás hay PostgreSQL, MongoDB o un repositorio en memoria.
- * El adaptador {@code ProductPersistenceAdapter} la implementa con JPA.</p>
+ * Puerto de salida (Output Port) que define el contrato de persistencia para productos.
+ * 
+ * <p>Permite al dominio abstraerse de la tecnología de almacenamiento, definiendo 
+ * las operaciones necesarias para la lectura y escritura del catálogo maestro.</p>
  */
 public interface ProductRepositoryPort {
 
     /**
-     * Recupera todos los productos del almacenamiento.
-     * @return Lista de modelos de dominio.
+     * Obtiene el listado completo de productos desde el almacenamiento.
+     * 
+     * @return Lista de modelos de dominio {@link Product}.
      */
     List<Product> findAll();
 
     /**
-     * Busca un producto por su ID en el almacenamiento.
+     * Busca un producto por su clave primaria.
+     * 
      * @param id Identificador único.
-     * @return Optional con el modelo de dominio si existe.
+     * @return {@link Optional} con el producto si fue localizado.
      */
     Optional<Product> findById(Long id);
 
     /**
-     * Verifica si ya existe un producto con el SKU dado.
-     * Útil para validar unicidad antes de crear.
-     * @param sku Código SKU a verificar.
-     * @return {@code true} si el SKU ya está registrado.
+     * Comprueba si un código SKU ya está en uso por otro producto.
+     * 
+     * @param sku Código SKU a validar.
+     * @return true si el SKU ya existe en la base de datos.
      */
     boolean existsBySku(String sku);
 
     /**
-     * Persiste un producto (crea o actualiza).
+     * Persiste o actualiza un producto en el almacenamiento.
+     * 
      * @param product Modelo de dominio a guardar.
-     * @return El modelo de dominio persistido con ID asignado.
+     * @return El modelo persistido.
      */
     Product save(Product product);
 
     /**
-     * Elimina un producto por su ID.
-     * @param id Identificador del producto a eliminar.
+     * Elimina físicamente el registro de un producto.
+     * 
+     * @param id Identificador del producto a suprimir.
      */
     void deleteById(Long id);
 }
+

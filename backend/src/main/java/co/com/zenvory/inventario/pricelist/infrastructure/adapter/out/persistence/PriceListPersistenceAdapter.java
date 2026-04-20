@@ -10,17 +10,34 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * Adaptador de persistencia (Output Adapter) para la gestión de listas de precios.
+ * 
+ * <p>Implementa el puerto {@link PriceListRepositoryPort} delegando las operaciones 
+ * a los repositorios JPA específicos para listas y precios individuales. Se encarga 
+ * de la transformación entre modelos de dominio y entidades de persistencia.</p>
+ */
 @Component
 public class PriceListPersistenceAdapter implements PriceListRepositoryPort {
 
+    /** Repositorio JPA para definiciones de listas. */
     private final JpaPriceListRepository priceListRepo;
+    
+    /** Repositorio JPA para valores de precios específicos. */
     private final JpaProductPriceRepository productPriceRepo;
 
+    /**
+     * Constructor para inyección de dependencias.
+     * 
+     * @param priceListRepo    Repositorio de listas.
+     * @param productPriceRepo Repositorio de precios.
+     */
     public PriceListPersistenceAdapter(JpaPriceListRepository priceListRepo,
                                        JpaProductPriceRepository productPriceRepo) {
         this.priceListRepo = priceListRepo;
         this.productPriceRepo = productPriceRepo;
     }
+
 
     @Override
     public List<PriceList> findAllActive() {

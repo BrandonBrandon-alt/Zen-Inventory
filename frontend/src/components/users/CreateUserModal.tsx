@@ -121,6 +121,7 @@ export default function CreateUserModal({ open, onClose, roles, branches, onCrea
                 />
                 <Select
                     label="Rol del sistema"
+                    placeholder="top"
                     value={values.rolId ?? ""}
                     onChange={val => setValues({...values, rolId: Number(val)})}
                     options={roles.map(r => ({ value: r.id!, label: r.nombre! }))}
@@ -129,6 +130,7 @@ export default function CreateUserModal({ open, onClose, roles, branches, onCrea
                 {values.rolId && Number(values.rolId) !== 1 && (
                     <Select
                         label="Sucursal asignada"
+                        placement="top"
                         value={values.sucursalId || ""}
                         onChange={val => setValues({...values, sucursalId: Number(val)})}
                         options={branches

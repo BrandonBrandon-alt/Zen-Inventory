@@ -13,15 +13,33 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Adaptador de salida (Secondary Adapter) que implementa la persistencia de analítica.
+ * 
+ * <p>Utiliza {@link JdbcTemplate} para ejecutar consultas SQL directas sobre el esquema relacional,
+ * permitiendo realizar agregaciones complejas (SUM, AVG) que serían menos eficientes vía JPA tradicional.</p>
+ * 
+ * <p>Las consultas están optimizadas para filtrar por sucursal y rango de fechas dinámicamente.</p>
+ */
 @Component
 public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Constructor con inyección de JdbcTemplate.
+     * 
+     * @param jdbcTemplate Motor de ejecución de consultas SQL de Spring.
+     */
     public AnalyticsPersistenceAdapter(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>Consulta SQL: Agrupa la tabla 'detalles_venta' por producto, filtrando ventas completadas 
+     * en el periodo y sucursal especificados.</p>
+     */
     @Override
     public List<TopSellingProduct> findTopSellingProducts(int limit, LocalDateTime startDate, LocalDateTime endDate, Long branchId) {
         StringBuilder query = new StringBuilder("""
@@ -56,6 +74,11 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
         ), args.toArray());
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>Consulta SQL: Calcula el valor monetario del inventario actual multiplicando 'cantidad_actual' 
+     * por 'costo_promedio' de los productos.</p>
+     */
     @Override
     public List<BranchValuation> findBranchValuations(Long branchId) {
         StringBuilder query = new StringBuilder("""
@@ -81,6 +104,11 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
         ), args.toArray());
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>Consulta SQL: Ejecuta sub-consultas correlacionadas para obtener ingresos, unidades vendidas, 
+     * valor de activos y ticket promedio en una sola fila de resultados.</p>
+     */
     @Override
     public GlobalSummary findGlobalSummary(LocalDateTime startDate, LocalDateTime endDate, Long branchId) {
         List<Object> args = new ArrayList<>();
@@ -134,6 +162,11 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
 
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>Consulta SQL: Realiza LEFT JOINs entre sucursales y ventas para asegurar que incluso 
+     * las sucursales sin ventas aparezcan en el reporte (con valor cero).</p>
+     */
     @Override
     public List<BranchPerformance> findBranchPerformance(LocalDateTime startDate, LocalDateTime endDate, Long branchId) {
         StringBuilder query = new StringBuilder("""
@@ -187,6 +220,11 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
         ), args.toArray());
     }
 
+    /**
+     * {@inheritDoc}
+     * <p>Consulta SQL: Agrupa las ventas por fecha (truncando la hora) para visualizar 
+     * la evolución diaria de los ingresos.</p>
+     */
     @Override
     public List<SalesTrend> findSalesTrend(LocalDateTime startDate, LocalDateTime endDate, Long branchId) {
         StringBuilder query = new StringBuilder("""

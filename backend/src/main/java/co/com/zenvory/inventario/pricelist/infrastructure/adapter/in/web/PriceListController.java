@@ -13,21 +13,34 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * API REST para gestionar listas de precios.
- * - Los vendedores pueden consultar las listas y los precios (para el POS).
- * - Solo ADMIN/MANAGER pueden configurar precios.
+ * Controlador REST para la gestión de estrategias de precios diferenciados.
+ * 
+ * <p>Permite la administración de múltiples listas de precios (Minorista, Mayorista, etc.) 
+ * y la asignación de valores monetarios específicos por producto. Implementa 
+ * restricciones de seguridad donde la consulta está abierta a ventas, pero la 
+ * configuración está reservada para perfiles administrativos.</p>
  */
 @RestController
 @RequestMapping("/api/v1/price-lists")
 public class PriceListController {
 
+    /** Caso de uso para la gestión de precios. */
     private final PriceListUseCase priceListUseCase;
 
+    /**
+     * Constructor con inyección de dependencias.
+     * 
+     * @param priceListUseCase Servicio de listas de precios.
+     */
     public PriceListController(PriceListUseCase priceListUseCase) {
         this.priceListUseCase = priceListUseCase;
     }
 
-    /** GET /api/v1/price-lists — Lista todas las listas activas. */
+    /**
+     * Recupera todas las listas de precios activas en el sistema.
+     * 
+     * @return Lista de {@link PriceListResponse}.
+     */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER')")
     public ResponseEntity<List<PriceListResponse>> getAllLists() {
@@ -37,7 +50,12 @@ public class PriceListController {
         return ResponseEntity.ok(response);
     }
 
-    /** GET /api/v1/price-lists/{listaId}/prices — Precios de todos los productos en una lista. */
+    /**
+     * Obtiene el catálogo completo de precios para una lista específica.
+     * 
+     * @param listaId ID de la lista.
+     * @return Lista de {@link ProductPriceResponse}.
+     */
     @GetMapping("/{listaId}/prices")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER')")
     public ResponseEntity<List<ProductPriceResponse>> getPricesForList(@PathVariable Long listaId) {
@@ -48,8 +66,15 @@ public class PriceListController {
     }
 
     /**
-     * GET /api/v1/price-lists/{listaId}/products/{productoId}/price
-     * Consulta el precio de un producto específico en una lista (útil en el POS para un ítem).
+     * Consulta el precio de un producto específico en una lista.
+     * 
+     * <p>Útil para el Punto de Venta (POS) cuando se requiere validar el valor 
+     * de un solo ítem. Informa si el precio proviene de la lista o si se debe 
+     * usar el base.</p>
+     * 
+     * @param listaId    ID de la lista.
+     * @param productoId ID del producto.
+     * @return Mapa con el precio y bandera de origen.
      */
     @GetMapping("/{listaId}/products/{productoId}/price")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER')")
@@ -62,8 +87,12 @@ public class PriceListController {
     }
 
     /**
-     * PUT /api/v1/price-lists/{listaId}/products/{productoId}/price
      * Crea o actualiza el precio de un producto en una lista.
+     * 
+     * @param listaId    ID de la lista.
+     * @param productoId ID del producto.
+     * @param request    Cuerpo con el nuevo precio.
+     * @return Detalle del registro de precio guardado.
      */
     @PutMapping("/{listaId}/products/{productoId}/price")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
@@ -76,8 +105,11 @@ public class PriceListController {
     }
 
     /**
-     * DELETE /api/v1/price-lists/{listaId}/products/{productoId}/price
-     * Elimina el precio personalizado; el sistema usará el precio base del producto.
+     * Elimina una definición de precio personalizado para un producto.
+     * 
+     * @param listaId    ID de la lista.
+     * @param productoId ID del producto.
+     * @return 204 No Content.
      */
     @DeleteMapping("/{listaId}/products/{productoId}/price")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
@@ -90,10 +122,13 @@ public class PriceListController {
 
     // ── DTOs internos ─────────────────────────────────────────────────────────
 
+    /** DTO para respuesta resumida de una lista de precios. */
     public record PriceListResponse(Long id, String nombre, String descripcion) {}
 
+    /** DTO para respuesta de un precio de producto. */
     public record ProductPriceResponse(Long id, Long listaId, Long productoId, BigDecimal precio) {}
 
+    /** DTO para capturar el valor del precio en peticiones de actualización. */
     public record UpsertPriceRequest(
             @NotNull(message = "El precio es obligatorio")
             @DecimalMin(value = "0.01", message = "El precio debe ser mayor a 0")

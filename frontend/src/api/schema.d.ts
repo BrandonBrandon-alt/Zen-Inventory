@@ -1163,8 +1163,16 @@ export interface components {
             precioVenta: number;
             /** Format: int64 */
             unitId?: number;
-            supplierIds?: number[];
+            suppliers?: components["schemas"]["ProductSupplierRequest"][];
             activo?: boolean;
+        };
+        ProductSupplierRequest: {
+            /** Format: int64 */
+            supplierId: number;
+            negotiatedPrice: number;
+            /** Format: int32 */
+            deliveryDays: number;
+            preferred: boolean;
         };
         ProductResponse: {
             /** Format: int64 */
@@ -1185,6 +1193,10 @@ export interface components {
             /** Format: int64 */
             id?: number;
             nombre?: string;
+            precioPactado?: number;
+            preferido?: boolean;
+            /** Format: int32 */
+            tiempoEntregaDias?: number;
         };
         BranchRequest: {
             nombre: string;
@@ -1420,8 +1432,8 @@ export interface components {
             userId: number;
             /** Format: int64 */
             branchId: number;
-            /** Format: date-time */
-            estimatedArrivalDate?: string;
+            /** Format: int32 */
+            leadTimeDays: number;
             /** Format: int32 */
             paymentDueDays: number;
             items: components["schemas"]["PurchaseDetailRequest"][];
@@ -1459,6 +1471,8 @@ export interface components {
             receivingUserId?: number;
             /** Format: int64 */
             branchId?: number;
+            /** Format: int32 */
+            deliveryLeadTimeDays?: number;
             total?: number;
             reasonResolution?: string;
             exceptionApproved?: boolean;
@@ -1518,8 +1532,8 @@ export interface components {
             message?: string;
         };
         PurchaseResolutionRequest: {
-            /** Format: date-time */
-            estimatedArrival?: string;
+            /** Format: int32 */
+            leadTimeDays?: number;
             quantity?: number;
             /** Format: int64 */
             userId?: number;
@@ -1648,6 +1662,7 @@ export interface components {
             precioVenta?: number;
             costoPromedio?: number;
             unit?: string;
+            activo?: boolean;
             /** Format: date-time */
             lastUpdated?: string;
         };

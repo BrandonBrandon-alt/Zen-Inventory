@@ -7,31 +7,44 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Repositorio Spring Data JPA para {@link ProductEntity}.
- *
- * <p>Spring genera la implementación automáticamente en tiempo de ejecución.
- * Esta interfaz es un detalle de infraestructura y el dominio nunca la conoce;
- * es usada únicamente por {@link ProductPersistenceAdapter}.</p>
+ * Repositorio Spring Data JPA para la entidad {@link ProductEntity}.
+ * 
+ * <p>Extiende de {@link JpaRepository} para proporcionar capacidades CRUD estándar.
+ * Incluye consultas optimizadas mediante JPQL para reducir el problema del N+1,
+ * cargando de forma ansiosa (Eager) las relaciones críticas.</p>
  */
 public interface JpaProductRepository extends JpaRepository<ProductEntity, Long> {
 
     /**
-     * Verifica si existe un producto con el SKU dado.
-     * Spring Data genera la query automáticamente desde el nombre del método.
-     * @param sku Código SKU a buscar.
-     * @return {@code true} si existe.
+     * Verifica la existencia de un producto basado en su código SKU.
+     * 
+     * @param sku Código SKU a validar.
+     * @return true si el SKU ya está registrado, false en caso contrario.
      */
     boolean existsBySku(String sku);
 
-    /** Trae todos los productos cargando su unidad en una sola consulta. */
+    /** 
+     * Recupera todos los productos enriquecidos con su unidad de medida y proveedores.
+     * 
+     * <p>Utiliza {@code JOIN FETCH} para cargar las relaciones en una única consulta SQL,
+     * optimizando el rendimiento de la aplicación.</p>
+     * 
+     * @return Lista de entidades de producto con relaciones cargadas.
+     */
     @Override
     @NonNull
-    @Query("SELECT p FROM ProductEntity p JOIN FETCH p.unit")
+    @Query("SELECT p FROM ProductEntity p JOIN FETCH p.unit LEFT JOIN FETCH p.suppliers")
     List<ProductEntity> findAll();
 
-    /** Trae un producto por ID cargando su unidad. */
+    /** 
+     * Busca un producto por su ID con sus relaciones precargadas.
+     * 
+     * @param id Identificador único del producto.
+     * @return Optional con la entidad encontrada y sus relaciones inicializadas.
+     */
     @Override
     @NonNull
-    @Query("SELECT p FROM ProductEntity p JOIN FETCH p.unit WHERE p.id = :id")
+    @Query("SELECT p FROM ProductEntity p JOIN FETCH p.unit LEFT JOIN FETCH p.suppliers WHERE p.id = :id")
     Optional<ProductEntity> findById(@NonNull Long id);
 }
+

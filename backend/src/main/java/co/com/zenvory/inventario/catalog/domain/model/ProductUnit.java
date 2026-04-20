@@ -4,12 +4,10 @@ import lombok.*;
 import java.math.BigDecimal;
 
 /**
- * Modelo de dominio que representa la relación entre un Producto
- * y una Unidad de Medida (tabla {@code producto_unidad}).
- *
- * <p>Un producto puede tener múltiples unidades (ej: caja, unidad, docena).
- * Una de ellas es la unidad base ({@code esBase = true}) desde la cual
- * se calculan los factores de conversión de las demás.</p>
+ * Modelo de dominio que representa la asociación entre un Producto y sus Unidades de Medida.
+ * 
+ * <p>Permite definir múltiples presentaciones de un mismo artículo (e.g., caja, unidad, docena),
+ * estableciendo una unidad base y factores de conversión para las presentaciones alternativas.</p>
  */
 @Getter
 @Setter
@@ -18,28 +16,32 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class ProductUnit {
 
+    /** Identificador único de la asociación. */
     private Long id;
 
-    /** ID del producto al que pertenece esta relación. */
+    /** ID del producto vinculado. */
     private Long productId;
 
-    /** ID de la unidad de medida asociada. */
+    /** ID de la unidad de medida correspondiente. */
     private Long unitId;
 
     /**
-     * Factor de conversión relativo a la unidad base.
-     * Ej: si la unidad base es "unidad", una "caja" con factor 12
-     * equivale a 12 unidades.
+     * Coeficiente numérico para transformar esta unidad a la unidad base.
+     * Ej: Si la base es 'unidad' y esta es 'caja', un factor de 12 significa 
+     * que 1 caja = 12 unidades.
      */
     private BigDecimal conversionFactor;
 
     /**
-     * Indica si esta es la unidad de medida base del producto.
-     * Solo puede haber una unidad base por producto.
+     * Determina si esta presentación es la referencia base para el control de inventario.
+     * Solo debe existir una unidad base por producto.
      */
     private Boolean isBase;
 
-    // Enriched fields for UI
+    /** Nombre de la unidad (enriquecido para visualización). */
     private String unitName;
+    
+    /** Abreviatura de la unidad (enriquecido para visualización). */
     private String unitAbbreviation;
 }
+

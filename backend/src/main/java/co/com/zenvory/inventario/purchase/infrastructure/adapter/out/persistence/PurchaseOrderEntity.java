@@ -5,72 +5,101 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Entidad JPA que representa una Orden de Compra en la base de datos.
+ * 
+ * <p>Almacena la cabecera de la orden, incluyendo fechas clave, estados logísticos 
+ * y financieros, y la resolución de auditoría. Gestiona la relación uno-a-muchos 
+ * con sus detalles.</p>
+ */
 @Entity
 @Table(name = "ordenes_compra")
 public class PurchaseOrderEntity {
 
+    /** Identificador único autoincremental. */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** ID del proveedor destinatario. */
     @Column(name = "proveedor_id", nullable = false)
     private Long supplierId;
 
+    /** ID de la sucursal que realizó el pedido. */
     @Column(name = "sucursal_id", nullable = false)
     private Long branchId;
 
+    /** ID del usuario que autorizó o creó la orden. */
     @Column(name = "usuario_id", nullable = false)
     private Long userId;
 
+    /** ID del usuario que registró la entrada de mercancía. */
     @Column(name = "usuario_recepcion_id")
     private Long receivingUserId;
 
+    /** Fecha y hora de emisión de la orden. */
     @Column(name = "fecha_solicitud", nullable = false)
     private LocalDateTime requestDate;
 
+    /** Fecha teórica programada para el arribo de la mercancía. */
     @Column(name = "fecha_estimada_llegada")
     private LocalDateTime estimatedArrivalDate;
 
+    /** Fecha efectiva en que se registró el ingreso físico. */
     @Column(name = "fecha_real_llegada")
     private LocalDateTime actualArrivalDate;
 
+    /** Días de espera pactados con el proveedor. */
     @Column(name = "tiempo_entrega_dias")
     private Integer deliveryLeadTimeDays;
 
+    /** Almacena el nombre del estado logístico (ReceptionStatus). */
     @Column(name = "estado_recepcion", nullable = false)
     private String receptionStatus;
 
+    /** Almacena el nombre del estado de pago (PaymentStatus). */
     @Column(name = "estado_pago", nullable = false)
     private String paymentStatus;
 
+    /** Suma total monetaria de la orden. */
     @Column(name = "total", nullable = false)
     private java.math.BigDecimal total;
 
+    /** Fecha límite para cancelar la obligación. */
     @Column(name = "fecha_vencimiento_pago")
     private LocalDateTime paymentDueDate;
 
+    /** Plazo de crédito en días. */
     @Column(name = "plazo_pago_dias", nullable = false)
     private Integer paymentDueDays;
 
+    /** Justificación de aprobaciones excepcionales o cancelaciones. */
     @Column(name = "motivo_resolucion")
     private String reasonResolution;
 
+    /** Usuario responsable de la resolución administrativa. */
     @Column(name = "resuelto_por_id")
     private Long resueltoPorId;
 
+    /** Fecha de la última acción administrativa. */
     @Column(name = "fecha_resolucion")
     private LocalDateTime fechaResolucion;
 
+    /** Indica si se autorizó una compra con anomalías. */
     @Column(name = "excepcion_aprobada", nullable = false)
     private boolean exceptionApproved = false;
 
+    /** Control de concurrencia optimista. */
     @Version
     private Integer version;
 
+    /** Listado detallado de ítems asociados a esta orden. */
     @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PurchaseDetailEntity> details = new ArrayList<>();
 
+    /** Constructor por defecto requerido por JPA. */
     public PurchaseOrderEntity() {}
+
 
     public void addDetail(PurchaseDetailEntity detail) {
         details.add(detail);

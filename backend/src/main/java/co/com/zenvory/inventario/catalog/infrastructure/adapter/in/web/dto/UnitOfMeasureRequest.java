@@ -2,7 +2,15 @@ package co.com.zenvory.inventario.catalog.infrastructure.adapter.in.web.dto;
 
 import jakarta.validation.constraints.*;
 
-/** DTO de entrada para crear una unidad de medida. */
+/**
+ * DTO (Data Transfer Object) de entrada para la creación de unidades de medida.
+ * 
+ * <p>Define los parámetros básicos del nomenclador de unidades, asegurando 
+ * que se proporcione un nombre y una abreviatura única y válida.</p>
+ *
+ * @param nombre Nombre completo de la unidad (e.g., "Centímetros").
+ * @param abreviatura Símbolo técnico representativo (e.g., "cm").
+ */
 public record UnitOfMeasureRequest(
 
         @NotBlank(message = "El nombre de la unidad es obligatorio")
@@ -14,3 +22,4 @@ public record UnitOfMeasureRequest(
         String abreviatura
 
 ) {}
+

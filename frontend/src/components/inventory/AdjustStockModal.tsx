@@ -221,25 +221,50 @@ export default function AdjustStockModal({
                 {EXTERNAL_MOTIVES[adjustData.reason as string].description}
               </p>
             </div>
-            <Button 
-              variant="primary" 
-              fullWidth 
-              onClick={() => {
-                const path = EXTERNAL_MOTIVES[adjustData.reason as string].path;
-                const productId = product?.id;
-                onClose();
-                
-                const params = new URLSearchParams();
-                if (productId) params.set("productId", productId.toString());
-                if (branchId) params.set("branchId", branchId.toString());
-                
-                const query = params.toString();
-                router.push(`${path}${query ? `?${query}` : ""}`);
-              }}
-              leftIcon={<ArrowRight size={16} />}
-            >
-              {EXTERNAL_MOTIVES[adjustData.reason as string].label}
-            </Button>
+            {(() => {
+              const hasSuppliers = product?.proveedores && product.proveedores.length > 0;
+              const preferredSupplier = product?.proveedores?.find((p: any) => p.preferido);
+              const targetSupplier = preferredSupplier || (hasSuppliers ? product.proveedores[0] : null);
+
+              return (
+                <div className="w-full space-y-3">
+                  {!hasSuppliers && adjustData.reason === "COMPRA" && (
+                    <div className="flex items-center gap-2 p-3 bg-[var(--color-danger-10)] border border-[var(--color-danger-20)] rounded-xl text-[var(--color-danger)] animate-in fade-in slide-in-from-top-1">
+                      <XCircle size={14} />
+                      <span className="text-[10px] font-black uppercase tracking-tight">Sin proveedores vinculados en el catálogo</span>
+                    </div>
+                  )}
+                  
+                  <Button 
+                    variant="primary" 
+                    fullWidth 
+                    disabled={!hasSuppliers && adjustData.reason === "COMPRA"}
+                    onClick={() => {
+                      const path = EXTERNAL_MOTIVES[adjustData.reason as string].path;
+                      onClose();
+                      
+                      const params = new URLSearchParams();
+                      if (branchId) params.set("branchId", branchId.toString());
+
+                      if (adjustData.reason === "COMPRA") {
+                        if (targetSupplier) params.set("preselectedSupplier", targetSupplier.id.toString());
+                        params.set("preselectedProduct", product.id.toString());
+                      } else {
+                        if (product?.id) params.set("productId", product.id.toString());
+                      }
+                      
+                      const query = params.toString();
+                      router.push(`${path}${query ? `?${query}` : ""}`);
+                    }}
+                    leftIcon={hasSuppliers || adjustData.reason !== "COMPRA" ? <ArrowRight size={16} /> : <XCircle size={16} />}
+                  >
+                    {!hasSuppliers && adjustData.reason === "COMPRA" 
+                      ? "Configurar Proveedores" 
+                      : EXTERNAL_MOTIVES[adjustData.reason as string].label}
+                  </Button>
+                </div>
+              );
+            })()}
           </div>
         ) : (
           <>

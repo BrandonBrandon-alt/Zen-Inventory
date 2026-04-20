@@ -4,11 +4,19 @@ import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 
 /**
- * DTO de entrada para crear o actualizar un producto en el catálogo.
+ * DTO (Data Transfer Object) de entrada para la creación o actualización de productos.
+ * 
+ * <p>Define la estructura de datos que el cliente debe enviar en las peticiones HTTP.
+ * Incluye metadatos de validación de Bean Validation para asegurar la integridad sintáctica 
+ * de los datos antes de alcanzar la capa de aplicación.</p>
  *
- * <p>Las validaciones se aplican aquí (capa de infraestructura web) porque
- * son reglas del protocolo HTTP, no invariantes de negocio del dominio.
- * El controlador activa estas validaciones con {@code @Valid}.</p>
+ * @param sku Código único de identificación logística.
+ * @param nombre Nombre descriptivo del producto.
+ * @param costoPromedio Valor ponderado de adquisición.
+ * @param precioVenta Valor sugerido para el mercado.
+ * @param unitId Referencia a la unidad de medida principal.
+ * @param suppliers Colección de proveedores y condiciones comerciales vinculadas.
+ * @param activo Estado de disponibilidad del producto.
  */
 public record ProductRequest(
 
@@ -22,17 +30,18 @@ public record ProductRequest(
         String nombre,
 
         @NotNull(message = "El costo promedio es obligatorio")
-        @DecimalMin(value = "0.0", inclusive = false, message = "El costo promedio debe ser mayor a 0")
+        @DecimalMin(value = "0.0", inclusive = true, message = "El costo promedio no puede ser negativo")
         @Digits(integer = 10, fraction = 2, message = "El costo promedio debe tener máximo 10 enteros y 2 decimales")
         BigDecimal costoPromedio,
 
         @NotNull(message = "El precio de venta es obligatorio")
-        @DecimalMin(value = "0.0", inclusive = false, message = "El precio de venta debe ser mayor a 0")
+        @DecimalMin(value = "0.0", inclusive = true, message = "El precio de venta no puede ser negativo")
         @Digits(integer = 10, fraction = 2, message = "El precio de venta debe tener máximo 10 enteros y 2 decimales")
         BigDecimal precioVenta,
 
         Long unitId,
-        java.util.List<Long> supplierIds,
+        java.util.List<@jakarta.validation.Valid ProductSupplierRequest> suppliers,
         Boolean activo
 
 ) {}
+

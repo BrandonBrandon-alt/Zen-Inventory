@@ -1,10 +1,19 @@
 package co.com.zenvory.inventario.purchase.domain.model;
 
 /**
- * Representa el estado de pago de una orden de compra ante el proveedor.
+ * Representa el estado financiero de una orden de compra frente al proveedor.
+ * 
+ * <p>Permite rastrear si la obligación monetaria derivada de la adquisición de 
+ * mercancía ha sido satisfecha total, parcial o nulamente.</p>
  */
 public enum PaymentStatus {
-    POR_PAGAR,      // Deuda registrada pero no cancelada
-    PAGO_PARCIAL,   // Se ha realizado un abono
-    PAGADO          // Deuda totalmente saneada
+    /** La deuda ha sido registrada pero no se ha realizado ningún abono. */
+    POR_PAGAR,
+    
+    /** Se ha realizado al menos un pago parcial pero aún resta un saldo pendiente. */
+    PAGO_PARCIAL,
+    
+    /** La obligación financiera ha sido cancelada en su totalidad. */
+    PAGADO
 }
+

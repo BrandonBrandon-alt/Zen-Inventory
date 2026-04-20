@@ -18,6 +18,14 @@ type ProductResponse = components["schemas"]["ProductResponse"];
 type BranchResponse = components["schemas"]["BranchResponse"];
 type SupplierResponse = components["schemas"]["SupplierResponse"];
 
+interface EnrichedSupplier {
+  id: number;
+  nombre: string;
+  precioPactado?: number;
+  preferido?: boolean;
+  tiempoEntregaDias?: number;
+}
+
 interface AlertResolutionModalProps {
   alert: StockAlertResponse | null;
   onClose: () => void;
@@ -42,7 +50,7 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
   const [branches, setBranches] = useState<BranchResponse[]>([]);
   const [branchStocks, setBranchStocks] = useState<Record<number, number>>({});
   const [supplier, setSupplier] = useState<SupplierResponse | null>(null);
-  const [allSuppliers, setAllSuppliers] = useState<SupplierResponse[]>([]);
+  const [allSuppliers, setAllSuppliers] = useState<EnrichedSupplier[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
 
   // Form State
@@ -91,14 +99,14 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
       if (prod) {
         setQuantity(100); // Default suggestion
         
-        // 2. Fetch Valid Suppliers (Validation: Junction table check)
-        const { data: validSupp } = await apiClient.GET("/api/catalog/suppliers/search" as any, {
-          params: { query: { productId: alert.productId } }
-        });
-        setAllSuppliers(validSupp ?? []);
+        // 2. Fetch Valid Suppliers (Enriched from product data)
+        const validSupp: EnrichedSupplier[] = (prod as any).proveedores || [];
+        setAllSuppliers(validSupp);
         
-        if (validSupp && validSupp.length > 0) {
-          setSelectedSupplierId(validSupp[0].id!);
+        if (validSupp.length > 0) {
+          // Auto-select preferred or the first one
+          const preferred = validSupp.find(s => s.preferido);
+          setSelectedSupplierId(preferred ? preferred.id : validSupp[0].id);
         }
 
         // 3. Fetch Branches and Stocks (for Path A)
@@ -300,7 +308,10 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
                       label="Seleccionar Proveedor"
                       value={selectedSupplierId}
                       onChange={(val) => setSelectedSupplierId(val)}
-                      options={allSuppliers.map(s => ({ value: s.id!, label: s.nombre! }))}
+                      options={allSuppliers.map(s => ({ 
+                        value: s.id!, 
+                        label: `${s.nombre} ${s.preferido ? "⭐" : ""} ($${s.precioPactado || 'N/A'})` 
+                      }))}
                     />
                     {supplier && (
                       <p style={{ fontSize: "12px", color: "var(--neutral-500)", marginTop: "-8px" }}>

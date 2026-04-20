@@ -5,38 +5,67 @@ import co.com.zenvory.inventario.catalog.domain.model.Supplier;
 import java.util.List;
 
 /**
- * Puerto de entrada para los casos de uso de Proveedores.
- * Define el contrato CRUD que el exterior puede invocar.
+ * Puerto de entrada (Input Port) que define las operaciones de negocio para la gestión de proveedores.
+ * 
+ * <p>Permite administrar la base de datos de proveedores y consultar las relaciones 
+ * comerciales con los productos del catálogo.</p>
  */
 public interface SupplierUseCase {
 
-    /** Retorna todos los proveedores registrados. */
+    /**
+     * Recupera todos los proveedores registrados en el sistema.
+     * 
+     * @return Lista de modelos de dominio {@link Supplier}.
+     */
     List<Supplier> getAllSuppliers();
 
     /**
-     * Busca un proveedor por ID.
+     * Busca un proveedor específico por su identificador primario.
+     * 
+     * @param id Identificador único.
+     * @return Modelo del proveedor encontrado.
      * @throws co.com.zenvory.inventario.catalog.domain.exception.SupplierNotFoundException si no existe.
      */
     Supplier getSupplierById(Long id);
 
-    /** Crea un nuevo proveedor. */
+    /**
+     * Registra un nuevo proveedor en el sistema.
+     * 
+     * @param supplier Datos iniciales del proveedor.
+     * @return El proveedor guardado con ID asignado.
+     */
     Supplier createSupplier(Supplier supplier);
 
     /**
-     * Actualiza los datos de un proveedor existente.
-     * @throws co.com.zenvory.inventario.catalog.domain.exception.SupplierNotFoundException si no existe.
+     * Actualiza la información de un proveedor existente.
+     * 
+     * @param id Identificador del proveedor a modificar.
+     * @param supplier Nuevos datos.
+     * @return El proveedor actualizado.
      */
     Supplier updateSupplier(Long id, Supplier supplier);
 
     /**
-     * Elimina un proveedor por ID.
-     * @throws co.com.zenvory.inventario.catalog.domain.exception.SupplierNotFoundException si no existe.
+     * Elimina un proveedor del sistema.
+     * 
+     * @param id Identificador del proveedor a retirar.
      */
     void deleteSupplier(Long id);
 
-    /** Retorna los proveedores asociados a un producto específico por su ID. */
+    /**
+     * Obtiene la lista de proveedores que suministran un producto específico.
+     * 
+     * @param productId ID del producto.
+     * @return Lista de proveedores vinculados.
+     */
     List<Supplier> getSuppliersByProductId(Long productId);
 
-    /** Retorna los productos suministrados por un proveedor específico. */
+    /**
+     * Obtiene todos los productos que son suministrados por un proveedor determinado.
+     * 
+     * @param supplierId ID del proveedor.
+     * @return Lista de productos del catálogo asociados al proveedor.
+     */
     List<co.com.zenvory.inventario.catalog.domain.model.Product> getProductsBySupplierId(Long supplierId);
 }
+

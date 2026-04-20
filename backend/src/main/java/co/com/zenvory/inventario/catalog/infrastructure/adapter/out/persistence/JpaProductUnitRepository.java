@@ -4,12 +4,21 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-/** Repositorio Spring Data JPA para {@link ProductUnitEntity}. */
+/**
+ * Repositorio Spring Data JPA para la entidad {@link ProductUnitEntity}.
+ * 
+ * <p>Gestiona la persistencia de las equivalencias de unidades por producto.
+ * Permite consultar la matriz de conversión configurada para cada artículo 
+ * del catálogo.</p>
+ */
 public interface JpaProductUnitRepository extends JpaRepository<ProductUnitEntity, Long> {
 
     /**
-     * Busca todas las unidades asignadas a un producto específico.
-     * Spring Data genera la query desde el nombre del método.
+     * Recupera la lista completa de unidades y presentaciones vinculadas a un producto.
+     * 
+     * @param productId Identificador del producto.
+     * @return Lista de entidades de relación producto-unidad.
      */
     List<ProductUnitEntity> findByProductId(Long productId);
 }
+

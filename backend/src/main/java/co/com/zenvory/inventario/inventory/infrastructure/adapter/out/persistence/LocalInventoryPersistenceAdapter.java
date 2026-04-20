@@ -7,14 +7,29 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Adaptador de persistencia (Output Adapter) para la gestión de saldos de inventario local.
+ * 
+ * <p>Implementa el puerto {@link LocalInventoryRepositoryPort} interactuando con 
+ * el repositorio JPA {@link JpaLocalInventoryRepository}. Proporciona las 
+ * capacidades de almacenamiento y consulta de existencias físicas por ubicación, 
+ * traduciendo entre el dominio y la persistencia.</p>
+ */
 @Component
 public class LocalInventoryPersistenceAdapter implements LocalInventoryRepositoryPort {
 
+    /** Repositorio JPA de bajo nivel para inventarios locales. */
     private final JpaLocalInventoryRepository localInventoryRepository;
 
+    /**
+     * Constructor para inyección de dependencias.
+     * 
+     * @param localInventoryRepository Implementación del repositorio Spring Data.
+     */
     public LocalInventoryPersistenceAdapter(JpaLocalInventoryRepository localInventoryRepository) {
         this.localInventoryRepository = localInventoryRepository;
     }
+
 
     @Override
     public Optional<LocalInventory> findByBranchAndProduct(Long branchId, Long productId) {

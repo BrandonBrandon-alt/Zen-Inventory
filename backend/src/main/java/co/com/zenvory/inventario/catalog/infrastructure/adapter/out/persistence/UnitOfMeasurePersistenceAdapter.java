@@ -10,8 +10,11 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Adaptador de salida que implementa {@link UnitOfMeasureRepositoryPort} con Spring Data JPA.
- * Gestiona tanto las unidades de medida como sus relaciones con los productos.
+ * Adaptador de salida (Secondary Adapter) para la persistencia de unidades de medida.
+ * 
+ * <p>Implementa {@link UnitOfMeasureRepositoryPort} utilizando repositorios JPA.
+ * Gestiona de manera centralizada el catálogo de unidades y las configuraciones 
+ * de empaque o presentación vinculadas a los productos.</p>
  */
 @Component
 public class UnitOfMeasurePersistenceAdapter implements UnitOfMeasureRepositoryPort {
@@ -19,6 +22,11 @@ public class UnitOfMeasurePersistenceAdapter implements UnitOfMeasureRepositoryP
     private final JpaUnitOfMeasureRepository unitRepository;
     private final JpaProductUnitRepository productUnitRepository;
 
+    /**
+     * Constructor con inyección de dependencias.
+     * @param unitRepository Repositorio JPA maestro de unidades.
+     * @param productUnitRepository Repositorio JPA para las presentaciones de productos.
+     */
     public UnitOfMeasurePersistenceAdapter(
             JpaUnitOfMeasureRepository unitRepository,
             JpaProductUnitRepository productUnitRepository) {
@@ -26,6 +34,7 @@ public class UnitOfMeasurePersistenceAdapter implements UnitOfMeasureRepositoryP
         this.productUnitRepository = productUnitRepository;
     }
 
+    /** {@inheritDoc} */
     @Override
     public List<UnitOfMeasure> findAll() {
         return unitRepository.findAll().stream()
@@ -33,21 +42,25 @@ public class UnitOfMeasurePersistenceAdapter implements UnitOfMeasureRepositoryP
                 .collect(Collectors.toList());
     }
 
+    /** {@inheritDoc} */
     @Override
     public Optional<UnitOfMeasure> findById(Long id) {
         return unitRepository.findById(id).map(UnitOfMeasureEntity::toDomain);
     }
 
+    /** {@inheritDoc} */
     @Override
     public UnitOfMeasure save(UnitOfMeasure unit) {
         return unitRepository.save(UnitOfMeasureEntity.fromDomain(unit)).toDomain();
     }
 
+    /** {@inheritDoc} */
     @Override
     public void deleteById(Long id) {
         unitRepository.deleteById(id);
     }
 
+    /** {@inheritDoc} */
     @Override
     public List<ProductUnit> findProductUnitsByProductId(Long productId) {
         return productUnitRepository.findByProductId(productId).stream()
@@ -55,8 +68,10 @@ public class UnitOfMeasurePersistenceAdapter implements UnitOfMeasureRepositoryP
                 .collect(Collectors.toList());
     }
 
+    /** {@inheritDoc} */
     @Override
     public ProductUnit saveProductUnit(ProductUnit productUnit) {
         return productUnitRepository.save(ProductUnitEntity.fromDomain(productUnit)).toDomain();
     }
 }
+

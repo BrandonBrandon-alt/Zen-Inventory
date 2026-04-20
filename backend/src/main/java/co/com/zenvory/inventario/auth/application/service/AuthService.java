@@ -11,14 +11,16 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 /**
- * Servicio de aplicación que implementa el caso de uso de Login.
- *
- * <p>Orquesta:
- * <ol>
- *   <li>Busca el usuario por email en la BD (puerto de salida).</li>
- *   <li>Verifica la contraseña con BCrypt.</li>
- *   <li>Delega al {@link JwtService} para generar el token.</li>
- * </ol>
+ * Servicio de aplicación que implementa la orquestación del inicio de sesión.
+ * 
+ * <p>Responsabilidades:
+ * <ul>
+ *   <li>Validar la existencia del usuario en el almacén de datos.</li>
+ *   <li>Verificar la integridad de la contraseña mediante {@link PasswordEncoder}.</li>
+ *   <li>Validar si la cuenta se encuentra habilitada para operar.</li>
+ *   <li>Solicitar la generación de tokens de acceso al {@link JwtService}.</li>
+ * </ul>
+ * </p>
  */
 @Service
 public class AuthService implements AuthUseCase {
@@ -27,6 +29,13 @@ public class AuthService implements AuthUseCase {
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
 
+    /**
+     * Constructor para la inyección de dependencias.
+     * 
+     * @param userRepositoryPort Puerto de salida para acceso a datos de usuario.
+     * @param jwtService Servicio para la gestión de tokens JWT.
+     * @param passwordEncoder Componente de validación de hashes de contraseña.
+     */
     public AuthService(
             UserRepositoryPort userRepositoryPort,
             JwtService jwtService,
@@ -39,9 +48,9 @@ public class AuthService implements AuthUseCase {
     /**
      * {@inheritDoc}
      *
-     * <p>Lanza {@link InvalidCredentialsException} tanto para email inexistente
-     * como para contraseña incorrecta (seguridad). Si las credenciales son válidas
-     * pero la cuenta está inactiva, lanza {@link AccountDisabledException}.</p>
+     * <p>Lanza {@link InvalidCredentialsException} para errores de identidad (email o contraseña) 
+     * evitando revelar cuál de los dos falló por motivos de seguridad. 
+     * Si las credenciales son correctas pero la cuenta está inactiva, lanza {@link AccountDisabledException}.</p>
      */
     @Override
     public LoginResult login(String email, String password) {
@@ -68,3 +77,4 @@ public class AuthService implements AuthUseCase {
                 .build();
     }
 }
+

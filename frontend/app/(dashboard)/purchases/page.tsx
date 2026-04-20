@@ -50,7 +50,8 @@ function PurchasesContent() {
   const { showToast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const productIdPreselected = searchParams.get("productId");
+  const productIdPreselected = searchParams.get("preselectedProduct") || searchParams.get("productId");
+  const supplierIdPreselected = searchParams.get("preselectedSupplier");
   const branchIdPreselected = searchParams.get("branchId");
 
   // Protect route
@@ -91,6 +92,12 @@ function PurchasesContent() {
     fetchCatalogs();
     fetchOrders();
   }, []);
+
+  useEffect(() => {
+    if (supplierIdPreselected) {
+      setSupplierId(supplierIdPreselected);
+    }
+  }, [supplierIdPreselected]);
 
   const fetchCatalogs = async () => {
     try {

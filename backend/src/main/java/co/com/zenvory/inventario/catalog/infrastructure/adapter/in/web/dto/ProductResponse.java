@@ -5,11 +5,22 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * DTO de salida que representa un producto en la respuesta HTTP.
+ * DTO (Data Transfer Object) de salida para la representación de productos.
+ * 
+ * <p>Define la estructura de datos que se retorna al cliente en las respuestas JSON.
+ * Normaliza los nombres de los campos a español para asegurar la consistencia con 
+ * el contrato de la API REST externa.</p>
  *
- * <p>Expone nombres en español para la API REST, desacoplando los nombres
- * del dominio (en inglés) de los nombres del contrato con el cliente.
- * Jackson serializa este record automáticamente a JSON.</p>
+ * @param id Identificador único del recurso.
+ * @param sku Código único de identificación logística.
+ * @param nombre Nombre descriptivo del producto.
+ * @param costoPromedio Valor ponderado de adquisición.
+ * @param precioVenta Valor sugerido para el mercado.
+ * @param unitId Referencia a la unidad de medida principal.
+ * @param unitAbbreviation Símbolo técnico de la unidad de medida.
+ * @param activo Estado de disponibilidad actual.
+ * @param proveedores Resumen de proveedores vinculados.
+ * @param creadoEn Marca temporal de creación del registro.
  */
 @Builder
 public record ProductResponse(
@@ -24,3 +35,4 @@ public record ProductResponse(
         java.util.List<co.com.zenvory.inventario.catalog.domain.model.SupplierSummary> proveedores,
         java.time.LocalDateTime creadoEn
 ) {}
+

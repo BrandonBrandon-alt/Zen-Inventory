@@ -65,20 +65,53 @@ const InventoryItemCard = ({ item, onAdd, priceOverride, priceListName, priceLis
   </Card>
 );
 
-const CartItemRow = ({ item, actions }: { item: any, actions: any }) => (
+const CartItemRow = ({ item, actions, priceLists }: { item: any, actions: any, priceLists: any[] }) => (
   <div className="p-4 bg-[var(--bg-card)] border border-[var(--neutral-800)] rounded-2xl flex flex-col gap-3 transition-all animate-in fade-in slide-in-from-right-2">
     <div className="flex justify-between items-start gap-3">
       <div className="flex-1">
         <h4 className="text-[13px] font-black text-[var(--neutral-50)] leading-tight uppercase tracking-tight">{item.nombre}</h4>
         <div className="flex items-center gap-2 mt-1">
           <span className="text-[9px] font-mono text-[var(--brand-500)] font-bold tracking-tight uppercase">SKU: {item.sku}</span>
-          {item.priceListId && <Badge variant="info">LISTA #{item.priceListId}</Badge>}
+          {item.priceListId ? (
+            <Badge variant="info" className="px-1.5 py-0 text-[8px] uppercase">
+              {priceLists.find(l => l.id === item.priceListId)?.nombre || `LISTA #${item.priceListId}`}
+            </Badge>
+          ) : (
+            <Badge variant="neutral" className="px-1.5 py-0 text-[8px] uppercase">GRAL.</Badge>
+          )}
         </div>
       </div>
       <div className="text-right">
         <p className="text-[14px] font-black text-[var(--neutral-50)]">{formatCurrency(item.unitPrice * item.quantity * (1 - item.discountPercentage / 100))}</p>
         <p className="text-[10px] text-[var(--neutral-500)] font-bold">{formatCurrency(item.unitPrice)} un.</p>
       </div>
+    </div>
+
+    {/* Selector de Tarifa Granular */}
+    <div className="flex flex-wrap gap-1.5 mt-1 border-t border-[var(--neutral-800)]/50 pt-2.5">
+      <button 
+        onClick={() => actions.updateItemPriceList(item.productId, null)}
+        className={`px-2 py-1 rounded-md text-[8px] font-black transition-all uppercase tracking-widest border ${
+          item.priceListId === null 
+            ? "bg-[var(--brand-500)] text-[var(--neutral-50)] border-[var(--brand-500)] shadow-[0_0_10px_rgba(217,99,79,0.3)]" 
+            : "bg-[var(--bg-surface)] text-[var(--neutral-500)] border-[var(--neutral-800)] hover:text-[var(--neutral-300)] hover:border-[var(--neutral-700)]"
+        }`}
+      >
+        General
+      </button>
+      {priceLists.map(list => (
+        <button 
+          key={list.id}
+          onClick={() => actions.updateItemPriceList(item.productId, list.id)}
+          className={`px-2 py-1 rounded-md text-[8px] font-black transition-all uppercase tracking-widest border ${
+            item.priceListId === list.id 
+              ? "bg-[var(--brand-500)] text-[var(--neutral-50)] border-[var(--brand-500)] shadow-[0_0_10px_rgba(217,99,79,0.3)]" 
+              : "bg-[var(--bg-surface)] text-[var(--neutral-500)] border-[var(--neutral-800)] hover:text-[var(--neutral-300)] hover:border-[var(--neutral-700)]"
+          }`}
+        >
+          {list.nombre}
+        </button>
+      ))}
     </div>
 
     <div className="flex items-center gap-3">
@@ -240,7 +273,7 @@ export default function NewSaleDraft({
 
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 custom-scrollbar bg-[var(--bg-card)]/10">
           {cart.map(item => (
-            <CartItemRow key={item.productId} item={item} actions={cartActions} />
+            <CartItemRow key={item.productId} item={item} actions={cartActions} priceLists={priceLists} />
           ))}
 
           {cart.length === 0 && (

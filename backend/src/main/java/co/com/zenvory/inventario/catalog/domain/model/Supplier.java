@@ -3,8 +3,10 @@ package co.com.zenvory.inventario.catalog.domain.model;
 import lombok.*;
 
 /**
- * Modelo de dominio que representa un Proveedor.
- * Objeto puro sin dependencias de frameworks.
+ * Modelo de dominio que representa un Proveedor en el sistema.
+ * 
+ * <p>Define los datos de contacto y condiciones logísticas base de los 
+ * aliados comerciales que abastecen el inventario.</p>
  */
 @Getter
 @Setter
@@ -13,15 +15,16 @@ import lombok.*;
 @AllArgsConstructor
 public class Supplier {
 
-    /** Identificador único del proveedor. */
+    /** Identificador único del proveedor asignado por el sistema. */
     private Long id;
 
-    /** Nombre comercial del proveedor. */
+    /** Nombre comercial o razón social. */
     private String name;
 
-    /** Nombre o email del contacto principal. */
+    /** Información detallada de contacto (persona, correo o teléfono). */
     private String contact;
 
-    /** Días promedio que tarda el proveedor en entregar mercancía. */
+    /** Tiempo estándar de reabastecimiento en días calendario. */
     private Integer deliveryDays;
 }
+

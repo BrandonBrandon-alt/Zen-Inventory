@@ -16,20 +16,34 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Adaptador de entrada REST para el módulo de Proveedores.
- * Expone el CRUD de proveedores bajo {@code /api/catalog/suppliers}.
+ * Adaptador de entrada (Primary Adapter) para la gestión del catálogo de proveedores.
+ * 
+ * <p>Expone endpoints REST para administrar la base de datos de proveedores 
+ * y consultar las relaciones comerciales con los productos. Actúa como puente 
+ * entre la capa web y la lógica de negocio de suministros.</p>
  */
 @RestController
 @RequestMapping("/api/catalog/suppliers")
 public class SupplierController {
 
+    /** Puerto de entrada para las operaciones de negocio sobre proveedores. */
     private final SupplierUseCase supplierUseCase;
 
+    /**
+     * Constructor para inyección de dependencias.
+     * 
+     * @param supplierUseCase Implementación del puerto de entrada.
+     */
     public SupplierController(SupplierUseCase supplierUseCase) {
         this.supplierUseCase = supplierUseCase;
     }
 
-    /** GET /api/catalog/suppliers — Lista todos los proveedores. */
+
+    /**
+     * Obtiene el listado completo de proveedores registrados.
+     * 
+     * @return Lista de proveedores.
+     */
     @GetMapping
     public ResponseEntity<List<SupplierResponse>> getAll() {
         return ResponseEntity.ok(
@@ -38,13 +52,24 @@ public class SupplierController {
                         .collect(Collectors.toList()));
     }
 
-    /** GET /api/catalog/suppliers/{id} — Obtiene un proveedor por ID. */
+    /**
+     * Busca un proveedor por su identificador único.
+     * 
+     * @param id ID del proveedor.
+     * @return Datos detallados del proveedor.
+     */
     @GetMapping("/{id}")
     public ResponseEntity<SupplierResponse> getById(@PathVariable Long id) {
         return ResponseEntity.ok(mapToResponse(supplierUseCase.getSupplierById(id)));
     }
 
-    /** POST /api/catalog/suppliers — Crea un nuevo proveedor. */
+    /**
+     * Registra un nuevo proveedor en el sistema.
+     * 
+     * @param request Datos del nuevo proveedor.
+     * @return El proveedor guardado.
+     * @status 201 Created si es exitoso.
+     */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SupplierResponse> create(@Valid @RequestBody SupplierRequest request) {
@@ -52,7 +77,13 @@ public class SupplierController {
         return ResponseEntity.status(HttpStatus.CREATED).body(mapToResponse(created));
     }
 
-    /** PUT /api/catalog/suppliers/{id} — Actualiza un proveedor. */
+    /**
+     * Actualiza la información de un proveedor existente.
+     * 
+     * @param id ID del proveedor a modificar.
+     * @param request Nuevos datos.
+     * @return El proveedor actualizado.
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SupplierResponse> update(
@@ -61,7 +92,12 @@ public class SupplierController {
         return ResponseEntity.ok(mapToResponse(supplierUseCase.updateSupplier(id, mapToDomain(request))));
     }
 
-    /** DELETE /api/catalog/suppliers/{id} — Elimina un proveedor. */
+    /**
+     * Elimina un proveedor del catálogo.
+     * 
+     * @param id ID del proveedor a retirar.
+     * @return Respuesta vacía.
+     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
@@ -69,7 +105,12 @@ public class SupplierController {
         return ResponseEntity.noContent().build();
     }
 
-    /** GET /api/catalog/suppliers/search?productId=... — Busca proveedores por producto. */
+    /**
+     * Busca los proveedores asociados a un producto particular.
+     * 
+     * @param productId ID del producto de referencia.
+     * @return Lista de proveedores que suministran dicho producto.
+     */
     @GetMapping("/search")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<List<SupplierResponse>> searchByProduct(@RequestParam Long productId) {
@@ -79,7 +120,12 @@ public class SupplierController {
                         .collect(Collectors.toList()));
     }
 
-    /** GET /api/catalog/suppliers/{id}/products — Lista los productos de un proveedor. */
+    /**
+     * Obtiene el listado de productos que suministra un proveedor específico.
+     * 
+     * @param id ID del proveedor.
+     * @return Lista de productos vinculados.
+     */
     @GetMapping("/{id}/products")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<List<ProductResponse>> getProductsBySupplier(@PathVariable Long id) {
@@ -90,6 +136,9 @@ public class SupplierController {
                         .collect(Collectors.toList()));
     }
 
+    /**
+     * Mapea un producto de dominio a su DTO de respuesta especializado.
+     */
     private ProductResponse mapProductToResponse(Product product) {
         return ProductResponse.builder()
                 .id(product.getId())
@@ -104,6 +153,9 @@ public class SupplierController {
                 .build();
     }
 
+    /**
+     * Mapea un DTO de solicitud al modelo de dominio {@link Supplier}.
+     */
     private Supplier mapToDomain(SupplierRequest req) {
         return Supplier.builder()
                 .name(req.nombre())
@@ -112,6 +164,9 @@ public class SupplierController {
                 .build();
     }
 
+    /**
+     * Mapea el modelo de dominio {@link Supplier} al DTO de respuesta.
+     */
     private SupplierResponse mapToResponse(Supplier supplier) {
         return SupplierResponse.builder()
                 .id(supplier.getId())
@@ -121,3 +176,4 @@ public class SupplierController {
                 .build();
     }
 }
+

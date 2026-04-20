@@ -7,11 +7,11 @@ import java.util.List;
 import java.util.ArrayList;
 
 /**
- * Modelo de dominio que representa un Producto en el catálogo.
- * Es un objeto puro sin dependencias de frameworks ni de persistencia.
- *
- * <p>En arquitectura hexagonal, el dominio es el núcleo de la aplicación.
- * Todo el resto de capas gira alrededor de él.</p>
+ * Modelo de dominio que representa un Producto en el catálogo maestro.
+ * 
+ * <p>Esta clase es el núcleo de la gestión de mercancías, definiendo su 
+ * identidad comercial (SKU), costos, precios de venta y relaciones con 
+ * proveedores y unidades de medida.</p>
  */
 @Getter
 @Setter
@@ -20,42 +20,48 @@ import java.util.ArrayList;
 @AllArgsConstructor
 public class Product {
 
-    /** Identificador único del producto (asignado por la BD). */
+    /** Identificador único del producto asignado por el sistema. */
     private Long id;
 
-    /**
-     * Código SKU (Stock Keeping Unit) único que identifica el producto
-     * comercialmente. Ej: "PROD-001".
+    /** 
+     * Código SKU (Stock Keeping Unit). 
+     * Identificador comercial único para control de inventario.
      */
     private String sku;
 
-    /** Nombre descriptivo del producto. */
+    /** Nombre descriptivo o comercial del artículo. */
     private String name;
 
-    /** Costo promedio de adquisición del producto (precio de compra). */
+    /** Valor monetario promedio de adquisición del producto. */
     private BigDecimal averageCost;
 
-    /** Precio de venta al público del producto. */
+    /** Precio sugerido de venta al público. */
     private BigDecimal salePrice;
 
-    /** ID de la unidad de medida asociada del catálogo maestro. */
+    /** ID de la unidad de medida principal definida en el catálogo. */
     private Long unitId;
 
-    /** Abreviatura de la unidad de medida (para visualización). */
+    /** Abreviatura de la unidad de medida (e.g., 'kg', 'und'). */
     private String unitAbbreviation;
 
-    /** Fecha en que el producto fue registrado en el sistema. */
+    /** Marca temporal del registro inicial del producto. */
     private LocalDateTime createdAt;
 
-    /** IDs de los proveedores asociados (usado principalmente para creación/actualización). */
+    /** 
+     * Detalles de configuración comercial con diversos proveedores. 
+     * Incluye precios negociados y tiempos de entrega.
+     */
     @Builder.Default
-    private List<Long> supplierIds = new ArrayList<>();
+    private List<ProductSupplierDetail> suppliersDetails = new ArrayList<>();
 
-    /** Detalles resumidos de los proveedores asociados (usado para visualización). */
+    /** 
+     * Resumen de proveedores vinculados para propósitos de visualización en interfaz. 
+     */
     @Builder.Default
     private List<SupplierSummary> suppliers = new ArrayList<>();
 
-    /** Estado del producto (Activo/Inactivo). */
+    /** Indica si el producto está habilitado para operaciones comerciales. */
     @Builder.Default
     private Boolean active = true;
 }
+
