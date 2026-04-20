@@ -164,4 +164,9 @@ public class ReturnRequestService implements ReturnRequestUseCase {
     public List<ReturnRequest> getPendingRequestsByBranch(Long branchId) {
         return repositoryPort.findByBranchIdAndStatus(branchId, ReturnRequestStatus.PENDIENTE);
     }
+
+    @Override
+    public List<ReturnRequest> getAllRequests() {
+        return repositoryPort.findAll();
+    }
 }

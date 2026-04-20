@@ -42,4 +42,9 @@ public interface ReturnRequestUseCase {
      * Listar solicitudes pendientes de aprobación (para Managers).
      */
     List<ReturnRequest> getPendingRequestsByBranch(Long branchId);
+    
+    /**
+     * Obtiene todas las solicitudes de devolución de todas las sedes (Solo ADMIN).
+     */
+    List<ReturnRequest> getAllRequests();
 }

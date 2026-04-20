@@ -73,4 +73,11 @@ public class ReturnRequestController {
         List<ReturnRequest> requests = useCase.getRequestsByBranch(branchId);
         return ResponseEntity.ok(requests.stream().map(ReturnRequestResponse::fromDomain).toList());
     }
+
+    @GetMapping
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<List<ReturnRequestResponse>> getAll() {
+        List<ReturnRequest> requests = useCase.getAllRequests();
+        return ResponseEntity.ok(requests.stream().map(ReturnRequestResponse::fromDomain).toList());
+    }
 }

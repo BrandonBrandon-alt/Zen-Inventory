@@ -6,6 +6,7 @@ import { apiClient } from "@/api/client";
 import { getSession } from "@/api/auth";
 import type { components } from "@/api/schema";
 import { History, Search, MessageCircle, ShoppingBag, ShoppingCart, Repeat, Truck, AlertTriangle, CheckCircle, MinusCircle } from "lucide-react";
+import Select from "@/components/ui/Select";
 
 import Spinner from "@/components/ui/Spinner";
 import PageHeader from "@/components/ui/PageHeader";
@@ -24,12 +25,14 @@ export default function AuditPage() {
   const router = useRouter();
   const { showToast } = useToast();
   const [movements, setMovements] = useState<any[]>([]);
-  const [branches, setBranches] = useState<Map<number, string>>(new Map());
+  const [branchesList, setBranchesList] = useState<any[]>([]);
+  const [branchesMap, setBranchesMap] = useState<Map<number, string>>(new Map());
   const [products, setProducts] = useState<Map<number, components["schemas"]["ProductResponse"]>>(new Map());
   const [suppliers, setSuppliers] = useState<Map<number, string>>(new Map());
   const [users, setUsers] = useState<Map<number, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedBranch, setSelectedBranch] = useState("all");
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: "asc" | "desc" | null }>({ key: "date", direction: "desc" });
   const [viewingObservation, setViewingObservation] = useState<any | null>(null);
 
@@ -53,9 +56,11 @@ export default function AuditPage() {
         ]);
 
         setMovements(movs.data ?? []);
-        setBranches(new Map((bras.data ?? []).map((b) => [b.id!, b.nombre!])));
-        setProducts(new Map((pros.data ?? []).map((p) => [p.id!, p])));
-        setSuppliers(new Map((sups.data ?? []).map((s) => [s.id!, s.nombre!])));
+        const rawBranches = bras.data ?? [];
+        setBranchesList(rawBranches);
+        setBranchesMap(new Map(rawBranches.map((b: any) => [b.id!, b.nombre!])));
+        setProducts(new Map((pros.data ?? []).map((p: any) => [p.id!, p])));
+        setSuppliers(new Map((sups.data ?? []).map((s: any) => [s.id!, s.nombre!])));
         setUsers(new Map((usrs.data as UserResponse[] ?? []).map((u) => [u.id!, u.nombre!])));
       } catch (err) {
         showToast("Error al cargar datos de auditoría", "error");
@@ -72,6 +77,8 @@ export default function AuditPage() {
       direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc"
     }));
   };
+  
+  // Re-import Select
 
   const filteredAndSortedMovements = movements.filter(m => {
     const product = products.get(m.productId!);
@@ -80,7 +87,10 @@ export default function AuditPage() {
     const reason = (m.reason || "").toLowerCase();
     const term = searchTerm.toLowerCase();
     
-    return productName.includes(term) || userName.includes(term) || reason.includes(term);
+    const matchesSearch = productName.includes(term) || userName.includes(term) || reason.includes(term);
+    const matchesBranch = selectedBranch === "all" || m.branchId?.toString() === selectedBranch;
+    
+    return matchesSearch && matchesBranch;
   }).sort((a, b) => {
     if (!sortConfig.key || !sortConfig.direction) return 0;
     
@@ -185,7 +195,7 @@ export default function AuditPage() {
     {
       header: "Sucursal",
       key: "branchId",
-      render: (m) => <span style={{ fontSize: "12px", color: "var(--neutral-400)" }}>{branches.get(m.branchId!) || m.branchId}</span>
+      render: (m) => <span style={{ fontSize: "12px", color: "var(--neutral-400)" }}>{branchesMap.get(m.branchId!) || m.branchId}</span>
     },
     {
       header: "Cantidad",
@@ -257,6 +267,17 @@ export default function AuditPage() {
             value={searchTerm}
             onChange={setSearchTerm}
             containerClassName="w-full"
+          />
+        </div>
+        <div style={{ minWidth: "240px" }}>
+          <Select
+            label="Filtrar por Sede"
+            value={selectedBranch}
+            onChange={setSelectedBranch}
+            options={[
+              { value: "all", label: "Todas las sedes" },
+              ...branchesList.map(b => ({ value: b.id.toString(), label: b.nombre }))
+            ]}
           />
         </div>
       </div>

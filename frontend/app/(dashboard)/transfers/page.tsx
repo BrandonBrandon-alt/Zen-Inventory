@@ -19,26 +19,20 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Cell, Legend, RadarChart, PolarGrid, PolarAngleAxis, Radar
 } from "recharts";
-import { 
-  ArrowRight, 
-  ArrowRightCircle,
-  Truck, 
-  Package, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle, 
+import {
+  ArrowRight,
+  Truck,
+  Package,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
   Zap,
-  XCircle, 
+  XCircle,
   Timer,
   MessageCircle,
-  LogOut,
-  LogIn,
   BarChart2,
-  TrendingUp,
-  DollarSign
 } from "lucide-react";
 
-// Components
 import NewTransferModal from "@/components/transfers/NewTransferModal";
 import ReceiveTransferModal from "@/components/transfers/ReceiveTransferModal";
 import DispatchTransferModal from "@/components/transfers/DispatchTransferModal";
@@ -50,6 +44,8 @@ import TransferCard from "@/components/transfers/TransferCard";
 type TransferResponse = components["schemas"]["TransferResponse"];
 type BranchResponse = components["schemas"]["BranchResponse"];
 
+const CARDS_PER_PAGE = 5;
+
 function TransfersContent() {
   const { showToast } = useToast();
   const [transfers, setTransfers] = useState<TransferResponse[]>([]);
@@ -59,11 +55,13 @@ function TransfersContent() {
   const [logisticsAnalytics, setLogisticsAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+
   const searchParams = useSearchParams();
   const productIdPreselected = searchParams.get("productId");
   const branchIdPreselected = searchParams.get("branchId");
+  const typePreselected = searchParams.get("type") as "INBOUND" | "OUTBOUND" | null;
 
-  // Modal states
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [receivingTransfer, setReceivingTransfer] = useState<TransferResponse | null>(null);
   const [dispatchingTransfer, setDispatchingTransfer] = useState<TransferResponse | null>(null);
@@ -71,7 +69,6 @@ function TransfersContent() {
   const [resolvingTransfer, setResolvingTransfer] = useState<{ t: TransferResponse; mode: "cancel" | "reject" } | null>(null);
   const [viewingReason, setViewingReason] = useState<TransferResponse | null>(null);
 
-  // Filters
   const [activeTab, setActiveTab] = useState<"all" | "monitor" | "analytics">("all");
   const [filterOrigin, setFilterOrigin] = useState<string>("all");
   const [filterDestination, setFilterDestination] = useState<string>("all");
@@ -86,45 +83,43 @@ function TransfersContent() {
   const myBranchId = session?.sucursalId || null;
 
   useEffect(() => {
-    if (isSeller) {
-      router.push("/sales/pos");
-    }
+    if (isSeller) router.push("/sales/pos");
   }, [isSeller, router]);
 
   const fetchTransfers = useCallback(async () => {
     try {
-      const isAdminOrManager = (session?.rol === "ADMIN" || session?.rol === "MANAGER");
+      const isAdminOrManager = session?.rol === "ADMIN" || session?.rol === "MANAGER";
       const requests: Promise<any>[] = [
         apiClient.GET("/api/v1/transfers"),
         apiClient.GET("/api/branches"),
-        (apiClient as any).GET("/api/v1/transfers/fulfillment-report")
+        (apiClient as any).GET("/api/v1/transfers/fulfillment-report"),
       ];
       if (isAdminOrManager) {
         requests.push((apiClient as any).GET("/api/v1/transfers/analytics/logistics"));
       }
       const [tRes, bRes, fRes, aRes] = await Promise.all(requests);
-      
+
       const allTransfers = tRes.data ?? [];
-      // Filter for non-admins: only show where I am origin or destination
       if (!isAdmin && myBranchId) {
-        let branchTransfers = allTransfers.filter((t: TransferResponse) => 
-          Number(t.originBranchId) === Number(myBranchId) || 
-          Number(t.destinationBranchId) === Number(myBranchId)
-        );
-        // INVENTORY only sees operational transfers they need to act on (Origin) 
-        // OR transfers they requested (Destination)
-        if (isInventory) {
-          branchTransfers = branchTransfers.filter((t: TransferResponse) => 
-            t.status === "PREPARING" || 
-            t.status === "IN_TRANSIT" || 
-            t.status === "WITH_ISSUE" ||
+        let branchTransfers = allTransfers.filter(
+          (t: TransferResponse) =>
+            Number(t.originBranchId) === Number(myBranchId) ||
             Number(t.destinationBranchId) === Number(myBranchId)
+        );
+        if (isInventory) {
+          branchTransfers = branchTransfers.filter(
+            (t: TransferResponse) =>
+              t.status === "PREPARING" ||
+              t.status === "IN_TRANSIT" ||
+              t.status === "WITH_ISSUE" ||
+              Number(t.destinationBranchId) === Number(myBranchId)
           );
         }
         setTransfers(branchTransfers);
       } else {
         setTransfers(allTransfers);
       }
+
       const rawBranches = bRes.data ?? [];
       setBranchesList(rawBranches);
       setBranchesMap(new Map(rawBranches.map((b: BranchResponse) => [b.id!, b.nombre!])));
@@ -137,49 +132,44 @@ function TransfersContent() {
     }
   }, [isAdmin, myBranchId, showToast]);
 
-  useEffect(() => {
-    fetchTransfers();
-  }, [fetchTransfers]);
+  useEffect(() => { fetchTransfers(); }, [fetchTransfers]);
+  useEffect(() => { if (productIdPreselected) setIsNewModalOpen(true); }, [productIdPreselected]);
+  useEffect(() => { if (branchIdPreselected) setFilterOrigin(branchIdPreselected); }, [branchIdPreselected]);
 
-  useEffect(() => {
-    if (productIdPreselected) {
-      setIsNewModalOpen(true);
-    }
-  }, [productIdPreselected]);
-
-  useEffect(() => {
-    if (branchIdPreselected) {
-      setFilterOrigin(branchIdPreselected);
-    }
-  }, [branchIdPreselected]);
-
-  const filteredTransfers = transfers.filter(t => {
+  const filteredTransfers = transfers.filter((t) => {
     if (filterOrigin !== "all" && t.originBranchId?.toString() !== filterOrigin) return false;
     if (filterDestination !== "all" && t.destinationBranchId?.toString() !== filterDestination) return false;
     if (filterStatus !== "all" && t.status !== filterStatus) return false;
     return true;
   });
 
+  const totalPages = Math.ceil(filteredTransfers.length / CARDS_PER_PAGE);
+  const paginatedTransfers = filteredTransfers.slice(
+    (currentPage - 1) * CARDS_PER_PAGE,
+    currentPage * CARDS_PER_PAGE
+  );
+
+  const handleFilterChange = (setter: (v: string) => void) => (val: string) => {
+    setter(val);
+    setCurrentPage(1);
+  };
+
   const handleCancel = async (id: number, reason: string) => {
     try {
-      await (apiClient as any).POST(`/api/v1/transfers/${id}/cancel`, {
-        body: { reason }
-      });
+      await (apiClient as any).POST(`/api/v1/transfers/${id}/cancel`, { body: { reason } });
       showToast("Traslado cancelado correctamente", "success");
       fetchTransfers();
-    } catch (err) {
+    } catch {
       throw new Error("No se pudo cancelar el traslado. Verifique su conexión.");
     }
   };
 
   const handleReject = async (id: number, reason: string) => {
     try {
-      await (apiClient as any).POST(`/api/v1/transfers/${id}/reject`, {
-        body: { reason }
-      });
+      await (apiClient as any).POST(`/api/v1/transfers/${id}/reject`, { body: { reason } });
       showToast("Traslado rechazado", "success");
       fetchTransfers();
-    } catch (err) {
+    } catch {
       throw new Error("No se pudo rechazar el traslado.");
     }
   };
@@ -190,7 +180,7 @@ function TransfersContent() {
       await (apiClient as any).POST(`/api/v1/transfers/${id}/approve-destination`);
       showToast("Traslado aprobado por sucursal de destino", "success");
       fetchTransfers();
-    } catch (err) {
+    } catch {
       showToast("No se pudo aprobar el traslado", "error");
     } finally {
       setProcessingId(null);
@@ -199,13 +189,12 @@ function TransfersContent() {
 
   const handleResolve = async (id: number, type: "shrinkage" | "resend" | "claim") => {
     if (!confirm(`¿Estás seguro de resolver esta novedad como ${type}?`)) return;
-    
     setProcessingId(id);
     try {
       await (apiClient as any).POST(`/api/v1/transfers/${id}/resolve-${type}`);
       showToast("Novedad resuelta", "success");
       fetchTransfers();
-    } catch (err) {
+    } catch {
       showToast("Error al resolver la novedad", "error");
     } finally {
       setProcessingId(null);
@@ -222,7 +211,7 @@ function TransfersContent() {
           <div style={{ fontSize: "14px", color: "var(--neutral-100)", fontWeight: 600 }}>#{t.id}</div>
           <div style={{ fontSize: "12px", color: "var(--neutral-500)" }}>{new Date(t.requestDate || "").toLocaleDateString()}</div>
         </div>
-      )
+      ),
     },
     {
       header: "Ruta (Origen → Destino)",
@@ -239,7 +228,7 @@ function TransfersContent() {
             <span style={{ fontSize: "13px", color: "var(--neutral-100)", fontWeight: 600 }}>{branchesMap.get(t.destinationBranchId!) || t.destinationBranchId}</span>
           </div>
         </div>
-      )
+      ),
     },
     {
       header: "Estado",
@@ -250,7 +239,7 @@ function TransfersContent() {
         let variant: "neutral" | "success" | "warning" | "danger" | "info" = "neutral";
         let icon = <Clock size={12} />;
         let label = s;
-        
+
         switch (s) {
           case "PENDING": label = "Pendiente"; break;
           case "PREPARING": variant = "info"; icon = <Timer size={12} />; label = "Preparando"; break;
@@ -259,24 +248,23 @@ function TransfersContent() {
           case "WITH_ISSUE": variant = "danger"; icon = <AlertCircle size={12} />; label = "Con Novedad"; break;
           case "CANCELLED":
           case "REJECTED":
-            variant = "danger"; icon = <XCircle size={12} />; label = s === "CANCELLED" ? "Cancelado" : "Rechazado";
+            variant = "danger";
+            icon = <XCircle size={12} />;
+            label = s === "CANCELLED" ? "Cancelado" : "Rechazado";
             break;
         }
 
         return (
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             <Badge variant={variant} dot>
-              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                {icon}
-                {label}
-              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>{icon}{label}</div>
             </Badge>
             {(s === "CANCELLED" || s === "REJECTED") && (t as any).reasonResolution && (
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
                 <p style={{ fontSize: "10px", color: "var(--neutral-500)", fontStyle: "italic", lineHeight: "1.2", maxWidth: "110px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {(t as any).reasonResolution}
                 </p>
-                <button 
+                <button
                   onClick={(e) => { e.stopPropagation(); setViewingReason(t); }}
                   style={{ background: "transparent", border: "none", cursor: "pointer", padding: "4px", color: "var(--brand-400)" }}
                   title="Leer motivo detallado"
@@ -287,7 +275,7 @@ function TransfersContent() {
             )}
           </div>
         );
-      }
+      },
     },
     {
       header: "Prioridad",
@@ -297,19 +285,13 @@ function TransfersContent() {
         const p = t.priority || "NORMAL";
         let variant: "neutral" | "success" | "warning" | "danger" | "info" = "neutral";
         let label = "Normal";
-
         switch (p) {
           case "HIGH": variant = "danger"; label = "ALTA"; break;
           case "LOW": variant = "neutral"; label = "Baja"; break;
           default: variant = "info"; label = "Normal";
         }
-
-        return (
-          <Badge variant={variant}>
-            <span style={{ fontWeight: 700, fontSize: "10px" }}>{label}</span>
-          </Badge>
-        );
-      }
+        return <Badge variant={variant}><span style={{ fontWeight: 700, fontSize: "10px" }}>{label}</span></Badge>;
+      },
     },
     {
       header: "Items",
@@ -319,43 +301,34 @@ function TransfersContent() {
           <Package size={14} style={{ color: "var(--neutral-500)" }} />
           <span style={{ fontSize: "13px", color: "var(--neutral-400)" }}>{t.details?.length} productos</span>
         </div>
-      )
+      ),
     },
     {
       header: "SLA",
       key: "estimatedArrivalDate",
       width: "140px",
       render: (t) => {
-        if (t.status !== "DELIVERED" && t.status !== "IN_TRANSIT") {
+        if (t.status !== "DELIVERED" && t.status !== "IN_TRANSIT")
           return <span style={{ fontSize: "12px", color: "var(--neutral-600)" }}>—</span>;
-        }
+
         const estimated = t.estimatedArrivalDate ? new Date(t.estimatedArrivalDate) : null;
         const actual = t.actualArrivalDate ? new Date(t.actualArrivalDate) : null;
         const now = new Date();
-        
+
         if (t.status === "IN_TRANSIT" && estimated) {
-          const diffMs = estimated.getTime() - now.getTime();
-          const diffHrs = Math.round(diffMs / 3600000);
-          if (diffHrs < 0) {
-            return <Badge variant="danger">Retrasado {Math.abs(diffHrs)}h</Badge>;
-          }
+          const diffHrs = Math.round((estimated.getTime() - now.getTime()) / 3600000);
+          if (diffHrs < 0) return <Badge variant="danger">Retrasado {Math.abs(diffHrs)}h</Badge>;
           return <Badge variant="warning">Vence en {diffHrs}h</Badge>;
         }
         if (actual && estimated) {
-          const diffMs = actual.getTime() - estimated.getTime();
-          const diffHrs = Math.round(diffMs / 3600000);
-          if (diffHrs > 0) {
-            return (
-              <Badge variant="danger">
-                +{diffHrs > 24 ? `${(diffHrs/24).toFixed(1)}d` : `${diffHrs}h`} tarde
-              </Badge>
-            );
-          }
+          const diffHrs = Math.round((actual.getTime() - estimated.getTime()) / 3600000);
+          if (diffHrs > 0)
+            return <Badge variant="danger">+{diffHrs > 24 ? `${(diffHrs / 24).toFixed(1)}d` : `${diffHrs}h`} tarde</Badge>;
           return <Badge variant="success">A tiempo ✓</Badge>;
         }
         return <span style={{ fontSize: "12px", color: "var(--neutral-600)" }}>Sin fecha</span>;
-      }
-    }
+      },
+    },
   ];
 
   if (loading) return <Spinner fullPage />;
@@ -367,114 +340,78 @@ function TransfersContent() {
         description="Solicita y gestiona el movimiento de mercancía entre las sucursales de la red."
       />
 
-      <div style={{ 
-        display: "flex", 
-        flexDirection: "row", 
-        flexWrap: "wrap",
-        justifyContent: "space-between", 
-        alignItems: "flex-end", 
-        marginBottom: "32px", 
-        gap: "24px" 
-      }}>
-        <div style={{ display: "flex", gap: "16px", alignItems: "flex-end" }}></div>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          {/* OPERADOR_INVENTARIO should be able to create requests if the user needs to test the flow, 
-              but the guide says they only execute. However, to fix the user's blocker, 
-              we allow them if they have a branch. */}
-          {(!isInventory || isInventory) && (
-            <Button variant="primary" onClick={() => setIsNewModalOpen(true)}>
-              + Nueva Solicitud
-            </Button>
-          )}
-        </div>
+      {/* Toolbar */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "32px" }}>
+        <Button variant="primary" onClick={() => setIsNewModalOpen(true)}>
+          + Nueva Solicitud
+        </Button>
       </div>
 
+      {/* Tabs */}
       <div style={{ display: "flex", gap: "20px", marginBottom: "24px", borderBottom: "1px solid var(--border-default)" }}>
-        <button 
-          onClick={() => setActiveTab("all")}
-          style={{ 
-            padding: "12px 20px", 
-            background: "none", 
-            border: "none", 
-            color: activeTab === "all" ? "var(--brand-500)" : "var(--neutral-400)",
-            borderBottom: activeTab === "all" ? "2px solid var(--brand-500)" : "none",
-            fontWeight: 600,
-            cursor: "pointer"
-          }}
-        >
-          Panel General
-        </button>
-
-        {(isAdmin || isManager) && (
-          <button 
-            onClick={() => setActiveTab("monitor")}
-            style={{ 
-              padding: "12px 20px", 
-              background: "none", 
-              border: "none", 
-              color: activeTab === "monitor" ? "var(--brand-500)" : "var(--neutral-400)",
-              borderBottom: activeTab === "monitor" ? "2px solid var(--brand-500)" : "none",
-              fontWeight: 600,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px"
-            }}
-          >
-            Monitor Logístico
-          </button>
-        )}
-        {(isAdmin || isManager) && (
+        {(["all", ...(isAdmin || isManager ? ["monitor", "analytics"] : [])] as const).map((tab) => (
           <button
-            onClick={() => setActiveTab("analytics")}
+            key={tab}
+            onClick={() => setActiveTab(tab as any)}
             style={{
               padding: "12px 20px",
               background: "none",
               border: "none",
-              color: activeTab === "analytics" ? "var(--brand-500)" : "var(--neutral-400)",
-              borderBottom: activeTab === "analytics" ? "2px solid var(--brand-500)" : "none",
+              color: activeTab === tab ? "var(--brand-500)" : "var(--neutral-400)",
+              borderBottom: activeTab === tab ? "2px solid var(--brand-500)" : "2px solid transparent",
               fontWeight: 600,
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
-              gap: "8px"
+              gap: "8px",
+              transition: "color 0.15s",
             }}
           >
-            <BarChart2 size={15} />
-            Analítica Logística
+            {tab === "all" && "Panel General"}
+            {tab === "monitor" && "Monitor Logístico"}
+            {tab === "analytics" && <><BarChart2 size={15} /> Analítica Logística</>}
           </button>
-        )}
+        ))}
       </div>
 
-      {activeTab === "analytics" ? (
+      {/* ── Tab: Analítica ─────────────────────────────────────────────────── */}
+      {activeTab === "analytics" && (
         <TransferAnalyticsTab logisticsAnalytics={logisticsAnalytics} branchesMap={branchesMap} />
-      ) : activeTab === "monitor" ? (
+      )}
+
+      {/* ── Tab: Monitor ───────────────────────────────────────────────────── */}
+      {activeTab === "monitor" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          <div style={{ display: "flex", gap: "16px" }}>
-            <Card style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: "16px", marginBottom: "0px", minWidth: "220px" }}>
+          {/* KPI strip */}
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+            <Card style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: "16px", marginBottom: "0", minWidth: "220px" }}>
               <div style={{ padding: "10px", borderRadius: "10px", background: "var(--brand-900)", color: "var(--brand-400)" }}>
                 <Truck size={24} />
               </div>
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--neutral-500)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Traslados Activos</span>
-                <span style={{ fontSize: "24px", fontWeight: 700, color: "var(--brand-500)" }}>{transfers.filter(t => !["DELIVERED", "CANCELLED", "REJECTED"].includes(t.status || "")).length}</span>
+                <span style={{ fontSize: "24px", fontWeight: 700, color: "var(--brand-500)" }}>
+                  {transfers.filter((t) => !["DELIVERED", "CANCELLED", "REJECTED"].includes(t.status || "")).length}
+                </span>
               </div>
             </Card>
 
-            {transfers.filter(t => t.status === "WITH_ISSUE").length > 0 && (
-              <Card style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: "16px", marginBottom: "0px", minWidth: "220px", border: "1px solid rgba(217,99,79,0.3)" }}>
+            {transfers.filter((t) => t.status === "WITH_ISSUE").length > 0 && (
+              <Card style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: "16px", marginBottom: "0", minWidth: "220px", border: "1px solid rgba(217,99,79,0.3)" }}>
                 <div style={{ padding: "10px", borderRadius: "10px", background: "rgba(217,99,79,0.1)", color: "var(--brand-500)" }}>
                   <AlertCircle size={24} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--neutral-500)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Con Novedades</span>
-                  <span style={{ fontSize: "24px", fontWeight: 700, color: "var(--brand-500)" }}>{transfers.filter(t => t.status === "WITH_ISSUE").length}</span>
+                  <span style={{ fontSize: "24px", fontWeight: 700, color: "var(--brand-500)" }}>
+                    {transfers.filter((t) => t.status === "WITH_ISSUE").length}
+                  </span>
                 </div>
               </Card>
             )}
 
             {fulfillmentReport && (
-              <Card style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: "16px", marginBottom: "0px", minWidth: "220px", border: "1px solid rgba(46,204,113,0.3)" }}>
+              <Card style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: "16px", marginBottom: "0", minWidth: "220px", border: "1px solid rgba(46,204,113,0.3)" }}>
                 <div style={{ padding: "10px", borderRadius: "10px", background: "rgba(46,204,113,0.1)", color: "#2ecc71" }}>
                   <Timer size={24} />
                 </div>
@@ -486,16 +423,16 @@ function TransfersContent() {
                 </div>
               </Card>
             )}
-            
-            {fulfillmentReport && fulfillmentReport.delayedTransfers > 0 && (
-              <Card style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: "16px", marginBottom: "0px", minWidth: "220px" }}>
+
+            {fulfillmentReport?.delayedTransfers > 0 && (
+              <Card style={{ padding: "16px 24px", display: "flex", alignItems: "center", gap: "16px", marginBottom: "0", minWidth: "220px" }}>
                 <div style={{ padding: "10px", borderRadius: "10px", background: "rgba(243,156,18,0.1)", color: "#f39c12" }}>
                   <Clock size={24} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--neutral-500)", textTransform: "uppercase", letterSpacing: "0.5px" }}>Demora Promedio</span>
                   <span style={{ fontSize: "24px", fontWeight: 700, color: "#f39c12" }}>
-                    {fulfillmentReport.averageDelayHours > 24 
+                    {fulfillmentReport.averageDelayHours > 24
                       ? `${(fulfillmentReport.averageDelayHours / 24).toFixed(1)} días`
                       : `${fulfillmentReport.averageDelayHours?.toFixed(1) || 0} hrs`}
                   </span>
@@ -513,36 +450,40 @@ function TransfersContent() {
               emptyState={{
                 title: "Sin actividad logística",
                 description: "No hay traslados registrados en el sistema.",
-                icon: <ArrowRight size={40} />
+                icon: <ArrowRight size={40} />,
               }}
             />
           </Card>
         </div>
-      ) : (
+      )}
+
+      {/* ── Tab: Panel General ─────────────────────────────────────────────── */}
+      {activeTab === "all" && (
         <>
+          {/* Filtros */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "24px" }}>
             <Select
               label="Sede Origen"
               value={filterOrigin}
-              onChange={(val) => setFilterOrigin(val)}
+              onChange={handleFilterChange(setFilterOrigin)}
               options={[
                 { value: "all", label: "Todas las sedes" },
-                ...branchesList.map((b) => ({ value: b.id!.toString(), label: b.nombre! }))
+                ...branchesList.map((b) => ({ value: b.id!.toString(), label: b.nombre! })),
               ]}
             />
             <Select
               label="Sede Destino"
               value={filterDestination}
-              onChange={(val) => setFilterDestination(val)}
+              onChange={handleFilterChange(setFilterDestination)}
               options={[
                 { value: "all", label: "Todas las sedes" },
-                ...branchesList.map((b) => ({ value: b.id!.toString(), label: b.nombre! }))
+                ...branchesList.map((b) => ({ value: b.id!.toString(), label: b.nombre! })),
               ]}
             />
             <Select
               label="Estado"
               value={filterStatus}
-              onChange={(val) => setFilterStatus(val)}
+              onChange={handleFilterChange(setFilterStatus)}
               options={[
                 { value: "all", label: "Cualquier estado" },
                 { value: "PENDING", label: "Por Aprobar (Destino)" },
@@ -557,58 +498,160 @@ function TransfersContent() {
             />
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            {filteredTransfers.length === 0 ? (
-              <EmptyState
-                title="Sin resultados"
-                description="No se encontraron traslados con los filtros seleccionados."
-                icon={<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>}
-              />
-            ) : (
-              filteredTransfers.map((t) => (
-                <TransferCard 
-                  key={t.id}
-                  t={t}
-                  branchesMap={branchesMap}
-                  isAdmin={isAdmin}
-                  isManager={isManager}
-                  isInventory={isInventory}
-                  myBranchId={myBranchId}
-                  processingId={processingId}
-                  onApproveDest={handleApproveDest}
-                  onResolve={handleResolve}
-                  onResolvingSubmit={(t, mode) => setResolvingTransfer({ t, mode })}
-                  onPreparing={setPreparingTransfer}
-                  onDispatching={setDispatchingTransfer}
-                  onReceiving={setReceivingTransfer}
-                  onViewingReason={setViewingReason}
-                />
-              ))
-            )}
-        </div>
-      </>
-    )}
+          {filteredTransfers.length === 0 ? (
+            <EmptyState
+              title="Sin resultados"
+              description="No se encontraron traslados con los filtros seleccionados."
+              icon={<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" /></svg>}
+            />
+          ) : (
+            <>
+              {/* Contador */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <span style={{ fontSize: "13px", color: "var(--neutral-500)" }}>
+                  {filteredTransfers.length} traslado{filteredTransfers.length !== 1 ? "s" : ""} encontrado{filteredTransfers.length !== 1 ? "s" : ""}
+                </span>
+                {totalPages > 1 && (
+                  <span style={{ fontSize: "13px", color: "var(--neutral-500)" }}>
+                    Página {currentPage} de {totalPages}
+                  </span>
+                )}
+              </div>
 
-      {/* Modals */}
-      <NewTransferModal 
-        open={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} onSuccess={fetchTransfers}
-        currentBranchId={myBranchId} isAdmin={isAdmin} isManager={isManager} initialProductId={productIdPreselected}
+              {/* Cards */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                {paginatedTransfers.map((t) => (
+                  <TransferCard
+                    key={t.id}
+                    t={t}
+                    branchesMap={branchesMap}
+                    isAdmin={isAdmin}
+                    isManager={isManager}
+                    isInventory={isInventory}
+                    myBranchId={myBranchId}
+                    processingId={processingId}
+                    onApproveDest={handleApproveDest}
+                    onResolve={handleResolve}
+                    onResolvingSubmit={(t, mode) => setResolvingTransfer({ t, mode })}
+                    onPreparing={setPreparingTransfer}
+                    onDispatching={setDispatchingTransfer}
+                    onReceiving={setReceivingTransfer}
+                    onViewingReason={setViewingReason}
+                  />
+                ))}
+              </div>
+
+              {/* Paginación */}
+              {totalPages > 1 && (
+                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", marginTop: "32px" }}>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "10px",
+                      border: "1px solid var(--border-default)",
+                      background: "var(--bg-card)",
+                      color: currentPage === 1 ? "var(--neutral-600)" : "var(--neutral-200)",
+                      cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    ← Anterior
+                  </button>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((page) =>
+                      page === 1 ||
+                      page === totalPages ||
+                      Math.abs(page - currentPage) <= 1
+                    )
+                    .reduce<(number | "...")[]>((acc, page, idx, arr) => {
+                      if (idx > 0 && page - (arr[idx - 1] as number) > 1) acc.push("...");
+                      acc.push(page);
+                      return acc;
+                    }, [])
+                    .map((item, idx) =>
+                      item === "..." ? (
+                        <span key={`ellipsis-${idx}`} style={{ color: "var(--neutral-500)", padding: "0 4px" }}>…</span>
+                      ) : (
+                        <button
+                          key={item}
+                          onClick={() => setCurrentPage(item as number)}
+                          style={{
+                            width: "36px",
+                            height: "36px",
+                            borderRadius: "10px",
+                            border: currentPage === item ? "none" : "1px solid var(--border-default)",
+                            background: currentPage === item ? "var(--brand-500)" : "var(--bg-card)",
+                            color: currentPage === item ? "#f2f0e3" : "var(--neutral-300)",
+                            cursor: "pointer",
+                            fontSize: "13px",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {item}
+                        </button>
+                      )
+                    )}
+
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "10px",
+                      border: "1px solid var(--border-default)",
+                      background: "var(--bg-card)",
+                      color: currentPage === totalPages ? "var(--neutral-600)" : "var(--neutral-200)",
+                      cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Siguiente →
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {/* ── Modals ─────────────────────────────────────────────────────────── */}
+      <NewTransferModal
+        open={isNewModalOpen}
+        onClose={() => setIsNewModalOpen(false)}
+        onSuccess={fetchTransfers}
+        currentBranchId={myBranchId}
+        isAdmin={isAdmin}
+        isManager={isManager}
+        initialProductId={productIdPreselected}
+        initialType={typePreselected}
         branches={branchesList}
       />
       <ReceiveTransferModal
-        open={!!receivingTransfer} onClose={() => setReceivingTransfer(null)} onSuccess={fetchTransfers}
+        open={!!receivingTransfer}
+        onClose={() => setReceivingTransfer(null)}
+        onSuccess={fetchTransfers}
         transfer={receivingTransfer}
       />
       <DispatchTransferModal
-        open={!!dispatchingTransfer} onClose={() => setDispatchingTransfer(null)} onSuccess={fetchTransfers}
+        open={!!dispatchingTransfer}
+        onClose={() => setDispatchingTransfer(null)}
+        onSuccess={fetchTransfers}
         transfer={dispatchingTransfer}
       />
       <PrepareTransferModal
-        open={!!preparingTransfer} onClose={() => setPreparingTransfer(null)} onSuccess={fetchTransfers}
+        open={!!preparingTransfer}
+        onClose={() => setPreparingTransfer(null)}
+        onSuccess={fetchTransfers}
         transfer={preparingTransfer}
       />
       <ResolutionModal
-        open={!!resolvingTransfer} onClose={() => setResolvingTransfer(null)}
+        open={!!resolvingTransfer}
+        onClose={() => setResolvingTransfer(null)}
         title={resolvingTransfer?.mode === "cancel" ? "Cancelar Traslado" : "Rechazar Traslado"}
         confirmLabel={resolvingTransfer?.mode === "cancel" ? "Confirmar Cancelación" : "Confirmar Rechazo"}
         onConfirm={async (reason) => {
@@ -618,13 +661,14 @@ function TransfersContent() {
         }}
       />
       <Modal
-        open={!!viewingReason} onClose={() => setViewingReason(null)}
+        open={!!viewingReason}
+        onClose={() => setViewingReason(null)}
         title={viewingReason?.status === "CANCELLED" ? "Motivo de Cancelación" : "Motivo de Rechazo"}
       >
         <div style={{ padding: "8px 0" }}>
           <div style={{ background: "rgba(var(--brand-500-rgb), 0.05)", padding: "20px", borderRadius: "12px", border: "1px solid var(--border-default)", marginBottom: "20px" }}>
             <p style={{ fontSize: "15px", lineHeight: "1.6", color: "var(--neutral-200)", fontStyle: "italic" }}>
-              "{ (viewingReason as any)?.reasonResolution }"
+              "{(viewingReason as any)?.reasonResolution}"
             </p>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

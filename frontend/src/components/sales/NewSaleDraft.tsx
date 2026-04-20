@@ -9,7 +9,7 @@ import Badge from "@/components/ui/Badge";
 import { 
   Package, Search, Plus, ShoppingCart, 
   Trash2, DollarSign, Tag, ArrowRight,
-  User, CheckCircle
+  User, CheckCircle, Store
 } from "lucide-react";
 
 const formatCurrency = (amount: number) => {
@@ -165,13 +165,18 @@ interface NewSaleDraftProps {
   handleCheckout: () => void;
   priceLists: any[];
   listPrices: any;
+  branches: any[];
+  selectedBranchId: number | null;
+  setSelectedBranchId: (id: number | null) => void;
+  isAdmin: boolean;
 }
 
 export default function NewSaleDraft({
   filteredProducts, searchTerm, setSearchTerm, cartActions, cart, 
   customerName, setCustomerName, customerDocument, setCustomerDocument,
   selectedPriceList, setSelectedPriceList, globalDiscount, setGlobalDiscount,
-  financials, isSubmitting, handleCheckout, priceLists, listPrices
+  financials, isSubmitting, handleCheckout, priceLists, listPrices,
+  branches, selectedBranchId, setSelectedBranchId, isAdmin
 }: NewSaleDraftProps) {
   return (
     <main className="flex gap-8 flex-col lg:flex-row h-[82vh] animate-in fade-in zoom-in-95 duration-300 mt-8">
@@ -180,23 +185,48 @@ export default function NewSaleDraft({
         
         {/* Selection Strategy Header */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-6 border-b border-[var(--neutral-800)]">
-          <Select 
-            label="Lista de Precios Base" 
-            value={selectedPriceList?.toString() || ""} 
-            onChange={(val) => setSelectedPriceList(val ? Number(val) : null)} 
-            options={[
-              { value: "", label: "Precio General (Básico)" },
-              ...priceLists.map(l => ({ value: String(l.id), label: `Tarifa: ${l.nombre}` }))
-            ]} 
-            icon={<DollarSign size={14} className="text-[var(--brand-500)]" />}
-          />
+          <div className="flex flex-col gap-1.5">
+             {isAdmin ? (
+               <Select 
+                 label="Sucursal de Venta"
+                 value={selectedBranchId?.toString() || ""}
+                 onChange={(val) => setSelectedBranchId(val ? Number(val) : null)}
+                 options={branches.map(b => ({ value: String(b.id), label: b.nombre || "" }))}
+                 icon={<Store size={14} className="text-[var(--brand-500)]" />}
+               />
+             ) : (
+               <Select 
+                 label="Lista de Precios Base" 
+                 value={selectedPriceList?.toString() || ""} 
+                 onChange={(val) => setSelectedPriceList(val ? Number(val) : null)} 
+                 options={[
+                   { value: "", label: "Precio General (Básico)" },
+                   ...priceLists.map(l => ({ value: String(l.id), label: `Tarifa: ${l.nombre}` }))
+                 ]} 
+                 icon={<DollarSign size={14} className="text-[var(--brand-500)]" />}
+               />
+             )}
+          </div>
           <div className="flex items-center gap-3 bg-[var(--bg-card)] px-4 rounded-xl border border-[var(--neutral-800)]">
              <div className="w-10 h-10 bg-[var(--brand-500)]/10 rounded-full flex items-center justify-center text-[var(--brand-400)] border border-[var(--brand-500)]/20 shadow-inner">
                 <ShoppingCart size={18} />
              </div>
              <div>
-                <span className="text-[9px] font-black text-[var(--neutral-500)] uppercase tracking-[0.2em] block">Sede de Venta Activa</span>
-                <span className="text-[12px] font-black text-[var(--neutral-100)] uppercase tracking-tight">Caja Principal / POS #1</span>
+                <span className="text-[9px] font-black text-[var(--neutral-500)] uppercase tracking-[0.2em] block">Configuración de Venta</span>
+                {isAdmin ? (
+                  <div className="w-[180px] mt-1">
+                    <Select 
+                      value={selectedPriceList?.toString() || ""} 
+                      onChange={(val) => setSelectedPriceList(val ? Number(val) : null)} 
+                      options={[
+                        { value: "", label: "General" },
+                        ...priceLists.map(l => ({ value: String(l.id), label: l.nombre }))
+                      ]} 
+                    />
+                  </div>
+                ) : (
+                  <span className="text-[12px] font-black text-[var(--neutral-100)] uppercase tracking-tight">Caja Principal / POS #1</span>
+                )}
              </div>
           </div>
         </div>

@@ -59,6 +59,13 @@ public class ReturnRequestPersistenceAdapter implements ReturnRequestRepositoryP
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public List<ReturnRequest> findAll() {
+        return repository.findAll().stream()
+                .map(this::toDomain)
+                .collect(Collectors.toList());
+    }
+
     private ReturnRequestEntity toEntity(ReturnRequest domain) {
         ReturnRequestEntity entity = ReturnRequestEntity.builder()
                 .id(domain.getId())

@@ -57,9 +57,25 @@ export default function LoginPage() {
               lineHeight: 1.05,
               letterSpacing: "-0.04em",
               color: "var(--neutral-50)",
+              display: "flex",
+              gap: "0.15em",
+              flexWrap: "wrap",
+              justifyContent: "center"
             }}
           >
-            Zen Inventory
+            {"Zen Inventory".split("").map((char, i) => (
+              <span
+                key={i}
+                style={{
+                  display: "inline-block",
+                  whiteSpace: char === " " ? "pre" : "normal",
+                  animation: `letterReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) both`,
+                  animationDelay: `${0.2 + i * 0.04}s`,
+                }}
+              >
+                {char}
+              </span>
+            ))}
           </h1>
           
           <div style={{ display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" }}>
@@ -165,10 +181,12 @@ export default function LoginPage() {
           {/* Demo accounts */}
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
             {[
-              { role: "Admin",    email: "admin@zeninventory.co",    pw: "admin123",    dot: "var(--brand-500)" },
-              { role: "Gerente",  email: "gerente@zeninventory.co",  pw: "gerente123",  dot: "var(--neutral-400)" },
-              { role: "Operador", email: "operador@zeninventory.co", pw: "operador123", dot: "var(--neutral-500)" },
-              { role: "Operador", email: "inventario@zeninventory.co", pw: "operador123", dot: "var(--neutral-500)" },
+              { role: "Admin",    email: "admin@zeninventory.co",    pw: "123456",    dot: "var(--brand-500)" },
+              { role: "Gerentenorte",  email: "gerenten@zeninventory.co",  pw: "123456",  dot: "var(--color-warning)" },
+              { role: "Gerentesur", email: "gerentes@gmail.com", pw: "123456", dot: "var(--color-warning)" },
+              { role: "Operador norte", email: "operadonc@zeninventory.co", pw: "123456", dot: "var(--color-success)" },
+              { role: "Operador sur", email: "operadors@zeninventory.co", pw: "123456", dot: "var(--color-success)" },
+
             ].map(({ role, email, pw, dot }) => (
               <div
                 key={role}
@@ -194,6 +212,18 @@ export default function LoginPage() {
       </div>
 
       <style>{`
+        @keyframes letterReveal {
+          from {
+            opacity: 0;
+            transform: translateY(12px) scale(0.9);
+            filter: blur(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter: blur(0);
+          }
+        }
         @media (max-width: 768px) {
           .hidden-mobile { display: none !important; }
           .show-mobile   { display: flex !important; }

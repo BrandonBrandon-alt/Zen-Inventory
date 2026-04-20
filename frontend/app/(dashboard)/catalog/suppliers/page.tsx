@@ -223,8 +223,8 @@ export default function MasterSuppliersPage() {
                 />
               </div>
               <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-                <button type="button" onClick={() => setShowModal(false)} style={{ background: "none", border: "1px solid var(--border-default)", color: "white", padding: "10px 20px", borderRadius: "8px", cursor: "pointer" }}>Cancelar</button>
-                <button type="submit" style={{ background: "var(--brand-500)", border: "none", color: "white", padding: "10px 20px", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>Guardar</button>
+                <button type="button" onClick={() => setShowModal(false)} style={{ background: "none", border: "1px solid var(--border-default)", color: "#f2f0e3", padding: "10px 20px", borderRadius: "8px", cursor: "pointer" }}>Cancelar</button>
+                <button type="submit" style={{ background: "var(--brand-500)", border: "none", color: "#f2f0e3", padding: "10px 20px", borderRadius: "8px", fontWeight: 600, cursor: "pointer" }}>Guardar</button>
               </div>
             </form>
           </div>
@@ -237,7 +237,7 @@ export default function MasterSuppliersPage() {
           <div style={{ background: "var(--bg-card)", padding: "32px", borderRadius: "16px", width: "100%", maxWidth: "600px", border: "1px solid var(--border-default)", display: "flex", flexDirection: "column", maxHeight: "80vh" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px" }}>
                <div>
-                  <h2 style={{ color: "white", fontSize: "20px", fontWeight: "bold", margin: 0 }}>Catálogo Asociado</h2>
+                  <h2 style={{ color: "#f2f0e3", fontSize: "20px", fontWeight: "bold", margin: 0 }}>Catálogo Asociado</h2>
                   <p style={{ color: "var(--brand-400)", fontSize: "14px", fontWeight: "bold", marginTop: "4px" }}>{viewCatalogSupplier.nombre}</p>
                </div>
                <button onClick={() => setViewCatalogSupplier(null)} style={{ background: "none", border: "none", color: "var(--neutral-400)", cursor: "pointer", fontSize: "18px" }}><X size={18} /></button>

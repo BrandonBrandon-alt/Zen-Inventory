@@ -33,6 +33,7 @@ export default function ReturnsPage() {
   const isApprover = isAdmin || isManager;
   
   const [requests, setRequests] = useState<any[]>([]);
+  const [branchesMap, setBranchesMap] = useState<Map<number, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   
@@ -42,15 +43,30 @@ export default function ReturnsPage() {
   const [processing, setProcessing] = useState(false);
 
   const fetchRequests = async () => {
-    if (!session?.sucursalId) return;
     setLoading(true);
     try {
-      const data: any = await apiClient.GET(`/api/v1/returns/branch/{branchId}` as any, {
+      if (isAdmin) {
+        // ADMIN fetches all returns and also branches for mapping
+        const [returnsRes, branchesRes]: any = await Promise.all([
+          apiClient.GET("/api/v1/returns" as any, {}),
+          apiClient.GET("/api/branches")
+        ]);
+        
+        setRequests(returnsRes.data || []);
+        if (branchesRes.data) {
+          const bMap = new Map<number, string>(branchesRes.data.map((b: any) => [b.id as number, b.nombre as string]));
+          setBranchesMap(bMap);
+        }
+      } else {
+        // Others only fetch their branch
+        if (!session?.sucursalId) return;
+        const data: any = await apiClient.GET(`/api/v1/returns/branch/{branchId}` as any, {
           params: {
               path: { branchId: session.sucursalId }
           }
-      });
-      setRequests(data.data || []);
+        });
+        setRequests(data.data || []);
+      }
     } catch (err) {
       showToast("Error al cargar las solicitudes de devolución.", "error");
     } finally {
@@ -145,6 +161,15 @@ export default function ReturnsPage() {
         </div>
       )
     },
+    ...(isAdmin ? [{
+      header: "Sede",
+      key: "sucursalId",
+      render: (r: any) => (
+        <Badge variant="neutral">
+          {branchesMap.get(Number(r.sucursalId)) || `ID: ${r.sucursalId}`}
+        </Badge>
+      )
+    }] : []),
     {
       header: "Estado",
       key: "estado",
@@ -191,7 +216,9 @@ export default function ReturnsPage() {
             <div className="flex items-center gap-4">
               <div className="px-4 py-2 bg-[var(--bg-card)] rounded-xl border border-[var(--border-default)] flex items-center gap-3">
                  <Info size={14} className="text-[var(--brand-400)]" />
-                 <span className="text-[11px] font-bold text-[var(--neutral-400)] uppercase tracking-wider">Sucursal: {session?.sucursalId || '—'}</span>
+                 <span className="text-[11px] font-bold text-[var(--neutral-400)] uppercase tracking-wider">
+                   Sucursal: {isAdmin ? 'Todas' : (session?.sucursalId || '—')}
+                 </span>
               </div>
               
               {!isApprover && (

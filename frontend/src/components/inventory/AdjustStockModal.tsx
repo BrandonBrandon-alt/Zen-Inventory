@@ -147,8 +147,7 @@ export default function AdjustStockModal({
             { value: "AJUSTE_NEGATIVO", label: "Ajuste de Auditoría (-)" },
             { value: "TRASLADO", label: "Traslado Enviado" }
           ]).filter(opt => {
-            if (isInventoryRole && opt.value === "DEVOLUCION") return false;
-            if (isInventoryRole && opt.value === "VENTA") return false;
+            // Se habilitan todas las opciones para todos los roles autorizados
             return true;
           })}
         />
@@ -251,6 +250,9 @@ export default function AdjustStockModal({
                         params.set("preselectedProduct", product.id.toString());
                       } else {
                         if (product?.id) params.set("productId", product.id.toString());
+                        if (adjustData.reason === "TRASLADO") {
+                          params.set("type", adjustData.type === "INGRESO" ? "INBOUND" : "OUTBOUND");
+                        }
                       }
                       
                       const query = params.toString();

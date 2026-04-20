@@ -21,14 +21,15 @@ interface NewTransferModalProps {
   isAdmin: boolean;
   isManager: boolean;
   initialProductId?: string | null;
+  initialType?: "INBOUND" | "OUTBOUND" | null;
   branches: BranchResponse[];
 }
 
-export default function NewTransferModal({ open, onClose, onSuccess, currentBranchId, isAdmin, isManager, initialProductId, branches }: NewTransferModalProps) {
+export default function NewTransferModal({ open, onClose, onSuccess, currentBranchId, isAdmin, isManager, initialProductId, initialType, branches }: NewTransferModalProps) {
   const { showToast } = useToast();
   const [products, setProducts] = useState<ProductResponse[]>([]);
   const [loading, setLoading] = useState(false);
-  const [transferType, setTransferType] = useState<"INBOUND" | "OUTBOUND">("INBOUND");
+  const [transferType, setTransferType] = useState<"INBOUND" | "OUTBOUND">(initialType ?? "INBOUND");
 
   const [formData, setFormData] = useState({
     originBranchId: "",
@@ -75,7 +76,10 @@ export default function NewTransferModal({ open, onClose, onSuccess, currentBran
     if (open && initialProductId) {
       setFormData(prev => ({ ...prev, productId: initialProductId }));
     }
-  }, [open, initialProductId]);
+    if (open && initialType) {
+      setTransferType(initialType);
+    }
+  }, [open, initialProductId, initialType]);
 
   useEffect(() => {
     if (formData.originBranchId && formData.productId) {

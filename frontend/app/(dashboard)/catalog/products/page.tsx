@@ -551,12 +551,23 @@ export default function MasterProductsPage() {
             />
           </div>
 
-          <Select
-            label="Unidad de Medida"
-            value={formData.unitId.toString()}
-            onChange={(val) => setFormData({ ...formData, unitId: Number(val) })}
-            options={units.map(u => ({ value: u.id!.toString(), label: `${u.nombre} (${u.abreviatura})` }))}
-          />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+            <Select
+              label="Unidad de Medida"
+              value={formData.unitId.toString()}
+              onChange={(val) => setFormData({ ...formData, unitId: Number(val) })}
+              options={units.map(u => ({ value: u.id!.toString(), label: `${u.nombre} (${u.abreviatura})` }))}
+            />
+            <Select
+              label="Estado del Catálogo"
+              value={formData.activo ? "true" : "false"}
+              onChange={(val) => setFormData({ ...formData, activo: val === "true" })}
+              options={[
+                { value: "true", label: "Activo" },
+                { value: "false", label: "Inactivo (Descatalogado)" }
+              ]}
+            />
+          </div>
 
           {/* ── Gestión de Proveedores (Tabla) ─────────────────────────── */}
           <div style={{ 

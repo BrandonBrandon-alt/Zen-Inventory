@@ -53,6 +53,8 @@ function POSContent() {
   const { print, isPrinting } = usePrint();
   const [session, setSession] = useState<AuthSession | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [globalDiscount, setGlobalDiscount] = useState<number | "">("");
@@ -91,25 +93,29 @@ function POSContent() {
       return;
     }
     setSession(sess);
+    if (sess.sucursalId) {
+      setSelectedBranchId(sess.sucursalId);
+    }
 
-    const fetchData = async () => {
+    const initData = async () => {
       try {
-        const [inventoryRes, priceListsRes] = await Promise.all([
-          sess.sucursalId ? apiClient.GET("/api/v1/inventory/branches/{branchId}", {
-            params: { path: { branchId: sess.sucursalId } }
-          }) : Promise.resolve({ data: null }),
+        const [branchesRes, priceListsRes] = await Promise.all([
+          apiClient.GET("/api/branches"),
           apiClient.GET("/api/v1/price-lists" as any, {}).catch(() => (null))
         ]);
 
-        if (inventoryRes.data) {
-          setInventory(inventoryRes.data as any[]);
+        if (branchesRes.data) {
+          setBranches(branchesRes.data);
+          // Si es Admin y no tiene sucursal, seleccionar la primera por defecto
+          if (sess.rol === "ADMIN" && !sess.sucursalId && branchesRes.data.length > 0) {
+            setSelectedBranchId(branchesRes.data[0].id!);
+          }
         }
         
         if (priceListsRes && priceListsRes.data) {
           const listData = priceListsRes.data as any[];
           setPriceLists(listData);
           
-          // Precarga masiva de precios para todas las listas para permitir cambio instantáneo
           const priceMaps: Record<number, Record<number, number>> = {};
           await Promise.all(listData.map(async (list: any) => {
             const res = await apiClient.GET("/api/v1/price-lists/{id}/prices" as any, {
@@ -127,15 +133,35 @@ function POSContent() {
           setListPrices(priceMaps);
         }
       } catch (error) {
-        console.error("Error fetching data:", error);
-        showToast("Error al cargar datos del POS.", "error");
+        console.error("Error initializing POS:", error);
+        showToast("Error al inicializar datos del POS.", "error");
+      }
+    };
+
+    initData();
+  }, [router, showToast]);
+
+  useEffect(() => {
+    if (!selectedBranchId) return;
+
+    const fetchInventory = async () => {
+      setLoading(true);
+      try {
+        const res = await apiClient.GET("/api/v1/inventory/branches/{branchId}", {
+          params: { path: { branchId: selectedBranchId } }
+        });
+        if (res.data) {
+          setInventory(res.data as any[]);
+        }
+      } catch (error) {
+        showToast("Error al cargar inventario de la sucursal.", "error");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
-  }, [router, showToast]);
+    fetchInventory();
+  }, [selectedBranchId, showToast]);
 
   // Ya no necesitamos los efectos de actualización global de precios del carrito
   // ya que ahora la selección es individual y por "override".
@@ -290,7 +316,7 @@ function POSContent() {
 
     try {
       const payload = {
-        branchId: session?.sucursalId,
+        branchId: selectedBranchId,
         userId: session?.id,
         customerName: customerName.trim() || null,
         customerDocument: customerDocument.trim() || null,
@@ -416,6 +442,10 @@ function POSContent() {
         handleCheckout={handleCheckout}
         priceLists={priceLists}
         listPrices={listPrices}
+        branches={branches}
+        selectedBranchId={selectedBranchId}
+        setSelectedBranchId={setSelectedBranchId}
+        isAdmin={session?.rol === "ADMIN"}
       />
 
       {/* Modal de Éxito con Recibo */}

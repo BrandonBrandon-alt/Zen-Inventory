@@ -19,7 +19,6 @@ import SalesTrendChart from "@/components/dashboard/SalesTrendChart";
 import AlertsList from "@/components/dashboard/AlertsList";
 import ActiveTransfersList from "@/components/dashboard/ActiveTransfersList";
 
-// New Advanced Components
 import MonthlyComparisonChart from "@/components/dashboard/MonthlyComparisonChart";
 import InventoryInsightTable from "@/components/dashboard/InventoryInsightTable";
 import ReplenishmentGrid from "@/components/dashboard/ReplenishmentGrid";
@@ -27,7 +26,6 @@ import TransfersImpactDisplay from "@/components/dashboard/TransfersImpactDispla
 
 import { 
   LineChart as LineChartIcon, 
-  LayoutGrid, 
   Zap, 
   BarChart3, 
   PackageSearch,
@@ -83,9 +81,7 @@ export default function DashboardPage() {
   const isInventory = session?.rol === "OPERADOR_INVENTARIO";
 
   useEffect(() => {
-    if (isSeller) {
-      router.push("/sales/pos");
-    }
+    if (isSeller) router.push("/sales/pos");
   }, [isSeller, router]);
 
   useEffect(() => {
@@ -96,8 +92,8 @@ export default function DashboardPage() {
 
     async function fetchData() {
       try {
-        let startDate: string | undefined = undefined;
-        let endDate: string | undefined = undefined;
+        let startDate: string | undefined;
+        let endDate: string | undefined;
         const now = new Date();
 
         if (timeRange === "today") {
@@ -105,39 +101,38 @@ export default function DashboardPage() {
           startDate = today.toISOString();
           endDate = new Date(today.getTime() + 86400000 - 1).toISOString();
         } else if (timeRange === "7d") {
-          const past = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-          startDate = past.toISOString();
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).toISOString();
         } else if (timeRange === "month") {
-          const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-          startDate = startMonth.toISOString();
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
         }
 
         const cleanQuery = { startDate, endDate };
 
-        const basePromises = [
-          apiClient.GET("/api/v1/analytics/top-products", { params: { query: { limit: 5, ...cleanQuery } } } as any),
-          apiClient.GET("/api/branches"),
-          apiClient.GET("/api/v1/analytics/global-summary", { params: { query: { ...cleanQuery } } } as any),
-          apiClient.GET("/api/v1/analytics/sales-trend", { params: { query: cleanQuery } } as any),
-          isAdmin ? apiClient.GET("/api/v1/analytics/branch-performance", { params: { query: { ...cleanQuery } } } as any) : Promise.resolve({ data: [] }),
-          apiClient.GET("/api/v1/transfers"),
-          apiClient.GET("/api/v1/analytics/monthly-sales" as any, {}),
-          apiClient.GET("/api/v1/analytics/inventory-rotation" as any, {}),
-          apiClient.GET("/api/v1/analytics/replenishment-insights" as any, {}),
-          apiClient.GET("/api/v1/analytics/transfers-impact" as any, {}),
-          apiClient.GET("/api/v1/alerts", { params: { query: isManager ? { branchId: session?.sucursalId } : {} } } as any)
-        ];
-
-        const [top, bra, glo, trend, perf, tra, monthly, rotation, repl, impact, alertRes] = await Promise.all(basePromises);
+        const [top, bra, glo, trend, perf, tra, monthly, rotation, repl, impact, alertRes] =
+          await Promise.all([
+            apiClient.GET("/api/v1/analytics/top-products", { params: { query: { limit: 5, ...cleanQuery } } } as any),
+            apiClient.GET("/api/branches"),
+            apiClient.GET("/api/v1/analytics/global-summary", { params: { query: { ...cleanQuery } } } as any),
+            apiClient.GET("/api/v1/analytics/sales-trend", { params: { query: cleanQuery } } as any),
+            isAdmin
+              ? apiClient.GET("/api/v1/analytics/branch-performance", { params: { query: { ...cleanQuery } } } as any)
+              : Promise.resolve({ data: [] }),
+            apiClient.GET("/api/v1/transfers"),
+            apiClient.GET("/api/v1/analytics/monthly-sales" as any, {}),
+            apiClient.GET("/api/v1/analytics/inventory-rotation" as any, {}),
+            apiClient.GET("/api/v1/analytics/replenishment-insights" as any, {}),
+            apiClient.GET("/api/v1/analytics/transfers-impact" as any, {}),
+            apiClient.GET("/api/v1/alerts", { params: { query: isManager ? { branchId: session?.sucursalId } : {} } } as any),
+          ]);
 
         const transfersData = (tra?.data ?? []) as any[];
-        let filteredTransfers = transfersData;
-        if (isManager && session?.sucursalId) {
-          const myBranchId = Number(session.sucursalId);
-          filteredTransfers = transfersData.filter((t: any) =>
-            Number(t.originBranchId) === myBranchId || Number(t.destinationBranchId) === myBranchId
-          );
-        }
+        const filteredTransfers =
+          isManager && session?.sucursalId
+            ? transfersData.filter((t: any) =>
+                Number(t.originBranchId) === Number(session.sucursalId) ||
+                Number(t.destinationBranchId) === Number(session.sucursalId)
+              )
+            : transfersData;
 
         setDashboardData({
           topProducts: top?.data ?? [],
@@ -152,7 +147,6 @@ export default function DashboardPage() {
           transferImpact: impact?.data ?? null,
           alerts: (alertRes?.data ?? []).filter((a: any) => !a.resolved),
         });
-
       } catch (e) {
         console.error("Dashboard fetch error:", e);
       } finally {
@@ -165,10 +159,8 @@ export default function DashboardPage() {
 
   const branchMap = useMemo(() => {
     const map = new Map<number, string>();
-    (dashboardData.branches || []).forEach(b => {
-      if (b.id !== undefined && b.nombre !== undefined) {
-        map.set(b.id, b.nombre);
-      }
+    (dashboardData.branches || []).forEach((b) => {
+      if (b.id !== undefined && b.nombre !== undefined) map.set(b.id, b.nombre);
     });
     return map;
   }, [dashboardData.branches]);
@@ -177,13 +169,13 @@ export default function DashboardPage() {
 
   const rangeButtons = (
     <div className="flex items-center gap-4 bg-[var(--bg-card)] p-1.5 rounded-2xl border border-[var(--border-subtle)] shadow-sm">
-      {["today", "7d", "month", "all"].map((range) => (
+      {(["today", "7d", "month", "all"] as const).map((range) => (
         <button
           key={range}
-          onClick={() => setTimeRange(range as any)}
+          onClick={() => setTimeRange(range)}
           className={`px-4 py-2 rounded-xl text-[11px] font-black uppercase transition-all ${
-            timeRange === range 
-              ? "bg-[var(--brand-500)] text-white shadow-lg" 
+            timeRange === range
+              ? "bg-[var(--brand-500)] text-white shadow-lg"
               : "text-[var(--neutral-400)] hover:text-[var(--neutral-200)]"
           }`}
         >
@@ -193,15 +185,15 @@ export default function DashboardPage() {
     </div>
   );
 
-  return (
-    <div style={{ padding: "var(--page-padding)", maxWidth: "1600px", margin: "0 auto" }} className="space-y-12">
-      <PageHeader 
-        title={isAdmin ? "Panel central" : "Dashboard de Gestión"} 
-        description={isAdmin ? `Bienvenido, ${session?.nombre}. Resumen consolidado.` : `Hola ${session?.nombre}. Estado operativo.`} 
-        actions={rangeButtons}
-      />
-
-      {isInventory ? (
+  // ─── Vista OPERADOR_INVENTARIO ────────────────────────────────────────────
+  if (isInventory) {
+    return (
+      <div style={{ padding: "var(--page-padding)", maxWidth: "1600px", margin: "0 auto" }} className="space-y-12">
+        <PageHeader
+          title="Panel de Inventario"
+          description={`Hola ${session?.nombre}. Estado operativo de tu sede.`}
+          actions={rangeButtons}
+        />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-8 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -216,7 +208,9 @@ export default function DashboardPage() {
                   <h3 className="text-[18px] font-black text-[var(--neutral-50)] mb-1 uppercase tracking-tight">En Ruta</h3>
                   <div className="flex items-baseline gap-2">
                     <span className="text-[52px] font-black text-[var(--brand-500)] leading-none">
-                      {dashboardData.transfers.filter(t => Number(t.destinationBranchId) === Number(session?.sucursalId) && t.status === "IN_TRANSIT").length}
+                      {dashboardData.transfers.filter(
+                        (t) => Number(t.destinationBranchId) === Number(session?.sucursalId) && t.status === "IN_TRANSIT"
+                      ).length}
                     </span>
                     <span className="text-[12px] font-bold text-[var(--neutral-500)] uppercase">Traslados</span>
                   </div>
@@ -233,7 +227,11 @@ export default function DashboardPage() {
                   <h3 className="text-[18px] font-black text-[var(--neutral-50)] mb-1 uppercase tracking-tight">Pendientes</h3>
                   <div className="flex items-baseline gap-2">
                     <span className="text-[52px] font-black text-[var(--color-warning)] leading-none">
-                      {dashboardData.transfers.filter(t => Number(t.originBranchId) === Number(session?.sucursalId) && (t.status === "PREPARING" || t.status === "AUTHORIZED")).length}
+                      {dashboardData.transfers.filter(
+                        (t) =>
+                          Number(t.originBranchId) === Number(session?.sucursalId) &&
+                          (t.status === "PREPARING" || t.status === "AUTHORIZED")
+                      ).length}
                     </span>
                     <span className="text-[12px] font-bold text-[var(--neutral-500)] uppercase">Traslados</span>
                   </div>
@@ -251,10 +249,31 @@ export default function DashboardPage() {
             </Card>
           </div>
         </div>
-      ) : (
-        <div className="space-y-12 pb-12">
-          {/* Layer 1: Executive Pulse (KPIs) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+      </div>
+    );
+  }
+
+  // ─── Vista ADMIN / MANAGER ────────────────────────────────────────────────
+  return (
+    <div style={{ padding: "var(--page-padding)", maxWidth: "1600px", margin: "0 auto" }} className="space-y-12">
+      <PageHeader
+        title={isAdmin ? "Executive Intelligence" : "Dashboard de Gestión"}
+        description={
+          isAdmin
+            ? `Bienvenido, ${session?.nombre}. Resumen consolidado.`
+            : `Hola ${session?.nombre}. Estado operativo.`
+        }
+        actions={rangeButtons}
+      />
+
+      <div className="space-y-12 pb-12">
+
+        {/* ── Zona 1: Pulso ejecutivo (KPIs) ─────────────────────────────── */}
+        <section>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--neutral-500)] mb-4">
+            Pulso ejecutivo
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <KpiCard
               label="Ventas Netas"
               value={formatCOP(dashboardData.global?.totalRevenue ?? 0)}
@@ -288,9 +307,14 @@ export default function DashboardPage() {
               icon={<Zap size={22} strokeWidth={2.5} />}
             />
           </div>
+        </section>
 
-          {/* Layer 2: Commercial Intelligence (2/3 + 1/3) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* ── Zona 2: Inteligencia comercial (8/12 + 4/12) ───────────────── */}
+        <section>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--neutral-500)] mb-4">
+            Inteligencia comercial
+          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <div className="lg:col-span-8">
               <Card title="Tendencia de Ingresos" headerRight={<LineChartIcon size={18} className="text-[var(--neutral-500)]" />}>
                 <div className="h-[360px] w-full pt-4">
@@ -306,31 +330,43 @@ export default function DashboardPage() {
               </Card>
             </div>
           </div>
+        </section>
 
-          {/* Layer 3: Inventory & Logistics Deep Dive (3/5 + 2/5 approx 7/12) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* ── Zona 3: Inventario y logística (7/12 + 5/12) ───────────────── */}
+        <section>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--neutral-500)] mb-4">
+            Inventario y logística
+          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <div className="lg:col-span-7">
               <Card title="Análisis de Eficiencia y Rotación" headerRight={<PackageSearch size={18} className="text-[var(--neutral-500)]" />}>
                 <InventoryInsightTable data={dashboardData.inventoryRotation} />
               </Card>
             </div>
-            <div className="lg:col-span-5 space-y-8">
-              {dashboardData.transferImpact && <TransfersImpactDisplay data={dashboardData.transferImpact} />}
+            <div className="lg:col-span-5 space-y-6">
+              {dashboardData.transferImpact && (
+                <TransfersImpactDisplay data={dashboardData.transferImpact} />
+              )}
               <Card title="Velocidad de Productos" headerRight={<TrendingUp size={16} className="text-[var(--brand-500)]" />}>
                 <TopProductsList products={dashboardData.topProducts} />
               </Card>
             </div>
           </div>
+        </section>
 
-          {/* Layer 4: Operations & Control (5/12 + 7/12) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* ── Zona 4: Operaciones y control (5/12 + 7/12) ────────────────── */}
+        <section>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-[var(--neutral-500)] mb-4">
+            Operaciones y control
+          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <div className="lg:col-span-5">
               <Card title="Gestión de Reabastecimiento" headerRight={<ShoppingCart size={18} className="text-[var(--neutral-500)]" />}>
                 <ReplenishmentGrid data={dashboardData.replenishment} />
               </Card>
             </div>
-            <div className="lg:col-span-7 space-y-8">
-               <Card title="Monitoreo de Alertas Stock" headerRight={<Zap size={18} className="text-[var(--color-danger)]" />}>
+            <div className="lg:col-span-7 space-y-6">
+              <Card title="Monitoreo de Alertas Stock" headerRight={<Zap size={18} className="text-[var(--color-danger)]" />}>
                 <AlertsList alerts={dashboardData.alerts} />
               </Card>
               <Card title="Traslados en Curso" headerRight={<Badge variant="info">Logística</Badge>}>
@@ -345,8 +381,9 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
-        </div>
-      )}
+        </section>
+
+      </div>
     </div>
   );
 }

@@ -15,4 +15,5 @@ public interface ReturnRequestRepositoryPort {
     List<ReturnRequest> findBySaleId(Long saleId);
     List<ReturnRequest> findBySaleIdAndStatus(Long saleId, ReturnRequestStatus status);
     List<ReturnRequest> findByBranchIdAndStatus(Long branchId, ReturnRequestStatus status);
+    List<ReturnRequest> findAll();
 }
