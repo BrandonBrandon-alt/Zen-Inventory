@@ -59,5 +59,13 @@ public interface UnitOfMeasureRepositoryPort {
      * @return La asociación persistida.
      */
     ProductUnit saveProductUnit(ProductUnit productUnit);
+
+    /**
+     * Elimina la asociación entre un producto y una unidad.
+     * 
+     * @param productId ID del producto.
+     * @param unitId ID de la unidad.
+     */
+    void deleteProductUnit(Long productId, Long unitId);
 }
 

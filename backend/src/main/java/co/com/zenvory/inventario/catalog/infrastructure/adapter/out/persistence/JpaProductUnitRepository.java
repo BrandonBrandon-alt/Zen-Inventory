@@ -20,5 +20,12 @@ public interface JpaProductUnitRepository extends JpaRepository<ProductUnitEntit
      * @return Lista de entidades de relación producto-unidad.
      */
     List<ProductUnitEntity> findByProductId(Long productId);
+    /**
+     * Elimina la asociación entre un producto y una unidad específica.
+     * 
+     * @param productId ID del producto.
+     * @param unitId ID de la unidad.
+     */
+    void deleteByProductIdAndUnitId(Long productId, Long unitId);
 }
 

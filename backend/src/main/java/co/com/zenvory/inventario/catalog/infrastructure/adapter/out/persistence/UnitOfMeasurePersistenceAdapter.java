@@ -4,6 +4,7 @@ import co.com.zenvory.inventario.catalog.application.port.out.UnitOfMeasureRepos
 import co.com.zenvory.inventario.catalog.domain.model.ProductUnit;
 import co.com.zenvory.inventario.catalog.domain.model.UnitOfMeasure;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -72,6 +73,13 @@ public class UnitOfMeasurePersistenceAdapter implements UnitOfMeasureRepositoryP
     @Override
     public ProductUnit saveProductUnit(ProductUnit productUnit) {
         return productUnitRepository.save(ProductUnitEntity.fromDomain(productUnit)).toDomain();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public void deleteProductUnit(Long productId, Long unitId) {
+        productUnitRepository.deleteByProductIdAndUnitId(productId, unitId);
     }
 }
 

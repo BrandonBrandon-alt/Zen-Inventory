@@ -26,6 +26,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.stream.Collectors;
 
@@ -140,6 +141,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AlertAlreadyResolvedException.class)
     public ResponseEntity<ErrorResponse> handleAlertAlreadyResolved(AlertAlreadyResolvedException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(ex.getMessage()));
+    }
+
+    /** 409 - Conflicto de integridad de datos (ej: SKU duplicado a nivel DB). */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMessage());
+        String message = "No se pudo realizar la operación porque viola una restricción de integridad (posible duplicado).";
+        
+        // Intento de extraer mensaje más específico si es un SKU duplicado
+        if (ex.getMessage() != null && (ex.getMessage().contains("producto_sku_key") || ex.getMessage().toLowerCase().contains("sku"))) {
+            message = "Ya existe un producto con el SKU indicado.";
+        }
+        
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(message));
     }
 
     /** 400 - Parámetro ilegal genérico (común en constructores del dominio). */

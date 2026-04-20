@@ -25,7 +25,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/v1/analytics")
-@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
 public class AnalyticsController {
 
     private final AnalyticsUseCase analyticsUseCase;
@@ -57,7 +57,9 @@ public class AnalyticsController {
     private Long resolveBranchScope() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         User user = userRepositoryPort.findByEmail(auth.getName()).orElseThrow();
-        if ("MANAGER".equals(user.getRole().getNombre())) {
+        String roleName = user.getRole().getNombre();
+        
+        if ("MANAGER".equals(roleName) || "OPERADOR_INVENTARIO".equals(roleName)) {
             return user.getSucursalId();
         }
         return null; // ADMIN ve todo el sistema

@@ -200,25 +200,25 @@ export default function InventoryPage() {
     }
   }, [adjustingProduct]);
 
-  const handleAdjustSubmit = async () => {
+  const handleAdjustSubmit = async (data: AdjustData) => {
     if (!adjustingProduct || !selectedBranchId) return;
-    const qty = typeof adjustData.quantity === "number" ? adjustData.quantity : 0;
+    const qty = typeof data.quantity === "number" ? data.quantity : 0;
     if (qty <= 0) {
       showToast("La cantidad debe ser mayor a 0", "warning");
       return;
     }
-    if (!adjustData.reason) {
+    if (!data.reason) {
       showToast("El motivo es obligatorio", "warning");
       return;
     }
-    if (observationsRequired && (adjustData.reason === "AJUSTE_POSITIVO" || adjustData.reason === "AJUSTE_NEGATIVO" || adjustData.reason === "MERMA") && adjustData.observations.trim().length < 15) {
+    if (observationsRequired && (data.reason === "AJUSTE_POSITIVO" || data.reason === "AJUSTE_NEGATIVO" || data.reason === "MERMA") && data.observations.trim().length < 15) {
       showToast("Debes justificar el ajuste con al menos 15 caracteres.", "warning");
       return;
     }
 
     setSubmitting(true);
     try {
-      const endpoint = adjustData.type === "INGRESO" 
+      const endpoint = data.type === "INGRESO" 
         ? "/api/v1/inventory/branches/{branchId}/products/{productId}/add"
         : "/api/v1/inventory/branches/{branchId}/products/{productId}/withdraw";
       
@@ -226,12 +226,12 @@ export default function InventoryPage() {
         params: { path: { branchId: selectedBranchId, productId: adjustingProduct.id! } },
         body: {
           quantity: qty,
-          unitId: adjustData.unitId,
-          reason: adjustData.reason,
+          unitId: data.unitId,
+          reason: data.reason,
           userId: session?.id || 1,
-          unitCost: adjustData.type === "INGRESO" ? (Number(adjustData.unitCost) || 0) : undefined,
-          observations: adjustData.observations,
-          subReason: adjustData.subReason,
+          unitCost: data.type === "INGRESO" ? (Number(data.unitCost) || 0) : undefined,
+          observations: data.observations,
+          subReason: data.subReason,
         }
       });
 

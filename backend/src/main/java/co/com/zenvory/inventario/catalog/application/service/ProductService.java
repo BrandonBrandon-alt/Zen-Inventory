@@ -5,6 +5,8 @@ import co.com.zenvory.inventario.catalog.application.port.out.ProductRepositoryP
 import co.com.zenvory.inventario.catalog.domain.exception.DuplicateSkuException;
 import co.com.zenvory.inventario.catalog.domain.exception.ProductNotFoundException;
 import co.com.zenvory.inventario.catalog.domain.model.Product;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -18,6 +20,8 @@ import java.util.List;
  */
 @Service
 public class ProductService implements ProductUseCase {
+ 
+    private static final Logger log = LoggerFactory.getLogger(ProductService.class);
 
     private final ProductRepositoryPort productRepositoryPort;
 
@@ -52,9 +56,12 @@ public class ProductService implements ProductUseCase {
      */
     @Override
     public Product createProduct(Product product) {
-        if (productRepositoryPort.existsBySku(product.getSku())) {
-            throw new DuplicateSkuException(product.getSku());
+        String sku = product.getSku() != null ? product.getSku().trim() : null;
+        if (productRepositoryPort.existsBySku(sku)) {
+            log.warn("Intento de creación de producto con SKU duplicado: {}", sku);
+            throw new DuplicateSkuException(sku);
         }
+        product.setSku(sku);
         product.setCreatedAt(LocalDateTime.now());
         product.setActive(true);
         return productRepositoryPort.save(product);
@@ -71,13 +78,16 @@ public class ProductService implements ProductUseCase {
         Product existing = productRepositoryPort.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException(id));
 
+        String newSku = product.getSku() != null ? product.getSku().trim() : null;
+        
         // Solo validar unicidad de SKU si realmente cambió para evitar falsos positivos con el mismo registro
-        if (!existing.getSku().equals(product.getSku()) &&
-                productRepositoryPort.existsBySku(product.getSku())) {
-            throw new DuplicateSkuException(product.getSku());
+        if (newSku != null && !existing.getSku().equals(newSku) &&
+                productRepositoryPort.existsBySku(newSku)) {
+            log.warn("Intento de actualización de producto {} a un SKU ya existente: {}", id, newSku);
+            throw new DuplicateSkuException(newSku);
         }
 
-        existing.setSku(product.getSku());
+        existing.setSku(newSku);
         existing.setName(product.getName());
         existing.setAverageCost(product.getAverageCost());
         existing.setSalePrice(product.getSalePrice());
@@ -105,4 +115,3 @@ public class ProductService implements ProductUseCase {
         productRepositoryPort.save(existing);
     }
 }
-

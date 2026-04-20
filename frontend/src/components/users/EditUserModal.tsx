@@ -26,6 +26,7 @@ export default function EditUserModal({ open, onClose, user, roles, branches, on
     const { showToast } = useToast();
     const [isPending, startTransition] = useTransition();
     const [values, setValues] = useState<Partial<UserRequest>>({});
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [serverError, setServerError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -38,6 +39,7 @@ export default function EditUserModal({ open, onClose, user, roles, branches, on
                 activo: user.activo,
                 password: ""
             });
+            setErrors({});
             setServerError(null);
         }
     }, [user, open]);
@@ -45,29 +47,28 @@ export default function EditUserModal({ open, onClose, user, roles, branches, on
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!user?.id) return;
+        const errs: Record<string, string> = {};
         
-        // --- Validaciones Frontend Importantes ---
+        // --- Validaciones Frontend ---
         if (!values.nombre || values.nombre.trim().length < 3) {
-            setServerError("El nombre debe tener al menos 3 caracteres.");
-            return;
+            errs.nombre = "El nombre debe tener al menos 3 caracteres.";
         }
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!values.email || !emailRegex.test(values.email)) {
-            setServerError("Debes proporcionar un correo electrónico válido.");
-            return;
+            errs.email = "Correo electrónico inválido.";
         }
         if (values.password && values.password.length < 6) {
-            setServerError("La nueva contraseña debe tener un mínimo de 6 caracteres por seguridad.");
-            return;
+            errs.password = "Mínimo 6 caracteres.";
         }
         if (!values.rolId) {
-            setServerError("El rol del sistema es obligatorio.");
-            return;
+            errs.rolId = "Campo obligatorio.";
         }
         if (Number(values.rolId) !== 1 && (!values.sucursalId || Number(values.sucursalId) === 0)) {
-            setServerError("Es estrictamente obligatorio asignar una sucursal para Vendedores o Administradores Locales.");
-            return;
+            errs.sucursalId = "Requerido para este rol.";
         }
+
+        setErrors(errs);
+        if (Object.keys(errs).length > 0) return;
 
         setServerError(null);
         startTransition(async () => {
@@ -109,30 +110,33 @@ export default function EditUserModal({ open, onClose, user, roles, branches, on
             }
         >
             <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                {serverError && <div style={{ color: "var(--brand-500)", fontSize: "13px" }}>{serverError}</div>}
+                {serverError && <div style={{ color: "var(--brand-500)", fontSize: "12px", background: "rgba(217,99,79,0.1)", padding: "8px", borderRadius: "var(--radius-sm)" }}>{serverError}</div>}
                 <Input
                     label="Nombre completo"
                     value={values.nombre ?? ""}
-                    onChange={e => setValues({...values, nombre: e.target.value})}
+                    onChange={e => { setValues({...values, nombre: e.target.value}); setErrors({...errors, nombre: ""}); }}
                     icon={<User size={15} />}
+                    error={errors.nombre}
                 />
                 <Input
                     label="Email"
                     value={values.email ?? ""}
-                    onChange={e => setValues({...values, email: e.target.value})}
+                    onChange={e => { setValues({...values, email: e.target.value}); setErrors({...errors, email: ""}); }}
                     icon={<Mail size={15} />}
+                    error={errors.email}
                 />
                 <Input
                     label="Nueva contraseña (dejar en blanco para no cambiar)"
                     type="password"
                     value={values.password ?? ""}
-                    onChange={e => setValues({...values, password: e.target.value})}
+                    onChange={e => { setValues({...values, password: e.target.value}); setErrors({...errors, password: ""}); }}
                     icon={<Lock size={15} />}
+                    error={errors.password}
                 />
                 <Select
                     label="Rol del sistema"
                     value={values.rolId ?? ""}
-                    onChange={val => setValues({...values, rolId: Number(val)})}
+                    onChange={val => { setValues({...values, rolId: Number(val)}); setErrors({...errors, rolId: ""}); }}
                     options={roles.map(r => ({ value: r.id!, label: r.nombre! }))}
                     icon={<Shield size={15} />}
                 />
@@ -140,13 +144,14 @@ export default function EditUserModal({ open, onClose, user, roles, branches, on
                     <Select
                         label="Sucursal asignada"
                         value={values.sucursalId || ""}
-                        onChange={val => setValues({...values, sucursalId: Number(val)})}
+                        onChange={val => { setValues({...values, sucursalId: Number(val)}); setErrors({...errors, sucursalId: ""}); }}
                         options={branches
                           .filter(b => b.activa || b.id === values.sucursalId)
                           .map(b => ({ value: b.id!, label: b.nombre! }))
                         }
                         icon={<Building size={15} />}
                         placeholder="Seleccionar sede..."
+                        error={errors.sucursalId}
                     />
                 )}
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>

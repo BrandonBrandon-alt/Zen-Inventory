@@ -90,10 +90,6 @@ function POSContent() {
       router.push("/login");
       return;
     }
-    if (sess.rol === "OPERADOR_INVENTARIO") {
-      router.replace("/dashboard");
-      return;
-    }
     setSession(sess);
 
     const fetchData = async () => {

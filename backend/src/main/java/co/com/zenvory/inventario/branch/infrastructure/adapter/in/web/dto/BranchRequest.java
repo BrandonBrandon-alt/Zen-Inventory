@@ -18,11 +18,11 @@ import jakarta.validation.constraints.Size;
 public record BranchRequest(
 
         @NotBlank(message = "El nombre es obligatorio")
-        @Size(max = 100, message = "El nombre no puede superar los 100 caracteres")
+        @Size(min = 3, max = 100, message = "El nombre debe tener entre 3 y 100 caracteres")
         String nombre,
 
         @NotBlank(message = "La dirección es obligatoria")
-        @Size(max = 200, message = "La dirección no puede superar los 200 caracteres")
+        @Size(min = 5, max = 200, message = "La dirección debe tener entre 5 y 200 caracteres")
         String direccion,
 
         @Pattern(regexp = "\\d{7,15}", message = "El teléfono debe contener entre 7 y 15 dígitos")

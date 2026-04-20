@@ -6,6 +6,7 @@ import co.com.zenvory.inventario.catalog.domain.exception.UnitOfMeasureNotFoundE
 import co.com.zenvory.inventario.catalog.domain.model.ProductUnit;
 import co.com.zenvory.inventario.catalog.domain.model.UnitOfMeasure;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -16,6 +17,7 @@ import java.util.List;
  * técnicas por producto, incluyendo el cálculo de visualización de nombres y abreviaturas.</p>
  */
 @Service
+@Transactional
 public class UnitOfMeasureService implements UnitOfMeasureUseCase {
 
     private final UnitOfMeasureRepositoryPort unitRepositoryPort;
@@ -93,6 +95,13 @@ public class UnitOfMeasureService implements UnitOfMeasureUseCase {
     public void deleteUnit(Long id) {
         getUnitById(id); // Verificar existencia previa
         unitRepositoryPort.deleteById(id);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void unassignUnitFromProduct(Long productId, Long unitId) {
+        // En el futuro, podríamos validar que el producto existe
+        unitRepositoryPort.deleteProductUnit(productId, unitId);
     }
 }
 

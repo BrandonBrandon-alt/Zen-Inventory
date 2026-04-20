@@ -1,6 +1,8 @@
 package co.com.zenvory.inventario.sale.infrastructure.adapter.in.web;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -16,6 +18,8 @@ public record SaleRequest(
         String customerName,
         String customerDocument,
 
+        @DecimalMin(value = "0", message = "El descuento no puede ser negativo")
+        @DecimalMax(value = "100", message = "El descuento no puede superar el 100%")
         java.math.BigDecimal globalDiscountPercentage,
 
         Long priceListId,
@@ -32,6 +36,8 @@ public record SaleRequest(
             @Positive(message = "La cantidad debe ser mayor a cero.")
             Integer quantity,
 
+            @DecimalMin(value = "0", message = "El descuento no puede ser negativo")
+            @DecimalMax(value = "100", message = "El descuento no puede superar el 100%")
             java.math.BigDecimal discountPercentage,
             Long priceListId
     ) {}

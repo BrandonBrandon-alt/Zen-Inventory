@@ -135,6 +135,22 @@ public class UnitOfMeasureController {
     }
 
     /**
+     * Elimina la asociación de una unidad de medida con un producto.
+     * 
+     * @param productId ID del producto.
+     * @param unitId ID de la unidad.
+     * @return Respuesta vacía.
+     */
+    @DeleteMapping("/api/catalog/products/{productId}/units/{unitId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> unassignUnit(
+            @PathVariable Long productId,
+            @PathVariable Long unitId) {
+        unitUseCase.unassignUnitFromProduct(productId, unitId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
      * Mapea un DTO de solicitud al modelo de dominio {@link UnitOfMeasure}.
      */
     private UnitOfMeasure mapToDomain(UnitOfMeasureRequest req) {

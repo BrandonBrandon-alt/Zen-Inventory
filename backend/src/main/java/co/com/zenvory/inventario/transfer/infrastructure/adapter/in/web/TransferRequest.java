@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -19,6 +20,7 @@ public record TransferRequest(
         LocalDateTime estimatedArrivalDate,
 
         @NotNull(message = "La prioridad de envío es obligatoria.")
+        @Pattern(regexp = "NORMAL|HIGH|LOW", message = "La prioridad debe ser NORMAL, HIGH o LOW")
         String priority,
 
         @NotEmpty(message = "La transferencia debe contener al menos un producto a mover.")

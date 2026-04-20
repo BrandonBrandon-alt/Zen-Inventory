@@ -76,10 +76,6 @@ function SalesHistoryContent() {
       router.push("/login");
       return;
     }
-    if (sess.rol === "OPERADOR_INVENTARIO") {
-      router.replace("/dashboard");
-      return;
-    }
     setSession(sess);
 
     // Initial data fetch: Branches (if admin)

@@ -68,5 +68,13 @@ public interface UnitOfMeasureUseCase {
      * @param id ID de la unidad a retirar.
      */
     void deleteUnit(Long id);
+
+    /**
+     * Elimina la asociación de una unidad de medida con un producto.
+     * 
+     * @param productId ID del producto.
+     * @param unitId ID de la unidad.
+     */
+    void unassignUnitFromProduct(Long productId, Long unitId);
 }
 

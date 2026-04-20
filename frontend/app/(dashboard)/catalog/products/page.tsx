@@ -51,6 +51,9 @@ export default function MasterProductsPage() {
   const [priceListValues, setPriceListValues] = useState<Record<number, string>>({});
   const [priceListLoading, setPriceListLoading] = useState(false);
   const [showPriceLists, setShowPriceLists] = useState(false);
+  const [productUnits, setProductUnits] = useState<any[]>([]);
+  const [newUnitId, setNewUnitId] = useState<string>("");
+  const [newUnitFactor, setNewUnitFactor] = useState<string>("1");
 
   // Form state
   const [formData, setFormData] = useState({
@@ -141,6 +144,18 @@ export default function MasterProductsPage() {
           setPriceListLoading(false);
         }
       }
+
+      // Cargar unidades alternativas
+      if (product.id) {
+        try {
+          const res = await apiClient.GET("/api/catalog/products/{productId}/units", {
+            params: { path: { productId: product.id } }
+          });
+          setProductUnits(res.data ?? []);
+        } catch (error) {
+          console.error("Error fetching product units:", error);
+        }
+      }
       setShowPriceLists(true);
     } else {
       setEditingProduct(null);
@@ -153,12 +168,59 @@ export default function MasterProductsPage() {
         activo: true
       });
       setSelectedSuppliers([]);
+      setProductUnits([]);
       const defaults: Record<number, string> = {};
       priceLists.forEach(l => { defaults[l.id] = ""; });
       setPriceListValues(defaults);
       setShowPriceLists(true);
     }
+    setNewUnitId("");
+    setNewUnitFactor("1");
     setShowModal(true);
+  };
+
+  const handleAddProductUnit = async () => {
+    if (!editingProduct?.id || !newUnitId) return;
+    try {
+      await apiClient.POST("/api/catalog/products/{productId}/units", {
+        params: { path: { productId: editingProduct.id } },
+        body: {
+          productoId: editingProduct.id,
+          unidadId: Number(newUnitId),
+          factorConversion: Number(newUnitFactor),
+          esBase: false
+        } as any
+      });
+      showToast("Unidad asociada correctamente.", "success");
+      
+      // Refresh units
+      const res = await apiClient.GET("/api/catalog/products/{productId}/units", {
+        params: { path: { productId: editingProduct.id } }
+      });
+      setProductUnits(res.data ?? []);
+      setNewUnitId("");
+      setNewUnitFactor("1");
+    } catch (error) {
+      showToast("Error al asociar la unidad.", "error");
+    }
+  };
+
+  const handleRemoveProductUnit = async (unitId: number) => {
+    if (!editingProduct?.id) return;
+    try {
+      await apiClient.DELETE("/api/catalog/products/{productId}/units/{unitId}" as any, {
+        params: { path: { productId: editingProduct.id, unitId } }
+      });
+      showToast("Asociación eliminada.", "success");
+      
+      // Refresh units
+      const res = await apiClient.GET("/api/catalog/products/{productId}/units", {
+        params: { path: { productId: editingProduct.id } }
+      });
+      setProductUnits(res.data ?? []);
+    } catch (error) {
+      showToast("Error al eliminar la asociación.", "error");
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -598,6 +660,92 @@ export default function MasterProductsPage() {
                   />
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* ── Gestión de Unidades Alternativas ────────────────────────── */}
+          {editingProduct && (
+            <div style={{ 
+              marginTop: "10px", 
+              padding: "16px", 
+              background: "rgba(255,255,255,0.02)", 
+              borderRadius: "12px",
+              border: "1px solid var(--neutral-800)"
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                <h4 style={{ fontSize: "13px", fontWeight: 700, color: "var(--neutral-400)", textTransform: "uppercase" }}>
+                  Unidades y Conversiones
+                </h4>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 100px", gap: "8px", marginBottom: "16px", alignItems: "flex-end" }}>
+                <Select
+                  label="Asociar Unidad"
+                  value={newUnitId}
+                  onChange={setNewUnitId}
+                  placeholder="Seleccionar..."
+                  options={units
+                    .filter(u => u.id !== formData.unitId && !productUnits.some(pu => pu.unidadId === u.id))
+                    .map(u => ({ value: u.id!.toString(), label: u.nombre ?? "" }))
+                  }
+                />
+                <Input
+                  label="Factor de Conversión"
+                  type="number"
+                  value={newUnitFactor}
+                  onChange={(e: any) => setNewUnitFactor(e.target.value)}
+                  placeholder="Ej. 12"
+                />
+                <Button 
+                  type="button" 
+                  size="sm" 
+                  onClick={handleAddProductUnit} 
+                  disabled={!newUnitId}
+                >
+                  Añadir
+                </Button>
+              </div>
+
+              {productUnits.length > 0 && (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--neutral-800)" }}>
+                        <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: "var(--neutral-500)" }}>UNIDAD</th>
+                        <th style={{ textAlign: "left", padding: "8px", fontSize: "11px", color: "var(--neutral-500)" }}>EQUIVALE A</th>
+                        <th style={{ textAlign: "right", padding: "8px" }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productUnits.map(pu => (
+                        <tr key={pu.unidadId} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                          <td style={{ padding: "8px", fontSize: "12px", color: "var(--neutral-100)" }}>
+                            {pu.nombreUnidad} ({pu.abreviaturaUnidad})
+                          </td>
+                          <td style={{ padding: "8px", fontSize: "12px", color: "var(--neutral-400)" }}>
+                            <span style={{ fontWeight: 600, color: "var(--brand-400)" }}>{pu.factorConversion}</span> {units.find(u => u.id === formData.unitId)?.abreviatura}
+                          </td>
+                          <td style={{ padding: "8px", textAlign: "right" }}>
+                            <button 
+                              type="button" 
+                              onClick={() => handleRemoveProductUnit(pu.unidadId)}
+                              style={{ background: "none", border: "none", color: "var(--neutral-600)", cursor: "pointer" }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {productUnits.length === 0 && (
+                <p style={{ fontSize: "12px", fontStyle: "italic", color: "var(--neutral-500)", textAlign: "center", padding: "5px" }}>
+                  Sin unidades alternativas configuradas.
+                </p>
+              )}
             </div>
           )}
         </form>

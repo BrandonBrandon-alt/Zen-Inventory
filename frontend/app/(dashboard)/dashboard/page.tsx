@@ -196,7 +196,7 @@ export default function DashboardPage() {
   return (
     <div style={{ padding: "var(--page-padding)", maxWidth: "1600px", margin: "0 auto" }} className="space-y-12">
       <PageHeader 
-        title={isAdmin ? "Executive Intelligence" : "Dashboard de Gestión"} 
+        title={isAdmin ? "Panel central" : "Dashboard de Gestión"} 
         description={isAdmin ? `Bienvenido, ${session?.nombre}. Resumen consolidado.` : `Hola ${session?.nombre}. Estado operativo.`} 
         actions={rangeButtons}
       />
