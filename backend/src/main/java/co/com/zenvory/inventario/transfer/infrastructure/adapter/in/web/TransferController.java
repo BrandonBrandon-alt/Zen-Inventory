@@ -70,7 +70,7 @@ public class TransferController {
     }
 
     @PostMapping("/{id}/prepare")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<TransferResponse> prepareTransfer(
             @PathVariable Long id,
             @Valid @RequestBody TransferPrepareRequest request) {
@@ -162,8 +162,14 @@ public class TransferController {
     }
 
     @GetMapping("/fulfillment-report")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<TransferFulfillmentReport> getFulfillmentReport() {
         return ResponseEntity.ok(transferUseCase.getFulfillmentReport());
+    }
+
+    @GetMapping("/analytics/logistics")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<LogisticsAnalyticsResponse> getLogisticsAnalytics() {
+        return ResponseEntity.ok(transferUseCase.getLogisticsAnalytics());
     }
 }

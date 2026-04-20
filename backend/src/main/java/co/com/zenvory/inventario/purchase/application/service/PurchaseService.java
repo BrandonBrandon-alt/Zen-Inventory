@@ -11,6 +11,9 @@ import co.com.zenvory.inventario.purchase.application.port.out.PurchaseRepositor
 import co.com.zenvory.inventario.purchase.domain.model.PurchaseOrder;
 import co.com.zenvory.inventario.purchase.domain.model.PurchaseOrderDetail;
 import co.com.zenvory.inventario.purchase.domain.model.ReceptionStatus;
+import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
+import co.com.zenvory.inventario.alert.domain.model.StockAlert;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,18 +29,21 @@ public class PurchaseService implements PurchaseUseCase {
     private final PurchaseRepositoryPort repository;
     private final InventoryUseCase inventoryUseCase;
     private final ProductUseCase productUseCase;
+    private final AlertUseCase alertUseCase;
 
     public PurchaseService(PurchaseRepositoryPort repository, 
                            InventoryUseCase inventoryUseCase,
-                           ProductUseCase productUseCase) {
+                           ProductUseCase productUseCase,
+                           @Lazy AlertUseCase alertUseCase) {
         this.repository = repository;
         this.inventoryUseCase = inventoryUseCase;
         this.productUseCase = productUseCase;
+        this.alertUseCase = alertUseCase;
     }
 
     @Override
     @Transactional
-    public PurchaseOrder createOrder(CreatePurchaseCommand command) {
+    public PurchaseOrder createOrder(CreatePurchaseCommand command, boolean isManager) {
         List<PurchaseOrderDetail> details = command.items().stream()
                 .map(item -> PurchaseOrderDetail.create(item.productId(), item.quantity(), item.unitPrice(), item.discountPct()))
                 .toList();
@@ -46,11 +52,31 @@ public class PurchaseService implements PurchaseUseCase {
                 command.supplierId(),
                 command.userId(),
                 command.branchId(), 
-                command.estimatedArrivalDate(),
+                command.leadTimeDays(),
                 command.paymentDueDays(),
-                details
+                details,
+                isManager
         );
 
+        PurchaseOrder savedOrder = repository.save(order);
+
+
+        return savedOrder;
+    }
+
+    @Override
+    @Transactional
+    public PurchaseOrder approveOrder(Long orderId, Long userId) {
+        PurchaseOrder order = getOrderById(orderId);
+        order.approve(userId);
+        return repository.save(order);
+    }
+
+    @Override
+    @Transactional
+    public PurchaseOrder approveException(Long orderId, Long userId) {
+        PurchaseOrder order = getOrderById(orderId);
+        order.approveException(userId);
         return repository.save(order);
     }
 
@@ -139,7 +165,6 @@ public class PurchaseService implements PurchaseUseCase {
     public void cancelPurchase(Long orderId, String reason, Long userId) {
         PurchaseOrder order = getOrderById(orderId);
         order.cancel(reason, userId);
-        
         repository.save(order);
         
         // TODO: Notificar anulación a módulo CXP (Cuentas por Pagar). 

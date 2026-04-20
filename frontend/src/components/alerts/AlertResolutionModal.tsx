@@ -30,6 +30,8 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
   const { showToast } = useToast();
   const session = getSession();
   const isAdmin = session?.rol === "ADMIN";
+  const isManager = session?.rol === "MANAGER";
+  const isInventory = session?.rol === "OPERADOR_INVENTARIO";
 
   const [activeTab, setActiveTab] = useState<Tab>("TRANSFER");
   const [loading, setLoading] = useState(false);
@@ -40,12 +42,15 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
   const [branches, setBranches] = useState<BranchResponse[]>([]);
   const [branchStocks, setBranchStocks] = useState<Record<number, number>>({});
   const [supplier, setSupplier] = useState<SupplierResponse | null>(null);
+  const [allSuppliers, setAllSuppliers] = useState<SupplierResponse[]>([]);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
 
   // Form State
   const [originBranchId, setOriginBranchId] = useState<number | null>(null);
   const [quantity, setQuantity] = useState<number>(0);
   const [arrivalDate, setArrivalDate] = useState<string>("");
   const [reason, setReason] = useState("");
+  const [priority, setPriority] = useState("HIGH");
 
   useEffect(() => {
     if (alert) {
@@ -57,6 +62,21 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
       loadInitialData();
     }
   }, [alert]);
+
+  // Effect to handle lead-time reactivity
+  useEffect(() => {
+    if (selectedSupplierId && allSuppliers.length > 0) {
+      const selected = allSuppliers.find(s => s.id === selectedSupplierId);
+      if (selected) {
+        setSupplier(selected);
+        if (selected.tiempoEntregaDias !== undefined) {
+          const date = new Date();
+          date.setDate(date.getDate() + (selected.tiempoEntregaDias || 0));
+          setArrivalDate(date.toISOString().split("T")[0]);
+        }
+      }
+    }
+  }, [selectedSupplierId, allSuppliers]);
 
   const loadInitialData = async () => {
     if (!alert) return;
@@ -71,18 +91,14 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
       if (prod) {
         setQuantity(100); // Default suggestion
         
-        // 2. Fetch Supplier if exists (for Path B)
-        if (prod.proveedorId) {
-          const { data: supp } = await apiClient.GET("/api/catalog/suppliers/{id}", {
-            params: { path: { id: prod.proveedorId } }
-          });
-          setSupplier(supp ?? null);
-          
-          if (supp?.tiempoEntregaDias) {
-            const date = new Date();
-            date.setDate(date.getDate() + supp.tiempoEntregaDias);
-            setArrivalDate(date.toISOString().split("T")[0]);
-          }
+        // 2. Fetch Valid Suppliers (Validation: Junction table check)
+        const { data: validSupp } = await apiClient.GET("/api/catalog/suppliers/search" as any, {
+          params: { query: { productId: alert.productId } }
+        });
+        setAllSuppliers(validSupp ?? []);
+        
+        if (validSupp && validSupp.length > 0) {
+          setSelectedSupplierId(validSupp[0].id!);
         }
 
         // 3. Fetch Branches and Stocks (for Path A)
@@ -131,10 +147,16 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
       if (activeTab === "TRANSFER") {
         if (!originBranchId) throw new Error("Debes seleccionar una sucursal de origen.");
         endpoint = `/api/v1/alerts/${alert.id}/resolve/transfer`;
-        body = { originBranchId, quantity, userId: session?.id };
+        body = { originBranchId, quantity, userId: session?.id, priority };
       } else if (activeTab === "PURCHASE") {
+        if (!selectedSupplierId) throw new Error("Debes seleccionar un proveedor.");
         endpoint = `/api/v1/alerts/${alert.id}/resolve/purchase`;
-        body = { estimatedArrival: `${arrivalDate}T12:00:00`, quantity };
+        body = { 
+          estimatedArrival: `${arrivalDate}T12:00:00`, 
+          quantity, 
+          userId: session?.id,
+          supplierId: selectedSupplierId 
+        };
       } else if (activeTab === "AUTHORIZE") {
         // First authorize the transfer
         const { error: prepError } = await apiClient.POST(`/api/v1/transfers/${alert.referenceId}/prepare` as any, {});
@@ -198,7 +220,7 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
                   <Truck size={16} /> Traslado Interno
                 </button>
               )}
-              {isAdmin && alert.type !== "TRANSFER_REQUEST" && (
+              {(isAdmin || isManager || isInventory) && alert.type !== "TRANSFER_REQUEST" && (
                 <button 
                   onClick={() => setActiveTab("PURCHASE")}
                   style={{ ...tabStyle, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", background: activeTab === "PURCHASE" ? "var(--brand-500)" : "transparent", color: activeTab === "PURCHASE" ? "white" : "var(--neutral-400)" }}
@@ -233,6 +255,17 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
                     value={quantity}
                     onChange={(e) => setQuantity(Number(e.target.value))}
                   />
+                  <Select
+                    label="Prioridad del Traslado"
+                    placement="top"
+                    value={priority}
+                    onChange={(val) => setPriority(val)}
+                    options={[
+                      { value: "HIGH", label: "Alta Urgencia" },
+                      { value: "NORMAL", label: "Normal" },
+                      { value: "LOW", label: "Baja Prioridad" },
+                    ]}
+                  />
                 </div>
               )}
 
@@ -256,10 +289,24 @@ export default function AlertResolutionModal({ alert, onClose, onSuccess }: Aler
 
               {activeTab === "PURCHASE" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                  <div style={{ padding: "12px", background: "rgba(217, 99, 79, 0.05)", borderRadius: "8px", border: "1px solid var(--brand-glow)" }}>
-                    <p style={{ fontSize: "12px", color: "var(--brand-400)", fontWeight: 600 }}>INFORMACIÓN DEL PROVEEDOR</p>
-                    <p style={{ fontSize: "14px", color: "var(--neutral-100)" }}>{supplier?.nombre || "No asociado"}</p>
-                    <p style={{ fontSize: "12px", color: "var(--neutral-500)" }}>Tiempo de entrega: {supplier?.tiempoEntregaDias || 0} días</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <p style={{ fontSize: "12px", color: "var(--brand-400)", fontWeight: 600 }}>GESTIÓN DE ABASTECIMIENTO</p>
+                      {isInventory && (
+                        <Badge variant="warning">Requiere Aprobación</Badge>
+                      )}
+                    </div>
+                    <Select
+                      label="Seleccionar Proveedor"
+                      value={selectedSupplierId}
+                      onChange={(val) => setSelectedSupplierId(val)}
+                      options={allSuppliers.map(s => ({ value: s.id!, label: s.nombre! }))}
+                    />
+                    {supplier && (
+                      <p style={{ fontSize: "12px", color: "var(--neutral-500)", marginTop: "-8px" }}>
+                        Lead Time: {supplier.tiempoEntregaDias || 0} días registrados.
+                      </p>
+                    )}
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                     <Input 

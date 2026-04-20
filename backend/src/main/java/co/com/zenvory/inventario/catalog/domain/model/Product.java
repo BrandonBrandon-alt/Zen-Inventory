@@ -3,6 +3,8 @@ package co.com.zenvory.inventario.catalog.domain.model;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.ArrayList;
 
 /**
  * Modelo de dominio que representa un Producto en el catálogo.
@@ -13,7 +15,7 @@ import java.time.LocalDateTime;
  */
 @Getter
 @Setter
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class Product {
@@ -36,12 +38,6 @@ public class Product {
     /** Precio de venta al público del producto. */
     private BigDecimal salePrice;
 
-    /**
-     * ID del proveedor asociado. Se guarda como referencia escalar
-     * (no como objeto anidado) para mantener el dominio desacoplado.
-     */
-    private Long supplierId;
-
     /** ID de la unidad de medida asociada del catálogo maestro. */
     private Long unitId;
 
@@ -50,4 +46,16 @@ public class Product {
 
     /** Fecha en que el producto fue registrado en el sistema. */
     private LocalDateTime createdAt;
+
+    /** IDs de los proveedores asociados (usado principalmente para creación/actualización). */
+    @Builder.Default
+    private List<Long> supplierIds = new ArrayList<>();
+
+    /** Detalles resumidos de los proveedores asociados (usado para visualización). */
+    @Builder.Default
+    private List<SupplierSummary> suppliers = new ArrayList<>();
+
+    /** Estado del producto (Activo/Inactivo). */
+    @Builder.Default
+    private Boolean active = true;
 }

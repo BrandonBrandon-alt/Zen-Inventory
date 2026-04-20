@@ -25,7 +25,7 @@ export default function QuantitySelector({
   const isSm = size === "sm";
   const height = isSm ? "28px" : "36px";
   const btnWidth = isSm ? "28px" : "32px";
-  const inputWidth = isSm ? "30px" : "36px";
+  const inputWidth = isSm ? "60px" : "80px";
 
   return (
     <div style={{ 

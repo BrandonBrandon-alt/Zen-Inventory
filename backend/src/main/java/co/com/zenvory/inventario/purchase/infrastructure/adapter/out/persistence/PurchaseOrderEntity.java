@@ -34,6 +34,9 @@ public class PurchaseOrderEntity {
     @Column(name = "fecha_real_llegada")
     private LocalDateTime actualArrivalDate;
 
+    @Column(name = "tiempo_entrega_dias")
+    private Integer deliveryLeadTimeDays;
+
     @Column(name = "estado_recepcion", nullable = false)
     private String receptionStatus;
 
@@ -57,6 +60,9 @@ public class PurchaseOrderEntity {
 
     @Column(name = "fecha_resolucion")
     private LocalDateTime fechaResolucion;
+
+    @Column(name = "excepcion_aprobada", nullable = false)
+    private boolean exceptionApproved = false;
 
     @Version
     private Integer version;
@@ -95,6 +101,9 @@ public class PurchaseOrderEntity {
     public LocalDateTime getActualArrivalDate() { return actualArrivalDate; }
     public void setActualArrivalDate(LocalDateTime actualArrivalDate) { this.actualArrivalDate = actualArrivalDate; }
 
+    public Integer getDeliveryLeadTimeDays() { return deliveryLeadTimeDays; }
+    public void setDeliveryLeadTimeDays(Integer deliveryLeadTimeDays) { this.deliveryLeadTimeDays = deliveryLeadTimeDays; }
+
     public String getReceptionStatus() { return receptionStatus; }
     public void setReceptionStatus(String receptionStatus) { this.receptionStatus = receptionStatus; }
 
@@ -118,6 +127,9 @@ public class PurchaseOrderEntity {
 
     public LocalDateTime getFechaResolucion() { return fechaResolucion; }
     public void setFechaResolucion(LocalDateTime fechaResolucion) { this.fechaResolucion = fechaResolucion; }
+
+    public boolean isExceptionApproved() { return exceptionApproved; }
+    public void setExceptionApproved(boolean exceptionApproved) { this.exceptionApproved = exceptionApproved; }
 
     public Integer getVersion() { return version; }
     public void setVersion(Integer version) { this.version = version; }

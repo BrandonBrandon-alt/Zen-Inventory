@@ -18,4 +18,5 @@ public interface TransferUseCase {
     List<Transfer> getAllTransfers();
     List<Transfer> getTransfersByBranch(Long branchId);
     co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.TransferFulfillmentReport getFulfillmentReport();
+    co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.LogisticsAnalyticsResponse getLogisticsAnalytics();
 }

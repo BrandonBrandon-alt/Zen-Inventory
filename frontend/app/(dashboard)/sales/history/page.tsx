@@ -245,7 +245,7 @@ function SalesHistoryContent() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         sale={selectedSale}
-        isAdmin={session?.rol === "ADMIN" || session?.rol === "MANAGER"}
+        canCancel={session?.rol === "ADMIN" || session?.rol === "MANAGER"}
         onSaleCanceled={fetchSales}
       />
     </div>

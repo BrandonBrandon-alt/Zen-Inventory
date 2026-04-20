@@ -33,4 +33,10 @@ public interface SupplierUseCase {
      * @throws co.com.zenvory.inventario.catalog.domain.exception.SupplierNotFoundException si no existe.
      */
     void deleteSupplier(Long id);
+
+    /** Retorna los proveedores asociados a un producto específico por su ID. */
+    List<Supplier> getSuppliersByProductId(Long productId);
+
+    /** Retorna los productos suministrados por un proveedor específico. */
+    List<co.com.zenvory.inventario.catalog.domain.model.Product> getProductsBySupplierId(Long supplierId);
 }

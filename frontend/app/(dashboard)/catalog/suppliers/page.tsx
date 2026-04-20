@@ -5,7 +5,7 @@ import { apiClient } from "@/api/client";
 import type { components } from "@/api/schema";
 import { getSession } from "@/api/auth";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import Button from "@/components/ui/Button";
 import SearchFilter from "@/components/ui/SearchFilter";
@@ -29,6 +29,7 @@ export default function MasterSuppliersPage() {
     contacto: "",
     tiempoEntregaDias: 3,
   });
+  const [catalogLoading, setCatalogLoading] = useState(false);
 
   useEffect(() => {
     const session = getSession();
@@ -39,14 +40,32 @@ export default function MasterSuppliersPage() {
     fetchData();
   }, [router]);
 
+  useEffect(() => {
+    if (viewCatalogSupplier?.id) {
+       fetchCatalog(viewCatalogSupplier.id);
+    } else {
+       setProducts([]);
+    }
+  }, [viewCatalogSupplier]);
+
+  async function fetchCatalog(supplierId: number) {
+    setCatalogLoading(true);
+    try {
+      const { data } = await (apiClient as any).GET("/api/catalog/suppliers/{id}/products", {
+        params: { path: { id: supplierId } }
+      });
+      setProducts(data ?? []);
+    } catch (error) {
+      console.error("Error fetching catalog:", error);
+    } finally {
+      setCatalogLoading(false);
+    }
+  }
+
   async function fetchData() {
     try {
-      const [supRes, prodRes] = await Promise.all([
-        apiClient.GET("/api/catalog/suppliers"),
-        (apiClient.GET as any)("/api/catalog/products", {})
-      ]);
+      const supRes = await apiClient.GET("/api/catalog/suppliers");
       setSuppliers(supRes.data ?? []);
-      if (prodRes.data) setProducts(prodRes.data as any[]);
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -213,14 +232,16 @@ export default function MasterSuppliersPage() {
                   <h2 style={{ color: "white", fontSize: "20px", fontWeight: "bold", margin: 0 }}>Catálogo Asociado</h2>
                   <p style={{ color: "var(--brand-400)", fontSize: "14px", fontWeight: "bold", marginTop: "4px" }}>{viewCatalogSupplier.nombre}</p>
                </div>
-               <button onClick={() => setViewCatalogSupplier(null)} style={{ background: "none", border: "none", color: "var(--neutral-400)", cursor: "pointer", fontSize: "18px" }}>✖</button>
+               <button onClick={() => setViewCatalogSupplier(null)} style={{ background: "none", border: "none", color: "var(--neutral-400)", cursor: "pointer", fontSize: "18px" }}><X size={18} /></button>
             </div>
             
             <div className="custom-scrollbar" style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "12px", paddingRight: "8px" }}>
-               {products.filter(p => p.proveedorId === viewCatalogSupplier.id).length === 0 ? (
+               {catalogLoading ? (
+                  <div style={{ padding: "40px", textAlign: "center", color: "var(--neutral-500)" }}>Cargando catálogo...</div>
+               ) : products.length === 0 ? (
                   <p style={{ color: "var(--neutral-400)", textAlign: "center", padding: "40px" }}>Aún no hay productos comprados o registrados a este proveedor.</p>
                ) : (
-                  products.filter(p => p.proveedorId === viewCatalogSupplier.id).map(p => (
+                  products.map(p => (
                     <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", background: "var(--neutral-900)", border: "1px solid var(--border-default)", borderRadius: "8px" }}>
                         <div>
                             <p style={{ color: "white", fontWeight: "bold", fontSize: "14px", margin: 0 }}>{p.nombre}</p>

@@ -31,74 +31,66 @@ export default function LoginPage() {
         }}
         className="hidden-mobile"
       >
-        {/* Logo */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        {/* Spacer top */}
+        <div aria-hidden="true" />
+
+        {/* Hero Branding Center */}
+        <div style={{ animation: "fadeInUp 0.7s cubic-bezier(0.16,1,0.3,1) both", display: "flex", flexDirection: "column", gap: "24px", alignItems: "center", textAlign: "center" }}>
+          {/* Main Logo */}
           <div
             style={{
-              width: "40px",
-              height: "40px",
+              width: "120px",
+              height: "120px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              flexShrink: 0,
             }}
           >
-            <Logo size={36} />
+            <Logo size={120} />
           </div>
-          <span
-            style={{
-              fontSize: "16px",
-              fontWeight: 700,
-              color: "var(--neutral-50)",
-              fontFamily: "var(--font-sans)",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            Zen Inventory
-          </span>
-        </div>
-
-        {/* Headline editorial (estilo Zen) */}
-        <div style={{ animation: "fadeInUp 0.7s cubic-bezier(0.16,1,0.3,1) both" }}>
+          
           <h1
             style={{
               fontFamily: "var(--font-serif)",
-              fontSize: "clamp(40px, 4.5vw, 60px)",
+              fontSize: "clamp(48px, 5.5vw, 76px)",
               fontWeight: 700,
-              lineHeight: 1.1,
-              letterSpacing: "-0.02em",
+              lineHeight: 1.05,
+              letterSpacing: "-0.04em",
               color: "var(--neutral-50)",
-              marginBottom: "20px",
             }}
           >
-            gestiona{" "}
-            <em
+            Zen Inventory
+          </h1>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px", alignItems: "center" }}>
+            <p
               style={{
-                color: "var(--brand-500)",
-                fontStyle: "normal",
+                fontSize: "24px",
+                color: "var(--brand-400)",
                 fontFamily: "var(--font-serif)",
+                fontStyle: "italic",
+                fontWeight: 500,
+                letterSpacing: "-0.01em",
               }}
             >
-              tu inventario
-            </em>
-            <br />
-            con inteligencia
-          </h1>
-          <p
-            style={{
-              fontSize: "16px",
-              color: "var(--neutral-400)",
-              lineHeight: 1.7,
-              maxWidth: "400px",
-              fontFamily: "var(--font-sans)",
-            }}
-          >
-            Sistema multi-sucursal con alertas proactivas, trazabilidad completa y analítica en tiempo real.
-          </p>
+              Gestiona tu inventario con inteligencia.
+            </p>
+            <p
+              style={{
+                fontSize: "16px",
+                color: "var(--neutral-400)",
+                lineHeight: 1.6,
+                maxWidth: "460px",
+                fontFamily: "var(--font-sans)",
+              }}
+            >
+              Sistema multi-sucursal con alertas proactivas, trazabilidad completa y analítica en tiempo real.
+            </p>
+          </div>
         </div>
 
         {/* Footer branding */}
-        <p style={{ fontSize: "13px", color: "var(--neutral-500)", fontFamily: "var(--font-sans)" }}>
+        <p style={{ fontSize: "13px", color: "var(--neutral-500)", fontFamily: "var(--font-sans)", textAlign: "center" }}>
           © {new Date().getFullYear()} Zen Inventory Logic
         </p>
       </div>

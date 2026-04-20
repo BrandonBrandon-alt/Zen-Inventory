@@ -1,0 +1,145 @@
+"use client";
+
+import React, { useState, useEffect, useTransition } from "react";
+import { useToast } from "@/context/ToastContext";
+import { apiClient } from "@/api/client";
+import { User, Mail, Lock, Shield, Building } from "lucide-react";
+import Modal from "@/components/ui/Modal";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
+import type { components } from "@/api/schema";
+
+type UserResponse   = components["schemas"]["UserResponse"];
+type UserRequest    = components["schemas"]["UserRequest"];
+type RoleResponse   = components["schemas"]["RoleResponse"];
+type BranchResponse = components["schemas"]["BranchResponse"];
+
+export default function CreateUserModal({ open, onClose, roles, branches, onCreated }: {
+    open: boolean;
+    onClose: () => void;
+    roles: RoleResponse[];
+    branches: BranchResponse[];
+    onCreated: (u: UserResponse) => void;
+}) {
+    const { showToast } = useToast();
+    const [isPending, startTransition] = useTransition();
+    const [values, setValues] = useState<Partial<UserRequest>>({ rolId: 0, activo: true });
+    const [serverError, setServerError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (open) {
+            setValues({ rolId: roles[0]?.id || 0, activo: true, nombre: "", email: "", password: "" });
+            setServerError(null);
+        }
+    }, [open, roles]);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        // --- Validaciones Frontend Importantes ---
+        if (!values.nombre || values.nombre.trim().length < 3) {
+            setServerError("El nombre debe tener al menos 3 caracteres.");
+            return;
+        }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!values.email || !emailRegex.test(values.email)) {
+            setServerError("Debes proporcionar un correo electrónico válido.");
+            return;
+        }
+        if (!values.password || values.password.length < 6) {
+            setServerError("La contraseña debe tener un mínimo de 6 caracteres por seguridad.");
+            return;
+        }
+        if (!values.rolId) {
+            setServerError("El rol del sistema es obligatorio.");
+            return;
+        }
+        if (Number(values.rolId) !== 1 && (!values.sucursalId || Number(values.sucursalId) === 0)) {
+            setServerError("Es estrictamente obligatorio asignar una sucursal para Vendedores o Administradores Locales.");
+            return;
+        }
+
+        setServerError(null);
+        startTransition(async () => {
+            const { data, error } = await apiClient.POST("/api/users", {
+                body: {
+                    nombre: values.nombre!,
+                    email: values.email!,
+                    password: values.password!,
+                    rolId: Number(values.rolId),
+                    sucursalId: values.rolId !== 1 ? Number(values.sucursalId) : undefined,
+                } as any
+            });
+
+            if (data) {
+                showToast("Usuario creado correctamente.", "success", "Registro exitoso");
+                onCreated(data);
+                onClose();
+            } else {
+                showToast((error as any)?.message || "No se pudo crear el usuario.", "error", "Error");
+                setServerError((error as any)?.message || "Error al crear usuario.");
+            }
+        });
+    };
+
+    return (
+        <Modal
+            open={open}
+            onClose={onClose}
+            title="Nuevo Usuario"
+            description="Registra un nuevo colaborador y asigna sus permisos."
+            footer={
+                <>
+                    <Button variant="ghost" size="sm" onClick={onClose} disabled={isPending}>Cancelar</Button>
+                    <Button size="sm" loading={isPending} onClick={handleSubmit as any}>Crear Usuario</Button>
+                </>
+            }
+        >
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {serverError && <div style={{ color: "var(--brand-500)", fontSize: "13px" }}>{serverError}</div>}
+                <Input
+                    label="Nombre completo"
+                    value={values.nombre ?? ""}
+                    onChange={e => setValues({...values, nombre: e.target.value})}
+                    icon={<User size={15} />}
+                    placeholder="Ej. Juan Pérez"
+                />
+                <Input
+                    label="Email"
+                    value={values.email ?? ""}
+                    onChange={e => setValues({...values, email: e.target.value})}
+                    icon={<Mail size={15} />}
+                    placeholder="juan@zeninventory.com"
+                />
+                <Input
+                    label="Contraseña"
+                    type="password"
+                    value={values.password ?? ""}
+                    onChange={e => setValues({...values, password: e.target.value})}
+                    icon={<Lock size={15} />}
+                />
+                <Select
+                    label="Rol del sistema"
+                    value={values.rolId ?? ""}
+                    onChange={val => setValues({...values, rolId: Number(val)})}
+                    options={roles.map(r => ({ value: r.id!, label: r.nombre! }))}
+                    icon={<Shield size={15} />}
+                />
+                {values.rolId && Number(values.rolId) !== 1 && (
+                    <Select
+                        label="Sucursal asignada"
+                        value={values.sucursalId || ""}
+                        onChange={val => setValues({...values, sucursalId: Number(val)})}
+                        options={branches
+                          .filter(b => b.activa)
+                          .map(b => ({ value: b.id!, label: b.nombre! }))
+                        }
+                        icon={<Building size={15} />}
+                        placeholder="Seleccionar sede..."
+                    />
+                )}
+            </form>
+        </Modal>
+    );
+}

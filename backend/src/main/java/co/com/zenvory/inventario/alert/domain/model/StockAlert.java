@@ -8,6 +8,8 @@ public class StockAlert {
     public enum AlertType {
         LOW_STOCK,
         TRANSFER_REQUEST,
+        RETURN_REQUEST,
+        PURCHASE_REQUEST,
         ISSUE_REPORTED,
         VOID_SALE
     }

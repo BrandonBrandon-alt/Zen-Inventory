@@ -12,6 +12,7 @@ interface InventoryItem {
   sku: string;
   stockActual: number;
   precioVenta: number;
+  activo?: boolean;
 }
 
 interface InventoryItemCardProps {

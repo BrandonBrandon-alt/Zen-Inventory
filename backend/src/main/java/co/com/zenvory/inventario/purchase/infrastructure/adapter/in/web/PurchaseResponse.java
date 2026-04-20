@@ -19,8 +19,10 @@ public record PurchaseResponse(
         Long userId,
         Long receivingUserId,
         Long branchId,
+        Integer deliveryLeadTimeDays,
         BigDecimal total,
         String reasonResolution,
+        boolean exceptionApproved,
         List<PurchaseDetailResponse> details
 ) {
     public record PurchaseDetailResponse(
@@ -46,8 +48,10 @@ public record PurchaseResponse(
                 order.getUserId(),
                 order.getReceivingUserId(),
                 order.getBranchId(),
+                order.getDeliveryLeadTimeDays(),
                 order.getTotal(),
                 order.getReasonResolution(),
+                order.isExceptionApproved(),
                 order.getDetails().stream().map(d -> new PurchaseDetailResponse(
                         d.getId(),
                         d.getProductId(),

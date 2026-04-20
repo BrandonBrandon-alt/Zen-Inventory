@@ -77,8 +77,9 @@ public class TransferService implements TransferUseCase {
         );
 
         boolean autoApproved = false;
-        // SENIOR DIRECTIVE: Auto-Approval for Managers and Admins
-        if (user.getRole() != null && ("MANAGER".equals(user.getRole().getNombre()) || "ADMIN".equals(user.getRole().getNombre()))) {
+        // REGLA DE NEGOCIO: Los Managers y Admins auto-aprueban la recepción en destino al solicitar
+        String role = user.getRole() != null ? user.getRole().getNombre() : "";
+        if ("MANAGER".equals(role) || "ADMIN".equals(role)) {
             transfer.approveDestination(user.getId(), user.getNombre());
             autoApproved = true;
         }
@@ -95,15 +96,7 @@ public class TransferService implements TransferUseCase {
         Transfer savedTransfer = transferRepositoryPort.save(transfer);
 
         if (autoApproved) {
-            String msg = String.format("⚠ Solicitud de Traslado: La sucursal %s solicita productos. Requiere tu autorización de salida.", 
-                    user.getSucursalId() != null ? "tu sucursal vecina" : "Administración");
-            alertUseCase.createAlert(
-                savedTransfer.getOriginBranchId(), 
-                details.get(0).getProductId(), 
-                msg, 
-                co.com.zenvory.inventario.alert.domain.model.StockAlert.AlertType.TRANSFER_REQUEST, 
-                savedTransfer.getId()
-            );
+            // Generación de alertas desactivada
         }
 
         return savedTransfer;
@@ -146,6 +139,14 @@ public class TransferService implements TransferUseCase {
             
             String productName = productUseCase.getProductById(detail.getProductId()).getName();
             
+            // REGLA DE NEGOCIO: Liberar el stock comprometido antes de retirar físicamente
+            // para que la validación de 'hasSufficientStock' no lo cuente dos veces.
+            inventoryUseCase.releaseStock(
+                    transfer.getOriginBranchId(),
+                    detail.getProductId(),
+                    BigDecimal.valueOf(detail.getRequestedQuantity())
+            );
+
             inventoryUseCase.withdrawStock(
                     transfer.getOriginBranchId(),
                     detail.getProductId(),
@@ -158,13 +159,6 @@ public class TransferService implements TransferUseCase {
                     "TRANSFERENCIA_OUT",
                     null,
                     null
-            );
-
-            // REGLA DE NEGOCIO: Liberar el stock comprometido que ya se retiró físicamente
-            inventoryUseCase.releaseStock(
-                    transfer.getOriginBranchId(),
-                    detail.getProductId(),
-                    BigDecimal.valueOf(detail.getRequestedQuantity())
             );
         }
 
@@ -212,9 +206,7 @@ public class TransferService implements TransferUseCase {
             detail.registerReceipt(rDetail.receivedQuantity());
             if (detail.getMissingQuantity() > 0) {
                 hasIssues = true;
-                String msg = String.format("Novedad en Traslado #%d: Faltan %d unidades del producto #%d en destino", 
-                        transfer.getId(), detail.getMissingQuantity(), detail.getProductId());
-                alertUseCase.createAlert(transfer.getDestinationBranchId(), detail.getProductId(), msg, co.com.zenvory.inventario.alert.domain.model.StockAlert.AlertType.ISSUE_REPORTED, transfer.getId());
+                // Generación de alerta ISSUE_REPORTED desactivada
             }
             
             // Si llego mayor a cero, ingresar físicamente a la sucursal de destino
@@ -417,6 +409,108 @@ public class TransferService implements TransferUseCase {
             delayedCount,
             onTimePercentage,
             averageDelayHours
+        );
+    }
+
+    @Override
+    public co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.LogisticsAnalyticsResponse getLogisticsAnalytics() {
+        List<Transfer> transfers = transferRepositoryPort.findAll();
+        
+        long totalTransfers = transfers.size();
+        
+        List<Transfer> relevant = transfers.stream()
+            .filter(t -> t.getStatus() == TransferStatus.DELIVERED || t.getStatus() == TransferStatus.IN_TRANSIT)
+            .toList();
+            
+        long delayedCount = 0;
+        double globalDelayHours = 0.0;
+        long onTimeCount = 0;
+        long completedCount = 0;
+        
+        java.util.Map<String, co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.LogisticsAnalyticsResponse.RouteMetrics> routeMap = new java.util.HashMap<>();
+        
+        for (Transfer t : relevant) {
+            String routeKey = t.getOriginBranchId() + "-" + t.getDestinationBranchId();
+            
+            boolean isDelayed = false;
+            double delayHours = 0.0;
+            
+            if (t.getEstimatedArrivalDate() != null) {
+                java.time.LocalDateTime compareDate = t.getStatus() == TransferStatus.DELIVERED ? t.getActualArrivalDate() : java.time.LocalDateTime.now();
+                if (compareDate != null && compareDate.isAfter(t.getEstimatedArrivalDate())) {
+                    isDelayed = true;
+                    delayHours = java.time.Duration.between(t.getEstimatedArrivalDate(), compareDate).toMinutes() / 60.0;
+                }
+            }
+            
+            if (t.getStatus() == TransferStatus.DELIVERED) {
+                completedCount++;
+                if (isDelayed) {
+                    delayedCount++;
+                    globalDelayHours += delayHours;
+                } else {
+                    onTimeCount++;
+                }
+            }
+            
+            final boolean routeItemDelayed = isDelayed;
+            final double routeItemDelayHours = delayHours;
+            
+            routeMap.compute(routeKey, (key, existing) -> {
+                long rTotal = existing == null ? 1 : existing.totalTransfers() + 1;
+                long rOnTime = existing == null ? 
+                        (t.getStatus() == TransferStatus.DELIVERED && !routeItemDelayed ? 1 : 0) : 
+                        existing.onTimeTransfers() + (t.getStatus() == TransferStatus.DELIVERED && !routeItemDelayed ? 1 : 0);
+                long rDelayed = existing == null ? 
+                        (routeItemDelayed ? 1 : 0) : 
+                        existing.delayedTransfers() + (routeItemDelayed ? 1 : 0);
+                        
+                double currentTotalDelay = existing == null ? 0 : existing.averageDelayHours() * existing.delayedTransfers();
+                double rTotalDelayHours = currentTotalDelay + routeItemDelayHours;
+                        
+                double rAverageDelayHours = rDelayed > 0 ? rTotalDelayHours / rDelayed : 0.0;
+                
+                BigDecimal rCost = existing == null ? 
+                        (t.getShippingCost() != null ? t.getShippingCost() : BigDecimal.ZERO) : 
+                        existing.totalShippingCost().add(t.getShippingCost() != null ? t.getShippingCost() : BigDecimal.ZERO);
+                        
+                long rUrgent = existing == null ? 
+                        (t.getPriority() != null && "HIGH".equals(t.getPriority().name()) ? 1 : 0) : 
+                        existing.urgentCount() + (t.getPriority() != null && "HIGH".equals(t.getPriority().name()) ? 1 : 0);
+                        
+                return new co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.LogisticsAnalyticsResponse.RouteMetrics(
+                        t.getOriginBranchId(),
+                        t.getDestinationBranchId(),
+                        rTotal,
+                        rOnTime,
+                        rDelayed,
+                        rAverageDelayHours,
+                        rCost,
+                        rUrgent
+                );
+            });
+        }
+        
+        double onTimePercentage = completedCount > 0 ? ((double) onTimeCount / completedCount) * 100.0 : 0.0;
+        double avgDelayHours = delayedCount > 0 ? globalDelayHours / delayedCount : 0.0;
+        
+        co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.LogisticsAnalyticsResponse.GlobalMetrics globals = 
+            new co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.LogisticsAnalyticsResponse.GlobalMetrics(
+                totalTransfers,
+                onTimePercentage,
+                delayedCount,
+                avgDelayHours
+        );
+        
+        List<co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.LogisticsAnalyticsResponse.RouteMetrics> sortedRoutes = 
+            routeMap.values().stream()
+                .sorted((r1, r2) -> Long.compare(r2.totalTransfers(), r1.totalTransfers()))
+                .limit(10)
+                .toList();
+                
+        return new co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.LogisticsAnalyticsResponse(
+            globals,
+            sortedRoutes
         );
     }
 }

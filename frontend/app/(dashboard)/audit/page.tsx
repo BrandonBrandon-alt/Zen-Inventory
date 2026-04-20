@@ -77,11 +77,10 @@ export default function AuditPage() {
     const product = products.get(m.productId!);
     const productName = (product?.nombre || "").toLowerCase();
     const userName = (users.get(m.userId!) || "").toLowerCase();
-    const supplierName = product?.proveedorId ? (suppliers.get(product.proveedorId) || "").toLowerCase() : "";
     const reason = (m.reason || "").toLowerCase();
     const term = searchTerm.toLowerCase();
     
-    return productName.includes(term) || userName.includes(term) || reason.includes(term) || supplierName.includes(term);
+    return productName.includes(term) || userName.includes(term) || reason.includes(term);
   }).sort((a, b) => {
     if (!sortConfig.key || !sortConfig.direction) return 0;
     
@@ -121,8 +120,6 @@ export default function AuditPage() {
       key: "reason",
       sortable: true,
       render: (m) => {
-        const product = products.get(m.productId!);
-        const supplierName = product?.proveedorId ? suppliers.get(product.proveedorId) : null;
         const observations = m.observations;
         
         const reasonStyles: Record<string, { color: string, bg: string, icon: any }> = {
@@ -175,9 +172,6 @@ export default function AuditPage() {
                 )}
               </div>
             </div>
-            {m.reason === "COMPRA" && supplierName && (
-              <span style={{ fontSize: "11px", color: "var(--brand-400)", fontWeight: 700, marginLeft: "4px" }}>{supplierName}</span>
-            )}
           </div>
         );
       }

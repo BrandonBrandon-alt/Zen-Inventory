@@ -2,8 +2,10 @@ package co.com.zenvory.inventario.catalog.infrastructure.adapter.in.web;
 
 import co.com.zenvory.inventario.catalog.application.port.in.SupplierUseCase;
 import co.com.zenvory.inventario.catalog.domain.model.Supplier;
+import co.com.zenvory.inventario.catalog.infrastructure.adapter.in.web.dto.ProductResponse;
 import co.com.zenvory.inventario.catalog.infrastructure.adapter.in.web.dto.SupplierRequest;
 import co.com.zenvory.inventario.catalog.infrastructure.adapter.in.web.dto.SupplierResponse;
+import co.com.zenvory.inventario.catalog.domain.model.Product;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -65,6 +67,41 @@ public class SupplierController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         supplierUseCase.deleteSupplier(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /** GET /api/catalog/suppliers/search?productId=... — Busca proveedores por producto. */
+    @GetMapping("/search")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
+    public ResponseEntity<List<SupplierResponse>> searchByProduct(@RequestParam Long productId) {
+        return ResponseEntity.ok(
+                supplierUseCase.getSuppliersByProductId(productId).stream()
+                        .map(this::mapToResponse)
+                        .collect(Collectors.toList()));
+    }
+
+    /** GET /api/catalog/suppliers/{id}/products — Lista los productos de un proveedor. */
+    @GetMapping("/{id}/products")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
+    public ResponseEntity<List<ProductResponse>> getProductsBySupplier(@PathVariable Long id) {
+        return ResponseEntity.ok(
+                supplierUseCase.getProductsBySupplierId(id).stream()
+                        .filter(p -> p.getActive() == null || p.getActive())
+                        .map(this::mapProductToResponse)
+                        .collect(Collectors.toList()));
+    }
+
+    private ProductResponse mapProductToResponse(Product product) {
+        return ProductResponse.builder()
+                .id(product.getId())
+                .sku(product.getSku())
+                .nombre(product.getName())
+                .costoPromedio(product.getAverageCost())
+                .precioVenta(product.getSalePrice())
+                .unitId(product.getUnitId())
+                .unitAbbreviation(product.getUnitAbbreviation())
+                .activo(product.getActive())
+                .creadoEn(product.getCreatedAt())
+                .build();
     }
 
     private Supplier mapToDomain(SupplierRequest req) {

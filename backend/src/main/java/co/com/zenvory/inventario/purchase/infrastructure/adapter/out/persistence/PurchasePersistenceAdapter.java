@@ -48,6 +48,7 @@ public class PurchasePersistenceAdapter implements PurchaseRepositoryPort {
         entity.setRequestDate(domain.getRequestDate());
         entity.setEstimatedArrivalDate(domain.getEstimatedArrivalDate());
         entity.setActualArrivalDate(domain.getActualArrivalDate());
+        entity.setDeliveryLeadTimeDays(domain.getDeliveryLeadTimeDays());
         entity.setReceptionStatus(domain.getReceptionStatus().name());
         entity.setPaymentStatus(domain.getPaymentStatus().name());
         entity.setPaymentDueDate(domain.getPaymentDueDate());
@@ -56,6 +57,7 @@ public class PurchasePersistenceAdapter implements PurchaseRepositoryPort {
         entity.setReasonResolution(domain.getReasonResolution());
         entity.setResueltoPorId(domain.getResolvedById());
         entity.setFechaResolucion(domain.getResolutionDate());
+        entity.setExceptionApproved(domain.isExceptionApproved());
         entity.setVersion(domain.getVersion());
 
         domain.getDetails().forEach(d -> {
@@ -87,6 +89,7 @@ public class PurchasePersistenceAdapter implements PurchaseRepositoryPort {
                 entity.getRequestDate(),
                 entity.getEstimatedArrivalDate(),
                 entity.getActualArrivalDate(),
+                entity.getDeliveryLeadTimeDays(),
                 ReceptionStatus.valueOf(entity.getReceptionStatus()),
                 PaymentStatus.valueOf(entity.getPaymentStatus()),
                 entity.getPaymentDueDays(),
@@ -96,6 +99,7 @@ public class PurchasePersistenceAdapter implements PurchaseRepositoryPort {
                 entity.getReasonResolution(),
                 entity.getResueltoPorId(),
                 entity.getFechaResolucion(),
+                entity.isExceptionApproved(),
                 entity.getVersion()
         );
     }

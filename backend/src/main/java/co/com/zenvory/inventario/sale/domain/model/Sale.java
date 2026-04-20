@@ -68,6 +68,13 @@ public class Sale {
         this.cancellationReason = reason;
     }
 
+    public void markAsReturned() {
+        if (this.status == SaleStatus.CANCELED) {
+            throw new IllegalStateException("No se puede marcar como devolución una venta ya anulada.");
+        }
+        this.status = SaleStatus.RETURNED;
+    }
+
     private void calculateFinancials() {
         // 1. Subtotal Base: Suma de (cantidad * precio_pactado) de cada línea SIN descuentos de línea
         this.subtotal = this.details.stream()

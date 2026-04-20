@@ -149,7 +149,9 @@ export default function Modal({
         </div>
 
         {/* Body */}
-        <div style={{ padding: "24px", overflowY: "auto", flex: 1 }} className="custom-scrollbar">{children}</div>
+        <div style={{ padding: "24px", overflowY: "auto" }} className="custom-scrollbar">
+          {children}
+        </div>
 
         {/* Footer */}
         {footer && (

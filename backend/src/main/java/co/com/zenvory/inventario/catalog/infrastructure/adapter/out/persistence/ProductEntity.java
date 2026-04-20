@@ -1,11 +1,15 @@
 package co.com.zenvory.inventario.catalog.infrastructure.adapter.out.persistence;
 
 import co.com.zenvory.inventario.catalog.domain.model.Product;
+import co.com.zenvory.inventario.catalog.domain.model.SupplierSummary;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Entidad JPA que mapea la tabla {@code producto} de la base de datos.
@@ -40,12 +44,6 @@ public class ProductEntity {
     @Column(name = "precio_venta", precision = 12, scale = 2)
     private BigDecimal salePrice;
 
-    /**
-     * Referencia al ID del proveedor. Se guarda como clave foránea escalar
-     * para no crear un join eager innecesario con la entidad Proveedor.
-     */
-    @Column(name = "proveedor_id")
-    private Long supplierId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "unidad_id", nullable = false)
@@ -53,6 +51,16 @@ public class ProductEntity {
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    /** Indica si el producto está disponible para operaciones comerciales. */
+    @Column(name = "activa")
+    @Builder.Default
+    private Boolean active = true;
+
+    /** Relación Muchos a Muchos gestionada a través de la entidad puente. */
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<ProductSupplierEntity> suppliers = new ArrayList<>();
 
     // ── Mappers ─────────────────────────────────────────────────────────────
 
@@ -64,10 +72,14 @@ public class ProductEntity {
                 .name(this.name)
                 .averageCost(this.averageCost)
                 .salePrice(this.salePrice)
-                .supplierId(this.supplierId)
                 .unitId(this.unit != null ? this.unit.getId() : null)
                 .unitAbbreviation(this.unit != null ? this.unit.getAbbreviation() : "UND")
                 .createdAt(this.createdAt)
+                .active(this.active)
+                .suppliers(this.suppliers != null ? 
+                    this.suppliers.stream()
+                        .map(ps -> new SupplierSummary(ps.getSupplierId(), ps.getSupplier() != null ? ps.getSupplier().getName() : "Proveedor #" + ps.getSupplierId()))
+                        .collect(Collectors.toList()) : new ArrayList<>())
                 .build();
     }
 
@@ -79,9 +91,10 @@ public class ProductEntity {
                 .name(product.getName())
                 .averageCost(product.getAverageCost())
                 .salePrice(product.getSalePrice())
-                .supplierId(product.getSupplierId())
                 .unit(product.getUnitId() != null ? UnitOfMeasureEntity.builder().id(product.getUnitId()).build() : null)
                 .createdAt(product.getCreatedAt())
+                .active(product.getActive() != null ? product.getActive() : true)
+                .suppliers(new ArrayList<>())
                 .build();
     }
 }

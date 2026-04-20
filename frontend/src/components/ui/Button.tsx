@@ -26,9 +26,9 @@ export default function Button({
 
   const baseStyles: Record<string, React.CSSProperties> = {
     primary: {
-      background: "var(--brand-400)",
-      color: "#fff",
-      border: "1px solid var(--brand-500)",
+      background: "var(--btn-primary-bg)",
+      color: "var(--btn-primary-text)",
+      border: "1px solid transparent",
     },
     ghost: {
       background: "transparent",
@@ -43,7 +43,7 @@ export default function Button({
   };
 
   const hoverStyles: Record<string, Partial<React.CSSProperties>> = {
-    primary: { background: "var(--brand-400)", transform: "translateY(-1px)", boxShadow: "0 4px 20px var(--brand-glow)" },
+    primary: { background: "var(--btn-primary-hover-bg)", transform: "translateY(-1px)", boxShadow: "0 4px 16px rgba(0,0,0,0.18)" },
     ghost:   { background: "var(--bg-hover)",  transform: "translateY(-1px)" },
     danger:  { background: "rgba(224,112,112,0.18)", transform: "translateY(-1px)" },
   };

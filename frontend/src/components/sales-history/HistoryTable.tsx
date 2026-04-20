@@ -20,8 +20,8 @@ export default function HistoryTable({ sales, onOpenDetail, formatCurrency, onRe
       key: "id",
       width: "140px",
       render: (sale) => (
-        <span className="tabular" style={{ fontSize: "13px", fontWeight: 700, color: "var(--brand-400)" }}>
-          #{sale.id}
+        <span className="tabular font-black text-[var(--brand-400)] tracking-tighter text-sm">
+          #{String(sale.id).padStart(6, "0")}
         </span>
       )
     },
@@ -29,12 +29,12 @@ export default function HistoryTable({ sales, onOpenDetail, formatCurrency, onRe
       header: "Sucursal / Usuario",
       key: "branchName",
       render: (sale) => (
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ fontSize: "15px", fontWeight: 600, color: "var(--neutral-100)", textTransform: "uppercase" }}>
+        <div className="flex flex-col">
+          <span className="text-[13px] font-black text-[var(--neutral-50)] uppercase tracking-tight">
             {sale.branchName || `Sucursal ${sale.branchId}`}
           </span>
-          <span style={{ fontSize: "11px", color: "var(--neutral-500)", fontWeight: 500 }}>
-            {sale.userName || "Admin Central"}
+          <span className="text-[10px] text-[var(--neutral-500)] font-black uppercase tracking-widest mt-0.5">
+            Responsable: {sale.userName || "Admin Central"}
           </span>
         </div>
       )
@@ -43,35 +43,44 @@ export default function HistoryTable({ sales, onOpenDetail, formatCurrency, onRe
       header: "Cliente / Identificación",
       key: "customerName",
       render: (sale) => (
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <span style={{ fontSize: "15px", fontWeight: 600, color: "var(--neutral-100)", textTransform: "uppercase" }}>
-            {sale.customerName || "Venta General"}
+        <div className="flex flex-col">
+          <span className="text-[13px] font-black text-[var(--neutral-100)] uppercase tracking-tight">
+            {sale.customerName || "Consumidor Final"}
           </span>
-          <span className="tabular" style={{ fontSize: "11px", color: "var(--neutral-500)", fontWeight: 500 }}>
-            ID: {sale.customerDocument || "N/A"}
+          <span className="tabular text-[10px] text-[var(--brand-400)] font-black uppercase tracking-widest mt-0.5 opacity-70">
+            DOC: {sale.customerDocument || "ANÓNIMO"}
           </span>
         </div>
       )
     },
     {
-      header: "Inversión Final",
+      header: "Valor de Factura",
       key: "totalFinal",
       align: "right",
       render: (sale) => (
-        <span className="tabular" style={{ fontSize: "16px", fontWeight: 800, color: "var(--neutral-50)" }}>
+        <span className="tabular text-base font-black text-[var(--neutral-50)]" style={{ textShadow: "0 0 15px var(--brand-glow)" }}>
           {formatCurrency(sale.totalFinal)}
         </span>
       )
     },
     {
-      header: "Estado",
+      header: "Estado Transaccional",
       key: "status",
       align: "center",
-      render: (sale) => (
-        <Badge variant={sale.status === 'COMPLETED' ? "success" : "neutral"} dot>
-          {sale.status === 'COMPLETED' ? "Aprobada" : "Anulada"}
-        </Badge>
-      )
+      render: (sale) => {
+        const rawStatus = (sale.status || "").toUpperCase().trim();
+        const variantMap: Record<string, any> = {
+          'COMPLETED': { variant: 'success', text: 'Venta Exitosa' },
+          'RETURNED': { variant: 'warning', text: 'Devolución' },
+          'CANCELED': { variant: 'neutral', text: 'Anulada' }
+        };
+        const config = variantMap[rawStatus] || { variant: 'neutral', text: rawStatus || 'Sin Estado' };
+        return (
+          <Badge variant={config.variant} className="font-black uppercase tracking-widest text-[9px] px-3">
+            {config.text}
+          </Badge>
+        );
+      }
     },
     {
       header: "Acciones",
@@ -79,8 +88,8 @@ export default function HistoryTable({ sales, onOpenDetail, formatCurrency, onRe
       align: "right",
       width: "80px",
       render: () => (
-        <Button variant="ghost" size="sm" title="Ver detalle de venta">
-          <Eye size={16} />
+        <Button variant="ghost" size="sm" title="Consultar Comprobante" className="text-[var(--brand-400)] hover:bg-[var(--brand-500)]/10">
+          <Eye size={18} />
         </Button>
       )
     }
@@ -94,15 +103,19 @@ export default function HistoryTable({ sales, onOpenDetail, formatCurrency, onRe
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
         <span className="tabular" style={{ fontSize: "12px", fontWeight: 700, color: "var(--brand-400)" }}>#{sale.id}</span>
         <div style={{ 
-            padding: "2px 6px", 
-            borderRadius: "4px", 
+            padding: "2px 8px", 
+            borderRadius: "6px", 
             fontSize: "9px", 
-            fontWeight: 700, 
+            fontWeight: 800, 
             textTransform: "uppercase",
-            background: sale.status === 'COMPLETED' ? "color-mix(in srgb, var(--color-success), transparent 90%)" : "color-mix(in srgb, var(--color-danger), transparent 90%)",
-            color: sale.status === 'COMPLETED' ? "var(--color-success)" : "var(--color-danger)",
+            background: sale.status === 'COMPLETED' ? "rgba(var(--color-success-rgb), 0.1)" : 
+                        sale.status === 'RETURNED' ? "rgba(var(--color-warning-rgb), 0.1)" : "rgba(var(--neutral-500-rgb), 0.1)",
+            color: sale.status === 'COMPLETED' ? "var(--color-success)" : 
+                   sale.status === 'RETURNED' ? "var(--color-warning)" : "var(--neutral-400)",
+            border: `1px solid ${sale.status === 'COMPLETED' ? "rgba(var(--color-success-rgb), 0.2)" : 
+                                  sale.status === 'RETURNED' ? "rgba(var(--color-warning-rgb), 0.2)" : "rgba(var(--neutral-500-rgb), 0.2)"}`
         }}>
-          {sale.status === 'COMPLETED' ? "Aprobada" : "Anulada"}
+          {sale.status === 'COMPLETED' ? "Venta Ok" : sale.status === 'RETURNED' ? "Devolución" : "Anulada"}
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>

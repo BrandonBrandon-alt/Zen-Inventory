@@ -62,8 +62,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               colorScheme: props.type === "date" ? "dark" : undefined,
             }}
             onFocus={(e) => {
-              e.currentTarget.style.borderColor = hasError ? "rgba(224,112,112,0.7)" : "rgba(217,99,79,0.5)";
-              e.currentTarget.style.boxShadow  = hasError ? "0 0 0 3px rgba(224,112,112,0.1)" : "0 0 0 3px rgba(217,99,79,0.12)";
+              e.currentTarget.style.borderColor = hasError ? "var(--color-danger)" : "var(--brand-500)";
+              e.currentTarget.style.boxShadow  = hasError ? "0 0 0 3px rgba(224,112,112,0.15)" : "0 0 0 3px rgba(217,99,79,0.22)";
             }}
             onBlur={(e) => {
               e.currentTarget.style.borderColor = hasError ? "rgba(224,112,112,0.5)" : "var(--border-default)";

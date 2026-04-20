@@ -31,7 +31,8 @@ public record ProductRequest(
         @Digits(integer = 10, fraction = 2, message = "El precio de venta debe tener máximo 10 enteros y 2 decimales")
         BigDecimal precioVenta,
 
-        Long proveedorId,
-        Long unitId
+        Long unitId,
+        java.util.List<Long> supplierIds,
+        Boolean activo
 
 ) {}

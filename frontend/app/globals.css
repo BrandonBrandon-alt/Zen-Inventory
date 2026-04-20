@@ -23,8 +23,13 @@
   --brand-600: #c0503c;
   --brand-glow: rgba(217, 99, 79, 0.22);
 
+  /* Button – Zen-style adaptive (contrasta con el fondo) */
+  --btn-primary-bg:   #d1cfc0;
+  --btn-primary-text: #1f1f1f;
+  --btn-primary-hover-bg: #f5f4f0;
+
   /* Neutral escala cálida */
-  --neutral-50:  #f5f4f0;
+  --neutral-50:  #e8e6e0;
   --neutral-100: #e8e6e0;
   --neutral-200: #cbc8bf;
   --neutral-300: #a8a49a;
@@ -34,6 +39,10 @@
   --neutral-700: #2e2c27;
   --neutral-800: #232220;
   --neutral-900: #191917;
+
+  /* Borders */
+  --border-default: rgba(255,255,255,0.07);
+  --border-subtle:  rgba(255,255,255,0.04);
 
   /* State */
   --color-danger:  #e07070;
@@ -87,6 +96,50 @@
   --sidebar-ring:    oklch(0.708 0 0);
 }
 
+/* ============================================================
+ * LIGHT MODE – Paleta Crema / Arena cálida
+ * ============================================================ */
+:root[data-theme='light'], .light {
+  /* Backgrounds – tonos crema y arena */
+  --bg-base:    #f2f0e3;
+  --bg-surface: #eeebe4;
+  --bg-card:    #f2f0e3;
+  --bg-hover:   #e8e4db;
+
+  /* Brand – mismo Coral, levemente más intenso en claro */
+  --brand-400: #c94f3a;
+  --brand-500: #b83c28;
+  --brand-600: #9e2f1e;
+  --brand-glow: rgba(185, 60, 40, 0.18);
+
+  /* Button – Zen-style adaptive (carbón sobre fondo claro) */
+  --btn-primary-bg:   #2e2e2e;
+  --btn-primary-text: #f5f4f0;
+  --btn-primary-hover-bg: #2c2a25;
+
+  /* Neutral invertida para texto oscuro */
+  --neutral-50:  #1a1917;
+  --neutral-100: #2c2a25;
+  --neutral-200: #3d3b35;
+  --neutral-300: #5a574f;
+  --neutral-400: #7c7971;
+  --neutral-500: #a8a49a;
+  --neutral-600: #cbc8bf;
+  --neutral-700: #dedbd3;
+  --neutral-800: #eceae3;
+  --neutral-900: #f5f3ee;
+
+  /* Borders */
+  --border-default: rgba(0,0,0,0.10);
+  --border-subtle:  rgba(0,0,0,0.06);
+
+  /* State – versiones más saturadas para fondo claro */
+  --color-danger:  #cc4444;
+  --color-success: #2d8a52;
+  --color-warning: #c07c00;
+  --color-info:    #1d72d4;
+}
+
 @media (max-width: 1024px) {
   :root { --page-padding: 24px; }
 }
@@ -105,6 +158,7 @@ body {
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  transition: background 0.25s ease, color 0.25s ease;
 }
 
 /* Utilities */
@@ -124,6 +178,15 @@ body {
 
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite;
 }
 
 /* Page Components */

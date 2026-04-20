@@ -17,5 +17,6 @@ public record InventoryProductResponse(
         java.math.BigDecimal precioVenta,
         java.math.BigDecimal costoPromedio,
         String unit,
+        Boolean activo,
         java.time.LocalDateTime lastUpdated
 ) {}

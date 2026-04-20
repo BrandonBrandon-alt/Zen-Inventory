@@ -102,8 +102,9 @@ public class ProductController {
                 .name(req.nombre())
                 .averageCost(req.costoPromedio())
                 .salePrice(req.precioVenta())
-                .supplierId(req.proveedorId())
                 .unitId(req.unitId())
+                .supplierIds(req.supplierIds())
+                .active(req.activo())
                 .build();
     }
 
@@ -114,10 +115,11 @@ public class ProductController {
                 .nombre(product.getName())
                 .costoPromedio(product.getAverageCost())
                 .precioVenta(product.getSalePrice())
-                .proveedorId(product.getSupplierId())
                 .unitId(product.getUnitId())
                 .unitAbbreviation(product.getUnitAbbreviation())
+                .activo(product.getActive())
                 .creadoEn(product.getCreatedAt())
+                .proveedores(product.getSuppliers())
                 .build();
     }
 }

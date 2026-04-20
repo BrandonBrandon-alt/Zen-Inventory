@@ -23,41 +23,41 @@ public class AnalyticsService implements AnalyticsUseCase {
     }
 
     @Override
-    public List<TopSellingProduct> getTopSellingProducts(int limit, LocalDateTime startDate, LocalDateTime endDate) {
+    public List<TopSellingProduct> getTopSellingProducts(int limit, LocalDateTime startDate, LocalDateTime endDate,
+            Long branchId) {
         if (limit <= 0) {
             limit = 5;
         }
-        return analyticsRepository.findTopSellingProducts(limit, startDate, endDate);
+        return analyticsRepository.findTopSellingProducts(limit, startDate, endDate, branchId);
     }
 
     @Override
-    public List<BranchValuation> getBranchValuations() {
-        return analyticsRepository.findBranchValuations();
+    public List<BranchValuation> getBranchValuations(Long branchId) {
+        return analyticsRepository.findBranchValuations(branchId);
     }
 
     @Override
-    public GlobalSummary getGlobalSummary(LocalDateTime startDate, LocalDateTime endDate) {
-        return analyticsRepository.findGlobalSummary(startDate, endDate);
+    public GlobalSummary getGlobalSummary(LocalDateTime startDate, LocalDateTime endDate, Long branchId) {
+        return analyticsRepository.findGlobalSummary(startDate, endDate, branchId);
     }
 
     @Override
-    public List<BranchPerformance> getBranchPerformance(LocalDateTime startDate, LocalDateTime endDate) {
-        return analyticsRepository.findBranchPerformance(startDate, endDate);
+    public List<BranchPerformance> getBranchPerformance(LocalDateTime startDate, LocalDateTime endDate, Long branchId) {
+        return analyticsRepository.findBranchPerformance(startDate, endDate, branchId);
     }
 
     @Override
-    public List<SalesTrend> getSalesTrend(LocalDateTime startDate, LocalDateTime endDate) {
-        return analyticsRepository.findSalesTrend(startDate, endDate);
+    public List<SalesTrend> getSalesTrend(LocalDateTime startDate, LocalDateTime endDate, Long branchId) {
+        return analyticsRepository.findSalesTrend(startDate, endDate, branchId);
     }
 
     @Override
-    public DashboardAnalyticsResponse getDashboardData(LocalDateTime startDate, LocalDateTime endDate) {
+    public DashboardAnalyticsResponse getDashboardData(LocalDateTime startDate, LocalDateTime endDate, Long branchId) {
         return new DashboardAnalyticsResponse(
-                getGlobalSummary(startDate, endDate),
-                getSalesTrend(startDate, endDate),
-                getTopSellingProducts(5, startDate, endDate),
-                getBranchValuations(),
-                getBranchPerformance(startDate, endDate)
-        );
+                getGlobalSummary(startDate, endDate, branchId),
+                getSalesTrend(startDate, endDate, branchId),
+                getTopSellingProducts(5, startDate, endDate, branchId),
+                getBranchValuations(branchId),
+                getBranchPerformance(startDate, endDate, branchId));
     }
 }

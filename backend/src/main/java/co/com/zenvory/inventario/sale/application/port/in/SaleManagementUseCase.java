@@ -8,4 +8,5 @@ public interface SaleManagementUseCase {
     List<Sale> getSalesByBranch(Long branchId);
     Sale getSaleById(Long id);
     void cancelSale(Long id, String reason);
+    void updateSaleStatus(Long id, co.com.zenvory.inventario.sale.domain.model.SaleStatus status);
 }

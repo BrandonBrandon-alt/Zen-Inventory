@@ -21,4 +21,9 @@ public interface SupplierRepositoryPort {
     void deleteById(Long id);
 
     boolean existsById(Long id);
+
+    List<Supplier> findAllByProductId(Long productId);
+
+    /** Encuentra todos los productos suministrados por un proveedor específico. */
+    List<co.com.zenvory.inventario.catalog.domain.model.Product> findAllProductsBySupplierId(Long supplierId);
 }

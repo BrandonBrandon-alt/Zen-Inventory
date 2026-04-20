@@ -12,8 +12,8 @@ public interface AlertUseCase {
     void resolveAlert(Long alertId);
     
     // Decision Gateway Methods
-    void resolveViaTransfer(Long alertId, Long originBranchId, Integer quantity, Long userId);
-    void resolveViaPurchaseOrder(Long alertId, java.time.LocalDateTime estimatedArrival, java.math.BigDecimal quantity);
+    void resolveViaTransfer(Long alertId, Long originBranchId, Integer quantity, Long userId, String priority);
+    void resolveViaPurchaseOrder(Long alertId, Integer leadTimeDays, java.math.BigDecimal quantity, Long userId, boolean isManager, Long supplierId);
     void dismissAlert(Long alertId, String reason);
     
     void createAlert(Long branchId, Long productId, String message);

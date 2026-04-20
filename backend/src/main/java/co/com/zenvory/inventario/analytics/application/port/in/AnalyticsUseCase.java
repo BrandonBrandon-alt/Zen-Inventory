@@ -11,10 +11,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface AnalyticsUseCase {
-    List<TopSellingProduct> getTopSellingProducts(int limit, LocalDateTime startDate, LocalDateTime endDate);
-    List<BranchValuation> getBranchValuations();
-    GlobalSummary getGlobalSummary(LocalDateTime startDate, LocalDateTime endDate);
-    List<BranchPerformance> getBranchPerformance(LocalDateTime startDate, LocalDateTime endDate);
-    List<SalesTrend> getSalesTrend(LocalDateTime startDate, LocalDateTime endDate);
-    DashboardAnalyticsResponse getDashboardData(LocalDateTime startDate, LocalDateTime endDate);
+    List<TopSellingProduct> getTopSellingProducts(int limit, LocalDateTime startDate, LocalDateTime endDate, Long branchId);
+    List<BranchValuation> getBranchValuations(Long branchId);
+    GlobalSummary getGlobalSummary(LocalDateTime startDate, LocalDateTime endDate, Long branchId);
+    List<BranchPerformance> getBranchPerformance(LocalDateTime startDate, LocalDateTime endDate, Long branchId);
+    List<SalesTrend> getSalesTrend(LocalDateTime startDate, LocalDateTime endDate, Long branchId);
+    DashboardAnalyticsResponse getDashboardData(LocalDateTime startDate, LocalDateTime endDate, Long branchId);
 }

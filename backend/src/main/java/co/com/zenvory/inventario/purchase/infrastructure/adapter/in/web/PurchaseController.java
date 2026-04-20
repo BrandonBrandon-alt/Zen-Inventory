@@ -13,7 +13,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/purchases")
-@org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
 public class PurchaseController {
 
     private final PurchaseUseCase purchaseUseCase;
@@ -23,29 +22,55 @@ public class PurchaseController {
     }
 
     @PostMapping
-    public ResponseEntity<PurchaseResponse> createOrder(@Valid @RequestBody PurchaseRequest request) {
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
+    public ResponseEntity<PurchaseResponse> createOrder(
+            @Valid @RequestBody PurchaseRequest request,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
+        
+        boolean isManager = httpRequest.isUserInRole("ADMIN") || httpRequest.isUserInRole("MANAGER");
+        
         CreatePurchaseCommand command = new CreatePurchaseCommand(
                 request.supplierId(),
                 request.userId(),
                 request.branchId(),
-                request.estimatedArrivalDate(),
+                request.leadTimeDays(),
                 request.paymentDueDays(),
                 request.items().stream()
                         .map(item -> new CreatePurchaseCommand.Detail(item.productId(), item.quantity(), item.unitPrice(), item.discountPct()))
                         .toList()
         );
 
-        PurchaseOrder order = purchaseUseCase.createOrder(command);
+        PurchaseOrder order = purchaseUseCase.createOrder(command, isManager);
         return ResponseEntity.status(HttpStatus.CREATED).body(PurchaseResponse.fromDomain(order));
     }
 
+    @PostMapping("/{id}/approve")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<PurchaseResponse> approveOrder(
+            @PathVariable Long id,
+            @RequestParam Long userId) {
+        PurchaseOrder order = purchaseUseCase.approveOrder(id, userId);
+        return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
+    }
+
+    @PostMapping("/{id}/approve-exception")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PurchaseResponse> approveException(
+            @PathVariable Long id,
+            @RequestParam Long userId) {
+        PurchaseOrder order = purchaseUseCase.approveException(id, userId);
+        return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
+    }
+
     @PostMapping("/{id}/dispatch")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<PurchaseResponse> markAsInTransit(@PathVariable Long id) {
         PurchaseOrder order = purchaseUseCase.markAsInTransit(id);
         return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
     }
 
     @PostMapping("/{id}/receive")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<PurchaseReceiptResponse> receiveOrder(
             @PathVariable Long id,
             @Valid @RequestBody ReceiveOrderRequest request) {
@@ -83,12 +108,14 @@ public class PurchaseController {
     }
 
     @PostMapping("/{id}/pay")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<PurchaseResponse> registerPayment(@PathVariable Long id) {
         PurchaseOrder order = purchaseUseCase.registerPayment(id);
         return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
     }
 
     @PostMapping("/{id}/cancel")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<Void> cancelPurchase(
             @PathVariable Long id,
             @Valid @RequestBody ResolutionRequest request) {
@@ -97,12 +124,14 @@ public class PurchaseController {
     }
 
     @GetMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<PurchaseResponse> getOrder(@PathVariable Long id) {
         PurchaseOrder order = purchaseUseCase.getOrderById(id);
         return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
     }
 
     @GetMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<List<PurchaseResponse>> getAllOrders(
             @RequestParam(required = false) Long supplierId,
             @RequestParam(required = false) Long productId) {

@@ -135,6 +135,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(message));
     }
 
+    /** 403 - Acceso denegado (Falta de roles). */
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse("No tienes permisos para realizar esta acción."));
+    }
+
     /** 500 – Fallback para excepciones no manejadas explícitamente. */
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     public ResponseEntity<ErrorResponse> handleOptimisticLocking(ObjectOptimisticLockingFailureException ex) {

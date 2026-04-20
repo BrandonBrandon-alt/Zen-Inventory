@@ -43,6 +43,7 @@ public class ProductService implements ProductUseCase {
             throw new DuplicateSkuException(product.getSku());
         }
         product.setCreatedAt(LocalDateTime.now());
+        product.setActive(true);
         return productRepositoryPort.save(product);
     }
 
@@ -66,17 +67,22 @@ public class ProductService implements ProductUseCase {
         existing.setName(product.getName());
         existing.setAverageCost(product.getAverageCost());
         existing.setSalePrice(product.getSalePrice());
-        existing.setSupplierId(product.getSupplierId());
         existing.setUnitId(product.getUnitId());
+        
+        if (product.getActive() != null) {
+            existing.setActive(product.getActive());
+        }
 
         return productRepositoryPort.save(existing);
     }
 
     @Override
     public void deleteProduct(Long id) {
-        if (!productRepositoryPort.findById(id).isPresent()) {
-            throw new ProductNotFoundException(id);
-        }
-        productRepositoryPort.deleteById(id);
+        Product existing = productRepositoryPort.findById(id)
+                .orElseThrow(() -> new ProductNotFoundException(id));
+        
+        // Soft-delete: desactivar en lugar de borrar físicamente
+        existing.setActive(false);
+        productRepositoryPort.save(existing);
     }
 }

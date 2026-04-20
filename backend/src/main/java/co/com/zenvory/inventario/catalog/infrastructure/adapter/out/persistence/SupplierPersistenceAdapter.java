@@ -16,9 +16,11 @@ import java.util.stream.Collectors;
 public class SupplierPersistenceAdapter implements SupplierRepositoryPort {
 
     private final JpaSupplierRepository jpaRepository;
+    private final JpaProductSupplierRepository productSupplierRepository;
 
-    public SupplierPersistenceAdapter(JpaSupplierRepository jpaRepository) {
+    public SupplierPersistenceAdapter(JpaSupplierRepository jpaRepository, JpaProductSupplierRepository productSupplierRepository) {
         this.jpaRepository = jpaRepository;
+        this.productSupplierRepository = productSupplierRepository;
     }
 
     @Override
@@ -46,5 +48,19 @@ public class SupplierPersistenceAdapter implements SupplierRepositoryPort {
     @Override
     public boolean existsById(Long id) {
         return jpaRepository.existsById(id);
+    }
+
+    @Override
+    public List<Supplier> findAllByProductId(Long productId) {
+        return productSupplierRepository.findSuppliersByProductId(productId).stream()
+                .map(SupplierEntity::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<co.com.zenvory.inventario.catalog.domain.model.Product> findAllProductsBySupplierId(Long supplierId) {
+        return productSupplierRepository.findProductsBySupplierId(supplierId).stream()
+                .map(ProductEntity::toDomain)
+                .collect(Collectors.toList());
     }
 }

@@ -11,44 +11,42 @@ interface SummaryCardProps {
 
 function SummaryItem({ title, amount, icon, color }: SummaryCardProps) {
   return (
-    <Card style={{ 
-      flex: 1, 
-      minWidth: "240px", 
-      padding: "24px",
-      position: "relative",
-      overflow: "hidden",
-      border: "1px solid var(--neutral-800)",
-      background: "var(--bg-card)",
-      boxShadow: "0 4px 20px -5px rgba(0,0,0,0.3)"
-    }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", position: "relative", zIndex: 1 }}>
+    <Card className="flex-1 min-w-[240px] p-6 relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 bg-[var(--bg-card)] border-[var(--neutral-800)] shadow-xl hover:shadow-[0_20px_50px_rgba(0,0,0,0.5)] group">
+      {/* Decorative Gradient Glow */}
+      <div 
+        className="absolute -top-10 -right-10 w-32 h-32 blur-[80px] opacity-20 transition-opacity group-hover:opacity-40"
+        style={{ background: color }}
+      />
+      
+      <div className="flex justify-between items-start relative z-10">
         <div>
-          <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--neutral-500)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>
+          <p className="text-[10px] font-black text-[var(--neutral-500)] uppercase tracking-[0.2em] mb-2 leading-none">
             {title}
           </p>
-          <h3 style={{ fontSize: "28px", fontWeight: 800, color: "var(--neutral-50)", margin: 0 }}>
+          <h3 className="text-2xl font-black text-[var(--neutral-50)] tracking-tight leading-none tabular-nums" style={{ textShadow: `0 0 20px color-mix(in srgb, ${color}, transparent 80%)` }}>
             {amount}
           </h3>
         </div>
-        <div style={{ 
-          padding: "12px", 
-          borderRadius: "14px", 
-          background: `color-mix(in srgb, ${color}, transparent 90%)`,
-          color: color,
-          boxShadow: `0 0 15px -5px ${color}`
-        }}>
+        
+        <div 
+          className="p-3 rounded-2xl border transition-all duration-300 group-hover:scale-110"
+          style={{ 
+            background: `color-mix(in srgb, ${color}, transparent 95%)`,
+            borderColor: `color-mix(in srgb, ${color}, transparent 80%)`,
+            color: color,
+            boxShadow: `0 8px 15px -5px color-mix(in srgb, ${color}, transparent 60%)`
+          }}
+        >
           {icon}
         </div>
       </div>
-      <div style={{ 
-        position: "absolute", 
-        bottom: "-15px", 
-        right: "-15px", 
-        opacity: 0.05,
-        transform: "scale(3.5)",
-        color: color
-      }}>
-        {icon}
+      
+      {/* Background Icon Watermark */}
+      <div 
+        className="absolute -bottom-4 -right-4 opacity-[0.03] transition-all duration-500 group-hover:opacity-[0.08] group-hover:scale-110"
+        style={{ color: color }}
+      >
+        {React.cloneElement(icon as React.ReactElement<any>, { size: 100, strokeWidth: 1 })}
       </div>
     </Card>
   );

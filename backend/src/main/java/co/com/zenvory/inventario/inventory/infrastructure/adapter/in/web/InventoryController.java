@@ -54,6 +54,7 @@ public class InventoryController {
                         .precioVenta(inv.getSalePrice())
                         .costoPromedio(inv.getAverageCost())
                         .unit(inv.getUnit())
+                        .activo(inv.getProductActive())
                         .lastUpdated(inv.getLastUpdated())
                         .build())
                 .toList());

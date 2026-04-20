@@ -19,14 +19,17 @@ import {
   Printer, 
   AlertTriangle,
   Package,
-  CreditCard
+  CreditCard,
+  RotateCcw
 } from "lucide-react";
+import { getSession } from "@/api/auth";
+import ReturnRequestDialog from "./ReturnRequestDialog";
 
 interface SaleDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   sale: any | null;
-  isAdmin: boolean;
+  canCancel: boolean;
   onSaleCanceled?: () => void;
 }
 
@@ -34,7 +37,7 @@ export default function SaleDetailModal({
   isOpen,
   onClose,
   sale,
-  isAdmin,
+  canCancel,
   onSaleCanceled,
 }: SaleDetailModalProps) {
   const { showToast } = useToast();
@@ -42,6 +45,9 @@ export default function SaleDetailModal({
   const [isCanceling, setIsCanceling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [isReturnDialogOpen, setIsReturnDialogOpen] = useState(false);
+
+  const session = typeof window !== "undefined" ? getSession() : null;
 
   if (!sale) return null;
 
@@ -151,13 +157,18 @@ export default function SaleDetailModal({
         <Card className="!p-4 bg-[var(--bg-card)] shadow-sm border-[var(--neutral-800)]">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full animate-pulse ${sale.status === 'COMPLETED' ? "bg-[var(--color-success)] shadow-[0_0_10px_var(--color-success-glow)]" : "bg-[var(--color-danger)] shadow-[0_0_10px_var(--color-danger-glow)]"}`} />
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${
+                        sale.status === 'COMPLETED' ? "bg-[var(--color-success)] shadow-[0_0_10px_var(--color-success-glow)]" : 
+                        sale.status === 'RETURNED' ? "bg-[var(--color-warning)] shadow-[0_0_10px_var(--color-warning-glow)]" :
+                        "bg-[var(--color-danger)] shadow-[0_0_10px_var(--color-danger-glow)]"
+                    }`} />
                     <span className="text-[11px] font-black text-[var(--neutral-400)] uppercase tracking-widest">
-                        {sale.status === 'COMPLETED' ? "Transacción Aprobada" : "Transacción Anulada"}
+                        {sale.status === 'COMPLETED' ? "Transacción Aprobada" : 
+                         sale.status === 'RETURNED' ? "Transacción con Devolución" : "Transacción Anulada"}
                     </span>
                 </div>
-                {sale.status === 'CANCELLED' && (
-                    <Badge variant="danger" dot>REF-{sale.id}</Badge>
+                {sale.status !== 'COMPLETED' && (
+                    <Badge variant={sale.status === 'RETURNED' ? "warning" : "danger"} dot>REF-{sale.id}</Badge>
                 )}
             </div>
         </Card>
@@ -233,7 +244,7 @@ export default function SaleDetailModal({
                     <Button variant="primary" fullWidth onClick={handlePrint} leftIcon={<Printer size={16} />} loading={isPrinting} >
                         {isPrinting ? "Preparando..." : "Imprimir Comprobante Fiscal"}
                     </Button>
-                    {isAdmin && sale.status === 'COMPLETED' && (
+                    {canCancel && sale.status === 'COMPLETED' && (
                         <Button variant="danger" fullWidth onClick={() => setShowCancelConfirm(true)} leftIcon={<AlertTriangle size={16} />}>
                             Anular esta Transacción
                         </Button>
@@ -254,8 +265,38 @@ export default function SaleDetailModal({
                     </div>
                 </Card>
             )}
+
+            {sale.status === 'COMPLETED' && !showCancelConfirm && (
+                <Button 
+                    variant="ghost" 
+                    fullWidth 
+                    onClick={() => setIsReturnDialogOpen(true)} 
+                    leftIcon={<RotateCcw size={16} />}
+                >
+                    Solicitar Devolución Parcial
+                </Button>
+            )}
+
+            {sale.status === 'RETURNED' && (
+                <div className="bg-[var(--bg-card)] border border-[var(--neutral-800)] rounded-3xl p-5 flex flex-col items-center gap-2">
+                    <RotateCcw className="text-[var(--neutral-500)] opacity-40" size={24} />
+                    <p className="text-[11px] font-black text-[var(--neutral-500)] uppercase tracking-widest text-center">
+                        Esta venta ya posee devoluciones procesadas.<br/>El flujo administrativo se ha cerrado.
+                    </p>
+                </div>
+            )}
         </div>
 
+        <ReturnRequestDialog 
+            isOpen={isReturnDialogOpen}
+            onClose={() => setIsReturnDialogOpen(false)}
+            sale={sale}
+            branchId={session?.sucursalId || 0}
+            requesterId={session?.id || 0}
+            onSuccess={() => {
+                if (onSaleCanceled) onSaleCanceled();
+            }}
+        />
       </div>
     </Modal>
   );

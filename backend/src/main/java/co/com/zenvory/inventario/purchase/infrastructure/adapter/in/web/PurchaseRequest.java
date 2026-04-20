@@ -20,8 +20,9 @@ public record PurchaseRequest(
         @NotNull(message = "La sucursal destino es obligatoria.")
         Long branchId,
 
-        @FutureOrPresent(message = "La fecha estimada de llegada debe ser futura.")
-        LocalDateTime estimatedArrivalDate,
+        @NotNull(message = "El tiempo de entrega es obligatorio.")
+        @Positive(message = "El tiempo de entrega debe ser positivo.")
+        Integer leadTimeDays,
         
         @NotNull(message = "El plazo de pago es obligatorio.")
         Integer paymentDueDays,

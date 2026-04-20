@@ -19,11 +19,12 @@ interface NewTransferModalProps {
   onSuccess: () => void;
   currentBranchId: number | null;
   isAdmin: boolean;
+  isManager: boolean;
   initialProductId?: string | null;
   branches: BranchResponse[];
 }
 
-export default function NewTransferModal({ open, onClose, onSuccess, currentBranchId, isAdmin, initialProductId, branches }: NewTransferModalProps) {
+export default function NewTransferModal({ open, onClose, onSuccess, currentBranchId, isAdmin, isManager, initialProductId, branches }: NewTransferModalProps) {
   const { showToast } = useToast();
   const [products, setProducts] = useState<ProductResponse[]>([]);
   const [loading, setLoading] = useState(false);
@@ -60,7 +61,8 @@ export default function NewTransferModal({ open, onClose, onSuccess, currentBran
       async function fetchData() {
         try {
           const res = await apiClient.GET("/api/catalog/products");
-          setProducts(res.data ?? []);
+          const allProds = res.data ?? [];
+          setProducts(allProds.filter(p => (p as any).activo !== false));
         } catch (err) {
           showToast("Error al cargar productos", "error");
         }
@@ -192,7 +194,9 @@ export default function NewTransferModal({ open, onClose, onSuccess, currentBran
 
         <p style={{ fontSize: "13px", color: "var(--neutral-400)" }}>
           {transferType === "INBOUND" 
-            ? "Pide mercancía de otra sede hacia la tuya. El responsable de la otra sede deberá autorizar el envío."
+            ? (isAdmin || isManager 
+                ? "Pide mercancía de otra sede. Tu solicitud se aprobará automáticamente por tu rango." 
+                : "Pide mercancía de otra sede hacia la tuya. El responsable de la otra sede deberá autorizar el envío.")
             : "Selecciona una sede destino para enviar productos desde tu inventario actual."
           }
         </p>
@@ -212,6 +216,7 @@ export default function NewTransferModal({ open, onClose, onSuccess, currentBran
 
           <Select
             label="Prioridad"
+            placement="top"
             placeholder="Nivel de prioridad"
             value={formData.priority}
             onChange={(val) => setFormData({ ...formData, priority: val })}

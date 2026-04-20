@@ -21,6 +21,7 @@ public class PurchaseOrder {
     private LocalDateTime requestDate;
     private LocalDateTime estimatedArrivalDate;
     private LocalDateTime actualArrivalDate;
+    private Integer deliveryLeadTimeDays;
     
     private ReceptionStatus receptionStatus;
     private PaymentStatus paymentStatus;
@@ -33,13 +34,15 @@ public class PurchaseOrder {
     private String reasonResolution;
     private Long resolvedById;
     private LocalDateTime resolutionDate;
+    private boolean exceptionApproved;
     private Integer version;
 
     public PurchaseOrder(Long id, Long supplierId, Long branchId, Long userId, Long receivingUserId,
                          LocalDateTime requestDate, LocalDateTime estimatedArrivalDate, LocalDateTime actualArrivalDate,
+                         Integer deliveryLeadTimeDays,
                          ReceptionStatus receptionStatus, PaymentStatus paymentStatus, Integer paymentDueDays, 
                          LocalDateTime paymentDueDate, BigDecimal total, List<PurchaseOrderDetail> details,
-                         String reasonResolution, Long resolvedById, LocalDateTime resolutionDate, Integer version) {
+                         String reasonResolution, Long resolvedById, LocalDateTime resolutionDate, boolean exceptionApproved, Integer version) {
         if (supplierId == null || branchId == null || userId == null) {
             throw new IllegalArgumentException("Proveedor, Sucursal y Usuario Autorizador son obligatorios.");
         }
@@ -53,7 +56,8 @@ public class PurchaseOrder {
         this.userId = userId;
         this.receivingUserId = receivingUserId;
         this.requestDate = (requestDate != null) ? requestDate : LocalDateTime.now();
-        this.estimatedArrivalDate = estimatedArrivalDate;
+        this.deliveryLeadTimeDays = (deliveryLeadTimeDays != null) ? deliveryLeadTimeDays : 3;
+        this.estimatedArrivalDate = (estimatedArrivalDate != null) ? estimatedArrivalDate : this.requestDate.plusDays(this.deliveryLeadTimeDays);
         this.actualArrivalDate = actualArrivalDate;
         this.receptionStatus = (receptionStatus != null) ? receptionStatus : ReceptionStatus.PENDING;
         this.paymentStatus = (paymentStatus != null) ? paymentStatus : PaymentStatus.POR_PAGAR;
@@ -64,21 +68,50 @@ public class PurchaseOrder {
         this.reasonResolution = reasonResolution;
         this.resolvedById = resolvedById;
         this.resolutionDate = resolutionDate;
+        this.exceptionApproved = exceptionApproved;
         this.version = version;
     }
 
     public static PurchaseOrder create(Long supplierId, Long userId, Long branchId, 
-                                     LocalDateTime estimatedArrivalDate, Integer paymentDueDays, List<PurchaseOrderDetail> details) {
+                                     Integer leadTimeDays, Integer paymentDueDays, List<PurchaseOrderDetail> details, boolean isManager) {
+        ReceptionStatus initialStatus = isManager ? ReceptionStatus.PENDING : ReceptionStatus.AWAITING_APPROVAL;
+        LocalDateTime now = LocalDateTime.now();
+        Integer days = (leadTimeDays != null) ? leadTimeDays : 3;
+        LocalDateTime estimated = now.plusDays(days);
+        
         return new PurchaseOrder(null, supplierId, branchId, userId, null, 
-                                LocalDateTime.now(), estimatedArrivalDate, null,
-                                ReceptionStatus.PENDING, PaymentStatus.POR_PAGAR, paymentDueDays, null, null, details,
-                                null, null, null, 0);
+                                now, estimated, null,
+                                days,
+                                initialStatus, PaymentStatus.POR_PAGAR, paymentDueDays, null, null, details,
+                                null, null, null, false, 0);
     }
 
     private BigDecimal calculateTotal() {
         return details.stream()
                 .map(PurchaseOrderDetail::computeSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    public void approve(Long userId) {
+        if (this.receptionStatus != ReceptionStatus.AWAITING_APPROVAL) {
+            throw new InvalidPurchaseStateException("Solo se pueden aprobar órdenes en estado AWAITING_APPROVAL.");
+        }
+        this.receptionStatus = ReceptionStatus.PENDING;
+        this.resolvedById = userId;
+        this.resolutionDate = LocalDateTime.now();
+    }
+
+    /**
+     * Aprueba una excepción de límite de crédito u otra anomalía detectada.
+     */
+    public void approveException(Long userId) {
+        if (this.receptionStatus != ReceptionStatus.PENDING) {
+            throw new InvalidPurchaseStateException("Solo se pueden aprobar excepciones en órdenes con estado PENDING.");
+        }
+        this.exceptionApproved = true;
+        this.resolvedById = userId;
+        this.resolutionDate = LocalDateTime.now();
+        this.reasonResolution = "Excepción de compra aprobada manualmente por administrador.";
     }
 
     public void markAsInTransit() {
@@ -121,8 +154,10 @@ public class PurchaseOrder {
     }
 
     public void cancel(String reason, Long userId) {
-        if (this.receptionStatus != ReceptionStatus.PENDING && this.receptionStatus != ReceptionStatus.IN_TRANSIT) {
-            throw new InvalidPurchaseStateException("Solo se pueden cancelar órdenes que no hayan sido recibidas aún.");
+        if (this.receptionStatus != ReceptionStatus.PENDING && 
+            this.receptionStatus != ReceptionStatus.IN_TRANSIT &&
+            this.receptionStatus != ReceptionStatus.AWAITING_APPROVAL) {
+            throw new InvalidPurchaseStateException("Solo se pueden cancelar órdenes que no hayan sido recibidas aún o que estén pendientes de aprobación.");
         }
         if (reason == null || reason.isBlank()) {
             throw new IllegalArgumentException("El motivo de cancelación es obligatorio.");
@@ -152,6 +187,7 @@ public class PurchaseOrder {
     public LocalDateTime getRequestDate() { return requestDate; }
     public LocalDateTime getEstimatedArrivalDate() { return estimatedArrivalDate; }
     public LocalDateTime getActualArrivalDate() { return actualArrivalDate; }
+    public Integer getDeliveryLeadTimeDays() { return deliveryLeadTimeDays; }
     public ReceptionStatus getReceptionStatus() { return receptionStatus; }
     public PaymentStatus getPaymentStatus() { return paymentStatus; }
     public Integer getPaymentDueDays() { return paymentDueDays; }
@@ -161,5 +197,6 @@ public class PurchaseOrder {
     public String getReasonResolution() { return reasonResolution; }
     public Long getResolvedById() { return resolvedById; }
     public LocalDateTime getResolutionDate() { return resolutionDate; }
+    public boolean isExceptionApproved() { return exceptionApproved; }
     public Integer getVersion() { return version; }
 }

@@ -20,5 +20,6 @@ public class LocalInventoryEnriched {
     private BigDecimal salePrice;
     private BigDecimal averageCost;
     private String unit;
+    private Boolean productActive;
     private java.time.LocalDateTime lastUpdated;
 }

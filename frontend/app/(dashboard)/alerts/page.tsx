@@ -25,10 +25,12 @@ function AlertCard({
   alert,
   branchName,
   onResolve,
+  router,
 }: {
   alert: StockAlert;
   branchName: string;
   onResolve: (id: number) => void;
+  router: ReturnType<typeof useRouter>;
 }) {
   const resolved = alert.resolved ?? false;
   return (
@@ -90,18 +92,32 @@ function AlertCard({
           {resolved ? "Resuelta" : "Activa"}
         </Badge>
         {!resolved && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onResolve(alert.id!)}
-            leftIcon={
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            }
-          >
-            Resolver
-          </Button>
+          alert.type === "RETURN_REQUEST" ? (
+            <Button variant="ghost" size="sm" onClick={() => router.push("/returns")}>
+              Ver Solicitud
+            </Button>
+          ) : alert.type === "TRANSFER_REQUEST" ? (
+            <Button variant="ghost" size="sm" onClick={() => router.push("/transfers")}>
+              Ver Traslado
+            </Button>
+          ) : alert.type === "PURCHASE_REQUEST" ? (
+            <Button variant="ghost" size="sm" onClick={() => router.push("/purchases")}>
+              Ver Compra
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onResolve(alert.id!)}
+              leftIcon={
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              }
+            >
+              Resolver
+            </Button>
+          )
         )}
       </div>
     </div>
@@ -354,6 +370,7 @@ export default function AlertsPage() {
                 alert={alert}
                 branchName={branchName(alert.branchId)}
                 onResolve={(id) => setSelectedAlert(alerts.find(a => a.id === id) || null)}
+                router={router}
               />
             ))}
           </div>

@@ -164,14 +164,14 @@ public class AlertService implements AlertUseCase {
 
     @Override
     @Transactional
-    public void resolveViaTransfer(Long alertId, Long originBranchId, Integer quantity, Long userId) {
+    public void resolveViaTransfer(Long alertId, Long originBranchId, Integer quantity, Long userId, String priority) {
         StockAlert alert = findAlert(alertId);
         
         RequestTransferCommand cmd = new RequestTransferCommand(
                 originBranchId,
                 alert.getBranchId(),
                 LocalDateTime.now().plusDays(2),
-                co.com.zenvory.inventario.transfer.domain.model.TransferPriority.HIGH,
+                priority != null ? co.com.zenvory.inventario.transfer.domain.model.TransferPriority.valueOf(priority.toUpperCase()) : co.com.zenvory.inventario.transfer.domain.model.TransferPriority.HIGH,
                 List.of(new RequestTransferCommand.Detail(alert.getProductId(), quantity))
         );
         
@@ -183,19 +183,15 @@ public class AlertService implements AlertUseCase {
 
     @Override
     @Transactional
-    public void resolveViaPurchaseOrder(Long alertId, LocalDateTime estimatedArrival, BigDecimal quantity) {
+    public void resolveViaPurchaseOrder(Long alertId, Integer leadTimeDays, BigDecimal quantity, Long userId, boolean isManager, Long supplierId) {
         StockAlert alert = findAlert(alertId);
         Product product = productUseCase.getProductById(alert.getProductId());
         
-        if (product.getSupplierId() == null) {
-            throw new IllegalStateException("El producto no tiene un proveedor asociado para generar una orden de compra.");
-        }
-
         CreatePurchaseCommand cmd = new CreatePurchaseCommand(
-                product.getSupplierId(),
-                1L, // Por ahora default ADMIN ID = 1
+                supplierId,
+                userId != null ? userId : 1L,
                 alert.getBranchId(),
-                estimatedArrival,
+                leadTimeDays,
                 30,
                 List.of(new CreatePurchaseCommand.Detail(
                         alert.getProductId(), 
@@ -205,7 +201,7 @@ public class AlertService implements AlertUseCase {
                 ))
         );
         
-        var order = purchaseUseCase.createOrder(cmd);
+        var order = purchaseUseCase.createOrder(cmd, isManager);
         
         alert.resolve(ResolutionType.PURCHASE, order.getId(), "Abastecimiento vía orden de compra");
         alertRepository.save(alert);

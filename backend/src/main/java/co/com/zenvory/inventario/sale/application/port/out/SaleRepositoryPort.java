@@ -10,4 +10,5 @@ public interface SaleRepositoryPort {
     Optional<Sale> findById(Long id);
     List<Sale> findAll();
     List<Sale> findByBranchId(Long branchId);
+    void updateStatus(Long saleId, co.com.zenvory.inventario.sale.domain.model.SaleStatus status);
 }

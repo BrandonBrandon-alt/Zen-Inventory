@@ -1,6 +1,10 @@
 package co.com.zenvory.inventario.catalog.infrastructure.adapter.out.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.lang.NonNull;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Repositorio Spring Data JPA para {@link ProductEntity}.
@@ -18,4 +22,16 @@ public interface JpaProductRepository extends JpaRepository<ProductEntity, Long>
      * @return {@code true} si existe.
      */
     boolean existsBySku(String sku);
+
+    /** Trae todos los productos cargando su unidad en una sola consulta. */
+    @Override
+    @NonNull
+    @Query("SELECT p FROM ProductEntity p JOIN FETCH p.unit")
+    List<ProductEntity> findAll();
+
+    /** Trae un producto por ID cargando su unidad. */
+    @Override
+    @NonNull
+    @Query("SELECT p FROM ProductEntity p JOIN FETCH p.unit WHERE p.id = :id")
+    Optional<ProductEntity> findById(@NonNull Long id);
 }

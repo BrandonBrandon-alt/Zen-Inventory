@@ -14,8 +14,8 @@ public class AlertController {
     /** Envelope genérico para respuestas de mensaje — garantiza JSON válido. */
     public record MessageResponse(String message) {}
 
-    public record TransferResolutionRequest(Long originBranchId, Integer quantity, Long userId) {}
-    public record PurchaseResolutionRequest(java.time.LocalDateTime estimatedArrival, java.math.BigDecimal quantity) {}
+    public record TransferResolutionRequest(Long originBranchId, Integer quantity, Long userId, String priority) {}
+    public record PurchaseResolutionRequest(Integer leadTimeDays, java.math.BigDecimal quantity, Long userId, Long supplierId) {}
     public record DismissResolutionRequest(String reason) {}
 
     private final AlertUseCase alertUseCase;
@@ -57,16 +57,20 @@ public class AlertController {
     public ResponseEntity<MessageResponse> resolveViaTransfer(
             @PathVariable Long id, 
             @RequestBody TransferResolutionRequest request) {
-        alertUseCase.resolveViaTransfer(id, request.originBranchId(), request.quantity(), request.userId());
+        alertUseCase.resolveViaTransfer(id, request.originBranchId(), request.quantity(), request.userId(), request.priority());
         return ResponseEntity.ok(new MessageResponse("Alerta resuelta mediante solicitud de transferencia interna."));
     }
 
     @PostMapping("/{id}/resolve/purchase")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<MessageResponse> resolveViaPurchase(
             @PathVariable Long id, 
-            @RequestBody PurchaseResolutionRequest request) {
-        alertUseCase.resolveViaPurchaseOrder(id, request.estimatedArrival(), request.quantity());
+            @RequestBody PurchaseResolutionRequest request,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
+        
+        boolean isManager = httpRequest.isUserInRole("ADMIN") || httpRequest.isUserInRole("MANAGER");
+        
+        alertUseCase.resolveViaPurchaseOrder(id, request.leadTimeDays(), request.quantity(), request.userId(), isManager, request.supplierId());
         return ResponseEntity.ok(new MessageResponse("Alerta resuelta mediante generación de orden de compra."));
     }
 

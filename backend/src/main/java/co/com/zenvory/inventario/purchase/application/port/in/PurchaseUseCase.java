@@ -5,7 +5,9 @@ import co.com.zenvory.inventario.purchase.domain.model.PurchaseOrder;
 import java.util.List;
 
 public interface PurchaseUseCase {
-    PurchaseOrder createOrder(CreatePurchaseCommand command);
+    PurchaseOrder createOrder(CreatePurchaseCommand command, boolean isManager);
+    PurchaseOrder approveOrder(Long orderId, Long userId);
+    PurchaseOrder approveException(Long orderId, Long userId);
     PurchaseOrder markAsInTransit(Long orderId);
 
     PurchaseReceiptResult receiveOrder(Long orderId, Long userId, java.util.Map<Long, ItemReceiptInfo> items);

@@ -2,7 +2,7 @@ import React from "react";
 import SearchFilter from "@/components/ui/SearchFilter";
 import Separator from "@/components/ui/Separator";
 import Select from "@/components/ui/Select";
-import { Building } from "lucide-react";
+import { Building, CheckCircle } from "lucide-react";
 
 interface HistoryFiltersProps {
   searchTerm: string;
@@ -22,36 +22,48 @@ export default function HistoryFilters({
   isAdmin
 }: HistoryFiltersProps) {
   return (
-    <div className="p-6 flex flex-col gap-6 bg-[var(--bg-surface)]">
-      <div className="flex flex-row flex-wrap items-end gap-6">
-        {isAdmin && (
-          <div className="w-full max-w-[280px]">
-            <Select
-              label="Sucursal"
-              value={selectedBranchId || "all"}
-              onChange={(val) => onBranchChange(val === "all" ? 0 : val)}
-              options={[
-                { value: "all", label: "Todas las Sedes" },
-                ...branches.map(b => ({ value: b.id!, label: b.nombre! }))
-              ]}
-              icon={<Building size={14} className="text-[var(--brand-400)]" />}
+    <div className="p-8 flex flex-col gap-8 bg-[var(--bg-surface)]">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex-1 flex flex-col md:flex-row gap-6 items-end">
+          {isAdmin && (
+            <div className="w-full md:w-80">
+              <Select
+                label="Sucursal de Auditoría"
+                value={selectedBranchId || "all"}
+                onChange={(val) => onBranchChange(val === "all" ? 0 : val)}
+                options={[
+                  { value: "all", label: "Todas las Sedes / Consolidado" },
+                  ...branches.map(b => ({ value: b.id!, label: b.nombre! }))
+                ]}
+                icon={<Building size={14} className="text-[var(--brand-500)]" />}
+              />
+            </div>
+          )}
+
+          <div className="w-full md:w-96">
+            <SearchFilter 
+              label="Localizador de Transacción"
+              placeholder="Ej: #1024, Juan Perez, Sede Norte..."
+              value={searchTerm}
+              onChange={onSearchChange}
+              containerClassName="w-full"
+              className="h-11 shadow-inner bg-[var(--bg-card)] border-[var(--neutral-800)]"
             />
           </div>
-        )}
+        </div>
 
-        <div className="flex-1 max-w-[450px]">
-          <SearchFilter 
-            label="Búsqueda de Auditoría"
-            placeholder="ID venta, sucursal o cliente..."
-            value={searchTerm}
-            onChange={onSearchChange}
-            containerClassName="w-full"
-            className="h-11 shadow-sm"
-          />
+        <div className="hidden lg:flex items-center gap-4 px-6 border-l border-[var(--neutral-800)]">
+           <div className="text-right">
+              <span className="text-[10px] font-black text-[var(--neutral-500)] uppercase tracking-widest block">Registro de Caja</span>
+              <span className="text-[12px] font-black text-[var(--neutral-100)] uppercase tracking-tight">Cruce de Inventarios Ok</span>
+           </div>
+           <div className="w-10 h-10 bg-[var(--color-success)]/10 rounded-full flex items-center justify-center text-[var(--color-success)] border border-[var(--color-success)]/20 shadow-inner">
+              <CheckCircle size={18} />
+           </div>
         </div>
       </div>
       
-      <Separator />
+      <Separator className="opacity-40" />
     </div>
   );
 }

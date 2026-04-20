@@ -5,7 +5,7 @@ import { apiClient } from "@/api/client";
 import type { components } from "@/api/schema";
 import { getSession } from "@/api/auth";
 import { useRouter } from "next/navigation";
-import { Package, Plus, Edit, Trash2, Search, Tag, Truck, DollarSign, ChevronDown, ChevronUp } from "lucide-react";
+import { Package, Plus, Edit, Trash2, Search, Tag, Truck, DollarSign, ChevronDown, ChevronUp, RefreshCw, XCircle } from "lucide-react";
 
 import Select from "@/components/ui/Select";
 import Badge from "@/components/ui/Badge";
@@ -21,7 +21,10 @@ import Spinner from "@/components/ui/Spinner";
 import SearchFilter from "@/components/ui/SearchFilter";
 
 // Types from schema
-type ProductResponse = components["schemas"]["ProductResponse"];
+type ProductResponse = components["schemas"]["ProductResponse"] & { 
+  proveedores?: any[];
+  activo?: boolean;
+};
 type SupplierResponse = components["schemas"]["SupplierResponse"];
 type UnitOfMeasureResponse = components["schemas"]["UnitOfMeasureResponse"];
 
@@ -55,9 +58,10 @@ export default function MasterProductsPage() {
     nombre: "",
     costoPromedio: "" as number | "",
     precioVenta: "" as number | "",
-    proveedorId: 0,
     unitId: 0,
+    activo: true
   });
+  const [selectedSupplierIds, setSelectedSupplierIds] = useState<number[]>([]);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -98,9 +102,13 @@ export default function MasterProductsPage() {
         nombre: product.nombre ?? "",
         costoPromedio: product.costoPromedio ?? "",
         precioVenta: product.precioVenta ?? "",
-        proveedorId: product.proveedorId ?? 0,
         unitId: product.unitId ?? 0,
+        activo: product.activo ?? true
       });
+      // FIX: Normalizar IDs a número al cargar desde el producto
+      setSelectedSupplierIds(
+        (product as any).proveedores?.map((sp: any) => Number(sp.id)) ?? []
+      );
 
       // Cargar precios por lista existentes para este producto
       if (product.id && priceLists.length > 0) {
@@ -131,9 +139,10 @@ export default function MasterProductsPage() {
         nombre: "", 
         costoPromedio: "", 
         precioVenta: "", 
-        proveedorId: suppliers[0]?.id ?? 0, 
-        unitId: units[0]?.id ?? 0 
+        unitId: units[0]?.id ?? 0,
+        activo: true
       });
+      setSelectedSupplierIds([]);
       const defaults: Record<number, string> = {};
       priceLists.forEach(l => { defaults[l.id] = ""; });
       setPriceListValues(defaults);
@@ -148,6 +157,11 @@ export default function MasterProductsPage() {
       try {
         let savedProductId: number | undefined = editingProduct?.id;
 
+        if (selectedSupplierIds.length === 0) {
+          showToast("Debe asociar al menos un proveedor al producto.", "warning", "Validación requerida");
+          return;
+        }
+
         if (editingProduct) {
           await apiClient.PUT("/api/catalog/products/{id}", {
             params: { path: { id: editingProduct.id! } },
@@ -155,6 +169,8 @@ export default function MasterProductsPage() {
               ...formData,
               costoPromedio: Number(formData.costoPromedio) || 0,
               precioVenta: Number(formData.precioVenta) || 0,
+              supplierIds: selectedSupplierIds,
+              activo: formData.activo
             } as any,
           });
           showToast("Producto actualizado correctamente.", "success", "Cambios guardados");
@@ -164,6 +180,7 @@ export default function MasterProductsPage() {
               ...formData,
               costoPromedio: Number(formData.costoPromedio) || 0,
               precioVenta: Number(formData.precioVenta) || 0,
+              supplierIds: selectedSupplierIds
             } as any 
           });
           savedProductId = (res.data as any)?.id;
@@ -181,10 +198,9 @@ export default function MasterProductsPage() {
                 body: { precio }
               });
             } else if (!rawVal || rawVal === "") {
-              // Si se borra el campo, eliminar precio de la lista (fallback a precio base)
               await apiClient.DELETE("/api/v1/price-lists/{id}/products/{productId}/price" as any, {
                 params: { path: { id: lista.id, productId: savedProductId } }
-              }).catch(() => {}); // Ignorar error si no existía
+              }).catch(() => {});
             }
           }));
         }
@@ -198,13 +214,15 @@ export default function MasterProductsPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("¿Estás seguro de eliminar este producto del catálogo maestro?")) return;
+    if (!confirm("¿Desactivar este producto del catálogo maestro? Ya no se podrá usar en nuevas ventas o compras.")) return;
     try {
-      await apiClient.DELETE("/api/catalog/products/{id}", { params: { path: { id } } });
-      showToast("El producto ha sido eliminado del catálogo.", "success");
+      console.log("[DEBUG] Deactivating Product ID:", id);
+      const res = await apiClient.DELETE("/api/catalog/products/{id}", { params: { path: { id } } });
+      console.log("[DEBUG] DELETE Response:", res);
+      showToast("El producto ha sido desactivado.", "success", "Producto desactivado");
       fetchData();
     } catch (error) {
-      showToast("No se puede eliminar: tiene movimientos asociados.", "error");
+      showToast("No se pudo desactivar el producto.", "error");
     }
   };
 
@@ -217,14 +235,12 @@ export default function MasterProductsPage() {
 
   const filteredAndSortedProducts = (products || []).filter(p => {
     const term = searchTerm.toLowerCase();
-    const supplierName = suppliers.find(s => s.id === p.proveedorId)?.nombre?.toLowerCase() || "";
     const unit = (p.unitAbbreviation || "").toLowerCase();
     const price = (p.precioVenta ?? 0).toString();
 
     return (
       p.nombre?.toLowerCase().includes(term) || 
       p.sku?.toLowerCase().includes(term) ||
-      supplierName.includes(term) ||
       unit.includes(term) ||
       price.includes(term)
     );
@@ -237,6 +253,22 @@ export default function MasterProductsPage() {
     if (valA > valB) return sortConfig.direction === "asc" ? 1 : -1;
     return 0;
   });
+
+  // FIX: Helper para agregar proveedor con normalización de tipo
+  const handleAddSupplier = (val: string) => {
+    if (!val) return;
+    const id = Number(val);
+    setSelectedSupplierIds(prev => {
+      const normalized = prev.map(Number);
+      if (normalized.includes(id)) return prev;
+      return [...prev, id];
+    });
+  };
+
+  // FIX: Helper para eliminar proveedor con normalización de tipo
+  const handleRemoveSupplier = (id: number) => {
+    setSelectedSupplierIds(prev => prev.filter(sid => Number(sid) !== Number(id)));
+  };
 
   const columns: Column<ProductResponse>[] = [
     {
@@ -260,14 +292,50 @@ export default function MasterProductsPage() {
       render: (p: ProductResponse) => <Badge variant="neutral">{p.unitAbbreviation || "N/A"}</Badge>
     },
     {
-      header: "Proveedor",
-      key: "proveedorId",
+      header: "Estado",
+      key: "activo",
+      width: "100px",
       sortable: true,
       render: (p: ProductResponse) => (
-        <span style={{ fontSize: "13px", color: "var(--neutral-400)" }}>
-          {suppliers.find(s => s.id === p.proveedorId)?.nombre ?? "N/A"}
-        </span>
+        <Badge variant={p.activo ? "success" : "neutral"} dot>
+          {p.activo ? "Activo" : "Inactivo"}
+        </Badge>
       )
+    },
+    {
+      header: "Proveedor",
+      key: "proveedores",
+      width: "220px",
+      render: (p: ProductResponse) => {
+        const provs = p.proveedores || [];
+        if (provs.length === 0) return (
+          <div className="flex items-center gap-1.5 text-[var(--color-danger)] animate-pulse">
+            <XCircle size={12} />
+            <span style={{ fontStyle: "italic", fontSize: "11px", fontWeight: 700 }}>SIN PROVEEDOR</span>
+          </div>
+        );
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--neutral-100)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "150px" }}>
+              {provs[0].nombre}
+            </span>
+            {provs.length > 1 && (
+              <span style={{
+                background: "rgba(111,114,242,0.1)",
+                color: "var(--brand-400)",
+                fontSize: "10px",
+                padding: "2px 8px",
+                borderRadius: "9999px",
+                fontWeight: 900,
+                border: "1px solid rgba(111,114,242,0.2)",
+                fontFamily: "var(--font-primary)"
+              }}>
+                +{provs.length - 1}
+              </span>
+            )}
+          </div>
+        );
+      }
     },
     {
       header: "Precio Base",
@@ -290,9 +358,11 @@ export default function MasterProductsPage() {
           <Button variant="ghost" size="sm" onClick={() => handleOpenModal(p)} title="Editar producto">
             <Edit size={14} />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => handleDelete(p.id!)} title="Eliminar producto">
-            <span style={{ color: "var(--brand-500)" }}><Trash2 size={14} /></span>
-          </Button>
+          {p.activo && (
+            <Button variant="ghost" size="sm" onClick={() => handleDelete(p.id!)} title="Desactivar producto">
+              <span style={{ color: "var(--brand-500)" }}><Trash2 size={14} /></span>
+            </Button>
+          )}
         </div>
       )
     }
@@ -400,17 +470,151 @@ export default function MasterProductsPage() {
                 ...units.map(u => ({ value: u.id!.toString(), label: `${u.nombre} (${u.abreviatura})` }))
               ]}
             />
-            <Select
-              label="Proveedor"
-              value={formData.proveedorId.toString()}
-              onChange={(val: string) => setFormData({ ...formData, proveedorId: Number(val) })}
-              icon={<Truck size={15} />}
-              options={[
-                { value: "0", label: "Selecciona proveedor" },
-                ...suppliers.map(s => ({ value: s.id!.toString(), label: s.nombre! }))
-              ]}
-            />
           </div>
+
+          {/* ── Gestión Multi-Proveedor ─────────────────────────────────── */}
+          <div style={{ 
+            display: "flex", 
+            flexDirection: "column", 
+            gap: "10px", 
+            padding: "16px", 
+            background: "rgba(255,255,255,0.02)", 
+            border: "1px solid var(--neutral-800)", 
+            borderRadius: "16px" 
+          }}>
+            <div style={{ display: "flex", justifyContent: "between", alignItems: "center" }}>
+              <label style={{ fontSize: "12px", fontWeight: 800, color: "var(--neutral-400)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Red de Suministro (Proveedores)
+              </label>
+              {selectedSupplierIds.length === 0 && (
+                <Badge variant="warning">OBLIGATORIO</Badge>
+              )}
+            </div>
+
+            {/* FIX: Usar handleAddSupplier y filtrar con Number() para evitar type mismatch */}
+            <Select
+              value=""
+              onChange={handleAddSupplier}
+              placeholder="Asociar otro proveedor..."
+              icon={<Truck size={15} />}
+              options={suppliers
+                .filter(s => !selectedSupplierIds.map(Number).includes(Number(s.id)))
+                .map(s => ({ value: s.id!.toString(), label: s.nombre ?? "" }))
+              }
+            />
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "4px" }}>
+              {selectedSupplierIds.map(id => {
+                const s = suppliers.find(sup => Number(sup.id) === Number(id));
+                return (
+                  <div 
+                    key={id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "6px 12px",
+                      background: "var(--bg-card)",
+                      border: "1px solid var(--neutral-700)",
+                      borderRadius: "10px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      color: "var(--neutral-100)",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    <Truck size={12} className="text-[var(--brand-400)]" />
+                    {s?.nombre}
+                    {/* FIX: Usar handleRemoveSupplier con forma funcional */}
+                    <button 
+                      type="button"
+                      onClick={() => handleRemoveSupplier(id)}
+                      style={{
+                        marginLeft: "4px",
+                        padding: "2px",
+                        color: "var(--neutral-500)",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        display: "flex"
+                      }}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                );
+              })}
+              {selectedSupplierIds.length === 0 && (
+                <p style={{ fontSize: "12px", fontStyle: "italic", color: "var(--neutral-500)", padding: "4px" }}>
+                  No hay proveedores asociados. Use el selector arriba para añadir.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* ── Control de Activación (Solo en edición) ─────────────────── */}
+          {editingProduct && (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "12px 16px",
+              background: "rgba(255, 255, 255, 0.03)",
+              borderRadius: "12px",
+              border: "1px solid var(--neutral-700)",
+              marginTop: "4px"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "10px",
+                  background: formData.activo ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: formData.activo ? "var(--color-success)" : "var(--brand-500)",
+                  transition: "all 0.3s ease"
+                }}>
+                  <RefreshCw size={18} className={!formData.activo ? "animate-spin-slow" : ""} />
+                </div>
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--neutral-100)" }}>
+                    {formData.activo ? "Producto Activo" : "Producto Inactivo"}
+                  </div>
+                  <div style={{ fontSize: "12px", color: "var(--neutral-400)" }}>
+                    {formData.activo 
+                      ? "Disponible en todas las operaciones del sistema." 
+                      : "Restringido en POS, Compras y Traslados."}
+                  </div>
+                </div>
+              </div>
+              
+              <div 
+                onClick={() => setFormData({ ...formData, activo: !formData.activo })}
+                style={{
+                  width: "48px",
+                  height: "26px",
+                  borderRadius: "999px",
+                  background: formData.activo ? "var(--color-success)" : "var(--neutral-600)",
+                  padding: "3px",
+                  cursor: "pointer",
+                  transition: "all 0.3s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: formData.activo ? "flex-end" : "flex-start"
+                }}
+              >
+                <div style={{
+                  width: "20px",
+                  height: "20px",
+                  borderRadius: "50%",
+                  background: "white",
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
+                }} />
+              </div>
+            </div>
+          )}
 
           {/* ── Sección de Listas de Precios ─────────────────────────────── */}
           {priceLists.length > 0 && (

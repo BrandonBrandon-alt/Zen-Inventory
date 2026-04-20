@@ -292,6 +292,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/returns/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/returns/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/purchases": {
         parameters: {
             query?: never;
@@ -382,6 +430,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["cancelPurchase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchases/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["approveOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchases/{id}/approve-exception": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["approveException"];
         delete?: never;
         options?: never;
         head?: never;
@@ -493,7 +573,7 @@ export interface paths {
         };
         get: operations["getAll"];
         put?: never;
-        post: operations["create"];
+        post: operations["create_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -509,7 +589,7 @@ export interface paths {
         };
         get: operations["getAll_1"];
         put?: never;
-        post: operations["create_1"];
+        post: operations["create_2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -525,7 +605,7 @@ export interface paths {
         };
         get: operations["getAll_2"];
         put?: never;
-        post: operations["create_2"];
+        post: operations["create_3"];
         delete?: never;
         options?: never;
         head?: never;
@@ -541,7 +621,7 @@ export interface paths {
         };
         get: operations["getAll_3"];
         put?: never;
-        post: operations["create_3"];
+        post: operations["create_4"];
         delete?: never;
         options?: never;
         head?: never;
@@ -573,7 +653,7 @@ export interface paths {
         };
         get: operations["getAll_4"];
         put?: never;
-        post: operations["create_4"];
+        post: operations["create_5"];
         delete?: never;
         options?: never;
         head?: never;
@@ -644,6 +724,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/transfers/analytics/logistics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getLogisticsAnalytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sales/{id}": {
         parameters: {
             query?: never;
@@ -655,6 +751,54 @@ export interface paths {
         put?: never;
         post?: never;
         delete: operations["cancelSale"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/returns/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getById_5"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/returns/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getPending"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/returns/branch/{branchId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getByBranch"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -900,6 +1044,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/catalog/suppliers/{id}/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getProductsBySupplier"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/suppliers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["searchByProduct"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -986,9 +1162,9 @@ export interface components {
             costoPromedio: number;
             precioVenta: number;
             /** Format: int64 */
-            proveedorId?: number;
-            /** Format: int64 */
             unitId?: number;
+            supplierIds?: number[];
+            activo?: boolean;
         };
         ProductResponse: {
             /** Format: int64 */
@@ -998,12 +1174,17 @@ export interface components {
             costoPromedio?: number;
             precioVenta?: number;
             /** Format: int64 */
-            proveedorId?: number;
-            /** Format: int64 */
             unitId?: number;
             unitAbbreviation?: string;
+            activo?: boolean;
+            proveedores?: components["schemas"]["SupplierSummary"][];
             /** Format: date-time */
             creadoEn?: string;
+        };
+        SupplierSummary: {
+            /** Format: int64 */
+            id?: number;
+            nombre?: string;
         };
         BranchRequest: {
             nombre: string;
@@ -1186,6 +1367,45 @@ export interface components {
             globalDiscountPercentage?: number;
             details?: components["schemas"]["SaleDetailResponse"][];
         };
+        CreateReturnRequestCommand: {
+            /** Format: int64 */
+            saleId?: number;
+            /** Format: int64 */
+            branchId?: number;
+            /** Format: int64 */
+            requesterId?: number;
+            generalReason?: string;
+            items?: components["schemas"]["Detail"][];
+        };
+        Detail: {
+            /** Format: int64 */
+            productId?: number;
+            /** Format: int32 */
+            quantity?: number;
+            reasonSpecific?: string;
+            unitPricePaid?: number;
+        };
+        ReturnRequestResponse: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: int64 */
+            saleId?: number;
+            /** Format: int64 */
+            sucursalId?: number;
+            /** Format: int64 */
+            solicitanteId?: number;
+            /** Format: int64 */
+            aprobadorId?: number;
+            /** @enum {string} */
+            estado?: "PENDIENTE" | "APROBADA" | "RECHAZADA";
+            /** Format: date-time */
+            fechaSolicitud?: string;
+            /** Format: date-time */
+            fechaProcesamiento?: string;
+            motivoGeneral?: string;
+            comentarioAprobador?: string;
+            items?: components["schemas"]["Detail"][];
+        };
         PurchaseDetailRequest: {
             /** Format: int64 */
             productId: number;
@@ -1241,6 +1461,7 @@ export interface components {
             branchId?: number;
             total?: number;
             reasonResolution?: string;
+            exceptionApproved?: boolean;
             details?: components["schemas"]["PurchaseDetailResponse"][];
         };
         ItemReceipt: {
@@ -1291,6 +1512,7 @@ export interface components {
             quantity?: number;
             /** Format: int64 */
             userId?: number;
+            priority?: string;
         };
         MessageResponse: {
             message?: string;
@@ -1299,6 +1521,10 @@ export interface components {
             /** Format: date-time */
             estimatedArrival?: string;
             quantity?: number;
+            /** Format: int64 */
+            userId?: number;
+            /** Format: int64 */
+            supplierId?: number;
         };
         DismissResolutionRequest: {
             reason?: string;
@@ -1349,6 +1575,37 @@ export interface components {
             onTimePercentage?: number;
             /** Format: double */
             averageDelayHours?: number;
+        };
+        GlobalMetrics: {
+            /** Format: int64 */
+            totalTransfers?: number;
+            /** Format: double */
+            onTimePercentage?: number;
+            /** Format: int64 */
+            delayedTransfers?: number;
+            /** Format: double */
+            averageDelayHours?: number;
+        };
+        LogisticsAnalyticsResponse: {
+            globalMetrics?: components["schemas"]["GlobalMetrics"];
+            topRoutes?: components["schemas"]["RouteMetrics"][];
+        };
+        RouteMetrics: {
+            /** Format: int64 */
+            originBranchId?: number;
+            /** Format: int64 */
+            destinationBranchId?: number;
+            /** Format: int64 */
+            totalTransfers?: number;
+            /** Format: int64 */
+            onTimeTransfers?: number;
+            /** Format: int64 */
+            delayedTransfers?: number;
+            /** Format: double */
+            averageDelayHours?: number;
+            totalShippingCost?: number;
+            /** Format: int64 */
+            urgentCount?: number;
         };
         PriceListResponse: {
             /** Format: int64 */
@@ -2195,6 +2452,74 @@ export interface operations {
             };
         };
     };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReturnRequestCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReturnRequestResponse"];
+                };
+            };
+        };
+    };
+    reject: {
+        parameters: {
+            query: {
+                reason: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    approve: {
+        parameters: {
+            query: {
+                comment: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     getAllOrders: {
         parameters: {
             query?: {
@@ -2357,6 +2682,54 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    approveOrder: {
+        parameters: {
+            query: {
+                userId: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PurchaseResponse"];
+                };
+            };
+        };
+    };
+    approveException: {
+        parameters: {
+            query: {
+                userId: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PurchaseResponse"];
+                };
             };
         };
     };
@@ -2528,7 +2901,7 @@ export interface operations {
             };
         };
     };
-    create: {
+    create_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -2572,7 +2945,7 @@ export interface operations {
             };
         };
     };
-    create_1: {
+    create_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -2616,7 +2989,7 @@ export interface operations {
             };
         };
     };
-    create_2: {
+    create_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -2660,7 +3033,7 @@ export interface operations {
             };
         };
     };
-    create_3: {
+    create_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -2752,7 +3125,7 @@ export interface operations {
             };
         };
     };
-    create_4: {
+    create_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -2864,6 +3237,26 @@ export interface operations {
             };
         };
     };
+    getLogisticsAnalytics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LogisticsAnalyticsResponse"];
+                };
+            };
+        };
+    };
     getSale: {
         parameters: {
             query?: never;
@@ -2905,6 +3298,72 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    getById_5: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReturnRequestResponse"];
+                };
+            };
+        };
+    };
+    getPending: {
+        parameters: {
+            query: {
+                branchId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReturnRequestResponse"][];
+                };
+            };
+        };
+    };
+    getByBranch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                branchId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReturnRequestResponse"][];
+                };
             };
         };
     };
@@ -3234,6 +3693,50 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RoleResponse"][];
+                };
+            };
+        };
+    };
+    getProductsBySupplier: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductResponse"][];
+                };
+            };
+        };
+    };
+    searchByProduct: {
+        parameters: {
+            query: {
+                productId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SupplierResponse"][];
                 };
             };
         };

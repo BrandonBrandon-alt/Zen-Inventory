@@ -56,4 +56,14 @@ public class SupplierService implements SupplierUseCase {
         }
         supplierRepositoryPort.deleteById(id);
     }
+
+    @Override
+    public List<Supplier> getSuppliersByProductId(Long productId) {
+        return supplierRepositoryPort.findAllByProductId(productId);
+    }
+
+    @Override
+    public List<co.com.zenvory.inventario.catalog.domain.model.Product> getProductsBySupplierId(Long supplierId) {
+        return supplierRepositoryPort.findAllProductsBySupplierId(supplierId);
+    }
 }

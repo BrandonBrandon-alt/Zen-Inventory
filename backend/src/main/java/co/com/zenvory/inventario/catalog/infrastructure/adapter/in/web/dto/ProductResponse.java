@@ -18,8 +18,9 @@ public record ProductResponse(
         String nombre,
         BigDecimal costoPromedio,
         BigDecimal precioVenta,
-        Long proveedorId,
         Long unitId,
         String unitAbbreviation,
-        LocalDateTime creadoEn
+        Boolean activo,
+        java.util.List<co.com.zenvory.inventario.catalog.domain.model.SupplierSummary> proveedores,
+        java.time.LocalDateTime creadoEn
 ) {}
