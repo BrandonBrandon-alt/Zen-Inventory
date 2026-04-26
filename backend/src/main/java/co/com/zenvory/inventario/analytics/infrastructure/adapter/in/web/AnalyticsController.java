@@ -1,4 +1,4 @@
-package co.com.zenvory.inventario.analytics.infrastructure.adapter.in.web;
+    package co.com.zenvory.inventario.analytics.infrastructure.adapter.in.web;
 
 import co.com.zenvory.inventario.analytics.application.port.in.AnalyticsUseCase;
 import co.com.zenvory.inventario.analytics.domain.model.*;

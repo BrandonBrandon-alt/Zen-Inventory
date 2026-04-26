@@ -12,5 +12,7 @@ public record InventoryRotation(
         BigDecimal soldQuantity,
         BigDecimal currentStock,
         BigDecimal rotationRatio,
-        boolean isDeadStock
+        boolean isDeadStock,
+        Integer inactiveDays
 ) {}
+

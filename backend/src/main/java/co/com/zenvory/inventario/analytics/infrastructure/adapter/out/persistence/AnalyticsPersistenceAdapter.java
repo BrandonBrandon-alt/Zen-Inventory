@@ -298,11 +298,12 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
                     COALESCE(SUM(dv.cantidad), 0) as sold_qty,
                     i.cantidad_actual as current_stock,
                     (CAST(COALESCE(SUM(dv.cantidad), 0) AS DECIMAL) / COALESCE(NULLIF(i.cantidad_actual, 0), 1)) as rotation,
-                    (i.cantidad_actual > 0 AND COALESCE(SUM(dv.cantidad), 0) = 0) as dead_stock
+                    (i.cantidad_actual > 0 AND COALESCE(SUM(dv.cantidad), 0) = 0) as dead_stock,
+                    EXTRACT(DAY FROM (CURRENT_TIMESTAMP - COALESCE(MAX(v.fecha), i.last_updated)))::INT as inactive_days
                 FROM producto p
                 JOIN inventario_local i ON p.id = i.producto_id
                 LEFT JOIN detalles_venta dv ON p.id = dv.producto_id
-                LEFT JOIN ventas v ON dv.venta_id = v.id AND v.estado = 'COMPLETED' AND v.fecha >= CURRENT_DATE - INTERVAL '30 days'
+                LEFT JOIN ventas v ON dv.venta_id = v.id AND v.estado = 'COMPLETED'
                 WHERE 1=1
                 """);
         List<Object> args = new ArrayList<>();
@@ -312,7 +313,7 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
             args.add(branchId);
         }
 
-        query.append(" GROUP BY p.id, p.nombre, i.cantidad_actual ");
+        query.append(" GROUP BY p.id, p.nombre, i.cantidad_actual, i.last_updated ");
         query.append(" ORDER BY rotation DESC ");
 
         return jdbcTemplate.query(query.toString(), (rs, rowNum) -> new InventoryRotation(
@@ -321,9 +322,11 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
                 rs.getBigDecimal("sold_qty"),
                 rs.getBigDecimal("current_stock"),
                 rs.getBigDecimal("rotation"),
-                rs.getBoolean("dead_stock")
+                rs.getBoolean("dead_stock"),
+                rs.getInt("inactive_days")
         ), args.toArray());
     }
+
 
     @Override
     public List<ReplenishmentInsight> findReplenishmentInsights(Long branchId) {

@@ -11,7 +11,9 @@ interface InventoryRotation {
   currentStock: number;
   rotationRatio: number;
   isDeadStock: boolean;
+  inactiveDays: number;
 }
+
 
 interface InventoryInsightTableProps {
   data: InventoryRotation[];
@@ -82,7 +84,7 @@ export default function InventoryInsightTable({ data }: InventoryInsightTablePro
             <tr className="text-[10px] font-black text-[var(--neutral-500)] uppercase tracking-widest leading-none">
               <th className="px-4 pb-2">Producto</th>
               <th className="px-4 pb-2 text-center">Stock</th>
-              <th className="px-4 pb-2 text-center">{activeTab === 'dead' ? 'Días Inactivo' : 'Ratio'}</th>
+              <th className="px-4 pb-2 text-center">Días Inactivo</th>
               <th className="px-4 pb-2 text-right">Estado</th>
             </tr>
           </thead>
@@ -99,16 +101,17 @@ export default function InventoryInsightTable({ data }: InventoryInsightTablePro
                   <span className="text-[14px] font-black text-[var(--neutral-100)]">{item.currentStock} <span className="text-[10px] opacity-40">u</span></span>
                 </td>
                 <td className="px-4 py-3 text-center border-y border-[var(--neutral-800)] group-hover:border-[var(--neutral-700)]">
-                  {activeTab === 'dead' ? (
-                    <span className="text-[11px] font-bold text-[var(--color-danger)] underline decoration-dotted underline-offset-4">30+ días</span>
-                  ) : (
-                    <div className="flex flex-col items-center">
-                       <span className="text-[13px] font-black text-[var(--color-warning)]">{(item.rotationRatio * 100).toFixed(1)}%</span>
-                       <div className="w-12 h-1 bg-[var(--neutral-800)] rounded-full mt-1 overflow-hidden">
-                          <div className="h-full bg-[var(--color-warning)]" style={{ width: `${Math.min(item.rotationRatio * 100, 100)}%` }} />
-                       </div>
-                    </div>
-                  )}
+                  <div className="flex flex-col items-center">
+                     <span className={`text-[13px] font-black ${activeTab === 'dead' ? 'text-[var(--color-danger)]' : 'text-[var(--color-warning)]'}`}>
+                        {item.inactiveDays} {item.inactiveDays === 1 ? 'día' : 'días'}
+                     </span>
+                     <div className="w-12 h-1 bg-[var(--neutral-800)] rounded-full mt-1 overflow-hidden">
+                        <div 
+                          className={`h-full ${activeTab === 'dead' ? 'bg-[var(--color-danger)]' : 'bg-[var(--color-warning)]'}`} 
+                          style={{ width: `${Math.min((item.inactiveDays / 30) * 100, 100)}%` }} 
+                        />
+                     </div>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-right rounded-r-2xl border-y border-r border-[var(--neutral-800)] group-hover:border-[var(--neutral-700)]">
                    <Badge variant={activeTab === 'dead' ? 'danger' : 'warning'} dot>
