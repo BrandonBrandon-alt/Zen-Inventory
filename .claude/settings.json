@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/graphify-out/graph.json\" ] && echo \"Recordatorio: para preguntas sobre el código usa graphify query/path/explain antes de grep o Read (ver CLAUDE.md).\" || true",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

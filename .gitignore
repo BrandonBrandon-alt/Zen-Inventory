@@ -92,3 +92,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+# =========================================================================
+# graphify — cada desarrollador genera su grafo local (graphify update .)
+# =========================================================================
+graphify-out/
