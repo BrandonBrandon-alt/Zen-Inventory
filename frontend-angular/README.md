@@ -55,3 +55,17 @@ con sus roles y cambia su `loadComponent` en `app.routes.ts` (mientras tanto mue
 - Cada pantalla migrada entra con sus tests; el E2E se corre a pedido (necesita backend).
 - El token JWT solo se envía a la API propia, nunca a otros orígenes.
 - Los E2E de login interceptan `/api/**` (no necesitan backend); los flujos de negocio posteriores sí.
+
+## Docker
+
+El servicio `frontend-angular` del `docker-compose.yml` (raíz del monorepo) convive con el de Next.js:
+
+```bash
+docker compose up --build frontend-angular   # levanta también db y backend por depends_on
+```
+
+- Se sirve en `http://localhost:4200` (cámbialo con `ANGULAR_PORT` en el `.env` de la raíz).
+- La imagen compila la app y la sirve con nginx sin privilegios (`nginx/default.conf.template`): devuelve
+  `index.html` en las rutas de la SPA y reenvía `/api/*` al backend (`BACKEND_URL`, por defecto
+  `http://backend:8080`), así el navegador usa un único origen y no hace falta CORS.
+
