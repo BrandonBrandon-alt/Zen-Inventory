@@ -98,6 +98,7 @@
   --color-brand-strong: var(--brand-600);
   --color-primary: var(--btn-primary-bg);
   --color-primary-fg: var(--btn-primary-text);
+  --color-primary-hover: var(--btn-primary-hover-bg);
   --color-danger: var(--state-danger);
   --color-success: var(--state-success);
   --color-warning: var(--state-warning);
