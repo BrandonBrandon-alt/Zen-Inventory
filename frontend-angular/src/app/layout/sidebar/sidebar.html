@@ -1,6 +1,7 @@
 <aside
-  class="flex h-full flex-col border-r border-line bg-base py-5 transition-[width] duration-300"
-  [class]="state.collapsed() ? 'w-20' : 'w-60'"
+  class="flex h-full flex-col border-r border-line bg-base py-5"
+  [class]="resizing() ? '' : 'transition-[width] duration-300'"
+  [style.width.px]="widthPx()"
 >
   <header class="relative mb-6 flex items-center gap-2.5 px-4" [class.justify-center]="state.collapsed()">
     <app-logo [size]="32" [showText]="!state.collapsed()" />
@@ -19,7 +20,7 @@
     </button>
   </header>
 
-  <nav aria-label="Principal" class="custom-scrollbar flex-1 overflow-y-auto px-3">
+  <nav aria-label="Principal" class="flex-1 overflow-y-auto px-3">
     @for (section of sections(); track section.title) {
       <p
         class="mt-4 mb-2 px-3 text-[10px] font-bold tracking-widest text-fg-subtle uppercase first:mt-0"
@@ -84,3 +85,29 @@
     </button>
   </footer>
 </aside>
+
+@if (!state.collapsed()) {
+  <!-- Borde arrastrable (separador enfocable, patrón "window splitter" de WAI-ARIA). Empieza bajo la cabecera para no tapar el botón de colapsar. -->
+  <div
+    role="separator"
+    aria-orientation="vertical"
+    aria-label="Cambiar ancho del menú"
+    tabindex="0"
+    class="group absolute top-14 -right-[3px] bottom-0 z-10 w-1.5 cursor-col-resize touch-none outline-none"
+    [attr.aria-valuenow]="state.width()"
+    [attr.aria-valuemin]="minWidth"
+    [attr.aria-valuemax]="maxWidth"
+    (pointerdown)="startResize($event)"
+    (pointermove)="onResize($event)"
+    (pointerup)="endResize()"
+    (pointercancel)="endResize()"
+    (lostpointercapture)="endResize()"
+    (keydown)="onResizeKey($event)"
+    (dblclick)="state.resetWidth()"
+  >
+    <span
+      class="mx-auto block h-full w-0.5 rounded-full transition-colors duration-150 group-hover:bg-brand/40 group-focus-visible:bg-brand/60"
+      [class]="resizing() ? 'bg-brand/60' : 'bg-transparent'"
+    ></span>
+  </div>
+}

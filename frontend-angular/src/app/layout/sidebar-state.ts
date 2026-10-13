@@ -1,6 +1,19 @@
 import { Injectable, signal } from '@angular/core';
 
 export const SIDEBAR_STORAGE_KEY = 'zen_inventory_sidebar_collapsed';
+export const SIDEBAR_WIDTH_STORAGE_KEY = 'zen_inventory_sidebar_width';
+
+/** Ancho (px) del sidebar expandido: estándar y límites al arrastrar. */
+export const SIDEBAR_DEFAULT_WIDTH = 240;
+export const SIDEBAR_MIN_WIDTH = 200;
+export const SIDEBAR_MAX_WIDTH = 360;
+
+/** Ancho (px) del sidebar colapsado (solo iconos). */
+export const SIDEBAR_COLLAPSED_WIDTH = 80;
+
+function clampWidth(value: number): number {
+  return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(value)));
+}
 
 function readCollapsed(): boolean {
   try {
@@ -10,24 +23,50 @@ function readCollapsed(): boolean {
   }
 }
 
-function writeCollapsed(collapsed: boolean): void {
+function readWidth(): number {
   try {
-    localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed));
+    const stored = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+    const parsed = stored === null ? Number.NaN : Number(stored);
+    return stored === null || stored.trim() === '' || !Number.isFinite(parsed)
+      ? SIDEBAR_DEFAULT_WIDTH
+      : clampWidth(parsed);
+  } catch {
+    return SIDEBAR_DEFAULT_WIDTH;
+  }
+}
+
+function write(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
   } catch {
     // Almacenamiento no disponible: el estado sigue vigente solo en memoria.
   }
 }
 
-/** Estado colapsado/expandido del sidebar, persistido entre sesiones. */
+/** Estado del sidebar (colapsado y ancho), persistido entre sesiones. */
 @Injectable({ providedIn: 'root' })
 export class SidebarState {
-  private readonly state = signal(readCollapsed());
+  private readonly collapsedState = signal(readCollapsed());
+  private readonly widthState = signal(readWidth());
 
-  readonly collapsed = this.state.asReadonly();
+  readonly collapsed = this.collapsedState.asReadonly();
+  /** Ancho del sidebar expandido, en px. Colapsado se ignora (ver `SIDEBAR_COLLAPSED_WIDTH`). */
+  readonly width = this.widthState.asReadonly();
 
   toggle(): void {
-    const next = !this.state();
-    this.state.set(next);
-    writeCollapsed(next);
+    const next = !this.collapsedState();
+    this.collapsedState.set(next);
+    write(SIDEBAR_STORAGE_KEY, String(next));
+  }
+
+  setWidth(px: number): void {
+    if (!Number.isFinite(px)) return;
+    const next = clampWidth(px);
+    this.widthState.set(next);
+    write(SIDEBAR_WIDTH_STORAGE_KEY, String(next));
+  }
+
+  resetWidth(): void {
+    this.setWidth(SIDEBAR_DEFAULT_WIDTH);
   }
 }

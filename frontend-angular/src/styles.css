@@ -5,6 +5,29 @@
 @import './styles/theme.css';
 
 @layer base {
+  /* Scroll estético y consistente en toda la app: barra fina del color neutral del tema, sin pista visible.
+     Va en `*` porque `scrollbar-width` no se hereda: cada área con scroll necesita la propiedad. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--neutral-600) transparent;
+  }
+
+  /* Navegadores que aún no soportan scrollbar-width/scrollbar-color. */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--neutral-600);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--neutral-500);
+  }
+
   body {
     min-height: 100vh;
     background: var(--bg-base);
