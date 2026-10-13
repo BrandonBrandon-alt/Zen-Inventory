@@ -98,7 +98,7 @@ clases largas; las encapsulan los componentes de `shared/ui`.
 | Capa | Herramienta | Cubre | Ubicación |
 |---|---|---|---|
 | Unit y componentes | Runner por defecto de Angular (Vitest; se confirma al crear el proyecto) + Angular Testing Library | Servicios, stores y comportamiento de componentes visto por el usuario (roles, texto) | `*.spec.ts` junto al archivo |
-| Integración HTTP | MSW en modo Node | Servicios de `data-access/` contra la API simulada con el contrato real (rutas, query params, payload), interceptor JWT y 401 | `tests/integration/` |
+| Integración HTTP | MSW en modo Node | Servicios de `data-access/` contra la API simulada con el contrato real (rutas, query params, payload), interceptor JWT y 401 | `src/testing/integration/` (MSW y setup en `src/testing/`; `ng test` solo compila lo que está bajo `src/`) |
 | E2E | Playwright | Flujos reales contra el backend en `localhost:8080`; Playwright solo levanta el frontend | `e2e/` |
 
 - Los handlers MSW se tipan con los tipos generados del OpenAPI: un cambio de contrato
