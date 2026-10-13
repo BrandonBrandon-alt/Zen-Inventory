@@ -1,5 +1,6 @@
 import { Injectable, computed, signal } from '@angular/core';
 import { type AuthSession, isAuthSession } from './auth-session';
+import { type Role, isRole } from './role';
 
 export const SESSION_STORAGE_KEY = 'zen_inventory_session';
 
@@ -30,6 +31,12 @@ export class AuthStore {
   readonly session = this.state.asReadonly();
   readonly isAuthenticated = computed(() => this.state() !== null);
   readonly token = computed(() => this.state()?.token ?? null);
+
+  /** Rol de la sesión si es uno de los que la app conoce; null si no hay sesión o el rol es desconocido. */
+  readonly role = computed<Role | null>(() => {
+    const rol = this.state()?.rol;
+    return isRole(rol) ? rol : null;
+  });
 
   start(session: AuthSession): void {
     this.state.set(session);

@@ -17,6 +17,7 @@
 - `features` no importa de otra feature; `shared` y `core` no importan de `features` (ESLint lo hace cumplir). Dentro de la misma capa se usan imports relativos; entre capas, los alias `@core/*`, `@shared/*`, `@features/*`.
 - Sin `any`, sin `@ts-ignore`, sin hex ni `rgba()` sueltos: solo tokens de `src/styles/theme.css` (utilidades `bg-base`, `text-fg`, `border-line`, `bg-primary`, `text-danger`…).
 - Cada componente se prueba con `@testing-library/angular` consultando por rol/texto accesible, no por clases internas ni detalles de implementación. Un test que no puede fallar por un bug real no se escribe.
+- **Un componente = una carpeta** con su `.ts`, su `.html` (si lo tiene) y su `.spec.ts`. Servicios, guardas y utilidades de un solo archivo quedan planos junto a su spec.
 - Ejecutar los tests siempre con `npm test -- --watch=false` (el script `pretest` limpia una caché de Vitest que da falsos verdes; no usar `ng test` directo).
 - Roles del backend (`Role.java`/`PreAuthorize`): `ADMIN`, `MANAGER`, `SELLER`, `OPERADOR_INVENTARIO`. Visibilidad del menú = **paridad con el Sidebar actual del Next** (ver Task 7); las diferencias que se detecten se registran, no se corrigen en silencio.
 - Sin cuentas demo ni credenciales en el código del login (decisión del usuario).
@@ -50,22 +51,16 @@ frontend-angular/
     role.guard.ts  role.guard.spec.ts
     guest.guard.ts  guest.guard.spec.ts
   src/app/core/theme/theme.service.ts  theme.service.spec.ts
-  src/app/shared/ui/
-    spinner.ts  spinner.spec.ts
-    logo.ts  logo.spec.ts
-    button.ts  button.spec.ts
-    form-field.ts  form-field.spec.ts                InputDirective + FormField
-    password-toggle.ts  password-toggle.spec.ts
-    alert.ts  alert.spec.ts
+  src/app/shared/ui/                                 una carpeta por componente, con su spec dentro
+    spinner/  logo/  button/  password-toggle/  alert/
+    form-field/                                      InputDirective + FormField
   src/app/layout/
     nav-items.ts  nav-items.spec.ts
     sidebar-state.ts  sidebar-state.spec.ts
     data-access/branch-label-api.ts
-    user-card.ts  user-card.spec.ts
-    sidebar.ts  sidebar.html  sidebar.spec.ts
-    shell.ts
-  src/app/features/auth/pages/login-page.ts  login-page.html  login-page.spec.ts
-  src/app/features/not-migrated/pages/not-migrated-page.ts
+    user-card/  sidebar/  shell/                     carpeta por componente (ts, html, spec)
+  src/app/features/auth/pages/login-page/login-page.ts  login-page.html  login-page.spec.ts
+  src/app/features/not-migrated/pages/not-migrated-page/not-migrated-page.ts
 ```
 
 ---
@@ -74,8 +69,8 @@ frontend-angular/
 
 **Files:**
 - Modify: `src/testing/setup.ts`, `tsconfig.spec.json`
-- Create: `src/app/shared/ui/spinner.ts`, `src/app/shared/ui/logo.ts`
-- Test: `src/app/shared/ui/spinner.spec.ts`, `src/app/shared/ui/logo.spec.ts`
+- Create: `src/app/shared/ui/spinner/spinner.ts`, `src/app/shared/ui/logo/logo.ts`
+- Test: `src/app/shared/ui/spinner/spinner.spec.ts`, `src/app/shared/ui/logo/logo.spec.ts`
 
 **Interfaces:**
 - Produces: `Spinner` (`<app-spinner [size]="22" />`, input `size: number`, svg `role="status"` con nombre "Cargando", color por `currentColor`); `Logo` (`<app-logo [size]="48" [showText]="false" />`, inputs `size: number`, `showText: boolean`; sin texto es `role="img"` "Zen Inventory"; con texto el svg va `aria-hidden`).
@@ -101,12 +96,12 @@ En `tsconfig.spec.json`, dentro de `compilerOptions.types`, dejar:
 
 - [ ] **Step 2: Escribir los tests (rojo)**
 
-`src/app/shared/ui/spinner.spec.ts`:
+`src/app/shared/ui/spinner/spinner.spec.ts`:
 
 ```ts
 import { render, screen } from '@testing-library/angular';
 import { describe, expect, it } from 'vitest';
-import { Spinner } from './spinner';
+import { Spinner } from '../spinner/spinner';
 
 describe('Spinner', () => {
   it('se anuncia como estado de carga accesible', async () => {
@@ -123,7 +118,7 @@ describe('Spinner', () => {
 });
 ```
 
-`src/app/shared/ui/logo.spec.ts`:
+`src/app/shared/ui/logo/logo.spec.ts`:
 
 ```ts
 import { render, screen } from '@testing-library/angular';
@@ -276,8 +271,8 @@ git add frontend-angular && git commit -m "feat(angular): infraestructura de tes
 
 **Files:**
 - Modify: `src/styles/theme.css` (token `--color-primary-hover`)
-- Create: `src/app/shared/ui/button.ts`
-- Test: `src/app/shared/ui/button.spec.ts`
+- Create: `src/app/shared/ui/button/button.ts`
+- Test: `src/app/shared/ui/button/button.spec.ts`
 
 **Interfaces:**
 - Consumes: `Spinner` (Task 1).
@@ -293,7 +288,7 @@ En `src/styles/theme.css`, dentro de `@theme inline { … }`, tras `--color-prim
 
 - [ ] **Step 2: Escribir el test (rojo)**
 
-`src/app/shared/ui/button.spec.ts`:
+`src/app/shared/ui/button/button.spec.ts`:
 
 ```ts
 import { render, screen } from '@testing-library/angular';
@@ -367,7 +362,7 @@ Expected: FAIL con `Could not resolve "./button"`.
 
 ```ts
 import { ChangeDetectionStrategy, Component, booleanAttribute, computed, input } from '@angular/core';
-import { Spinner } from './spinner';
+import { Spinner } from '../spinner/spinner';
 
 export type ButtonVariant = 'primary' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -441,8 +436,8 @@ git add frontend-angular && git commit -m "feat(angular): componente Button con 
 ### Task 3: `FormField`, `InputDirective` y `PasswordToggle`
 
 **Files:**
-- Create: `src/app/shared/ui/form-field.ts`, `src/app/shared/ui/password-toggle.ts`
-- Test: `src/app/shared/ui/form-field.spec.ts`, `src/app/shared/ui/password-toggle.spec.ts`
+- Create: `src/app/shared/ui/form-field/form-field.ts`, `src/app/shared/ui/password-toggle/password-toggle.ts`
+- Test: `src/app/shared/ui/form-field/form-field.spec.ts`, `src/app/shared/ui/password-toggle/password-toggle.spec.ts`
 
 **Interfaces:**
 - Produces:
@@ -459,7 +454,7 @@ git add frontend-angular && git commit -m "feat(angular): componente Button con 
 
 - [ ] **Step 1: Escribir los tests (rojo)**
 
-`src/app/shared/ui/form-field.spec.ts`:
+`src/app/shared/ui/form-field/form-field.spec.ts`:
 
 ```ts
 import { render, screen } from '@testing-library/angular';
@@ -521,7 +516,7 @@ describe('FormField', () => {
 });
 ```
 
-`src/app/shared/ui/password-toggle.spec.ts`:
+`src/app/shared/ui/password-toggle/password-toggle.spec.ts`:
 
 ```ts
 import { render, screen } from '@testing-library/angular';
@@ -689,8 +684,8 @@ git add frontend-angular && git commit -m "feat(angular): FormField, InputDirect
 ### Task 4: `Alert`
 
 **Files:**
-- Create: `src/app/shared/ui/alert.ts`
-- Test: `src/app/shared/ui/alert.spec.ts`
+- Create: `src/app/shared/ui/alert/alert.ts`
+- Test: `src/app/shared/ui/alert/alert.spec.ts`
 
 **Interfaces:**
 - Produces: `Alert`, selector `app-alert`, input `variant: 'danger' | 'warning' | 'success' | 'info'` (por defecto `'danger'`); contenido proyectado; `role="alert"` para `danger`/`warning` y `role="status"` para `success`/`info`.
@@ -1553,8 +1548,8 @@ export class BranchLabelApi {
 ### Task 9: `UserCard`, `Sidebar` y `Shell`
 
 **Files:**
-- Create: `src/app/layout/user-card.ts`, `src/app/layout/sidebar.ts`, `src/app/layout/sidebar.html`, `src/app/layout/shell.ts`
-- Test: `src/app/layout/user-card.spec.ts`, `src/app/layout/sidebar.spec.ts`
+- Create: `src/app/layout/user-card/user-card.ts`, `src/app/layout/sidebar/sidebar.ts`, `src/app/layout/sidebar/sidebar.html`, `src/app/layout/shell/shell.ts`
+- Test: `src/app/layout/user-card/user-card.spec.ts`, `src/app/layout/sidebar/sidebar.spec.ts`
 
 **Interfaces:**
 - Consumes: `AuthStore`, `ThemeService`, `SidebarState`, `BranchLabelApi`, `navSectionsFor`, `Logo`, `LOGIN_URL`.
@@ -1565,15 +1560,15 @@ export class BranchLabelApi {
 
 - [ ] **Step 1: Escribir los tests (rojo)**
 
-`src/app/layout/user-card.spec.ts`:
+`src/app/layout/user-card/user-card.spec.ts`:
 
 ```ts
 import { render, screen } from '@testing-library/angular';
 import { of } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AuthStore } from '@core/auth/auth-store';
-import { BranchLabelApi } from './data-access/branch-label-api';
-import { UserCard } from './user-card';
+import { BranchLabelApi } from '../data-access/branch-label-api';
+import { UserCard } from '../user-card/user-card';
 
 const provideLabel = (label: string) => ({ provide: BranchLabelApi, useValue: { labelFor: () => of(label) } });
 
@@ -1618,7 +1613,7 @@ describe('UserCard', () => {
 });
 ```
 
-`src/app/layout/sidebar.spec.ts`:
+`src/app/layout/sidebar/sidebar.spec.ts`:
 
 ```ts
 import { render, screen } from '@testing-library/angular';
@@ -1629,8 +1624,8 @@ import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthStore } from '@core/auth/auth-store';
 import { ThemeService } from '@core/theme/theme.service';
-import { BranchLabelApi } from './data-access/branch-label-api';
-import { SIDEBAR_STORAGE_KEY } from './sidebar-state';
+import { BranchLabelApi } from '../data-access/branch-label-api';
+import { SIDEBAR_STORAGE_KEY } from '../sidebar-state';
 import { Sidebar } from './sidebar';
 
 const sessionFor = (rol: string) => ({ token: 't', email: 'e', nombre: 'Ana', rol, id: 1, sucursalId: 3 });
@@ -1717,7 +1712,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { LucideMapPin } from '@lucide/angular';
 import { of, switchMap } from 'rxjs';
 import { AuthStore } from '@core/auth/auth-store';
-import { BranchLabelApi, DEFAULT_BRANCH_LABEL } from './data-access/branch-label-api';
+import { BranchLabelApi, DEFAULT_BRANCH_LABEL } from '../data-access/branch-label-api';
 
 /** Datos del usuario en sesión: inicial, nombre y ámbito (sucursal o gestión global). */
 @Component({
@@ -1779,10 +1774,10 @@ import {
 import { LOGIN_URL } from '@core/auth/auth-urls';
 import { AuthStore } from '@core/auth/auth-store';
 import { ThemeService } from '@core/theme/theme.service';
-import { Logo } from '@shared/ui/logo';
-import { navSectionsFor } from './nav-items';
-import { SidebarState } from './sidebar-state';
-import { UserCard } from './user-card';
+import { Logo } from '@shared/ui/logo/logo';
+import { navSectionsFor } from '../nav-items';
+import { SidebarState } from '../sidebar-state';
+import { UserCard } from '../user-card/user-card';
 
 @Component({
   selector: 'app-sidebar',
@@ -1915,7 +1910,7 @@ Nota: `LucideDynamicIcon` (selector `svg[lucideIcon]`) pinta un icono recibido c
 ```ts
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { Sidebar } from './sidebar';
+import { Sidebar } from '../sidebar/sidebar';
 
 /** Estructura de las pantallas autenticadas: menú lateral + contenido. */
 @Component({
@@ -1946,8 +1941,8 @@ En `sidebar.ts`, cambiar `navSectionsFor(this.store.role())` por `NAV_SECTIONS` 
 ### Task 10: `LoginPage`
 
 **Files:**
-- Create: `src/app/features/auth/pages/login-page.ts`, `src/app/features/auth/pages/login-page.html`
-- Test: `src/app/features/auth/pages/login-page.spec.ts`
+- Create: `src/app/features/auth/pages/login-page/login-page.ts`, `src/app/features/auth/pages/login-page/login-page.html`
+- Test: `src/app/features/auth/pages/login-page/login-page.spec.ts`
 
 **Interfaces:**
 - Consumes: `AuthApi.login`, `AuthError`, `DASHBOARD_URL`, `Button`, `FormField`, `InputDirective`, `PasswordToggle`, `Alert`, `Logo`.
@@ -1965,7 +1960,7 @@ import { http, HttpResponse, delay } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { AuthStore } from '@core/auth/auth-store';
-import { okLogin, server, TEST_API } from '../../../../testing/msw-server';
+import { okLogin, server, TEST_API } from '../../../../../testing/msw-server';
 import { LoginPage } from './login-page';
 
 const LOGIN = `${TEST_API}/api/auth/login`;
@@ -2117,11 +2112,11 @@ import { Router } from '@angular/router';
 import { LucideLock, LucideMail } from '@lucide/angular';
 import { AuthApi, AuthError } from '@core/auth/auth-api';
 import { DASHBOARD_URL } from '@core/auth/auth-urls';
-import { Alert } from '@shared/ui/alert';
-import { Button } from '@shared/ui/button';
-import { FormField, InputDirective } from '@shared/ui/form-field';
-import { Logo } from '@shared/ui/logo';
-import { PasswordToggle } from '@shared/ui/password-toggle';
+import { Alert } from '@shared/ui/alert/alert';
+import { Button } from '@shared/ui/button/button';
+import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
+import { Logo } from '@shared/ui/logo/logo';
+import { PasswordToggle } from '@shared/ui/password-toggle/password-toggle';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 6;
@@ -2287,7 +2282,7 @@ Expected: PASS. Si los mensajes de error no aparecen tras `tab()` o el envío va
 ### Task 11: Rutas, página "en migración" y verificación de las guardas
 
 **Files:**
-- Create: `src/app/features/not-migrated/pages/not-migrated-page.ts`
+- Create: `src/app/features/not-migrated/pages/not-migrated-page/not-migrated-page.ts`
 - Modify: `src/app/app.routes.ts`
 - Test: `src/testing/integration/routes.integration.spec.ts`
 
@@ -2429,7 +2424,7 @@ import { NAV_SECTIONS } from './layout/nav-items';
 const APP_TITLE = 'Zen Inventory';
 
 const loadNotMigrated = () =>
-  import('./features/not-migrated/pages/not-migrated-page').then((m) => m.NotMigratedPage);
+  import('./features/not-migrated/pages/not-migrated-page/not-migrated-page').then((m) => m.NotMigratedPage);
 
 /** Una ruta por ítem del menú, con su guarda de roles. Al migrar una pantalla se cambia su `loadComponent`. */
 const menuRoutes: Routes = NAV_SECTIONS.flatMap((section) => section.items).map((item) => ({
@@ -2445,12 +2440,12 @@ export const routes: Routes = [
     path: 'login',
     title: `Ingresar | ${APP_TITLE}`,
     canActivate: [guestGuard],
-    loadComponent: () => import('./features/auth/pages/login-page').then((m) => m.LoginPage),
+    loadComponent: () => import('./features/auth/pages/login-page/login-page').then((m) => m.LoginPage),
   },
   {
     path: '',
     canActivate: [authGuard],
-    loadComponent: () => import('./layout/shell').then((m) => m.Shell),
+    loadComponent: () => import('./layout/shell/shell').then((m) => m.Shell),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       ...menuRoutes,

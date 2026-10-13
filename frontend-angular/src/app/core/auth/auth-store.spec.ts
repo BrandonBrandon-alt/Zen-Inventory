@@ -82,4 +82,18 @@ describe('AuthStore', () => {
     expect(() => store.start(session)).not.toThrow();
     expect(store.isAuthenticated()).toBe(true);
   });
+
+  it('role expone el rol conocido de la sesión y null si no hay sesión', () => {
+    const store = createStore();
+    expect(store.role()).toBeNull();
+    store.start(session);
+    expect(store.role()).toBe('ADMIN');
+  });
+
+  it('role es null cuando el rol de la sesión no es uno conocido', () => {
+    const store = createStore();
+    store.start({ ...session, rol: 'INVENTADO' });
+    expect(store.isAuthenticated()).toBe(true);
+    expect(store.role()).toBeNull();
+  });
 });
