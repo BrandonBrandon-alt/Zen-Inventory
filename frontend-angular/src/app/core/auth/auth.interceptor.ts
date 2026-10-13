@@ -15,8 +15,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
   const baseUrl = inject(API_BASE_URL);
 
-  // Con base vacía la API es del mismo origen (URLs relativas); con base absoluta, solo esa.
-  const isApiCall = baseUrl ? req.url.startsWith(baseUrl) : req.url.startsWith('/');
+  // Con base vacía la API es del mismo origen (ruta relativa; `//host` es otro origen sin protocolo);
+  // con base absoluta, solo esa.
+  const isSameOriginPath = req.url.startsWith('/') && !req.url.startsWith('//');
+  const isApiCall = baseUrl ? req.url.startsWith(baseUrl) : isSameOriginPath;
   const isLoginCall = req.url.endsWith(LOGIN_ENDPOINT);
   const token = store.token();
   const outgoing =

@@ -10,7 +10,7 @@ import { LOGIN_ENDPOINT } from './auth-urls';
 type LoginRequest = components['schemas']['LoginRequest'];
 type LoginResponse = components['schemas']['LoginResponse'];
 
-export type AuthErrorKind = 'credentials' | 'network' | 'invalid-response';
+export type AuthErrorKind = 'credentials' | 'network' | 'server' | 'invalid-response';
 
 export class AuthError extends Error {
   constructor(
@@ -24,6 +24,7 @@ export class AuthError extends Error {
 
 const DEFAULT_CREDENTIALS_MESSAGE = 'Credenciales incorrectas. Inténtalo de nuevo.';
 const NETWORK_MESSAGE = 'No se pudo conectar con el servidor.';
+const SERVER_MESSAGE = 'El servidor no pudo procesar la solicitud. Inténtalo más tarde.';
 
 @Injectable({ providedIn: 'root' })
 export class AuthApi {
@@ -62,6 +63,7 @@ export class AuthApi {
     if (!(error instanceof HttpErrorResponse) || error.status === 0) {
       return new AuthError('network', NETWORK_MESSAGE);
     }
+    if (error.status >= 500) return new AuthError('server', SERVER_MESSAGE);
     return new AuthError('credentials', this.backendMessage(error.error) ?? DEFAULT_CREDENTIALS_MESSAGE);
   }
 

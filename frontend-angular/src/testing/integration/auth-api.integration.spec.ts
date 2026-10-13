@@ -70,6 +70,16 @@ describe('AuthApi (contrato HTTP real con MSW)', () => {
     });
   });
 
+  it('error 500 del servidor: AuthError "server", no se presenta como credenciales incorrectas', async () => {
+    server.use(http.post(`${TEST_API}/api/auth/login`, () => new HttpResponse(null, { status: 500 })));
+    const error = await api.login(credentials).catch((e: unknown) => e);
+    expect(error).toMatchObject({
+      kind: 'server',
+      message: 'El servidor no pudo procesar la solicitud. Inténtalo más tarde.',
+    });
+    expect(store.isAuthenticated()).toBe(false);
+  });
+
   it('respuesta sin token (campos opcionales ausentes): AuthError "invalid-response", sin sesión parcial', async () => {
     server.use(http.post(`${TEST_API}/api/auth/login`, () => HttpResponse.json({ email: 'ana@zen.com' })));
     const error = await api.login(credentials).catch((e: unknown) => e);

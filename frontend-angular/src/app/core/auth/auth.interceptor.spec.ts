@@ -124,6 +124,14 @@ describe('authInterceptor — alcance del token', () => {
     req.flush({});
   });
 
+  it('mismo origen: una URL sin protocolo (//host) es de otro origen y no lleva el token', () => {
+    configure('');
+    http.get('//terceros.example/x').subscribe();
+    const req = controller.expectOne('//terceros.example/x');
+    expect(req.request.headers.has('Authorization')).toBe(false);
+    req.flush({});
+  });
+
   it('API_BASE_URL absoluta: envía el token a esa API y no a otros orígenes', () => {
     configure('http://api.test');
     http.get('http://api.test/api/branches').subscribe();
