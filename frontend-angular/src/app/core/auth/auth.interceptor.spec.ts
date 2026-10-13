@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { API_BASE_URL } from '../api/api-base-url';
 import { authInterceptor } from './auth.interceptor';
 import { AuthStore } from './auth-store';
 
@@ -87,6 +88,61 @@ describe('authInterceptor', () => {
     http.get('/api/branches').subscribe({ error: (e) => (status = e.status) });
     controller.expectOne('/api/branches').error(new ProgressEvent('error'));
     expect(status).toBe(0);
+    expect(store.isAuthenticated()).toBe(true);
+    expect(navigateByUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe('authInterceptor — alcance del token', () => {
+  let http: HttpClient;
+  let controller: HttpTestingController;
+  let store: AuthStore;
+  let navigateByUrl: ReturnType<typeof vi.fn>;
+
+  function configure(baseUrl: string) {
+    localStorage.clear();
+    navigateByUrl = vi.fn().mockResolvedValue(true);
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([authInterceptor])),
+        provideHttpClientTesting(),
+        { provide: API_BASE_URL, useValue: baseUrl },
+        { provide: Router, useValue: { navigateByUrl } },
+      ],
+    });
+    http = TestBed.inject(HttpClient);
+    controller = TestBed.inject(HttpTestingController);
+    store = TestBed.inject(AuthStore);
+    store.start(session);
+  }
+
+  it('mismo origen (API_BASE_URL vacía): no envía el token a una URL absoluta de terceros', () => {
+    configure('');
+    http.get('https://terceros.example/x').subscribe();
+    const req = controller.expectOne('https://terceros.example/x');
+    expect(req.request.headers.has('Authorization')).toBe(false);
+    req.flush({});
+  });
+
+  it('API_BASE_URL absoluta: envía el token a esa API y no a otros orígenes', () => {
+    configure('http://api.test');
+    http.get('http://api.test/api/branches').subscribe();
+    const own = controller.expectOne('http://api.test/api/branches');
+    expect(own.request.headers.get('Authorization')).toBe('Bearer jwt-123');
+    own.flush([]);
+
+    http.get('https://terceros.example/x').subscribe();
+    const other = controller.expectOne('https://terceros.example/x');
+    expect(other.request.headers.has('Authorization')).toBe(false);
+    other.flush({});
+  });
+
+  it('un 401 de un origen ajeno no cierra la sesión ni redirige', () => {
+    configure('http://api.test');
+    http.get('https://terceros.example/x').subscribe({ error: () => undefined });
+    controller
+      .expectOne('https://terceros.example/x')
+      .flush({}, { status: 401, statusText: 'Unauthorized' });
     expect(store.isAuthenticated()).toBe(true);
     expect(navigateByUrl).not.toHaveBeenCalled();
   });

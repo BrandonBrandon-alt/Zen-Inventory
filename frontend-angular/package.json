@@ -9,7 +9,8 @@
     "test": "ng test",
     "lint": "ng lint",
     "openapi:gen": "npx --yes openapi-typescript@7.13.0 http://localhost:8080/v3/api-docs -o ./src/app/core/api/schema.d.ts",
-    "pretest": "node -e \"require('fs').rmSync('node_modules/.vitest-cache',{recursive:true,force:true})\""
+    "pretest": "node -e \"require('fs').rmSync('node_modules/.vitest-cache',{recursive:true,force:true})\"",
+    "test:e2e": "playwright test"
   },
   "private": true,
   "packageManager": "npm@11.19.0",
@@ -30,6 +31,7 @@
     "@angular/cli": "^22.2.0",
     "@angular/compiler-cli": "^22.2.0",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/postcss": "^4.1.12",
     "@testing-library/angular": "^19.5.0",
     "@testing-library/dom": "^10.4.2",
