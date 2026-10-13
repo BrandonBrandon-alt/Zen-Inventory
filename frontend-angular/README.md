@@ -27,13 +27,22 @@ Migración incremental del frontend de Next.js (`../frontend`) a Angular. Diseñ
 
 ```
 src/app/
-  core/      servicios singleton: sesión (AuthStore), AuthApi, interceptor, guard, API_BASE_URL
-  shared/    ui/ — componentes reutilizables sin lógica de negocio
-  features/  una carpeta por pantalla/vertical (pages/, components/, data-access/)
-  layout/    shell de la aplicación
-src/testing/ MSW (msw-server.ts), setup de Vitest e integración HTTP
+  core/       servicios únicos de toda la app
+    api/        API_BASE_URL y tipos OpenAPI generados
+    auth/       session/ (AuthStore), roles/, guards/ (auth, guest, role), http/ (AuthApi, interceptor)
+    theme/      ThemeService (claro/oscuro)
+  shared/ui/  componentes reutilizables sin lógica de negocio: una carpeta por componente
+  layout/     shell de la app: nav-items.ts (menú y rutas), sidebar/, user-card/, shell/
+  features/   una carpeta por área de negocio: pages/<pagina>/, components/<componente>/, data-access/
+src/testing/ MSW (msw-server.ts), setup de Vitest e integración HTTP (alias @testing/*)
 e2e/         tests de Playwright
 ```
+
+**Un componente = una carpeta** con su `.ts`, su `.html` (si lo tiene) y su `.spec.ts`. Servicios, guardas y
+utilidades de un solo archivo quedan planos junto a su spec.
+
+**Menú y rutas:** `layout/nav-items.ts` es la fuente única. Para una pantalla nueva, agrégala a `NAV_SECTIONS`
+con sus roles y cambia su `loadComponent` en `app.routes.ts` (mientras tanto muestra `NotMigratedPage`).
 
 ## Reglas
 
@@ -45,3 +54,4 @@ e2e/         tests de Playwright
 - Un componente sube a `shared/ui` solo cuando lo usa una segunda pantalla.
 - Cada pantalla migrada entra con sus tests; el E2E se corre a pedido (necesita backend).
 - El token JWT solo se envía a la API propia, nunca a otros orígenes.
+- Los E2E de login interceptan `/api/**` (no necesitan backend); los flujos de negocio posteriores sí.

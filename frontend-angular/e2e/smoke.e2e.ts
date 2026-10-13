@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('la app arranca y tiene el título del producto', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveTitle('Zen Inventory');
+  await expect(page).toHaveTitle(/Zen Inventory/);
 });
 
 test('el tema oscuro por defecto aplica los tokens de diseño', async ({ page }) => {

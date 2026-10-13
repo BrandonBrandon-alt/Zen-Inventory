@@ -13,7 +13,10 @@ import { BranchLabelApi, DEFAULT_BRANCH_LABEL } from '../data-access/branch-labe
   host: { class: 'block' },
   template: `
     @if (session(); as current) {
-      <div class="flex items-center gap-2.5 rounded-lg border border-line-subtle bg-card p-3">
+      <div
+        class="flex items-center gap-2.5 rounded-lg border border-line-subtle bg-card p-3"
+        [class.justify-center]="compact()"
+      >
         <div
           class="flex size-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-brand to-warning text-[13px] font-black text-white"
           aria-hidden="true"
