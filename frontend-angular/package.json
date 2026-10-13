@@ -8,7 +8,8 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "lint": "ng lint",
-    "openapi:gen": "npx --yes openapi-typescript@7.13.0 http://localhost:8080/v3/api-docs -o ./src/app/core/api/schema.d.ts"
+    "openapi:gen": "npx --yes openapi-typescript@7.13.0 http://localhost:8080/v3/api-docs -o ./src/app/core/api/schema.d.ts",
+    "pretest": "node -e \"require('fs').rmSync('node_modules/.vitest-cache',{recursive:true,force:true})\""
   },
   "private": true,
   "packageManager": "npm@11.19.0",
