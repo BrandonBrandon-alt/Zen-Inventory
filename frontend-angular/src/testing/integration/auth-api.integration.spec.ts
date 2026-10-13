@@ -4,9 +4,9 @@ import { Router } from '@angular/router';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_BASE_URL } from '@core/api/api-base-url';
-import { AuthApi, AuthError } from '@core/auth/auth-api';
-import { authInterceptor } from '@core/auth/auth.interceptor';
-import { AuthStore } from '@core/auth/auth-store';
+import { AuthApi, AuthError } from '@core/auth/http/auth-api';
+import { authInterceptor } from '@core/auth/http/auth.interceptor';
+import { AuthStore } from '@core/auth/session/auth-store';
 import { okLogin, server, TEST_API } from '../msw-server';
 
 const credentials = { email: 'ana@zen.com', password: 'secreto' };

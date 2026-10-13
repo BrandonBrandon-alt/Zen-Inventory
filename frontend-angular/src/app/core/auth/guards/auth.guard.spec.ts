@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, type ActivatedRouteSnapshot, type RouterStateSnapshot } from '@angular/router';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { authGuard } from './auth.guard';
-import { AuthStore } from './auth-store';
+import { AuthStore } from '../session/auth-store';
 
 const run = () =>
   TestBed.runInInjectionContext(() =>

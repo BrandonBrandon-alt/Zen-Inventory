@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Router, type ActivatedRouteSnapshot, type RouterStateSnapshot } from '@angular/router';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { AuthStore } from './auth-store';
+import { AuthStore } from '../session/auth-store';
 import { guestGuard } from './guest.guard';
 
 const run = () =>

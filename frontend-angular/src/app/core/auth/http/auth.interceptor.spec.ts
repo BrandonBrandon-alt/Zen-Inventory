@@ -3,9 +3,9 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { API_BASE_URL } from '../api/api-base-url';
+import { API_BASE_URL } from '../../api/api-base-url';
 import { authInterceptor } from './auth.interceptor';
-import { AuthStore } from './auth-store';
+import { AuthStore } from '../session/auth-store';
 
 const session = { token: 'jwt-123', email: 'a@z.com', nombre: 'A', rol: 'ADMIN', id: 1 };
 

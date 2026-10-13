@@ -2,9 +2,9 @@ import { HttpErrorResponse, type HttpInterceptorFn } from '@angular/common/http'
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
-import { API_BASE_URL } from '../api/api-base-url';
-import { LOGIN_ENDPOINT, LOGIN_URL } from './auth-urls';
-import { AuthStore } from './auth-store';
+import { API_BASE_URL } from '../../api/api-base-url';
+import { LOGIN_ENDPOINT, LOGIN_URL } from '../auth-urls';
+import { AuthStore } from '../session/auth-store';
 
 /**
  * Adjunta el JWT solo a las peticiones a nuestra API (nunca a terceros) y cierra la sesión

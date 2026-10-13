@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { appConfig } from '../../app/app.config';
 import { API_BASE_URL } from '@core/api/api-base-url';
-import { AuthStore } from '@core/auth/auth-store';
+import { AuthStore } from '@core/auth/session/auth-store';
 import { THEME_STORAGE_KEY } from '@core/theme/theme.service';
 import { server, TEST_API } from '../msw-server';
 

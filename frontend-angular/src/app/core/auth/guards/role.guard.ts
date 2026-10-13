@@ -1,8 +1,8 @@
 import { inject } from '@angular/core';
 import { type CanActivateFn, Router } from '@angular/router';
-import { DASHBOARD_URL, LOGIN_URL } from './auth-urls';
-import { AuthStore } from './auth-store';
-import type { Role } from './role';
+import { DASHBOARD_URL, LOGIN_URL } from '../auth-urls';
+import { AuthStore } from '../session/auth-store';
+import type { Role } from '../roles/role';
 
 /**
  * Restringe una ruta a ciertos roles. Una sesión sin rol reconocido se considera inválida:

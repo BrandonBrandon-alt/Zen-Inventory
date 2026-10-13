@@ -1,11 +1,11 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { API_BASE_URL } from '../api/api-base-url';
-import type { components } from '../api/schema';
-import { type AuthSession, isAuthSession } from './auth-session';
-import { AuthStore } from './auth-store';
-import { LOGIN_ENDPOINT } from './auth-urls';
+import { API_BASE_URL } from '../../api/api-base-url';
+import type { components } from '../../api/schema';
+import { type AuthSession, isAuthSession } from '../session/auth-session';
+import { AuthStore } from '../session/auth-store';
+import { LOGIN_ENDPOINT } from '../auth-urls';
 
 type LoginRequest = components['schemas']['LoginRequest'];
 type LoginResponse = components['schemas']['LoginResponse'];

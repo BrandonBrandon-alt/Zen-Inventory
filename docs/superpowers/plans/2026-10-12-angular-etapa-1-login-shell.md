@@ -17,6 +17,7 @@
 - `features` no importa de otra feature; `shared` y `core` no importan de `features` (ESLint lo hace cumplir). Dentro de la misma capa se usan imports relativos; entre capas, los alias `@core/*`, `@shared/*`, `@features/*`.
 - Sin `any`, sin `@ts-ignore`, sin hex ni `rgba()` sueltos: solo tokens de `src/styles/theme.css` (utilidades `bg-base`, `text-fg`, `border-line`, `bg-primary`, `text-danger`…).
 - Cada componente se prueba con `@testing-library/angular` consultando por rol/texto accesible, no por clases internas ni detalles de implementación. Un test que no puede fallar por un bug real no se escribe.
+- `core/auth/` se organiza por responsabilidad: `session/` (sesión y store), `roles/`, `guards/` y `http/` (API e interceptor); `auth-urls.ts` queda en la raíz.
 - **Un componente = una carpeta** con su `.ts`, su `.html` (si lo tiene) y su `.spec.ts`. Servicios, guardas y utilidades de un solo archivo quedan planos junto a su spec.
 - Ejecutar los tests siempre con `npm test -- --watch=false` (el script `pretest` limpia una caché de Vitest que da falsos verdes; no usar `ng test` directo).
 - Roles del backend (`Role.java`/`PreAuthorize`): `ADMIN`, `MANAGER`, `SELLER`, `OPERADOR_INVENTARIO`. Visibilidad del menú = **paridad con el Sidebar actual del Next** (ver Task 7); las diferencias que se detecten se registran, no se corrigen en silencio.
@@ -44,12 +45,11 @@ frontend-angular/
     routes.integration.spec.ts                       guardas + shell + login con las rutas reales
   src/app/app.config.ts                              (modifica) ThemeService al arrancar
   src/app/app.routes.ts                              (modifica) login, shell y rutas del menú
-  src/app/core/auth/
+  src/app/core/auth/                                 organizado por responsabilidad
     auth-urls.ts                                     (modifica) DASHBOARD_URL
-    role.ts  role.spec.ts                            Role, ROLES, isRole
-    auth-store.ts                                    (modifica) role: Signal<Role | null>
-    role.guard.ts  role.guard.spec.ts
-    guest.guard.ts  guest.guard.spec.ts
+    roles/role.ts  role.spec.ts                      Role, ROLES, isRole
+    session/auth-store.ts                            (modifica) role: Signal<Role | null>
+    guards/role.guard.ts  guest.guard.ts  (+ specs)
   src/app/core/theme/theme.service.ts  theme.service.spec.ts
   src/app/shared/ui/                                 una carpeta por componente, con su spec dentro
     spinner/  logo/  button/  password-toggle/  alert/
@@ -936,9 +936,9 @@ En `src/app/app.config.ts` importar `inject, provideAppInitializer` de `@angular
 ### Task 6: Roles, `roleGuard` y `guestGuard`
 
 **Files:**
-- Create: `src/app/core/auth/role.ts`, `src/app/core/auth/role.guard.ts`, `src/app/core/auth/guest.guard.ts`
-- Modify: `src/app/core/auth/auth-urls.ts`, `src/app/core/auth/auth-store.ts`
-- Test: `src/app/core/auth/role.spec.ts`, `src/app/core/auth/role.guard.spec.ts`, `src/app/core/auth/guest.guard.spec.ts`, `src/app/core/auth/auth-store.spec.ts` (agrega casos)
+- Create: `src/app/core/auth/roles/role.ts`, `src/app/core/auth/guards/role.guard.ts`, `src/app/core/auth/guards/guest.guard.ts`
+- Modify: `src/app/core/auth/auth-urls.ts`, `src/app/core/auth/session/auth-store.ts`
+- Test: `src/app/core/auth/roles/role.spec.ts`, `src/app/core/auth/guards/role.guard.spec.ts`, `src/app/core/auth/guards/guest.guard.spec.ts`, `src/app/core/auth/session/auth-store.spec.ts` (agrega casos)
 
 **Interfaces:**
 - Consumes: `AuthStore` (`session`, `isAuthenticated`, `clear`), `LOGIN_URL`.
@@ -951,7 +951,7 @@ En `src/app/app.config.ts` importar `inject, provideAppInitializer` de `@angular
 
 - [ ] **Step 1: Escribir los tests (rojo)**
 
-`src/app/core/auth/role.spec.ts`:
+`src/app/core/auth/roles/role.spec.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -975,7 +975,7 @@ describe('isRole', () => {
 });
 ```
 
-Agregar a `src/app/core/auth/auth-store.spec.ts`, dentro del `describe('AuthStore')`:
+Agregar a `src/app/core/auth/session/auth-store.spec.ts`, dentro del `describe('AuthStore')`:
 
 ```ts
   it('role expone el rol conocido de la sesión y null si no hay sesión', () => {
@@ -993,7 +993,7 @@ Agregar a `src/app/core/auth/auth-store.spec.ts`, dentro del `describe('AuthStor
   });
 ```
 
-`src/app/core/auth/role.guard.spec.ts`:
+`src/app/core/auth/guards/role.guard.spec.ts`:
 
 ```ts
 import { TestBed } from '@angular/core/testing';
@@ -1044,7 +1044,7 @@ describe('roleGuard', () => {
 });
 ```
 
-`src/app/core/auth/guest.guard.spec.ts`:
+`src/app/core/auth/guards/guest.guard.spec.ts`:
 
 ```ts
 import { TestBed } from '@angular/core/testing';
@@ -1183,7 +1183,7 @@ En `role.guard.ts` quitar `store.clear();` y ejecutar: debe fallar "con un rol d
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { ROLES } from '@core/auth/role';
+import { ROLES } from '@core/auth/roles/role';
 import { NAV_SECTIONS, navSectionsFor } from './nav-items';
 
 const labels = (role: Parameters<typeof navSectionsFor>[0]) =>
@@ -1267,7 +1267,7 @@ import {
   LucideUsers,
   type LucideIconData,
 } from '@lucide/angular';
-import { ROLES, type Role } from '@core/auth/role';
+import { ROLES, type Role } from '@core/auth/roles/role';
 
 export interface NavItem {
   readonly label: string;
@@ -1406,7 +1406,7 @@ import { http, HttpResponse } from 'msw';
 import { firstValueFrom } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { API_BASE_URL } from '@core/api/api-base-url';
-import type { AuthSession } from '@core/auth/auth-session';
+import type { AuthSession } from '@core/auth/session/auth-session';
 import {
   BranchLabelApi,
   DEFAULT_BRANCH_LABEL,
@@ -1515,7 +1515,7 @@ import { Injectable, inject } from '@angular/core';
 import { type Observable, catchError, map, of } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import type { components } from '@core/api/schema';
-import type { AuthSession } from '@core/auth/auth-session';
+import type { AuthSession } from '@core/auth/session/auth-session';
 
 type BranchResponse = components['schemas']['BranchResponse'];
 
@@ -1566,7 +1566,7 @@ export class BranchLabelApi {
 import { render, screen } from '@testing-library/angular';
 import { of } from 'rxjs';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { AuthStore } from '@core/auth/auth-store';
+import { AuthStore } from '@core/auth/session/auth-store';
 import { BranchLabelApi } from '../data-access/branch-label-api';
 import { UserCard } from '../user-card/user-card';
 
@@ -1622,7 +1622,7 @@ import { of } from 'rxjs';
 import { Router, provideRouter } from '@angular/router';
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthStore } from '@core/auth/auth-store';
+import { AuthStore } from '@core/auth/session/auth-store';
 import { ThemeService } from '@core/theme/theme.service';
 import { BranchLabelApi } from '../data-access/branch-label-api';
 import { SIDEBAR_STORAGE_KEY } from '../sidebar-state';
@@ -1711,7 +1711,7 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { LucideMapPin } from '@lucide/angular';
 import { of, switchMap } from 'rxjs';
-import { AuthStore } from '@core/auth/auth-store';
+import { AuthStore } from '@core/auth/session/auth-store';
 import { BranchLabelApi, DEFAULT_BRANCH_LABEL } from '../data-access/branch-label-api';
 
 /** Datos del usuario en sesión: inicial, nombre y ámbito (sucursal o gestión global). */
@@ -1772,7 +1772,7 @@ import {
   LucideDynamicIcon,
 } from '@lucide/angular';
 import { LOGIN_URL } from '@core/auth/auth-urls';
-import { AuthStore } from '@core/auth/auth-store';
+import { AuthStore } from '@core/auth/session/auth-store';
 import { ThemeService } from '@core/theme/theme.service';
 import { Logo } from '@shared/ui/logo/logo';
 import { navSectionsFor } from '../nav-items';
@@ -1948,6 +1948,15 @@ En `sidebar.ts`, cambiar `navSectionsFor(this.store.role())` por `NAV_SECTIONS` 
 - Consumes: `AuthApi.login`, `AuthError`, `DASHBOARD_URL`, `Button`, `FormField`, `InputDirective`, `PasswordToggle`, `Alert`, `Logo`.
 - Produces: `LoginPage` (`app-login-page`). Formulario `NonNullableFormBuilder` con `email` (requerido, patrón `^[^\s@]+@[^\s@]+\.[^\s@]+$`) y `password` (requerido, mínimo 6). Mensajes: "El correo es requerido.", "Correo inválido.", "La contraseña es requerida.", "Mínimo 6 caracteres." (solo tras `touched` o intento de envío). Envío: una sola petición mientras haya una en curso; durante el envío campos y botón deshabilitados y botón "Verificando…"; éxito → `navigateByUrl('/dashboard')`; fallo → `Alert` con `AuthError.message` (o "Error inesperado."), formulario habilitado, el error se limpia al editar.
 
+- [ ] **Step 0: Ajustar la regla de dependencias de ESLint a carpeta-por-componente**
+
+Con `pages/<pagina>/<pagina>.ts` un import legítimo dentro de la feature sube hasta 2 niveles (`../../data-access/…`). En `eslint.config.js`, reemplazar el bloque de `src/app/features/**/*.ts` por tres bloques por profundidad (cada uno con `no-restricted-imports` y el patrón `@features/*`):
+- `src/app/features/*/*.ts` (raíz de la feature, p. ej. rutas): prohibir `../*`.
+- `src/app/features/*/*/*.ts` (p. ej. `data-access/api.ts`): prohibir `../../*`.
+- `src/app/features/*/*/*/*.ts` (p. ej. `pages/login-page/login-page.ts`): prohibir `../../../*`.
+
+Verificar en rojo→verde con fixtures temporales: `features/beta/pages/beta-page/beta-page.ts` importando `'../../../alpha/alpha'` debe fallar el lint; `features/alpha/pages/alpha-page/alpha-page.ts` importando `'../../data-access/alpha-api'` no. Borrar los fixtures.
+
 - [ ] **Step 1: Escribir el test (rojo)**
 
 ```ts
@@ -1959,7 +1968,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse, delay } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_BASE_URL } from '@core/api/api-base-url';
-import { AuthStore } from '@core/auth/auth-store';
+import { AuthStore } from '@core/auth/session/auth-store';
 import { okLogin, server, TEST_API } from '../../../../../testing/msw-server';
 import { LoginPage } from './login-page';
 
@@ -2110,7 +2119,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { type AbstractControl, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { LucideLock, LucideMail } from '@lucide/angular';
-import { AuthApi, AuthError } from '@core/auth/auth-api';
+import { AuthApi, AuthError } from '@core/auth/http/auth-api';
 import { DASHBOARD_URL } from '@core/auth/auth-urls';
 import { Alert } from '@shared/ui/alert/alert';
 import { Button } from '@shared/ui/button/button';
@@ -2301,8 +2310,8 @@ import { screen } from '@testing-library/angular';
 import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { API_BASE_URL } from '@core/api/api-base-url';
-import { authInterceptor } from '@core/auth/auth.interceptor';
-import { AuthStore } from '@core/auth/auth-store';
+import { authInterceptor } from '@core/auth/http/auth.interceptor';
+import { AuthStore } from '@core/auth/session/auth-store';
 import { routes } from '../../app/app.routes';
 import { server, TEST_API } from '../msw-server';
 
@@ -2416,9 +2425,9 @@ export class NotMigratedPage {
 
 ```ts
 import type { Routes } from '@angular/router';
-import { authGuard } from '@core/auth/auth.guard';
-import { guestGuard } from '@core/auth/guest.guard';
-import { roleGuard } from '@core/auth/role.guard';
+import { authGuard } from '@core/auth/guards/auth.guard';
+import { guestGuard } from '@core/auth/guards/guest.guard';
+import { roleGuard } from '@core/auth/guards/role.guard';
 import { NAV_SECTIONS } from './layout/nav-items';
 
 const APP_TITLE = 'Zen Inventory';

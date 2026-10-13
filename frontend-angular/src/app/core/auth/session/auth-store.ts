@@ -1,6 +1,6 @@
 import { Injectable, computed, signal } from '@angular/core';
 import { type AuthSession, isAuthSession } from './auth-session';
-import { type Role, isRole } from './role';
+import { type Role, isRole } from '../roles/role';
 
 export const SESSION_STORAGE_KEY = 'zen_inventory_session';
 
