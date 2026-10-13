@@ -42,9 +42,17 @@ module.exports = defineConfig([
       '@typescript-eslint/ban-ts-comment': 'error',
     },
   },
-  {
-    // Una feature solo puede depender de core y shared, nunca de otra feature.
-    files: ['src/app/features/**/*.ts'],
+  // Una feature solo puede depender de core y shared, nunca de otra feature.
+  // El patrón relativo prohibido depende de la profundidad del archivo: `../` en la raíz de la feature,
+  // `../../` en `data-access/x.ts`, `../../../` en `pages/<pagina>/<pagina>.ts`, etc. Lo que queda dentro de la
+  // feature (hasta ese límite) es legítimo; lo que lo supera sale de la feature.
+  ...[
+    { files: 'src/app/features/*/*.ts', forbidden: '../*' },
+    { files: 'src/app/features/*/*/*.ts', forbidden: '../../*' },
+    { files: 'src/app/features/*/*/*/*.ts', forbidden: '../../../*' },
+    { files: 'src/app/features/*/*/*/*/**/*.ts', forbidden: '../../../../*' },
+  ].map(({ files, forbidden }) => ({
+    files: [files],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -52,32 +60,14 @@ module.exports = defineConfig([
           patterns: [
             { group: ['@features/*'], message: 'Una feature no puede importar de otra feature.' },
             {
-              group: ['../../*'],
+              group: [forbidden],
               message: 'Los imports relativos no pueden salir de la feature; usa @core o @shared.',
             },
           ],
         },
       ],
     },
-  },
-  {
-    // Archivos en la raíz de una feature (p. ej. rutas): un solo ../ ya sale de la feature.
-    files: ['src/app/features/*/*.ts'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          patterns: [
-            { group: ['@features/*'], message: 'Una feature no puede importar de otra feature.' },
-            {
-              group: ['../*'],
-              message: 'Los imports relativos no pueden salir de la feature; usa @core o @shared.',
-            },
-          ],
-        },
-      ],
-    },
-  },
+  })),
   {
     files: ['src/app/shared/**/*.ts', 'src/app/core/**/*.ts'],
     rules: {
