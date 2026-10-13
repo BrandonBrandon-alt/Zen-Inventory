@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { appConfig } from '../../app/app.config';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { AuthStore } from '@core/auth/auth-store';
+import { THEME_STORAGE_KEY } from '@core/theme/theme.service';
 import { server, TEST_API } from '../msw-server';
 
 describe('appConfig (cableado real de la app)', () => {
@@ -35,5 +36,16 @@ describe('appConfig (cableado real de la app)', () => {
     await firstValueFrom(TestBed.inject(HttpClient).get(`${TEST_API}/api/ping`));
 
     expect(authorization).toBe('Bearer jwt-123');
+  });
+
+  it('al arrancar aplica el tema guardado sin que nadie pida el servicio', () => {
+    delete document.documentElement.dataset['theme'];
+    localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [...appConfig.providers] });
+
+    TestBed.inject(HttpClient); // fuerza la creación del módulo de pruebas y sus inicializadores
+
+    expect(document.documentElement.dataset['theme']).toBe('light');
   });
 });
