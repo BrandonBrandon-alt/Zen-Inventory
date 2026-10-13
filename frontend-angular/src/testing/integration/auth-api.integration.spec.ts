@@ -1,4 +1,4 @@
-import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { http, HttpResponse } from 'msw';
@@ -19,7 +19,7 @@ describe('AuthApi (contrato HTTP real con MSW)', () => {
     localStorage.clear();
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
+        provideHttpClient(withInterceptors([authInterceptor])),
         { provide: API_BASE_URL, useValue: TEST_API },
         { provide: Router, useValue: { navigateByUrl: vi.fn() } },
       ],

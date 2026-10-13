@@ -1405,7 +1405,7 @@ describe('SidebarState', () => {
 `src/testing/integration/branch-label-api.integration.spec.ts`:
 
 ```ts
-import { provideHttpClient, withFetch } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { http, HttpResponse } from 'msw';
 import { firstValueFrom } from 'rxjs';
@@ -1433,7 +1433,7 @@ describe('BranchLabelApi (contrato HTTP con MSW)', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(withFetch()), { provide: API_BASE_URL, useValue: TEST_API }],
+      providers: [provideHttpClient(), { provide: API_BASE_URL, useValue: TEST_API }],
     });
     api = TestBed.inject(BranchLabelApi);
   });
@@ -1956,7 +1956,7 @@ En `sidebar.ts`, cambiar `navSectionsFor(this.store.role())` por `NAV_SECTIONS` 
 - [ ] **Step 1: Escribir el test (rojo)**
 
 ```ts
-import { provideHttpClient, withFetch } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
@@ -1974,7 +1974,7 @@ async function renderLogin() {
   const result = await render(LoginPage, {
     providers: [
       provideRouter([]),
-      provideHttpClient(withFetch()),
+      provideHttpClient(),
       { provide: API_BASE_URL, useValue: TEST_API },
     ],
   });
@@ -2298,7 +2298,7 @@ Expected: PASS. Si los mensajes de error no aparecen tras `tab()` o el envío va
 - [ ] **Step 1: Escribir el test de integración (rojo)**
 
 ```ts
-import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -2319,7 +2319,7 @@ async function setup(rol?: string) {
   TestBed.configureTestingModule({
     providers: [
       provideRouter(routes),
-      provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
+      provideHttpClient(withInterceptors([authInterceptor])),
       { provide: API_BASE_URL, useValue: TEST_API },
     ],
   });
