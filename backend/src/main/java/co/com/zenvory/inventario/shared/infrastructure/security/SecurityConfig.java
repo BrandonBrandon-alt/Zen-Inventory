@@ -37,9 +37,15 @@ import static org.springframework.security.config.Customizer.withDefaults;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+    private final RestAuthenticationEntryPoint authenticationEntryPoint;
+    private final RestAccessDeniedHandler accessDeniedHandler;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter,
+                          RestAuthenticationEntryPoint authenticationEntryPoint,
+                          RestAccessDeniedHandler accessDeniedHandler) {
         this.jwtAuthFilter = jwtAuthFilter;
+        this.authenticationEntryPoint = authenticationEntryPoint;
+        this.accessDeniedHandler = accessDeniedHandler;
     }
 
     @Bean
@@ -57,6 +63,10 @@ public class SecurityConfig {
                         // Todo lo demás requiere autenticación
                         .anyRequest().authenticated()
                 )
+                // Errores de seguridad con el mismo contrato JSON que el resto de la API (401 / 403)
+                .exceptionHandling(handling -> handling
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

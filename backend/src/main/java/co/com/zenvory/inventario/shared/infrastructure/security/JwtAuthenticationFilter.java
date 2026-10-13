@@ -1,6 +1,7 @@
 package co.com.zenvory.inventario.shared.infrastructure.security;
 
 import co.com.zenvory.inventario.auth.infrastructure.adapter.out.persistence.JpaUserRepository;
+import co.com.zenvory.inventario.shared.infrastructure.web.ErrorCode;
 import co.com.zenvory.inventario.auth.infrastructure.adapter.out.persistence.UserEntity;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -57,7 +58,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         final String token = authHeader.substring(7);
 
-        if (!jwtService.isTokenValid(token)) {
+        JwtService.TokenStatus tokenStatus = jwtService.inspect(token);
+        if (tokenStatus != JwtService.TokenStatus.VALID) {
+            // El motivo lo usa RestAuthenticationEntryPoint para responder 401 con el código correcto.
+            request.setAttribute(RestAuthenticationEntryPoint.AUTH_ERROR_ATTRIBUTE,
+                    tokenStatus == JwtService.TokenStatus.EXPIRED ? ErrorCode.TOKEN_EXPIRED : ErrorCode.INVALID_TOKEN);
             filterChain.doFilter(request, response);
             return;
         }

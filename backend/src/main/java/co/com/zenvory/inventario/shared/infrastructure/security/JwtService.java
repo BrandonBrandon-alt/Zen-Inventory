@@ -72,6 +72,20 @@ public class JwtService {
         }
     }
 
+    /** Resultado de inspeccionar un token: permite distinguir "venció" de "no es válido". */
+    public enum TokenStatus { VALID, EXPIRED, INVALID }
+
+    public TokenStatus inspect(String token) {
+        try {
+            parseClaims(token);
+            return TokenStatus.VALID;
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            return TokenStatus.EXPIRED;
+        } catch (Exception e) {
+            return TokenStatus.INVALID;
+        }
+    }
+
     private Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(signingKey)
