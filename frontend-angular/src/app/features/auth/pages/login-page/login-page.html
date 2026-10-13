@@ -1,0 +1,62 @@
+<div class="flex min-h-dvh bg-base">
+  <section
+    class="hidden flex-1 flex-col items-center justify-center gap-6 border-r border-line bg-surface p-12 text-center md:flex"
+  >
+    <app-logo [size]="120" />
+    <h1 class="font-serif text-5xl font-bold tracking-tight text-fg">Zen Inventory</h1>
+    <p class="font-serif text-2xl font-medium text-brand-soft italic">
+      Gestiona tu inventario con inteligencia.
+    </p>
+    <p class="max-w-[460px] text-base leading-relaxed text-fg-subtle">
+      Sistema multi-sucursal con alertas proactivas, trazabilidad completa y analítica en tiempo real.
+    </p>
+    <p class="text-[13px] text-fg-subtle">© {{ year }} Zen Inventory Logic</p>
+  </section>
+
+  <section class="flex flex-1 items-center justify-center p-6">
+    <div class="w-full max-w-[380px]">
+      <div class="mb-8 flex items-center gap-3 md:hidden">
+        <app-logo [size]="32" />
+        <span class="font-serif text-xl font-bold text-fg">Zen Inventory</span>
+      </div>
+
+      <h2 class="mb-2 font-serif text-[28px] leading-tight font-bold tracking-tight text-fg">
+        Bienvenido de vuelta
+      </h2>
+      <p class="mb-8 text-sm text-fg-subtle">Ingresa tus credenciales para continuar</p>
+
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="flex flex-col gap-[18px]">
+        @if (serverError(); as message) {
+          <app-alert>{{ message }}</app-alert>
+        }
+
+        <app-form-field label="Correo electrónico" [error]="emailError()">
+          <svg data-slot="prefix" lucideMail [size]="15" />
+          <input
+            appInput
+            formControlName="email"
+            type="email"
+            autocomplete="email"
+            placeholder="admin@zeninventory.co"
+          />
+        </app-form-field>
+
+        <app-form-field label="Contraseña" [error]="passwordError()">
+          <svg data-slot="prefix" lucideLock [size]="15" />
+          <input
+            appInput
+            formControlName="password"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            [type]="showPassword() ? 'text' : 'password'"
+          />
+          <app-password-toggle data-slot="suffix" [(visible)]="showPassword" />
+        </app-form-field>
+
+        <button appButton type="submit" size="lg" fullWidth class="mt-1.5" [loading]="submitting()">
+          {{ submitting() ? 'Verificando…' : 'Ingresar al sistema' }}
+        </button>
+      </form>
+    </div>
+  </section>
+</div>
