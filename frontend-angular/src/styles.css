@@ -41,47 +41,8 @@
   }
 }
 
-/* Transición entre pantallas (View Transitions API, activada en el router). Solo el contenido (<main>) se anima:
-   el menú lateral queda fijo en lugar de parpadear. */
-main {
-  view-transition-name: page;
-}
-
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 150ms;
-}
-
-::view-transition-old(page) {
-  animation: page-out 120ms ease-in both;
-}
-
-::view-transition-new(page) {
-  animation: page-in 280ms var(--ease-out-expo) both;
-}
-
-@keyframes page-out {
-  to {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-}
-
-@keyframes page-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-}
-
 /* Cambio de tema claro/oscuro: el tema nuevo se revela como un círculo que crece desde el botón pulsado
-   (--theme-x / --theme-y los pone ThemeService). Solo activo mientras dura el cambio (html[data-theme-switching]),
-   para no alterar la transición entre pantallas. */
-:root[data-theme-switching] main {
-  /* El contenido forma parte de la misma captura que el resto: así lo revela el círculo y no se desvanece aparte. */
-  view-transition-name: none;
-}
-
+   (--theme-x / --theme-y los pone ThemeService). Solo activo mientras dura el cambio (html[data-theme-switching]). */
 :root[data-theme-switching]::view-transition-old(root),
 :root[data-theme-switching]::view-transition-new(root) {
   animation: none;

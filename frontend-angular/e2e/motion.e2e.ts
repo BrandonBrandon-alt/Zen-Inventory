@@ -40,33 +40,6 @@ test('el aviso global entra animado y sale animado al cerrarlo', async ({ page }
   await expect(page.locator('app-toast')).toHaveCount(0);
 });
 
-test('al navegar entre pantallas se usa la transición de vistas y solo se anima el contenido', async ({ page }) => {
-  await page.addInitScript(() => {
-    const w = window as unknown as { __vt: number; __orig?: unknown };
-    w.__vt = 0;
-    const original = document.startViewTransition?.bind(document);
-    if (original) {
-      document.startViewTransition = ((cb: unknown) => {
-        w.__vt++;
-        return original(cb as never);
-      }) as typeof document.startViewTransition;
-    }
-  });
-  await stubLogin(page);
-  await page.goto('/login');
-  await login(page);
-  await expect(page).toHaveURL(/\/dashboard$/);
-
-  const count = () => page.evaluate(() => (window as unknown as { __vt: number }).__vt);
-  const before = await count();
-  await page.getByRole('link', { name: 'Inventario' }).click();
-  await expect(page).toHaveURL(/\/inventory$/);
-  expect(await count()).toBeGreaterThan(before);
-  // El contenido tiene su propia "capa" de transición; el menú no se anima con él.
-  expect(await page.locator('main').evaluate((el) => getComputedStyle(el).viewTransitionName)).toBe('page');
-  expect(await page.locator('aside').evaluate((el) => getComputedStyle(el).viewTransitionName)).toBe('none');
-});
-
 test('con "reducir movimiento" no hay animaciones ni transiciones apreciables', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await stubLogin(page);

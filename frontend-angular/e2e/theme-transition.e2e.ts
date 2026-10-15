@@ -26,7 +26,7 @@ async function spyOnViewTransitions(page: Page): Promise<void> {
   });
 }
 
-/** Solo las transiciones del cambio de tema (el router también usa View Transitions al navegar). */
+/** Solo las transiciones del cambio de tema (marcadas por ThemeService con data-theme-switching). */
 const calls = (page: Page) =>
   page.evaluate(() => (window as unknown as { __vt: Spy[] }).__vt.filter((call) => call.switching));
 
