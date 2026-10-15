@@ -52,8 +52,12 @@ describe('rutas (guardas + shell + login)', () => {
   it('el enlace de la pantalla actual queda marcado como página actual', async () => {
     const { harness } = await setup('ADMIN');
     await harness.navigateByUrl('/inventory');
-    expect(await screen.findByRole('link', { name: 'Inventario' })).toHaveAttribute('aria-current', 'page');
+    const active = await screen.findByRole('link', { name: 'Inventario' });
+    expect(active).toHaveAttribute('aria-current', 'page');
+    // La pantalla actual se resalta con el color de marca; las demás no.
+    expect(active).toHaveClass('text-brand!');
     expect(screen.getByRole('link', { name: 'Panel' })).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('link', { name: 'Panel' })).not.toHaveClass('text-brand!');
   });
 
   it('con sesión, entrar al login redirige al panel', async () => {

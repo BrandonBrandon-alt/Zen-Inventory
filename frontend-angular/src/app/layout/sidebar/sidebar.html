@@ -33,9 +33,9 @@
           <li>
             <a
               [routerLink]="item.path"
-              routerLinkActive="bg-card font-semibold text-fg"
+              routerLinkActive="bg-card font-semibold text-brand! before:absolute before:top-[20%] before:left-0 before:h-[60%] before:w-[3px] before:rounded-full before:bg-brand"
               ariaCurrentWhenActive="page"
-              class="flex items-center gap-3 rounded-md py-2.5 text-sm text-fg-muted transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
+              class="relative flex items-center gap-3 rounded-md py-2.5 text-sm text-fg-muted transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
               [class]="state.collapsed() ? 'justify-center px-3' : 'px-3'"
               [attr.aria-label]="item.label"
               [attr.title]="state.collapsed() ? item.label : null"

@@ -76,3 +76,17 @@ test('con la pantalla baja el menú hace scroll sin romper el diseño', async ({
   // Cerrar sesión sigue visible: el pie no se sale de la pantalla.
   await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeInViewport();
 });
+
+test('la pantalla actual del menú se resalta con el color de marca', async ({ page }) => {
+  await page.getByRole('link', { name: 'Inventario' }).click();
+  const color = (name: string) =>
+    page.getByRole('link', { name }).evaluate((el) => getComputedStyle(el).color);
+
+  // --brand-500 del tema oscuro (#d9634f); el resto de enlaces conserva el color neutro.
+  await expect.poll(() => color('Inventario')).toBe('rgb(217, 99, 79)');
+  expect(await color('Panel')).not.toBe('rgb(217, 99, 79)');
+
+  await page.getByRole('button', { name: 'Modo claro' }).click();
+  // --brand-500 del tema claro (#b83c28).
+  await expect.poll(() => color('Inventario')).toBe('rgb(184, 60, 40)');
+});
