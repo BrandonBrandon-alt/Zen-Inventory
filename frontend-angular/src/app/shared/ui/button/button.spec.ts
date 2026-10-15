@@ -57,4 +57,9 @@ describe('Button', () => {
     await render('<button appButton fullWidth>X</button>', { imports: [Button] });
     expect(screen.getByRole('button')).toHaveClass('w-full');
   });
+
+  it('al pulsarlo se hunde ligeramente (solo si está habilitado)', async () => {
+    await render('<button appButton>Guardar</button>', { imports: [Button] });
+    expect(screen.getByRole('button')).toHaveClass('enabled:active:scale-[0.98]');
+  });
 });

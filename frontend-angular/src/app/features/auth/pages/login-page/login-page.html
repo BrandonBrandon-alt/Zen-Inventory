@@ -32,7 +32,7 @@
   </section>
 
   <section class="flex flex-1 items-center justify-center p-6">
-    <div class="w-full max-w-[380px]">
+    <div class="w-full max-w-[380px] animate-form-in motion-reduce:animate-none">
       <div class="mb-8 flex items-center gap-3 md:hidden">
         <app-logo [size]="32" />
         <span class="font-serif text-xl font-bold text-fg">Zen Inventory</span>
@@ -43,9 +43,16 @@
       </h2>
       <p class="mb-8 text-sm text-fg-subtle">Ingresa tus credenciales para continuar</p>
 
-      <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="flex flex-col gap-[18px]">
+      <form
+        [formGroup]="form"
+        (ngSubmit)="submit()"
+        (animationend)="onShakeEnd($event)"
+        novalidate
+        class="flex flex-col gap-[18px]"
+        [class.animate-shake]="shaking()"
+      >
         @if (serverError(); as message) {
-          <app-alert>{{ message }}</app-alert>
+          <app-alert class="animate-alert-in">{{ message }}</app-alert>
         }
 
         <app-form-field label="Correo electrónico" [error]="emailError()">

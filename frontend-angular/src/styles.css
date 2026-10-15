@@ -41,3 +41,57 @@
       color 0.25s ease;
   }
 }
+
+/* Transición entre pantallas (View Transitions API, activada en el router). Solo el contenido (<main>) se anima:
+   el menú lateral queda fijo en lugar de parpadear. */
+main {
+  view-transition-name: page;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 150ms;
+}
+
+::view-transition-old(page) {
+  animation: page-out 120ms ease-in both;
+}
+
+::view-transition-new(page) {
+  animation: page-in 280ms var(--ease-out-expo) both;
+}
+
+@keyframes page-out {
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* Accesibilidad: quien pide menos movimiento no ve animaciones ni transiciones (el estado final se conserva). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+

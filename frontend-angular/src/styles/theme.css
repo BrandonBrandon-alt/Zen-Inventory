@@ -116,6 +116,15 @@
   --animate-letter-reveal: letterReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-fade-in-up: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 
+  /* Movimiento de interfaz: entradas rápidas y salidas aún más rápidas (la salida no debe hacer esperar). */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-form-in: fadeInUp 0.6s var(--ease-out-expo) 0.1s both;
+  --animate-alert-in: alertIn 0.28s var(--ease-out-expo) both;
+  --animate-error-in: errorIn 0.2s ease-out both;
+  --animate-toast-in: toastIn 0.35s var(--ease-out-expo) both;
+  --animate-toast-out: toastOut 0.2s ease-in both;
+  --animate-shake: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+
   @keyframes letterReveal {
     from {
       opacity: 0;
@@ -139,5 +148,68 @@
       transform: translateY(0);
     }
   }
-}
 
+  @keyframes alertIn {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes errorIn {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes toastIn {
+    from {
+      opacity: 0;
+      transform: translateX(24px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+  }
+
+  @keyframes toastOut {
+    from {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateX(24px) scale(0.96);
+    }
+  }
+
+  @keyframes shake {
+    10%,
+    90% {
+      transform: translateX(-1px);
+    }
+    20%,
+    80% {
+      transform: translateX(2px);
+    }
+    30%,
+    50%,
+    70% {
+      transform: translateX(-4px);
+    }
+    40%,
+    60% {
+      transform: translateX(4px);
+    }
+  }
+}

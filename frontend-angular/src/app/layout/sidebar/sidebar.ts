@@ -1,15 +1,19 @@
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { filter } from 'rxjs';
 import {
   LucideChevronLeft,
   LucideChevronRight,
   LucideDynamicIcon,
   LucideLogOut,
+  LucideX,
 } from '@lucide/angular';
 import { LOGIN_URL } from '@core/auth/auth-urls';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { Logo } from '@shared/ui/logo/logo';
 import { ThemeToggle } from '@shared/ui/theme-toggle/theme-toggle';
+import { MobileMenu } from '../mobile-menu';
 import { navSectionsFor } from '../nav-items';
 import {
   SIDEBAR_COLLAPSED_WIDTH,
@@ -18,6 +22,7 @@ import {
   SidebarState,
 } from '../sidebar-state';
 import { UserCard } from '../user-card/user-card';
+import { Viewport } from '../viewport';
 
 /** Cuánto cambia el ancho (px) con cada pulsación de flecha en el borde. */
 const KEYBOARD_STEP = 16;
@@ -33,12 +38,19 @@ const KEYBOARD_STEP = 16;
     LucideChevronLeft,
     LucideChevronRight,
     LucideLogOut,
+    LucideX,
     ThemeToggle,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    class: 'sticky top-0 z-40 block h-dvh shrink-0',
+    // Escritorio: barra fija que empuja el contenido. Móvil: cajón fuera de pantalla que se desliza al abrirse.
+    class:
+      'fixed inset-y-0 left-0 z-50 block h-dvh w-72 transition-transform duration-300 ' +
+      'md:sticky md:top-0 md:z-40 md:w-auto md:shrink-0 md:translate-x-0',
     '[class.select-none]': 'resizing()',
+    '[class.-translate-x-full]': '!viewport.isDesktop() && !menu.open()',
+    // Cerrado en móvil: no recibe foco ni lo lee un lector de pantalla.
+    '[attr.inert]': '!viewport.isDesktop() && !menu.open() ? "" : null',
   },
   templateUrl: './sidebar.html',
 })
@@ -47,15 +59,26 @@ export class Sidebar {
   private readonly router = inject(Router);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   protected readonly state = inject(SidebarState);
+  protected readonly viewport = inject(Viewport);
+  protected readonly menu = inject(MobileMenu);
 
   protected readonly minWidth = SIDEBAR_MIN_WIDTH;
   protected readonly maxWidth = SIDEBAR_MAX_WIDTH;
   protected readonly resizing = signal(false);
 
+  /** Solo el escritorio tiene menú colapsado (solo iconos); en móvil el cajón siempre se ve completo. */
+  protected readonly compact = computed(() => this.viewport.isDesktop() && this.state.collapsed());
   protected readonly sections = computed(() => navSectionsFor(this.store.role()));
   protected readonly widthPx = computed(() =>
     this.state.collapsed() ? SIDEBAR_COLLAPSED_WIDTH : this.state.width(),
   );
+
+  constructor() {
+    // Elegir una pantalla cierra el cajón.
+    this.router.events
+      .pipe(filter((event) => event instanceof NavigationEnd), takeUntilDestroyed())
+      .subscribe(() => this.menu.close());
+  }
 
   protected logout(): void {
     this.store.clear();

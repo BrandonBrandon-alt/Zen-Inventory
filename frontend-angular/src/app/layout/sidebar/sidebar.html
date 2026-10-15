@@ -1,32 +1,44 @@
 <aside
-  class="flex h-full flex-col border-r border-line bg-base py-5"
+  id="app-sidebar"
+  class="flex h-full w-full flex-col border-r border-line bg-base py-5"
   [class]="resizing() ? '' : 'transition-[width] duration-300'"
-  [style.width.px]="widthPx()"
+  [style.width.px]="viewport.isDesktop() ? widthPx() : null"
 >
-  <header class="relative mb-6 flex items-center gap-2.5 px-4" [class.justify-center]="state.collapsed()">
-    <app-logo [size]="32" [showText]="!state.collapsed()" />
-    <button
-      type="button"
-      class="absolute top-2 -right-3 flex size-6 cursor-pointer items-center justify-center rounded-full border border-line bg-card text-fg-muted transition-colors hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
-      [attr.aria-label]="state.collapsed() ? 'Expandir menú' : 'Contraer menú'"
-      [attr.aria-expanded]="!state.collapsed()"
-      (click)="state.toggle()"
-    >
-      @if (state.collapsed()) {
-        <svg lucideChevronRight [size]="14" />
-      } @else {
-        <svg lucideChevronLeft [size]="14" />
-      }
-    </button>
+  <header class="relative mb-6 flex items-center gap-2.5 px-4" [class.justify-center]="compact()">
+    <app-logo [size]="32" [showText]="!compact()" />
+    @if (viewport.isDesktop()) {
+      <button
+        type="button"
+        class="absolute top-2 -right-3 flex size-6 cursor-pointer items-center justify-center rounded-full border border-line bg-card text-fg-muted transition-colors hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
+        [attr.aria-label]="state.collapsed() ? 'Expandir menú' : 'Contraer menú'"
+        [attr.aria-expanded]="!state.collapsed()"
+        (click)="state.toggle()"
+      >
+        @if (state.collapsed()) {
+          <svg lucideChevronRight [size]="14" />
+        } @else {
+          <svg lucideChevronLeft [size]="14" />
+        }
+      </button>
+    } @else {
+      <button
+        type="button"
+        class="ml-auto flex size-8 cursor-pointer items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
+        aria-label="Cerrar menú"
+        (click)="menu.close()"
+      >
+        <svg lucideX [size]="18" />
+      </button>
+    }
   </header>
 
   <nav aria-label="Principal" class="flex-1 overflow-y-auto px-3">
     @for (section of sections(); track section.title) {
       <p
         class="mt-4 mb-2 px-3 text-[10px] font-bold tracking-widest text-fg-subtle uppercase first:mt-0"
-        [class.text-center]="state.collapsed()"
+        [class.text-center]="compact()"
       >
-        {{ state.collapsed() ? '—' : section.title }}
+        {{ compact() ? '—' : section.title }}
       </p>
       <ul class="flex flex-col gap-0.5">
         @for (item of section.items; track item.path) {
@@ -36,12 +48,12 @@
               routerLinkActive="bg-card font-semibold text-brand! before:absolute before:top-[20%] before:left-0 before:h-[60%] before:w-[3px] before:rounded-full before:bg-brand"
               ariaCurrentWhenActive="page"
               class="relative flex items-center gap-3 rounded-md py-2.5 text-sm text-fg-muted transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
-              [class]="state.collapsed() ? 'justify-center px-3' : 'px-3'"
+              [class]="compact() ? 'justify-center px-3' : 'px-3'"
               [attr.aria-label]="item.label"
-              [attr.title]="state.collapsed() ? item.label : null"
+              [attr.title]="compact() ? item.label : null"
             >
               <svg [lucideIcon]="item.icon" [size]="18" [strokeWidth]="1.8" class="shrink-0" />
-              @if (!state.collapsed()) {
+              @if (!compact()) {
                 <span class="truncate">{{ item.label }}</span>
               }
             </a>
@@ -52,26 +64,26 @@
   </nav>
 
   <footer class="flex flex-col gap-1 px-3 pt-3">
-    <app-theme-toggle variant="row" [labelVisible]="!state.collapsed()" />
+    <app-theme-toggle variant="row" [labelVisible]="!compact()" />
 
-    <app-user-card [compact]="state.collapsed()" />
+    <app-user-card [compact]="compact()" />
 
     <button
       type="button"
       class="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm text-fg-subtle transition-colors hover:bg-danger/10 hover:text-danger focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
-      [class.justify-center]="state.collapsed()"
+      [class.justify-center]="compact()"
       aria-label="Cerrar sesión"
       (click)="logout()"
     >
       <svg lucideLogOut [size]="18" class="shrink-0" />
-      @if (!state.collapsed()) {
+      @if (!compact()) {
         <span>Cerrar sesión</span>
       }
     </button>
   </footer>
 </aside>
 
-@if (!state.collapsed()) {
+@if (viewport.isDesktop() && !state.collapsed()) {
   <!-- Borde arrastrable (separador enfocable, patrón "window splitter" de WAI-ARIA). Empieza bajo la cabecera para no tapar el botón de colapsar. -->
   <div
     role="separator"

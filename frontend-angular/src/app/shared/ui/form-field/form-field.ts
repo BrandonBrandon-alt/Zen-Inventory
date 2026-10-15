@@ -50,7 +50,7 @@ export class InputDirective {
       </span>
     </div>
     @if (error(); as message) {
-      <p [id]="errorId" role="alert" class="flex items-center gap-1 text-xs text-danger">{{ message }}</p>
+      <p [id]="errorId" role="alert" class="flex animate-error-in items-center gap-1 text-xs text-danger">{{ message }}</p>
     }
   `,
 })

@@ -60,6 +60,8 @@ export class LoginPage {
   protected readonly showPassword = signal(false);
   protected readonly submitting = signal(false);
   protected readonly serverError = signal<string | null>(null);
+  /** El formulario "tiembla" cuando el servidor rechaza el intento (credenciales, cuenta desactivada, datos). */
+  protected readonly shaking = signal(false);
 
   protected readonly form = inject(NonNullableFormBuilder).group({
     email: ['', [Validators.required, Validators.pattern(EMAIL_PATTERN)]],
@@ -96,12 +98,18 @@ export class LoginPage {
     }
   }
 
+  /** Solo el fin del temblor del propio formulario (las animaciones de sus hijos también burbujean hasta aquí). */
+  protected onShakeEnd(event: AnimationEvent): void {
+    if (event.target === event.currentTarget) this.shaking.set(false);
+  }
+
   /** Errores por campo del backend bajo cada campo; el resto (credenciales, red, servidor) en un aviso del formulario. */
   private showError(error: unknown): void {
     if (!(error instanceof AuthError)) {
       this.serverError.set('Error inesperado.');
       return;
     }
+    if (error.kind === 'credentials' || error.kind === 'disabled' || error.kind === 'validation') this.shaking.set(true);
     const applied = error.kind === 'validation' ? applyServerErrors(this.form, error.fieldErrors) : [];
     this.serverError.set(applied.length > 0 ? null : error.message);
   }

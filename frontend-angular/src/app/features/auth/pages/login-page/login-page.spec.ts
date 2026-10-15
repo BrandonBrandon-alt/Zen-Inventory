@@ -126,6 +126,53 @@ describe('LoginPage', () => {
     expect(passwordInput()).toHaveValue('secreto1');
   });
 
+  describe('animación de rechazo', () => {
+    const form = (container: HTMLElement) => container.querySelector('form') as HTMLFormElement;
+
+    it('el formulario tiembla cuando el servidor rechaza las credenciales y deja de temblar al terminar', async () => {
+      server.use(http.post(LOGIN, () => HttpResponse.json(apiErrorBody(401, 'INVALID_CREDENTIALS', 'Credenciales incorrectas'), { status: 401 })));
+      const { container } = await renderLogin();
+      expect(form(container)).not.toHaveClass('animate-shake');
+      await fillValid();
+      await userEvent.click(submitButton());
+      await screen.findByRole('alert');
+      expect(form(container)).toHaveClass('animate-shake');
+      fireEvent.animationEnd(form(container));
+      expect(form(container)).not.toHaveClass('animate-shake');
+    });
+
+    it('un nuevo rechazo vuelve a hacer temblar el formulario', async () => {
+      server.use(http.post(LOGIN, () => HttpResponse.json(apiErrorBody(401, 'INVALID_CREDENTIALS', 'Credenciales incorrectas'), { status: 401 })));
+      const { container } = await renderLogin();
+      await fillValid();
+      await userEvent.click(submitButton());
+      await screen.findByRole('alert');
+      fireEvent.animationEnd(form(container));
+      await userEvent.click(submitButton());
+      await vi.waitFor(() => expect(form(container)).toHaveClass('animate-shake'));
+    });
+
+    it('no tiembla por errores de validación del cliente ni por un error de red', async () => {
+      server.use(http.post(LOGIN, () => HttpResponse.error()));
+      const { container } = await renderLogin();
+      await userEvent.click(submitButton()); // vacío: solo validación local
+      expect(form(container)).not.toHaveClass('animate-shake');
+      await fillValid();
+      await userEvent.click(submitButton());
+      await screen.findByRole('alert');
+      expect(form(container)).not.toHaveClass('animate-shake');
+    });
+
+    it('el aviso de error entra con animación', async () => {
+      server.use(http.post(LOGIN, () => HttpResponse.json(apiErrorBody(401, 'INVALID_CREDENTIALS', 'Credenciales incorrectas'), { status: 401 })));
+      await renderLogin();
+      await fillValid();
+      await userEvent.click(submitButton());
+      const alert = await screen.findByRole('alert');
+      expect(alert.closest('app-alert')).toHaveClass('animate-alert-in');
+    });
+  });
+
   it('muestra el error de servidor con el mensaje del backend', async () => {
     server.use(
       http.post(LOGIN, () =>

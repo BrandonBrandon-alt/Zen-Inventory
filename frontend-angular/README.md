@@ -14,7 +14,7 @@ Migración incremental del frontend de Next.js (`../frontend`) a Angular. Diseñ
 |---|---|
 | `npm start` | Servidor de desarrollo en `:4200`; `/api/*` se redirige al backend (`proxy.conf.js`). |
 | `npm test` | Unit + integración (Vitest). No necesita backend. |
-| `npm run test:e2e` | E2E con Playwright en su propio puerto (4300, no reutiliza el 4200). Los flujos de negocio necesitan el backend real levantado. |
+| `npm run test:e2e` | E2E con Playwright en su propio puerto (4300, no reutiliza el 4200; 2 workers para no saturar el servidor de desarrollo). Los flujos de negocio necesitan el backend real levantado. |
 | `npm run lint` | ESLint, incluidas las reglas de dependencias entre capas. |
 | `npm run build` | Build de producción. |
 | `npm run openapi:gen` | Regenera `src/app/core/api/schema.d.ts` desde `localhost:8080/v3/api-docs`. |
@@ -53,6 +53,7 @@ con sus roles y cambia su `loadComponent` en `app.routes.ts` (mientras tanto mue
   Tema oscuro por defecto; el claro se activa con `data-theme="light"` en `<html>`.
 - El sidebar se redimensiona arrastrando su borde (200–360 px, también con flechas/Inicio/Fin y doble clic para restablecer); el ancho y el estado colapsado se recuerdan.
 - El tema claro/oscuro se cambia desde cualquier pantalla, también el login (`ThemeToggle`, `shared/ui`); se recuerda en el navegador.
+- Responsivo: desde 768 px el menú es una barra lateral fija; por debajo es un cajón con barra superior (se cierra al elegir una pantalla, al pulsar fuera o con Escape).
 - Scroll fino y a tono con el tema en toda la app (`src/styles.css`).
 - Tablas: `DataTable` (`shared/ui/data-table`) recibe `columns`, `rows` y `rowKey`; ordena, pagina y gestiona los estados de carga, vacío y error. Las celdas se personalizan con `<ng-template appCell="columna" let-row>`. Ejemplo real: `features/branches/pages/branches-page`.
 - Un componente sube a `shared/ui` solo cuando lo usa una segunda pantalla.

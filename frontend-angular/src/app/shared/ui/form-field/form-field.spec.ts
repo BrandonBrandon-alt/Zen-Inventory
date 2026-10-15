@@ -54,4 +54,9 @@ describe('FormField', () => {
     expect(screen.getByText('P')).toBeInTheDocument();
     expect(screen.getByText('S')).toBeInTheDocument();
   });
+
+  it('el mensaje de error entra con animación', async () => {
+    await render('<app-form-field label="Correo" error="Correo inválido."><input appInput /></app-form-field>', { imports });
+    expect(screen.getByRole('alert')).toHaveClass('animate-error-in');
+  });
 });

@@ -12,6 +12,8 @@ import { Toast } from '@shared/ui/toast/toast';
     @for (item of notifications.items(); track item.id) {
       <app-toast
         class="pointer-events-auto"
+        animate.enter="animate-toast-in"
+        animate.leave="animate-toast-out"
         [kind]="item.kind"
         [message]="item.message"
         (dismissed)="notifications.dismiss(item.id)"
