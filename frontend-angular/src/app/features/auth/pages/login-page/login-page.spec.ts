@@ -251,4 +251,12 @@ describe('LoginPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Ocultar contraseña' }));
     expect(passwordInput()).toHaveAttribute('type', 'password');
   });
+
+  it('permite cambiar el tema claro/oscuro sin haber iniciado sesión', async () => {
+    delete document.documentElement.dataset['theme'];
+    await renderLogin();
+    await userEvent.click(screen.getByRole('button', { name: 'Modo claro' }));
+    expect(document.documentElement.dataset['theme']).toBe('light');
+    expect(screen.getByRole('button', { name: 'Modo oscuro' })).toBeInTheDocument();
+  });
 });

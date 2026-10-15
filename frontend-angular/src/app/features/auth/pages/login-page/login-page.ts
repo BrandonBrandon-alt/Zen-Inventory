@@ -11,6 +11,7 @@ import { Button } from '@shared/ui/button/button';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Logo } from '@shared/ui/logo/logo';
 import { PasswordToggle } from '@shared/ui/password-toggle/password-toggle';
+import { ThemeToggle } from '@shared/ui/theme-toggle/theme-toggle';
 
 /** Título de marca, letra por letra para animarlo. */
 const BRAND_TITLE = 'Zen Inventory';
@@ -40,6 +41,7 @@ const PASSWORD_MESSAGES: Record<string, string> = {
     InputDirective,
     Logo,
     PasswordToggle,
+    ThemeToggle,
     LucideLock,
     LucideMail,
   ],

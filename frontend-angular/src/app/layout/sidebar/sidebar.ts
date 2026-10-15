@@ -5,13 +5,11 @@ import {
   LucideChevronRight,
   LucideDynamicIcon,
   LucideLogOut,
-  LucideMoon,
-  LucideSun,
 } from '@lucide/angular';
 import { LOGIN_URL } from '@core/auth/auth-urls';
 import { AuthStore } from '@core/auth/session/auth-store';
-import { ThemeService } from '@core/theme/theme.service';
 import { Logo } from '@shared/ui/logo/logo';
+import { ThemeToggle } from '@shared/ui/theme-toggle/theme-toggle';
 import { navSectionsFor } from '../nav-items';
 import {
   SIDEBAR_COLLAPSED_WIDTH,
@@ -35,8 +33,7 @@ const KEYBOARD_STEP = 16;
     LucideChevronLeft,
     LucideChevronRight,
     LucideLogOut,
-    LucideMoon,
-    LucideSun,
+    ThemeToggle,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -49,7 +46,6 @@ export class Sidebar {
   private readonly store = inject(AuthStore);
   private readonly router = inject(Router);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  protected readonly theme = inject(ThemeService);
   protected readonly state = inject(SidebarState);
 
   protected readonly minWidth = SIDEBAR_MIN_WIDTH;

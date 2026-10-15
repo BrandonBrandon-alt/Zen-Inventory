@@ -33,7 +33,7 @@
           <li>
             <a
               [routerLink]="item.path"
-              routerLinkActive="bg-card font-semibold text-fg"
+              routerLinkActive="bg-card font-semibold text"
               ariaCurrentWhenActive="page"
               class="flex items-center gap-3 rounded-md py-2.5 text-sm text-fg-muted transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
               [class]="state.collapsed() ? 'justify-center px-3' : 'px-3'"
@@ -52,22 +52,7 @@
   </nav>
 
   <footer class="flex flex-col gap-1 px-3 pt-3">
-    <button
-      type="button"
-      class="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-[13px] text-fg-muted transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
-      [class.justify-center]="state.collapsed()"
-      [attr.aria-label]="theme.isDark() ? 'Modo claro' : 'Modo oscuro'"
-      (click)="theme.toggle()"
-    >
-      @if (theme.isDark()) {
-        <svg lucideSun [size]="18" class="shrink-0" />
-      } @else {
-        <svg lucideMoon [size]="18" class="shrink-0" />
-      }
-      @if (!state.collapsed()) {
-        <span>{{ theme.isDark() ? 'Modo claro' : 'Modo oscuro' }}</span>
-      }
-    </button>
+    <app-theme-toggle variant="row" [labelVisible]="!state.collapsed()" />
 
     <app-user-card [compact]="state.collapsed()" />
 
