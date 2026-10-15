@@ -36,9 +36,8 @@
     font-size: 15px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
-    transition:
-      background 0.25s ease,
-      color 0.25s ease;
+    /* Sin `transition` de color/fondo: el cambio de tema lo anima la View Transition (ver más abajo) y una
+       transición en el body haría que la captura de la pantalla nueva saliera con los colores a medio camino. */
   }
 }
 
@@ -72,6 +71,33 @@ main {
   from {
     opacity: 0;
     transform: translateY(10px);
+  }
+}
+
+/* Cambio de tema claro/oscuro: el tema nuevo se revela como un círculo que crece desde el botón pulsado
+   (--theme-x / --theme-y los pone ThemeService). Solo activo mientras dura el cambio (html[data-theme-switching]),
+   para no alterar la transición entre pantallas. */
+:root[data-theme-switching] main {
+  /* El contenido forma parte de la misma captura que el resto: así lo revela el círculo y no se desvanece aparte. */
+  view-transition-name: none;
+}
+
+:root[data-theme-switching]::view-transition-old(root),
+:root[data-theme-switching]::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+:root[data-theme-switching]::view-transition-new(root) {
+  animation: theme-reveal 650ms var(--ease-out-expo) both;
+}
+
+@keyframes theme-reveal {
+  from {
+    clip-path: circle(0 at var(--theme-x, 50%) var(--theme-y, 50%));
+  }
+  to {
+    clip-path: circle(150vmax at var(--theme-x, 50%) var(--theme-y, 50%));
   }
 }
 

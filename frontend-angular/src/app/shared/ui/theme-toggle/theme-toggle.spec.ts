@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { THEME_STORAGE_KEY, ThemeService } from '@core/theme/theme.service';
 import { ThemeToggle } from './theme-toggle';
 
@@ -51,5 +51,15 @@ describe('ThemeToggle', () => {
     );
     await userEvent.click(screen.getAllByRole('button', { name: 'Modo claro' })[0]);
     expect(screen.getAllByRole('button', { name: 'Modo oscuro' })).toHaveLength(2);
+  });
+
+  it('al pulsar pide el cambio con el centro del botón como origen de la animación', async () => {
+    await render(ThemeToggle);
+    const service = TestBed.inject(ThemeService);
+    const toggle = vi.spyOn(service, 'toggle');
+    const button = screen.getByRole('button', { name: 'Modo claro' });
+    vi.spyOn(button, 'getBoundingClientRect').mockReturnValue({ left: 100, top: 20, width: 36, height: 36 } as DOMRect);
+    await userEvent.click(button);
+    expect(toggle).toHaveBeenCalledWith({ x: 118, y: 38 });
   });
 });

@@ -17,7 +17,7 @@ import { ThemeService } from '@core/theme/theme.service';
       class="flex cursor-pointer items-center text-fg-muted transition-colors hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
       [class]="buttonClasses()"
       [attr.aria-label]="label()"
-      (click)="theme.toggle()"
+      (click)="toggle($event)"
     >
       @if (theme.isDark()) {
         <svg lucideSun [size]="18" class="shrink-0" />
@@ -37,6 +37,12 @@ export class ThemeToggle {
   readonly variant = input<'icon' | 'row'>('icon');
   /** Solo en `row`: muestra el texto junto al icono (se oculta, p. ej., con el sidebar colapsado). */
   readonly labelVisible = input(true);
+
+  /** Pide el cambio con el centro del botón como origen de la animación (también al activarlo con el teclado). */
+  protected toggle(event: Event): void {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this.theme.toggle({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+  }
 
   protected label(): string {
     return this.theme.isDark() ? 'Modo claro' : 'Modo oscuro';

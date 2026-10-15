@@ -52,7 +52,7 @@ con sus roles y cambia su `loadComponent` en `app.routes.ts` (mientras tanto mue
 - Colores y espaciados solo mediante tokens (`src/styles/theme.css`): `bg-base`, `text-fg`, `border-line`…
   Tema oscuro por defecto; el claro se activa con `data-theme="light"` en `<html>`.
 - El sidebar se redimensiona arrastrando su borde (200–360 px, también con flechas/Inicio/Fin y doble clic para restablecer); el ancho y el estado colapsado se recuerdan.
-- El tema claro/oscuro se cambia desde cualquier pantalla, también el login (`ThemeToggle`, `shared/ui`); se recuerda en el navegador.
+- El tema claro/oscuro se cambia desde cualquier pantalla, también el login (`ThemeToggle`, `shared/ui`); se recuerda en el navegador. Al cambiarlo, el tema nuevo se revela como un círculo que crece desde el botón pulsado (View Transitions API; instantáneo si el navegador no la soporta o el usuario pidió menos movimiento).
 - Responsivo: desde 768 px el menú es una barra lateral fija; por debajo es un cajón con barra superior (se cierra al elegir una pantalla, al pulsar fuera o con Escape).
 - Scroll fino y a tono con el tema en toda la app (`src/styles.css`).
 - Tablas: `DataTable` (`shared/ui/data-table`) recibe `columns`, `rows` y `rowKey`; ordena, pagina y gestiona los estados de carga, vacío y error. Las celdas se personalizan con `<ng-template appCell="columna" let-row>`. Ejemplo real: `features/branches/pages/branches-page`.
