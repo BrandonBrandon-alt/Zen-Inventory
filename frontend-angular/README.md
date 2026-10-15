@@ -52,6 +52,7 @@ con sus roles y cambia su `loadComponent` en `app.routes.ts` (mientras tanto mue
 - Colores y espaciados solo mediante tokens (`src/styles/theme.css`): `bg-base`, `text-fg`, `border-line`…
   Tema oscuro por defecto; el claro se activa con `data-theme="light"` en `<html>`.
 - El sidebar se redimensiona arrastrando su borde (200–360 px, también con flechas/Inicio/Fin y doble clic para restablecer); el ancho y el estado colapsado se recuerdan.
+- El tema claro/oscuro se cambia desde cualquier pantalla, también el login (`ThemeToggle`, `shared/ui`); se recuerda en el navegador.
 - Scroll fino y a tono con el tema en toda la app (`src/styles.css`).
 - Un componente sube a `shared/ui` solo cuando lo usa una segunda pantalla.
 - Cada pantalla migrada entra con sus tests; el E2E se corre a pedido (necesita backend).

@@ -87,3 +87,18 @@ test('con "reducir movimiento" activado el título aparece sin animación', asyn
   await expect(page.getByRole('heading', { level: 1, name: 'Zen Inventory' })).toBeVisible();
 });
 
+test('el tema se puede cambiar desde el login y se mantiene al iniciar sesión', async ({ page }) => {
+  await stubLogin(page);
+  await page.goto('/login');
+  await page.getByRole('button', { name: 'Modo claro' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+  await login(page);
+  await expect(page.getByRole('navigation', { name: 'Principal' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  // El interruptor del sidebar refleja el mismo estado.
+  await expect(page.getByRole('button', { name: 'Modo oscuro' })).toBeVisible();
+});
