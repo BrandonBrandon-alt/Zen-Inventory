@@ -61,3 +61,29 @@ test('el menú del sidebar navega entre pantallas', async ({ page }) => {
   await expect(page).toHaveURL(/\/inventory$/);
   await expect(page.getByRole('link', { name: 'Inventario' })).toHaveAttribute('aria-current', 'page');
 });
+
+test('el título de marca se anima letra por letra', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 760 });
+  await page.goto('/login');
+  const letters = page.getByRole('heading', { level: 1 }).locator('span');
+  await expect(letters).toHaveCount('Zen Inventory'.length);
+  const info = await letters.evaluateAll((els) =>
+    els.map((el) => ({ name: getComputedStyle(el).animationName, delay: getComputedStyle(el).animationDelay })),
+  );
+  expect(info.every((i) => i.name === 'letterReveal')).toBe(true);
+  expect(info[0].delay).toBe('0.2s');
+  expect(info[12].delay).toBe('0.68s');
+});
+
+test('con "reducir movimiento" activado el título aparece sin animación', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 1280, height: 760 });
+  await page.goto('/login');
+  const names = await page
+    .getByRole('heading', { level: 1 })
+    .locator('span')
+    .evaluateAll((els) => els.map((el) => getComputedStyle(el).animationName));
+  expect(names.every((n) => n === 'none')).toBe(true);
+  await expect(page.getByRole('heading', { level: 1, name: 'Zen Inventory' })).toBeVisible();
+});
+

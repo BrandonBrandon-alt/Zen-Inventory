@@ -10,6 +10,8 @@ export default defineConfig({
   testMatch: '**/*.e2e.ts',
   fullyParallel: true,
   forbidOnly: !!process.env['CI'],
+  // El servidor de desarrollo compila los trozos perezosos bajo demanda: en frío, las primeras pantallas tardan más que 5 s.
+  expect: { timeout: 10_000 },
   use: { baseURL: `http://localhost:${E2E_PORT}`, trace: 'on-first-retry' },
   webServer: {
     command: `npm start -- --port ${E2E_PORT}`,

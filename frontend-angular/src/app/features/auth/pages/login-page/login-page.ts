@@ -12,6 +12,12 @@ import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Logo } from '@shared/ui/logo/logo';
 import { PasswordToggle } from '@shared/ui/password-toggle/password-toggle';
 
+/** Título de marca, letra por letra para animarlo. */
+const BRAND_TITLE = 'Zen Inventory';
+/** Retraso (s) de la primera letra y entre letras consecutivas. */
+const LETTER_START_DELAY = 0.2;
+const LETTER_STEP = 0.04;
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 6;
 
@@ -45,6 +51,10 @@ export class LoginPage {
   private readonly router = inject(Router);
 
   protected readonly year = new Date().getFullYear();
+  protected readonly titleLetters = Array.from(BRAND_TITLE, (char, index) => ({
+    char,
+    delay: LETTER_START_DELAY + index * LETTER_STEP,
+  }));
   protected readonly showPassword = signal(false);
   protected readonly submitting = signal(false);
   protected readonly serverError = signal<string | null>(null);

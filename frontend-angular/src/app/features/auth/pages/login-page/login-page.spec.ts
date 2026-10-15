@@ -41,6 +41,28 @@ describe('LoginPage', () => {
     expect(screen.queryByText(/demo/i)).not.toBeInTheDocument();
   });
 
+  it('el título de marca se anima letra por letra pero sigue leyéndose entero para los lectores de pantalla', async () => {
+    await renderLogin();
+    const title = screen.getByRole('heading', { level: 1, name: 'Zen Inventory' });
+    const letters = Array.from(title.querySelectorAll('span'));
+    expect(letters.map((l) => l.textContent).join('')).toBe('Zen Inventory');
+    expect(letters).toHaveLength('Zen Inventory'.length);
+    // Cada letra es decorativa (el nombre lo da el título) y entra un poco después de la anterior.
+    expect(letters.every((l) => l.getAttribute('aria-hidden') === 'true')).toBe(true);
+    const delays = letters.map((l) => parseFloat(l.style.animationDelay));
+    expect(delays[0]).toBeCloseTo(0.2, 5);
+    expect(delays[1]).toBeCloseTo(0.24, 5);
+    expect(delays.every((d, i) => i === 0 || d > delays[i - 1])).toBe(true);
+  });
+
+  it('el espacio entre palabras del título se conserva', async () => {
+    await renderLogin();
+    const title = screen.getByRole('heading', { level: 1, name: 'Zen Inventory' });
+    const space = Array.from(title.querySelectorAll('span')).find((l) => l.textContent === ' ');
+    expect(space).toBeDefined();
+    expect(space).toHaveClass('whitespace-pre');
+  });
+
   it('al enviar vacío muestra los errores y no llama al backend', async () => {
     let calls = 0;
     server.use(
