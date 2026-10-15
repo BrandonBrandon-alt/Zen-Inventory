@@ -1,6 +1,7 @@
 import { HttpContextToken, HttpErrorResponse, type HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
+import { AuthStore } from '../auth/session/auth-store';
 import { NotificationService } from '../notifications/notification.service';
 import { toApiError } from './api-error';
 
@@ -15,12 +16,16 @@ export const SKIP_ERROR_NOTIFICATION = new HttpContextToken<boolean>(() => false
  */
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const notifications = inject(NotificationService);
+  // "Tu sesión expiró" solo tiene sentido si había una sesión al hacer la petición (authInterceptor la cierra al fallar).
+  const hadSession = inject(AuthStore).isAuthenticated();
 
   return next(req).pipe(
     catchError((error: unknown) => {
       if (!(error instanceof HttpErrorResponse)) return throwError(() => error);
       const apiError = toApiError(error);
-      if (apiError.isGlobal && !req.context.get(SKIP_ERROR_NOTIFICATION)) {
+      // La pantalla puede pedir manejar ella el error (SKIP), salvo la sesión vencida: siempre se avisa.
+      const notify = apiError.isSessionProblem ? hadSession : apiError.isGlobal && !req.context.get(SKIP_ERROR_NOTIFICATION);
+      if (notify) {
         const soft = apiError.code === 'ACCESS_DENIED' || apiError.isSessionProblem;
         notifications.show(soft ? 'warning' : 'error', apiError.message);
       }

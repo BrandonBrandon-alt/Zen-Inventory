@@ -54,6 +54,7 @@ con sus roles y cambia su `loadComponent` en `app.routes.ts` (mientras tanto mue
 - El sidebar se redimensiona arrastrando su borde (200–360 px, también con flechas/Inicio/Fin y doble clic para restablecer); el ancho y el estado colapsado se recuerdan.
 - El tema claro/oscuro se cambia desde cualquier pantalla, también el login (`ThemeToggle`, `shared/ui`); se recuerda en el navegador.
 - Scroll fino y a tono con el tema en toda la app (`src/styles.css`).
+- Tablas: `DataTable` (`shared/ui/data-table`) recibe `columns`, `rows` y `rowKey`; ordena, pagina y gestiona los estados de carga, vacío y error. Las celdas se personalizan con `<ng-template appCell="columna" let-row>`. Ejemplo real: `features/branches/pages/branches-page`.
 - Un componente sube a `shared/ui` solo cuando lo usa una segunda pantalla.
 - Cada pantalla migrada entra con sus tests; el E2E se corre a pedido (necesita backend).
 - El token JWT solo se envía a la API propia, nunca a otros orígenes.

@@ -1,0 +1,23 @@
+<header class="mb-6">
+  <h1 class="font-serif text-[28px] font-bold tracking-tight text-fg">Sucursales</h1>
+  @if (!loading() && !error() && branches().length > 0) {
+    <p class="mt-1 text-sm text-fg-subtle">{{ summary() }}</p>
+  }
+</header>
+
+<app-data-table
+  caption="Listado de sucursales"
+  [columns]="columns"
+  [rows]="branches()"
+  [rowKey]="rowKey"
+  [loading]="loading()"
+  [error]="error()"
+  [pageSize]="10"
+  emptyTitle="Todavía no hay sucursales"
+  emptyDescription="Las sucursales que se registren aparecerán aquí."
+  (retry)="load()"
+>
+  <ng-template appCell="activa" let-branch>
+    <app-badge [variant]="branch.activa ? 'success' : 'neutral'" dot>{{ branch.activa ? 'Activa' : 'Inactiva' }}</app-badge>
+  </ng-template>
+</app-data-table>

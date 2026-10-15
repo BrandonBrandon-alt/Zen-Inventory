@@ -2,6 +2,7 @@ import { HttpClient, HttpContext, provideHttpClient, withInterceptors } from '@a
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { AuthStore } from '../auth/session/auth-store';
 import { NotificationService } from '../notifications/notification.service';
 import { ApiError } from './api-error';
 import { SKIP_ERROR_NOTIFICATION, errorInterceptor } from './error.interceptor';
@@ -12,6 +13,7 @@ describe('errorInterceptor', () => {
   let notifications: NotificationService;
 
   beforeEach(() => {
+    localStorage.clear();
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [provideHttpClient(withInterceptors([errorInterceptor])), provideHttpClientTesting()],
@@ -71,9 +73,21 @@ describe('errorInterceptor', () => {
     expect(notifications.items()[0]).toMatchObject({ kind: 'warning', message: 'No tienes permisos para realizar esta acción.' });
   });
 
-  it('un token vencido avisa que la sesión expiró', () => {
+  it('un token vencido avisa que la sesión expiró (el usuario tenía sesión)', () => {
+    TestBed.inject(AuthStore).start({ token: 't', email: 'e', nombre: 'n', rol: 'ADMIN', id: 1 });
     fail(401, { code: 'TOKEN_EXPIRED', message: 'Tu sesión expiró. Inicia sesión de nuevo.' });
     expect(notifications.items()[0]).toMatchObject({ kind: 'warning', message: 'Tu sesión expiró. Inicia sesión de nuevo.' });
+  });
+
+  it('el aviso de sesión vencida no se suprime aunque la pantalla pida manejar sus propios errores', () => {
+    TestBed.inject(AuthStore).start({ token: 't', email: 'e', nombre: 'n', rol: 'ADMIN', id: 1 });
+    fail(401, { code: 'TOKEN_EXPIRED', message: 'Tu sesión expiró. Inicia sesión de nuevo.' }, new HttpContext().set(SKIP_ERROR_NOTIFICATION, true));
+    expect(notifications.items()).toHaveLength(1);
+  });
+
+  it('sin sesión previa un 401 de sesión no avisa "tu sesión expiró" (no había sesión que expirar)', () => {
+    fail(401, { code: 'UNAUTHENTICATED', message: 'Debes iniciar sesión para acceder a este recurso.' });
+    expect(notifications.items()).toEqual([]);
   });
 
   it('varias peticiones que fallan a la vez generan un solo aviso', () => {

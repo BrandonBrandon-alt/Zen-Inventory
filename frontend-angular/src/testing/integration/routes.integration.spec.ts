@@ -138,4 +138,24 @@ describe('rutas (guardas + shell + login)', () => {
     expect(store.isAuthenticated()).toBe(true);
     expect(screen.getByText('Ana')).toBeInTheDocument();
   });
+
+  it('Sucursales ya está migrada: muestra la tabla con los datos del backend', async () => {
+    server.use(
+      http.get(`${TEST_API}/api/branches`, () =>
+        HttpResponse.json([{ id: 3, nombre: 'Sucursal Norte', direccion: 'Av. 15', telefono: '601', activa: true }]),
+      ),
+    );
+    const { harness, router } = await setup('ADMIN');
+    await harness.navigateByUrl('/branches');
+    expect(router.url).toBe('/branches');
+    expect(await screen.findByRole('table', { name: 'Listado de sucursales' })).toBeInTheDocument();
+    expect(await screen.findByText('Av. 15')).toBeInTheDocument();
+    expect(screen.queryByText(/todavía no está disponible/)).not.toBeInTheDocument();
+  });
+
+  it('las pantallas sin migrar siguen mostrando el marcador', async () => {
+    const { harness } = await setup('ADMIN');
+    await harness.navigateByUrl('/users');
+    expect(await screen.findByText(/todavía no está disponible/)).toBeInTheDocument();
+  });
 });

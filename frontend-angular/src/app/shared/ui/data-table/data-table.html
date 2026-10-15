@@ -1,0 +1,128 @@
+<div class="overflow-hidden rounded-lg border border-line bg-card">
+  @if (loading()) {
+    <p role="status" class="sr-only">Cargando datos…</p>
+  }
+
+  <div class="overflow-x-auto">
+    <table class="w-full border-collapse text-sm" [style.min-width]="minWidth()" [attr.aria-busy]="loading() || null">
+      <caption class="sr-only">{{ caption() }}</caption>
+
+      <thead class="bg-surface">
+        <tr class="border-b border-line">
+          @for (column of columns(); track column.key) {
+            <th
+              scope="col"
+              class="px-4 py-3 text-xs font-medium whitespace-nowrap"
+              [class]="alignClass(column)"
+              [class.text-fg]="direction(column) !== null"
+              [class.text-fg-subtle]="direction(column) === null"
+              [style.width]="column.width"
+              [attr.aria-sort]="ariaSort(column)"
+            >
+              @if (column.sortable) {
+                <button
+                  type="button"
+                  class="group inline-flex cursor-pointer items-center gap-1.5 rounded-sm transition-colors hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
+                  (click)="toggleSort(column)"
+                >
+                  {{ column.header }}
+                  @switch (direction(column)) {
+                    @case ('asc') {
+                      <svg lucideArrowUp [size]="13" class="text-brand" aria-hidden="true" />
+                    }
+                    @case ('desc') {
+                      <svg lucideArrowDown [size]="13" class="text-brand" aria-hidden="true" />
+                    }
+                    @default {
+                      <svg
+                        lucideArrowUpDown
+                        [size]="13"
+                        class="opacity-0 transition-opacity group-hover:opacity-60 group-focus-visible:opacity-60"
+                        aria-hidden="true"
+                      />
+                    }
+                  }
+                </button>
+              } @else {
+                {{ column.header }}
+              }
+            </th>
+          }
+        </tr>
+      </thead>
+
+      <tbody>
+        @if (loading()) {
+          @for (row of skeletonRows; track row) {
+            <tr class="border-b border-line-subtle last:border-b-0" aria-hidden="true">
+              @for (column of columns(); track column.key; let i = $index) {
+                <td class="px-4 py-3.5">
+                  <div
+                    class="h-3 animate-pulse rounded-full bg-hover motion-reduce:animate-none"
+                    [class]="skeletonWidths[(row + i) % skeletonWidths.length]"
+                  ></div>
+                </td>
+              }
+            </tr>
+          }
+        } @else if (error(); as message) {
+          <tr>
+            <td [attr.colspan]="columns().length">
+              <div role="alert">
+                <app-empty-state title="No se pudieron cargar los datos" [description]="message">
+                  <svg data-slot="icon" lucideTriangleAlert [size]="28" aria-hidden="true" />
+                  <button data-slot="action" appButton variant="ghost" size="sm" type="button" (click)="retry.emit()">
+                    Reintentar
+                  </button>
+                </app-empty-state>
+              </div>
+            </td>
+          </tr>
+        } @else if (rows().length === 0) {
+          <tr>
+            <td [attr.colspan]="columns().length">
+              <app-empty-state [title]="emptyTitle()" [description]="emptyDescription()">
+                <svg data-slot="icon" lucideInbox [size]="28" aria-hidden="true" />
+                <ng-content select="[data-slot=empty-action]" ngProjectAs="[data-slot=action]" />
+              </app-empty-state>
+            </td>
+          </tr>
+        } @else {
+          @for (row of visibleRows(); track rowKey()(row)) {
+            <tr
+              class="border-b border-line-subtle transition-colors last:border-b-0 hover:bg-hover"
+              [class.cursor-pointer]="clickableRows()"
+              [class.focus-visible:bg-hover]="clickableRows()"
+              [attr.tabindex]="clickableRows() ? 0 : null"
+              (click)="clickableRows() && onRowClick($event, row)"
+              (keydown.enter)="clickableRows() && onRowKey($event, row)"
+              (keydown.space)="clickableRows() && onRowKey($event, row)"
+            >
+              @for (column of columns(); track column.key) {
+                <td
+                  class="px-4 py-3"
+                  [class]="alignClass(column)"
+                  [class.font-medium]="column.primary"
+                  [class.text-fg]="column.primary"
+                  [class.text-fg-muted]="!column.primary"
+                >
+                  @if (templateFor(column); as template) {
+                    <ng-container *ngTemplateOutlet="template; context: { $implicit: row }" />
+                  } @else {
+                    {{ text(column, row) }}
+                  }
+                </td>
+              }
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (pageSize() && !loading() && !error() && rows().length > 0) {
+    <div class="border-t border-line px-4 py-3">
+      <app-pagination [page]="currentPage()" [pageSize]="pageSize()!" [total]="rows().length" (pageChange)="setPage($event)" />
+    </div>
+  }
+</div>
