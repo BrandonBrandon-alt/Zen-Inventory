@@ -4,12 +4,14 @@ import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { screen } from '@testing-library/angular';
 import { http, HttpResponse } from 'msw';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_BASE_URL } from '@core/api/api-base-url';
+import { errorInterceptor } from '@core/api/error.interceptor';
 import { authInterceptor } from '@core/auth/http/auth.interceptor';
 import { AuthStore } from '@core/auth/session/auth-store';
+import { NotificationService } from '@core/notifications/notification.service';
 import { routes } from '../../app/app.routes';
-import { server, TEST_API } from '../msw-server';
+import { apiErrorBody, server, TEST_API } from '../msw-server';
 
 const sessionFor = (rol: string) => ({ token: 't', email: 'e@z.com', nombre: 'Ana', rol, id: 1, sucursalId: 3 });
 
@@ -19,7 +21,7 @@ async function setup(rol?: string) {
   TestBed.configureTestingModule({
     providers: [
       provideRouter(routes),
-      provideHttpClient(withInterceptors([authInterceptor])),
+      provideHttpClient(withInterceptors([errorInterceptor, authInterceptor])),
       { provide: API_BASE_URL, useValue: TEST_API },
     ],
   });
@@ -90,5 +92,46 @@ describe('rutas (guardas + shell + login)', () => {
     const { harness } = await setup('MANAGER');
     await harness.navigateByUrl('/dashboard');
     expect(await screen.findByText('Norte')).toBeInTheDocument();
+  });
+
+  it('token vencido en una llamada autenticada: cierra la sesión, lleva al login y avisa al usuario', async () => {
+    const { harness, router, store } = await setup('MANAGER');
+    server.use(
+      http.get(`${TEST_API}/api/branches/3`, () =>
+        HttpResponse.json(apiErrorBody(401, 'TOKEN_EXPIRED', 'Tu sesión expiró. Inicia sesión de nuevo.'), { status: 401 }),
+      ),
+    );
+    await harness.navigateByUrl('/dashboard');
+
+    await vi.waitFor(() => expect(router.url).toBe('/login'));
+    expect(store.isAuthenticated()).toBe(false);
+    expect(TestBed.inject(NotificationService).items()).toEqual([
+      expect.objectContaining({ kind: 'warning', message: 'Tu sesión expiró. Inicia sesión de nuevo.' }),
+    ]);
+  });
+
+  it('falta de permisos (403) en una llamada: avisa pero NO cierra la sesión', async () => {
+    const { harness, router, store } = await setup('MANAGER');
+    server.use(
+      http.get(`${TEST_API}/api/branches/3`, () =>
+        HttpResponse.json(apiErrorBody(403, 'ACCESS_DENIED', 'No tienes permisos para realizar esta acción.'), { status: 403 }),
+      ),
+    );
+    await harness.navigateByUrl('/dashboard');
+
+    await vi.waitFor(() => expect(TestBed.inject(NotificationService).items()).toHaveLength(1));
+    expect(router.url).toBe('/dashboard');
+    expect(store.isAuthenticated()).toBe(true);
+  });
+
+  it('servidor caído en una llamada: avisa del error sin cerrar la sesión y el sidebar sigue mostrando el nombre', async () => {
+    const { harness, store } = await setup('MANAGER');
+    server.use(http.get(`${TEST_API}/api/branches/3`, () => HttpResponse.error()));
+    await harness.navigateByUrl('/dashboard');
+
+    await vi.waitFor(() => expect(TestBed.inject(NotificationService).items()).toHaveLength(1));
+    expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ kind: 'error' });
+    expect(store.isAuthenticated()).toBe(true);
+    expect(screen.getByText('Ana')).toBeInTheDocument();
   });
 });

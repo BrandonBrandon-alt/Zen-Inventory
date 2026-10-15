@@ -71,3 +71,21 @@ docker compose up --build frontend-angular   # levanta también db y backend por
   `index.html` en las rutas de la SPA y reenvía `/api/*` al backend (`BACKEND_URL`, por defecto
   `http://backend:8080`), así el navegador usa un único origen y no hace falta CORS.
 
+## Errores de la API
+
+El backend responde todos los errores con el mismo contrato (`ErrorResponse`): `status`, `code` (estable, p. ej.
+`INVALID_CREDENTIALS`, `TOKEN_EXPIRED`, `INSUFFICIENT_STOCK`), `message` (en español), `path`, `traceId` y, en
+validaciones, `fieldErrors`. Un token ausente, inválido o vencido responde **401** (`UNAUTHENTICATED`,
+`INVALID_TOKEN`, `TOKEN_EXPIRED`); la falta de permisos, 403 (`ACCESS_DENIED`).
+
+En el frontend:
+- `core/api/api-error.ts`: `toApiError()` normaliza cualquier fallo HTTP (también red caída o un 502 del proxy) a un
+  `ApiError { status, code, message, fieldErrors, traceId }`. **Decide por `code`, nunca por el texto del mensaje.**
+- `core/api/error.interceptor.ts`: avisa globalmente (toast) solo de lo que no es de un formulario: red, servidor
+  (5xx), permisos y sesión. Los 400/404/409/422 los maneja la pantalla que hizo la llamada. Si la pantalla ya
+  muestra el error (como el login), la petición lleva `SKIP_ERROR_NOTIFICATION`.
+- Sesión vencida: `authInterceptor` cierra la sesión y manda al login; el aviso "Tu sesión expiró" sale por el toast.
+- `shared/forms/apply-server-errors.ts`: pinta los `fieldErrors` del backend bajo cada campo del formulario.
+- `core/notifications/NotificationService` + `layout/toast-container` (en la raíz de la app): avisos globales.
+- La lista de códigos vive en dos lados (`ErrorCode.java` y `api-error.ts`): al agregar uno en el backend, súmalo aquí.
+

@@ -7,7 +7,7 @@ import { http, HttpResponse, delay } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { AuthStore } from '@core/auth/session/auth-store';
-import { okLogin, server, TEST_API } from '@testing/msw-server';
+import { apiErrorBody, okLogin, server, TEST_API } from '@testing/msw-server';
 import { LoginPage } from './login-page';
 
 const LOGIN = `${TEST_API}/api/auth/login`;
@@ -104,12 +104,61 @@ describe('LoginPage', () => {
     expect(passwordInput()).toHaveValue('secreto1');
   });
 
-  it('muestra el error de servidor con su propio mensaje', async () => {
-    server.use(http.post(LOGIN, () => new HttpResponse(null, { status: 500 })));
+  it('muestra el error de servidor con el mensaje del backend', async () => {
+    server.use(
+      http.post(LOGIN, () =>
+        HttpResponse.json(apiErrorBody(500, 'INTERNAL_ERROR', 'Ocurrió un error inesperado. Código: a1b2c3d4'), { status: 500 }),
+      ),
+    );
     await renderLogin();
     await fillValid();
     await userEvent.click(submitButton());
-    expect(await screen.findByRole('alert')).toHaveTextContent('El servidor no pudo procesar la solicitud.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Código: a1b2c3d4');
+  });
+
+  it('una cuenta desactivada muestra el mensaje del backend', async () => {
+    server.use(
+      http.post(LOGIN, () =>
+        HttpResponse.json(apiErrorBody(401, 'ACCOUNT_DISABLED', 'La cuenta está desactivada. Por favor, contacte al administrador.'), { status: 401 }),
+      ),
+    );
+    await renderLogin();
+    await fillValid();
+    await userEvent.click(submitButton());
+    expect(await screen.findByRole('alert')).toHaveTextContent('La cuenta está desactivada');
+  });
+
+  it('si el backend rechaza el formato de un campo, el mensaje aparece bajo ese campo (no en el aviso general)', async () => {
+    server.use(
+      http.post(LOGIN, () =>
+        HttpResponse.json(
+          apiErrorBody(400, 'VALIDATION_FAILED', 'email: Formato de email inválido', {
+            fieldErrors: [{ field: 'email', message: 'El servidor no acepta este correo' }],
+          }),
+          { status: 400 },
+        ),
+      ),
+    );
+    await renderLogin();
+    await fillValid();
+    await userEvent.click(submitButton());
+    expect(await screen.findByText('El servidor no acepta este correo')).toBeInTheDocument();
+    expect(emailInput()).toHaveAttribute('aria-invalid', 'true');
+    // Es el mensaje del campo: no hay además un aviso general en el formulario (la única alerta es la del campo).
+    const alerts = screen.getAllByRole('alert');
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toHaveTextContent('El servidor no acepta este correo');
+    // Al corregir el correo el error del servidor desaparece.
+    await userEvent.type(emailInput(), 'x');
+    expect(screen.queryByText('El servidor no acepta este correo')).not.toBeInTheDocument();
+  });
+
+  it('un error de red muestra el aviso en el formulario y no un aviso global duplicado', async () => {
+    server.use(http.post(LOGIN, () => HttpResponse.error()));
+    await renderLogin();
+    await fillValid();
+    await userEvent.click(submitButton());
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo conectar');
   });
 
   it('el error del servidor desaparece al editar un campo', async () => {

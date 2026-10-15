@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { LucideLock, LucideMail } from '@lucide/angular';
 import { DASHBOARD_URL } from '@core/auth/auth-urls';
 import { AuthApi, AuthError } from '@core/auth/http/auth-api';
+import { applyServerErrors, SERVER_ERROR_KEY } from '@shared/forms/apply-server-errors';
 import { Alert } from '@shared/ui/alert/alert';
 import { Button } from '@shared/ui/button/button';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
@@ -77,15 +78,28 @@ export class LoginPage {
       await this.router.navigateByUrl(DASHBOARD_URL);
     } catch (error) {
       this.form.enable();
-      this.serverError.set(error instanceof AuthError ? error.message : 'Error inesperado.');
+      this.showError(error);
     } finally {
       this.submitting.set(false);
     }
   }
 
+  /** Errores por campo del backend bajo cada campo; el resto (credenciales, red, servidor) en un aviso del formulario. */
+  private showError(error: unknown): void {
+    if (!(error instanceof AuthError)) {
+      this.serverError.set('Error inesperado.');
+      return;
+    }
+    const applied = error.kind === 'validation' ? applyServerErrors(this.form, error.fieldErrors) : [];
+    this.serverError.set(applied.length > 0 ? null : error.message);
+  }
+
   /** Muestra el primer error del control, pero solo después de que el usuario lo tocó. */
   private messageFor(control: AbstractControl, messages: Record<string, string>): string | null {
     if (!control.touched || !control.errors) return null;
+    // Un error devuelto por el servidor (p. ej. "Formato de email inválido") se muestra tal cual.
+    const fromServer: unknown = control.errors[SERVER_ERROR_KEY];
+    if (typeof fromServer === 'string') return fromServer;
     const key = Object.keys(control.errors)[0];
     return messages[key] ?? null;
   }

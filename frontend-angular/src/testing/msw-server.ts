@@ -21,3 +21,13 @@ export const okLogin: LoginResponse = {
 export const server = setupServer(
   http.post(`${TEST_API}/api/auth/login`, () => HttpResponse.json(okLogin)),
 );
+
+/** Cuerpo de error con el contrato del backend (`ErrorResponse`): status, code, message, path, traceId, timestamp. */
+export function apiErrorBody(
+  status: number,
+  code: string,
+  message: string,
+  extras: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return { status, code, message, path: '/api/x', traceId: 'a1b2c3d4', timestamp: '2026-01-01T00:00:00', ...extras };
+}

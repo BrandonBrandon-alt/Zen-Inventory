@@ -299,7 +299,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["getAll"];
         put?: never;
         post: operations["create"];
         delete?: never;
@@ -571,7 +571,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getAll"];
+        get: operations["getAll_1"];
         put?: never;
         post: operations["create_1"];
         delete?: never;
@@ -587,7 +587,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getAll_1"];
+        get: operations["getAll_2"];
         put?: never;
         post: operations["create_2"];
         delete?: never;
@@ -603,7 +603,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getAll_2"];
+        get: operations["getAll_3"];
         put?: never;
         post: operations["create_3"];
         delete?: never;
@@ -619,7 +619,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getAll_3"];
+        get: operations["getAll_4"];
         put?: never;
         post: operations["create_4"];
         delete?: never;
@@ -651,7 +651,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getAll_4"];
+        get: operations["getAll_5"];
         put?: never;
         post: operations["create_5"];
         delete?: never;
@@ -1099,7 +1099,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["getAll_5"];
+        get: operations["getAll_6"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1135,6 +1135,22 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/products/{productId}/units/{unitId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["unassignUnit"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1776,6 +1792,8 @@ export interface components {
             currentStock?: number;
             rotationRatio?: number;
             isDeadStock?: boolean;
+            /** Format: int32 */
+            inactiveDays?: number;
         };
         GlobalSummary: {
             totalRevenue?: number;
@@ -2561,6 +2579,26 @@ export interface operations {
             };
         };
     };
+    getAll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReturnRequestResponse"][];
+                };
+            };
+        };
+    };
     create: {
         parameters: {
             query?: never;
@@ -2990,7 +3028,7 @@ export interface operations {
             };
         };
     };
-    getAll: {
+    getAll_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -3034,7 +3072,7 @@ export interface operations {
             };
         };
     };
-    getAll_1: {
+    getAll_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -3078,7 +3116,7 @@ export interface operations {
             };
         };
     };
-    getAll_2: {
+    getAll_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -3122,7 +3160,7 @@ export interface operations {
             };
         };
     };
-    getAll_3: {
+    getAll_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -3214,7 +3252,7 @@ export interface operations {
             };
         };
     };
-    getAll_4: {
+    getAll_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -3866,7 +3904,7 @@ export interface operations {
             };
         };
     };
-    getAll_5: {
+    getAll_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -3927,6 +3965,27 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["SupplierResponse"][];
                 };
+            };
+        };
+    };
+    unassignUnit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                productId: number;
+                unitId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
