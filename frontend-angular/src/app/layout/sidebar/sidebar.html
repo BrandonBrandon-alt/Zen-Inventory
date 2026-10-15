@@ -1,7 +1,8 @@
 <aside
   id="app-sidebar"
-  class="flex h-full w-full flex-col border-r border-line bg-base py-5"
+  class="flex h-full flex-col border-r border-line bg-base py-5"
   [class]="resizing() ? '' : 'transition-[width] duration-300'"
+  [class.w-full]="!viewport.isDesktop()"
   [style.width.px]="viewport.isDesktop() ? widthPx() : null"
 >
   <header class="relative mb-6 flex items-center gap-2.5 px-4" [class.justify-center]="compact()">

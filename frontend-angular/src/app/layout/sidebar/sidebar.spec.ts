@@ -206,4 +206,11 @@ describe('Sidebar', () => {
       expect(aside(container)).toHaveStyle({ width: '320px' });
     });
   });
+
+  it('en escritorio el menú no usa w-full: crecería desde el ancho mínimo hasta su ancho fijo al aparecer', async () => {
+    const { container } = await renderSidebar('ADMIN');
+    const aside = container.querySelector('aside') as HTMLElement;
+    expect(aside).not.toHaveClass('w-full');
+    expect(aside).toHaveStyle({ width: '240px' });
+  });
 });
