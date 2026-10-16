@@ -194,6 +194,19 @@ describe('UsersPage', () => {
       expect(screen.queryByLabelText('Sucursal')).not.toBeInTheDocument();
     });
 
+    it('al editar su propia cuenta el rol queda bloqueado; en la de otro no', async () => {
+      useSession('ADMIN', 1);
+      stub();
+      await renderPage();
+      await screen.findByText('Sofia Vendedora');
+      await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Editar Root Admin' })).toBeEnabled());
+      await userEvent.click(screen.getByRole('button', { name: 'Editar Root Admin' }));
+      expect(screen.getByLabelText('Rol')).toBeDisabled();
+      await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Editar Sofia Vendedora' }));
+      expect(screen.getByLabelText('Rol')).toBeEnabled();
+    });
+
     it('editar abre el formulario con los datos de esa fila', async () => {
       useSession('ADMIN', 1);
       stub();

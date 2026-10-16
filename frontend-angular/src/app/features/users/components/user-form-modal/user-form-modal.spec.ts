@@ -26,7 +26,7 @@ const BRANCHES: BranchOption[] = [
 const EXISTING: AppUser = { id: 7, nombre: 'Luis Pérez', email: 'luis@zen.com', rol: 'SELLER', sucursalId: 20, activo: true };
 const SAVED_RESPONSE = { id: 9, nombre: 'Ana Gómez', email: 'ana@zen.com', role: { id: 4, nombre: 'SELLER' }, sucursalId: 10, activo: true };
 
-const TEMPLATE = `<app-user-form-modal [(open)]="open" [user]="user" [roles]="roles" [branches]="branches" [branchLocked]="locked" (saved)="onSaved($event)" />`;
+const TEMPLATE = `<app-user-form-modal [(open)]="open" [user]="user" [roles]="roles" [branches]="branches" [branchLocked]="locked" [self]="self" (saved)="onSaved($event)" />`;
 
 interface Props {
   open: boolean;
@@ -34,11 +34,12 @@ interface Props {
   roles: RoleOption[];
   branches: BranchOption[];
   locked: boolean;
+  self: boolean;
   onSaved: ReturnType<typeof vi.fn>;
 }
 
 async function setup(props: Partial<Props> = {}) {
-  const componentProperties: Props = { open: true, user: null, roles: ROLES, branches: BRANCHES, locked: false, onSaved: vi.fn(), ...props };
+  const componentProperties: Props = { open: true, user: null, roles: ROLES, branches: BRANCHES, locked: false, self: false, onSaved: vi.fn(), ...props };
   const result = await render(TEMPLATE, {
     imports: [UserFormModal],
     componentProperties,
@@ -275,6 +276,33 @@ describe('UserFormModal', () => {
       await screen.findByRole('alert');
       await userEvent.type(nombre(), 'x');
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('cuenta propia', () => {
+    it('no puede cambiar su rol ni desactivarse: rol bloqueado y sin interruptor de activo', async () => {
+      await setup({ user: EXISTING, self: true });
+      expect(rol()).toBeDisabled();
+      expect(screen.queryByLabelText('Usuario activo')).not.toBeInTheDocument();
+    });
+
+    it('puede guardar sus otros datos y se envía el mismo rol', async () => {
+      let body: Record<string, unknown> = {};
+      server.use(http.put(`${USERS}/:id`, async ({ request }) => { body = (await request.json()) as Record<string, unknown>; return HttpResponse.json(SAVED_RESPONSE); }));
+      const { host } = await setup({ user: EXISTING, self: true });
+      await userEvent.type(nombre(), ' Jr');
+      await userEvent.click(submit('Guardar cambios'));
+      await vi.waitFor(() => expect(host.onSaved).toHaveBeenCalled());
+      expect(body['rolId']).toBe(4);
+      expect(body['nombre']).toBe('Luis Pérez Jr');
+      expect('activo' in body && body['activo'] === false).toBe(false);
+    });
+
+    it('al abrir después a otro usuario, el rol vuelve a poder cambiarse', async () => {
+      const { update } = await setup({ user: EXISTING, self: true });
+      await update({ open: false });
+      await update({ user: { ...EXISTING, id: 8 }, self: false, open: true });
+      expect(rol()).toBeEnabled();
     });
   });
 

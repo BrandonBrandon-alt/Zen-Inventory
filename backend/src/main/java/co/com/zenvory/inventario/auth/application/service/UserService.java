@@ -99,6 +99,10 @@ public class UserService implements UserUseCase {
                 ? findRole(updated.getRole().getId())
                 : null;
 
+        if (actor.getId().equals(existing.getId())) {
+            requireNoSelfPrivilegeChange(existing, newRole, updated.getActive());
+        }
+
         if (!isAdmin(actor)) {
             Long branchId = managerBranch(actor);
             requireManageable(actor, existing);
@@ -134,6 +138,9 @@ public class UserService implements UserUseCase {
     public void deactivateUser(Long id, String actorEmail) {
         User actor = actor(actorEmail);
         User existing = find(id);
+        if (actor.getId().equals(existing.getId())) {
+            throw new UnauthorizedActionException("No puede desactivar su propia cuenta.");
+        }
         if (!isAdmin(actor)) {
             requireManageable(actor, existing);
         }
@@ -206,6 +213,16 @@ public class UserService implements UserUseCase {
         requireSameBranch(manager, target);
         if (!MANAGER_ASSIGNABLE.contains(target.getRole().getNombre())) {
             throw new UnauthorizedActionException("No puede gestionar usuarios con rol " + target.getRole().getNombre() + ".");
+        }
+    }
+
+    /** Nadie cambia su propio rol ni se desactiva: evita auto-ascensos y dejar el sistema sin administradores. */
+    private void requireNoSelfPrivilegeChange(User self, Role newRole, Boolean newActive) {
+        if (newRole != null && !newRole.getId().equals(self.getRole().getId())) {
+            throw new UnauthorizedActionException("No puede cambiar su propio rol.");
+        }
+        if (Boolean.FALSE.equals(newActive)) {
+            throw new UnauthorizedActionException("No puede desactivar su propia cuenta.");
         }
     }
 

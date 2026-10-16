@@ -78,7 +78,7 @@ let nextId = 0;
             </select>
           </app-form-field>
         }
-        @if (user()) {
+        @if (user() && !self()) {
           <label class="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
             <input type="checkbox" formControlName="activo" class="size-4 accent-(--brand-500)" />
             Usuario activo
@@ -104,6 +104,8 @@ export class UserFormModal {
   readonly roles = input<readonly RoleOption[]>([]);
   readonly branches = input<readonly BranchOption[]>([]);
   readonly branchLocked = input(false);
+  /** Edita su propia cuenta: no puede cambiar su rol ni desactivarse (el backend también lo rechaza). */
+  readonly self = input(false);
   /** El usuario ya guardado en el servidor. */
   readonly saved = output<AppUser>();
 
@@ -143,6 +145,7 @@ export class UserFormModal {
       const roles = this.roles();
       untracked(() => {
         const roleId = user ? (roles.find((role) => role.nombre === user.rol)?.id ?? null) : null;
+        this.form.controls.rolId.enable({ emitEvent: false });
         this.form.reset({
           nombre: user?.nombre ?? '',
           email: user?.email ?? '',
@@ -155,6 +158,7 @@ export class UserFormModal {
         this.form.controls.password.setValidators(user ? [Validators.minLength(PASSWORD_MIN)] : [Validators.required, Validators.minLength(PASSWORD_MIN)]);
         this.form.controls.password.updateValueAndValidity();
         this.selectedRoleId.set(roleId);
+        this.lockOwnRole();
         this.serverError.set(null);
       });
     });
@@ -198,6 +202,7 @@ export class UserFormModal {
       next: (user) => {
         this.saving.set(false);
         this.form.enable({ emitEvent: false });
+        this.lockOwnRole();
         this.notifications.success(current ? 'Usuario actualizado correctamente.' : 'Usuario creado correctamente.');
         this.saved.emit(user);
         this.open.set(false);
@@ -205,11 +210,17 @@ export class UserFormModal {
       error: (error: unknown) => {
         this.saving.set(false);
         this.form.enable({ emitEvent: false });
+        this.lockOwnRole();
         const apiError = toApiError(error);
         const applied = apiError.code === 'VALIDATION_FAILED' ? applyServerErrors(this.form, apiError.fieldErrors) : [];
         this.serverError.set(applied.length > 0 ? null : apiError.message);
       },
     });
+  }
+
+  /** Con la propia cuenta el rol no se puede cambiar: el select queda deshabilitado. */
+  private lockOwnRole(): void {
+    if (this.self() && this.user()) this.form.controls.rolId.disable({ emitEvent: false });
   }
 
   /** Validador de la sucursal: obligatoria solo mientras el campo está visible. */

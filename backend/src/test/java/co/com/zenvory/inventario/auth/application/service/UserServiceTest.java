@@ -265,6 +265,40 @@ class UserServiceTest {
     }
 
     @Nested
+    @DisplayName("sobre uno mismo")
+    class OnSelf {
+        private User changes(Role role, Boolean active) {
+            return User.builder().nombre("Yo").email("admin@x.co").role(Role.builder().id(role.getId()).build()).active(active).build();
+        }
+
+        @Test
+        @DisplayName("un ADMIN no puede cambiar su propio rol")
+        void adminCannotChangeOwnRole() {
+            assertThatThrownBy(() -> service.updateUser(admin.getId(), changes(MANAGER, true), null, "admin@x.co"))
+                    .isInstanceOf(UnauthorizedActionException.class);
+            assertThat(admin.getRole().getNombre()).isEqualTo("ADMIN");
+        }
+
+        @Test
+        @DisplayName("puede editar sus otros datos manteniendo el rol")
+        void adminCanEditOwnProfile() {
+            User updated = service.updateUser(admin.getId(), changes(ADMIN, true), null, "admin@x.co");
+            assertThat(updated.getNombre()).isEqualTo("Yo");
+            assertThat(updated.getRole().getNombre()).isEqualTo("ADMIN");
+        }
+
+        @Test
+        @DisplayName("no puede desactivarse ni por editar ni por desactivar")
+        void cannotDeactivateSelf() {
+            assertThatThrownBy(() -> service.updateUser(admin.getId(), changes(ADMIN, false), null, "admin@x.co"))
+                    .isInstanceOf(UnauthorizedActionException.class);
+            assertThatThrownBy(() -> service.deactivateUser(admin.getId(), "admin@x.co"))
+                    .isInstanceOf(UnauthorizedActionException.class);
+            assertThat(admin.getActive()).isTrue();
+        }
+    }
+
+    @Nested
     @DisplayName("desactivar")
     class Deactivating {
         @Test

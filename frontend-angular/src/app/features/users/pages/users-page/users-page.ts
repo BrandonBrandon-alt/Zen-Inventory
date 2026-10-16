@@ -55,6 +55,7 @@ export class UsersPage {
 
   /** Un MANAGER siempre opera en su sucursal: no elige sucursal al crear o editar. */
   protected readonly isManager = computed(() => this.session()?.rol === 'MANAGER');
+  protected readonly currentUserId = computed(() => this.session()?.id);
   /** El formulario necesita los roles; hasta que lleguen no se ofrece crear ni editar. */
   protected readonly canOpenForm = computed(() => this.roles().length > 0);
 

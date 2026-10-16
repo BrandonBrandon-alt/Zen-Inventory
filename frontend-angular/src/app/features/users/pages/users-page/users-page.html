@@ -55,6 +55,7 @@
   [roles]="roles()"
   [branches]="branches()"
   [branchLocked]="isManager()"
+  [self]="editing()?.id === currentUserId()"
   (saved)="load(true)"
 />
 
