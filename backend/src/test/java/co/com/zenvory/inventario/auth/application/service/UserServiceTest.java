@@ -90,6 +90,15 @@ class UserServiceTest {
         }
 
         @Test
+        @DisplayName("un MANAGER o ADMIN desactivado pierde el acceso aunque su token siga vigente")
+        void deactivatedActorRejected() {
+            manager.setActive(false);
+            admin.setActive(false);
+            assertThatThrownBy(() -> service.getAllUsers("manager@x.co")).isInstanceOf(UnauthorizedActionException.class);
+            assertThatThrownBy(() -> service.getAllUsers("admin@x.co")).isInstanceOf(UnauthorizedActionException.class);
+        }
+
+        @Test
         @DisplayName("un actor desconocido es rechazado")
         void unknownActor() {
             assertThatThrownBy(() -> service.getAllUsers("nadie@x.co")).isInstanceOf(UnauthorizedActionException.class);

@@ -144,9 +144,10 @@ public class UserService implements UserUseCase {
     public List<Role> getAssignableRoles(String actorEmail) {
         User actor = actor(actorEmail);
         List<Role> all = userRepositoryPort.findAllRoles();
-        if (scopeBranch(actor) == null) {
+        if (isAdmin(actor)) {
             return all;
         }
+        managerBranch(actor);
         return all.stream().filter(role -> MANAGER_ASSIGNABLE.contains(role.getNombre())).toList();
     }
 
@@ -155,6 +156,9 @@ public class UserService implements UserUseCase {
     private User actor(String email) {
         User actor = userRepositoryPort.findByEmail(email)
                 .orElseThrow(() -> new UnauthorizedActionException("No se pudo identificar al usuario autenticado."));
+        if (Boolean.FALSE.equals(actor.getActive())) {
+            throw new UnauthorizedActionException("Su usuario está desactivado.");
+        }
         String role = actor.getRole().getNombre();
         if (!ADMIN.equals(role) && !MANAGER.equals(role)) {
             throw new UnauthorizedActionException("No tiene permisos para gestionar usuarios.");
