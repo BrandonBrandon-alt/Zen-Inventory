@@ -4,6 +4,7 @@ import co.com.zenvory.inventario.alert.domain.exception.AlertAlreadyResolvedExce
 import co.com.zenvory.inventario.auth.domain.exception.AccountDisabledException;
 import co.com.zenvory.inventario.auth.domain.exception.InvalidCredentialsException;
 import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException;
+import co.com.zenvory.inventario.auth.domain.exception.RoleNotFoundException;
 import co.com.zenvory.inventario.auth.domain.exception.UserNotFoundException;
 import co.com.zenvory.inventario.branch.domain.exception.BranchNotFoundException;
 import co.com.zenvory.inventario.catalog.domain.exception.DuplicateSkuException;
@@ -71,6 +72,7 @@ class GlobalExceptionHandlerTest {
                 Arguments.of("invalid-credentials", 401, "INVALID_CREDENTIALS", "Credenciales incorrectas"),
                 Arguments.of("account-disabled", 401, "ACCOUNT_DISABLED", null),
                 Arguments.of("unauthorized-action", 403, "FORBIDDEN_ACTION", "Sede no permitida"),
+                Arguments.of("role-not-found", 404, "RESOURCE_NOT_FOUND", null),
                 Arguments.of("user-not-found", 404, "RESOURCE_NOT_FOUND", null),
                 Arguments.of("branch-not-found", 404, "RESOURCE_NOT_FOUND", "Sucursal no encontrada con ID: 7"),
                 Arguments.of("product-not-found", 404, "RESOURCE_NOT_FOUND", null),
@@ -244,6 +246,7 @@ class GlobalExceptionHandlerTest {
                 case "invalid-credentials" -> new InvalidCredentialsException();
                 case "account-disabled" -> new AccountDisabledException();
                 case "unauthorized-action" -> new UnauthorizedActionException("Sede no permitida");
+                case "role-not-found" -> new RoleNotFoundException(9L);
                 case "user-not-found" -> new UserNotFoundException(3L);
                 case "branch-not-found" -> new BranchNotFoundException(7L);
                 case "product-not-found" -> new ProductNotFoundException(1L);

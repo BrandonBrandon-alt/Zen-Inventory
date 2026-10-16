@@ -209,6 +209,23 @@ class UserServiceTest {
         }
 
         @Test
+        @DisplayName("sin sucursalId en la petición se conserva la sucursal actual")
+        void omittedBranchIsKept() {
+            User updated = service.updateUser(otherSeller.getId(), changes(null, null), null, "admin@x.co");
+            assertThat(updated.getSucursalId()).isEqualTo(OTHER_BRANCH);
+        }
+
+        @Test
+        @DisplayName("un rol inexistente es 404, no 500")
+        void unknownRole() {
+            Role ghost = Role.builder().id(999L).nombre("X").build();
+            assertThatThrownBy(() -> service.updateUser(mySeller.getId(), changes(ghost, null), null, "admin@x.co"))
+                    .isInstanceOf(co.com.zenvory.inventario.auth.domain.exception.RoleNotFoundException.class);
+            assertThatThrownBy(() -> service.createUser(newUser(ghost, MY_BRANCH), "secret1", "admin@x.co"))
+                    .isInstanceOf(co.com.zenvory.inventario.auth.domain.exception.RoleNotFoundException.class);
+        }
+
+        @Test
         @DisplayName("MANAGER edita a un SELLER de su sede, conservando la sucursal y el hash si no hay contraseña")
         void managerUpdatesOwnLowerUser() {
             mySeller.setPasswordHash("hash:viejo");

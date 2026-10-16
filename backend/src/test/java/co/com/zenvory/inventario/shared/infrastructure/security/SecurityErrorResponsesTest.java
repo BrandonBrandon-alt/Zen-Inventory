@@ -56,6 +56,9 @@ class SecurityErrorResponsesTest {
     void setUp() {
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
         when(userRepository.findByEmail("ana@zen.com")).thenReturn(Optional.of(user("ana@zen.com", "MANAGER")));
+        when(userRepository.findByEmail("inactiva@zen.com")).thenReturn(Optional.of(
+                UserEntity.builder().id(3L).email("inactiva@zen.com").nombre("Inactiva").activa(false)
+                        .role(RoleEntity.builder().id(2L).nombre("MANAGER").build()).build()));
         when(userRepository.findByEmail("root@zen.com")).thenReturn(Optional.of(user("root@zen.com", "ADMIN")));
     }
 
@@ -125,6 +128,15 @@ class SecurityErrorResponsesTest {
         mockMvc.perform(get("/api/probe/any").header("Authorization", bearer(token)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+    }
+
+    @Test
+    @DisplayName("Token válido de una cuenta desactivada: 401 ACCOUNT_DISABLED")
+    void validTokenOfDisabledUser() throws Exception {
+        String token = jwtService.generateToken("inactiva@zen.com", "MANAGER", 2L);
+        mockMvc.perform(get("/api/probe/any").header("Authorization", bearer(token)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ACCOUNT_DISABLED"));
     }
 
     @Test

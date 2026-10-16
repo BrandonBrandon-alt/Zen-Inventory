@@ -123,6 +123,8 @@ describe('ApiError', () => {
     expect(new ApiError(401, 'TOKEN_EXPIRED', 'x').isSessionProblem).toBe(true);
     expect(new ApiError(401, 'INVALID_TOKEN', 'x').isSessionProblem).toBe(true);
     expect(new ApiError(401, 'UNAUTHENTICATED', 'x').isSessionProblem).toBe(true);
+    // Con sesión abierta, una cuenta desactivada también obliga a salir (en el login lo trata AuthApi).
+    expect(new ApiError(401, 'ACCOUNT_DISABLED', 'x').isSessionProblem).toBe(true);
     expect(new ApiError(401, 'INVALID_CREDENTIALS', 'x').isSessionProblem).toBe(false);
     expect(new ApiError(403, 'ACCESS_DENIED', 'x').isSessionProblem).toBe(false);
   });

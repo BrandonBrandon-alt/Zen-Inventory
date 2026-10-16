@@ -45,6 +45,7 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
         return switch (code) {
             case TOKEN_EXPIRED -> "Tu sesión expiró. Inicia sesión de nuevo.";
             case INVALID_TOKEN -> "Tu sesión no es válida. Inicia sesión de nuevo.";
+            case ACCOUNT_DISABLED -> "Tu cuenta está desactivada. Contacta a un administrador.";
             default -> "Debes iniciar sesión para acceder a este recurso.";
         };
     }

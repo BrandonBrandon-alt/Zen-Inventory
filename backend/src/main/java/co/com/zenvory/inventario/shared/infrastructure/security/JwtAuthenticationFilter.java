@@ -73,7 +73,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserEntity user = userRepository.findByEmail(email).orElse(null);
 
-            if (user != null) {
+            if (user != null && Boolean.FALSE.equals(user.getActiva())) {
+                // Un token vigente de una cuenta desactivada no da acceso: se responde 401 ACCOUNT_DISABLED.
+                request.setAttribute(RestAuthenticationEntryPoint.AUTH_ERROR_ATTRIBUTE, ErrorCode.ACCOUNT_DISABLED);
+            } else if (user != null) {
                 String roleName = "ROLE_" + user.getRole().getNombre();
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(

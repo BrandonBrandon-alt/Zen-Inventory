@@ -4,6 +4,7 @@ import co.com.zenvory.inventario.alert.domain.exception.AlertAlreadyResolvedExce
 import co.com.zenvory.inventario.auth.domain.exception.AccountDisabledException;
 import co.com.zenvory.inventario.auth.domain.exception.InvalidCredentialsException;
 import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException;
+import co.com.zenvory.inventario.auth.domain.exception.RoleNotFoundException;
 import co.com.zenvory.inventario.auth.domain.exception.UserNotFoundException;
 import co.com.zenvory.inventario.branch.domain.exception.BranchNotFoundException;
 import co.com.zenvory.inventario.catalog.domain.exception.DuplicateSkuException;
@@ -61,6 +62,7 @@ public class GlobalExceptionHandler {
             Map.entry(InvalidCredentialsException.class, new Mapping(HttpStatus.UNAUTHORIZED, ErrorCode.INVALID_CREDENTIALS)),
             Map.entry(AccountDisabledException.class, new Mapping(HttpStatus.UNAUTHORIZED, ErrorCode.ACCOUNT_DISABLED)),
             Map.entry(UnauthorizedActionException.class, new Mapping(HttpStatus.FORBIDDEN, ErrorCode.FORBIDDEN_ACTION)),
+            Map.entry(RoleNotFoundException.class, new Mapping(HttpStatus.NOT_FOUND, ErrorCode.RESOURCE_NOT_FOUND)),
             Map.entry(UserNotFoundException.class, new Mapping(HttpStatus.NOT_FOUND, ErrorCode.RESOURCE_NOT_FOUND)),
             Map.entry(BranchNotFoundException.class, new Mapping(HttpStatus.NOT_FOUND, ErrorCode.RESOURCE_NOT_FOUND)),
             Map.entry(ProductNotFoundException.class, new Mapping(HttpStatus.NOT_FOUND, ErrorCode.RESOURCE_NOT_FOUND)),

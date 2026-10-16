@@ -36,7 +36,7 @@ export type ApiErrorCode = (typeof BACKEND_CODES)[number] | ClientCode;
 
 const KNOWN_CODES: ReadonlySet<string> = new Set<string>(BACKEND_CODES);
 
-const SESSION_CODES: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>(['TOKEN_EXPIRED', 'INVALID_TOKEN', 'UNAUTHENTICATED']);
+const SESSION_CODES: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>(['TOKEN_EXPIRED', 'INVALID_TOKEN', 'UNAUTHENTICATED', 'ACCOUNT_DISABLED']);
 
 /** Errores que no pertenecen a ningún formulario: se avisan de forma global (toast). */
 const GLOBAL_CODES: ReadonlySet<ApiErrorCode> = new Set<ApiErrorCode>([

@@ -2,6 +2,7 @@ package co.com.zenvory.inventario.auth.application.service;
 
 import co.com.zenvory.inventario.auth.application.port.in.UserUseCase;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
+import co.com.zenvory.inventario.auth.domain.exception.RoleNotFoundException;
 import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException;
 import co.com.zenvory.inventario.auth.domain.exception.UserNotFoundException;
 import co.com.zenvory.inventario.auth.domain.model.Role;
@@ -109,7 +110,10 @@ public class UserService implements UserUseCase {
 
         existing.setNombre(updated.getNombre());
         existing.setEmail(updated.getEmail());
-        existing.setSucursalId(updated.getSucursalId());
+        // Actualización parcial: sin sucursalId en la petición se conserva la actual.
+        if (updated.getSucursalId() != null) {
+            existing.setSucursalId(updated.getSucursalId());
+        }
         if (newRole != null) {
             existing.setRole(newRole);
         }
@@ -217,6 +221,6 @@ public class UserService implements UserUseCase {
 
     private Role findRole(Long id) {
         return userRepositoryPort.findRoleById(id)
-                .orElseThrow(() -> new RuntimeException("Rol no encontrado: " + id));
+                .orElseThrow(() -> new RoleNotFoundException(id));
     }
 }
