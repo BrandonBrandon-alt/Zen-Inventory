@@ -44,13 +44,9 @@ public class UserService implements UserUseCase {
 
     @Override
     public List<User> getAllUsers(String actorEmail) {
-        User actor = actor(actorEmail);
-        if (isAdmin(actor)) {
-            return userRepositoryPort.findAll();
-        }
-        Long branchId = managerBranch(actor);
+        Long branchId = scopeBranch(actor(actorEmail));
         return userRepositoryPort.findAll().stream()
-                .filter(user -> branchId.equals(user.getSucursalId()))
+                .filter(user -> branchId == null || branchId.equals(user.getSucursalId()))
                 .toList();
     }
 
@@ -79,10 +75,7 @@ public class UserService implements UserUseCase {
         if (!isAdmin(actor)) {
             Long branchId = managerBranch(actor);
             requireAssignable(role);
-            if (user.getSucursalId() != null && !branchId.equals(user.getSucursalId())) {
-                throw new UnauthorizedActionException("Solo puede crear usuarios en su propia sucursal.");
-            }
-            user.setSucursalId(branchId);
+            forceOwnBranch(user, branchId, "Solo puede crear usuarios en su propia sucursal.");
         }
 
         user.setPasswordHash(passwordEncoder.encode(plainPassword));
@@ -111,10 +104,7 @@ public class UserService implements UserUseCase {
             if (newRole != null) {
                 requireAssignable(newRole);
             }
-            if (updated.getSucursalId() != null && !branchId.equals(updated.getSucursalId())) {
-                throw new UnauthorizedActionException("No puede mover usuarios a otra sucursal.");
-            }
-            updated.setSucursalId(branchId);
+            forceOwnBranch(updated, branchId, "No puede mover usuarios a otra sucursal.");
         }
 
         existing.setNombre(updated.getNombre());
@@ -154,10 +144,9 @@ public class UserService implements UserUseCase {
     public List<Role> getAssignableRoles(String actorEmail) {
         User actor = actor(actorEmail);
         List<Role> all = userRepositoryPort.findAllRoles();
-        if (isAdmin(actor)) {
+        if (scopeBranch(actor) == null) {
             return all;
         }
-        managerBranch(actor);
         return all.stream().filter(role -> MANAGER_ASSIGNABLE.contains(role.getNombre())).toList();
     }
 
@@ -175,6 +164,19 @@ public class UserService implements UserUseCase {
 
     private boolean isAdmin(User actor) {
         return ADMIN.equals(actor.getRole().getNombre());
+    }
+
+    /** Sucursal a la que queda limitado quien ejecuta: {@code null} para ADMIN (sin límite). */
+    private Long scopeBranch(User actor) {
+        return isAdmin(actor) ? null : managerBranch(actor);
+    }
+
+    /** Rechaza una sucursal ajena y, si no se indicó ninguna, asigna la del MANAGER. */
+    private void forceOwnBranch(User user, Long branchId, String message) {
+        if (user.getSucursalId() != null && !branchId.equals(user.getSucursalId())) {
+            throw new UnauthorizedActionException(message);
+        }
+        user.setSucursalId(branchId);
     }
 
     /** Sucursal del MANAGER; sin sucursal asignada no puede gestionar a nadie. */
