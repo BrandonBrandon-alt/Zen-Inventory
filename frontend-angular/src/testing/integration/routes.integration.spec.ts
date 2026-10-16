@@ -158,4 +158,10 @@ describe('rutas (guardas + shell + login)', () => {
     await harness.navigateByUrl('/users');
     expect(await screen.findByText(/todavía no está disponible/)).toBeInTheDocument();
   });
+
+  it('un MANAGER no entra a Sucursales: vuelve al panel', async () => {
+    const { harness, router } = await setup('MANAGER');
+    await harness.navigateByUrl('/branches');
+    expect(router.url).toBe('/dashboard');
+  });
 });

@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { type AbstractControl, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { LucideLock, LucideMail } from '@lucide/angular';
 import { DASHBOARD_URL } from '@core/auth/auth-urls';
 import { AuthApi, AuthError } from '@core/auth/http/auth-api';
-import { applyServerErrors, SERVER_ERROR_KEY } from '@shared/forms/apply-server-errors';
+import { applyServerErrors } from '@shared/forms/apply-server-errors';
+import { controlError } from '@shared/forms/control-error';
 import { Alert } from '@shared/ui/alert/alert';
 import { Button } from '@shared/ui/button/button';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
@@ -73,11 +74,11 @@ export class LoginPage {
   }
 
   protected emailError(): string | null {
-    return this.messageFor(this.form.controls.email, EMAIL_MESSAGES);
+    return controlError(this.form.controls.email, EMAIL_MESSAGES);
   }
 
   protected passwordError(): string | null {
-    return this.messageFor(this.form.controls.password, PASSWORD_MESSAGES);
+    return controlError(this.form.controls.password, PASSWORD_MESSAGES);
   }
 
   protected async submit(): Promise<void> {
@@ -114,13 +115,4 @@ export class LoginPage {
     this.serverError.set(applied.length > 0 ? null : error.message);
   }
 
-  /** Muestra el primer error del control, pero solo después de que el usuario lo tocó. */
-  private messageFor(control: AbstractControl, messages: Record<string, string>): string | null {
-    if (!control.touched || !control.errors) return null;
-    // Un error devuelto por el servidor (p. ej. "Formato de email inválido") se muestra tal cual.
-    const fromServer: unknown = control.errors[SERVER_ERROR_KEY];
-    if (typeof fromServer === 'string') return fromServer;
-    const key = Object.keys(control.errors)[0];
-    return messages[key] ?? null;
-  }
 }

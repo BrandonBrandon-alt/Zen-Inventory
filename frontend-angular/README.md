@@ -56,6 +56,9 @@ con sus roles y cambia su `loadComponent` en `app.routes.ts` (mientras tanto mue
 - Responsivo: desde 768 px el menú es una barra lateral fija; por debajo es un cajón con barra superior (se cierra al elegir una pantalla, al pulsar fuera o con Escape).
 - Scroll fino y a tono con el tema en toda la app (`src/styles.css`).
 - Tablas: `DataTable` (`shared/ui/data-table`) recibe `columns`, `rows` y `rowKey`; ordena, pagina y gestiona los estados de carga, vacío y error. Las celdas se personalizan con `<ng-template appCell="columna" let-row>`. Ejemplo real: `features/branches/pages/branches-page`.
+- Ventanas: `Modal` (`shared/ui/modal`) sobre `<dialog>` nativo (foco, Escape e inerte los gestiona el navegador); `[(open)]`, `dismissible` para bloquear el cierre mientras se guarda. `ConfirmDialog` lo usa para confirmar acciones destructivas.
+- Formularios: `applyServerErrors` marca bajo cada campo los `fieldErrors` del backend y `controlError` decide qué mensaje mostrar. Ejemplo: `features/branches/components/branch-form-modal`.
+- Sucursales (`/branches`) es solo ADMIN (igual que las acciones del backend): crear, editar y desactivar; la lista se recarga sin parpadeo tras cada acción.
 - Un componente sube a `shared/ui` solo cuando lo usa una segunda pantalla.
 - Cada pantalla migrada entra con sus tests; el E2E se corre a pedido (necesita backend).
 - El token JWT solo se envía a la API propia, nunca a otros orígenes.

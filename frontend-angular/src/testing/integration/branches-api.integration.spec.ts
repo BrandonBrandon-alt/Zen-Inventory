@@ -52,4 +52,67 @@ describe('BranchesApi (contrato HTTP con MSW)', () => {
     server.use(http.get(`${TEST_API}/api/branches`, () => HttpResponse.json([])));
     expect(await firstValueFrom(api.list())).toEqual([]);
   });
+
+  describe('escritura', () => {
+    const response = { id: 9, nombre: 'Nueva', direccion: 'Calle 1', telefono: '601', activa: true };
+
+    it('create: POST /api/branches con los datos recortados y devuelve la sucursal creada', async () => {
+      let body: unknown;
+      server.use(
+        http.post(`${TEST_API}/api/branches`, async ({ request }) => {
+          body = await request.json();
+          return HttpResponse.json(response, { status: 201 });
+        }),
+      );
+      const created = await firstValueFrom(api.create({ nombre: '  Nueva ', direccion: ' Calle 1 ', telefono: ' 601 ' }));
+      expect(body).toEqual({ nombre: 'Nueva', direccion: 'Calle 1', telefono: '601' });
+      expect(created).toMatchObject({ id: 9, nombre: 'Nueva', activa: true });
+    });
+
+    it('un teléfono vacío no se envía', async () => {
+      let body: Record<string, unknown> = {};
+      server.use(
+        http.post(`${TEST_API}/api/branches`, async ({ request }) => {
+          body = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(response, { status: 201 });
+        }),
+      );
+      await firstValueFrom(api.create({ nombre: 'Nueva', direccion: 'Calle 1', telefono: '   ' }));
+      expect(body).toEqual({ nombre: 'Nueva', direccion: 'Calle 1' });
+      expect('telefono' in body).toBe(false);
+    });
+
+    it('update: PUT /api/branches/{id}', async () => {
+      let url = '';
+      let body: unknown;
+      server.use(
+        http.put(`${TEST_API}/api/branches/:id`, async ({ request, params }) => {
+          url = String(params['id']);
+          body = await request.json();
+          return HttpResponse.json({ ...response, nombre: 'Editada' });
+        }),
+      );
+      const updated = await firstValueFrom(api.update(9, { nombre: 'Editada', direccion: 'Calle 1', telefono: '' }));
+      expect(url).toBe('9');
+      expect(body).toEqual({ nombre: 'Editada', direccion: 'Calle 1' });
+      expect(updated.nombre).toBe('Editada');
+    });
+
+    it('deactivate: DELETE /api/branches/{id}', async () => {
+      let called = '';
+      server.use(
+        http.delete(`${TEST_API}/api/branches/:id`, ({ params }) => {
+          called = String(params['id']);
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+      await firstValueFrom(api.deactivate(4));
+      expect(called).toBe('4');
+    });
+
+    it('si el servidor devuelve una sucursal sin id o nombre, falla en vez de aceptar datos a medias', async () => {
+      server.use(http.post(`${TEST_API}/api/branches`, () => HttpResponse.json({ nombre: 'sin id' }, { status: 201 })));
+      await expect(firstValueFrom(api.create({ nombre: 'x', direccion: 'y', telefono: '' }))).rejects.toThrow('incompleta');
+    });
+  });
 });

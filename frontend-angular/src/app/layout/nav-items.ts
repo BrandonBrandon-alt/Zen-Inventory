@@ -47,7 +47,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { label: 'Ventas', path: '/sales/pos', icon: LucideReceipt.icon, roles: EVERYONE },
       { label: 'Historial Ventas', path: '/sales/history', icon: LucideRotateCcwClock.icon, roles: EVERYONE },
       { label: 'Devoluciones', path: '/returns', icon: LucideUndo2.icon, roles: EVERYONE },
-      { label: 'Sucursales', path: '/branches', icon: LucideStore.icon, roles: MANAGEMENT },
+      { label: 'Sucursales', path: '/branches', icon: LucideStore.icon, roles: ADMIN_ONLY },
       { label: 'Usuarios', path: '/users', icon: LucideUsers.icon, roles: MANAGEMENT },
       { label: 'Auditoría Global', path: '/audit', icon: LucideFileText.icon, roles: MANAGEMENT },
     ],

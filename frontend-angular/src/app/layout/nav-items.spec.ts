@@ -56,4 +56,11 @@ describe('navSectionsFor', () => {
   it('sin rol no muestra nada', () => {
     expect(navSectionsFor(null)).toEqual([]);
   });
+
+  it('Sucursales es solo de ADMIN (la página y las acciones del backend lo exigen)', () => {
+    expect(labels('ADMIN')).toContain('Sucursales');
+    for (const role of ['MANAGER', 'SELLER', 'OPERADOR_INVENTARIO'] as const) {
+      expect(labels(role)).not.toContain('Sucursales');
+    }
+  });
 });
