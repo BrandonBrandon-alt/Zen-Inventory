@@ -155,8 +155,26 @@ describe('rutas (guardas + shell + login)', () => {
 
   it('las pantallas sin migrar siguen mostrando el marcador', async () => {
     const { harness } = await setup('ADMIN');
-    await harness.navigateByUrl('/users');
+    await harness.navigateByUrl('/alerts');
     expect(await screen.findByText(/todavía no está disponible/)).toBeInTheDocument();
+  });
+
+  it('Usuarios ya está migrada y un MANAGER entra (el backend le limita el alcance)', async () => {
+    server.use(
+      http.get(`${TEST_API}/api/users`, () => HttpResponse.json([])),
+      http.get(`${TEST_API}/api/roles`, () => HttpResponse.json([])),
+      http.get(`${TEST_API}/api/branches`, () => HttpResponse.json([])),
+    );
+    const { harness, router } = await setup('MANAGER');
+    await harness.navigateByUrl('/users');
+    expect(router.url).toBe('/users');
+    expect(await screen.findByText('Todavía no hay usuarios')).toBeInTheDocument();
+  });
+
+  it('un SELLER no entra a Usuarios: vuelve al panel', async () => {
+    const { harness, router } = await setup('SELLER');
+    await harness.navigateByUrl('/users');
+    expect(router.url).toBe('/dashboard');
   });
 
   it('un MANAGER no entra a Sucursales: vuelve al panel', async () => {

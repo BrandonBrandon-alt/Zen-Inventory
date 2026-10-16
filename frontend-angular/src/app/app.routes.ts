@@ -14,6 +14,7 @@ const loadNotMigrated = () =>
 const IMPLEMENTED: Readonly<Record<string, () => Promise<Type<unknown>>>> = {
   '/branches': () =>
     import('./features/branches/pages/branches-page/branches-page').then((m) => m.BranchesPage),
+  '/users': () => import('./features/users/pages/users-page/users-page').then((m) => m.UsersPage),
 };
 
 /** Una ruta por ítem del menú, con su guarda de roles. Al migrar una pantalla se cambia su `loadComponent`. */

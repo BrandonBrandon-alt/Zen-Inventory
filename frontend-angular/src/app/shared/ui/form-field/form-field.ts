@@ -2,9 +2,9 @@ import { ChangeDetectionStrategy, Component, Directive, contentChild, inject, in
 
 let nextId = 0;
 
-/** Estilos de un `<input>` del sistema de diseño. Dentro de `app-form-field` hereda errores y etiqueta. */
+/** Estilos de un `<input>` o `<select>` del sistema de diseño. Dentro de `app-form-field` hereda errores y etiqueta. */
 @Directive({
-  selector: 'input[appInput]',
+  selector: 'input[appInput], select[appInput]',
   host: {
     class:
       'w-full rounded-md border border-line bg-card px-3.5 py-[11px] text-sm text-fg outline-none ' +

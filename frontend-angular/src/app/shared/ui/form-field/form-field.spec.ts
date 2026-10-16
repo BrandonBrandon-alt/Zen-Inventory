@@ -37,6 +37,17 @@ describe('FormField', () => {
     expect(screen.getByLabelText('Uno').id).not.toBe(screen.getByLabelText('Dos').id);
   });
 
+  it('también sirve para un <select>: etiqueta asociada y error accesible', async () => {
+    await render(
+      '<app-form-field label="Rol" error="Elige un rol"><select appInput><option value="1">Admin</option></select></app-form-field>',
+      { imports },
+    );
+    const select = screen.getByLabelText('Rol');
+    expect(select.tagName).toBe('SELECT');
+    expect(select).toHaveAttribute('aria-invalid', 'true');
+    expect(select).toHaveAccessibleDescription('Elige un rol');
+  });
+
   it('un input sin FormField sigue funcionando', async () => {
     await render('<input appInput aria-label="Suelto" />', { imports });
     expect(screen.getByLabelText('Suelto')).toBeInTheDocument();

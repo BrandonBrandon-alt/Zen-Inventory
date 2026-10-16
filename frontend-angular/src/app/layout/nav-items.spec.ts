@@ -47,7 +47,6 @@ describe('navSectionsFor', () => {
 
   it.each(['MANAGER', 'SELLER'] as const)('%s ve toda la navegación y ningún maestro', (role) => {
     const visible = labels(role);
-    expect(visible).toContain('Usuarios');
     expect(visible).toContain('Alertas');
     expect(visible).not.toContain('Productos');
     expect(navSectionsFor(role).map((section) => section.title)).toEqual(['Navegación']);
@@ -55,6 +54,14 @@ describe('navSectionsFor', () => {
 
   it('sin rol no muestra nada', () => {
     expect(navSectionsFor(null)).toEqual([]);
+  });
+
+  it('Usuarios es de ADMIN y MANAGER (el backend responde 403 al resto)', () => {
+    expect(labels('ADMIN')).toContain('Usuarios');
+    expect(labels('MANAGER')).toContain('Usuarios');
+    for (const role of ['SELLER', 'OPERADOR_INVENTARIO'] as const) {
+      expect(labels(role)).not.toContain('Usuarios');
+    }
   });
 
   it('Sucursales es solo de ADMIN (la página y las acciones del backend lo exigen)', () => {

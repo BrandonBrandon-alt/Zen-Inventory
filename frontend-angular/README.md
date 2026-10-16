@@ -59,6 +59,7 @@ con sus roles y cambia su `loadComponent` en `app.routes.ts` (mientras tanto mue
 - Ventanas: `Modal` (`shared/ui/modal`) sobre `<dialog>` nativo (foco, Escape e inerte los gestiona el navegador); `[(open)]`, `dismissible` para bloquear el cierre mientras se guarda. `ConfirmDialog` lo usa para confirmar acciones destructivas.
 - Formularios: `applyServerErrors` marca bajo cada campo los `fieldErrors` del backend y `controlError` decide qué mensaje mostrar. Ejemplo: `features/branches/components/branch-form-modal`.
 - Sucursales (`/branches`) es solo ADMIN (igual que las acciones del backend): crear, editar y desactivar; la lista se recarga sin parpadeo tras cada acción.
+- Usuarios (`/users`): ADMIN gestiona a todos; MANAGER solo a los de su sucursal con rol SELLER u OPERADOR_INVENTARIO (el backend lo exige con 403; la pantalla además oculta las acciones que no corresponden y no muestra el selector de sucursal al MANAGER). `<select appInput>` funciona dentro de `app-form-field` igual que un `<input>`.
 - Un componente sube a `shared/ui` solo cuando lo usa una segunda pantalla.
 - Cada pantalla migrada entra con sus tests; el E2E se corre a pedido (necesita backend).
 - El token JWT solo se envía a la API propia, nunca a otros orígenes.

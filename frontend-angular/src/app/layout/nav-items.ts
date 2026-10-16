@@ -33,6 +33,8 @@ export interface NavSection {
 const EVERYONE: readonly Role[] = ROLES;
 const MANAGEMENT: readonly Role[] = ['ADMIN', 'MANAGER', 'SELLER'];
 const ADMIN_ONLY: readonly Role[] = ['ADMIN'];
+/** Quienes administran usuarios: el ADMIN (todos) y el MANAGER (los de su sucursal). */
+const USER_ADMINS: readonly Role[] = ['ADMIN', 'MANAGER'];
 
 /** Fuente única del menú y de las rutas protegidas del shell. */
 export const NAV_SECTIONS: readonly NavSection[] = [
@@ -48,7 +50,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { label: 'Historial Ventas', path: '/sales/history', icon: LucideRotateCcwClock.icon, roles: EVERYONE },
       { label: 'Devoluciones', path: '/returns', icon: LucideUndo2.icon, roles: EVERYONE },
       { label: 'Sucursales', path: '/branches', icon: LucideStore.icon, roles: ADMIN_ONLY },
-      { label: 'Usuarios', path: '/users', icon: LucideUsers.icon, roles: MANAGEMENT },
+      { label: 'Usuarios', path: '/users', icon: LucideUsers.icon, roles: USER_ADMINS },
       { label: 'Auditoría Global', path: '/audit', icon: LucideFileText.icon, roles: MANAGEMENT },
     ],
   },
