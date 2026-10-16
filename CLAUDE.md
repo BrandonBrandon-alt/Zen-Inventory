@@ -15,17 +15,24 @@ y luego `graphify update .` en la raíz para generar `graphify-out/`. La carpeta
 `.graphifyignore` excluye archivos generados (p. ej. `frontend/src/api/schema.d.ts`).
 
 Reglas:
+- **Antes de modificar código (obligatorio):** consultar el grafo del área afectada con
+  `graphify query "<qué voy a cambiar>"` y, según el caso, `graphify explain "<símbolo>"` (qué lo rodea) o
+  `graphify path "<A>" "<B>"` (qué depende de qué: p. ej. de un endpoint del backend a su pantalla Angular).
+  Sirve para encontrar los archivos correctos y el impacto del cambio sin leer de más. Un único grafo en la
+  raíz cubre `backend/` y `frontend-angular/` (y `frontend/`), así que las relaciones entre ambos se ven.
 - Para preguntas sobre el código, si existe `graphify-out/graph.json`, correr primero
   `graphify query "<pregunta>"`. Para relaciones, `graphify path "<A>" "<B>"`; para un
   concepto puntual, `graphify explain "<concepto>"`. Devuelven un subgrafo acotado,
   mucho más chico que `GRAPH_REPORT.md` o la salida cruda de grep.
 - Leer `graphify-out/GRAPH_REPORT.md` solo para revisiones de arquitectura amplias o
   cuando query/path/explain no alcancen.
-- Después de modificar código, correr `graphify update .` (solo AST, sin costo de API).
+- Después de modificar código, correr `graphify update .` (solo AST, sin costo de API). Un hook `Stop` lo hace
+  solo al terminar cada respuesta (~4 s), pero hay que correrlo a mano si se necesita el grafo al día a mitad de tarea.
 - Si `graphify` no está instalado, seguir con las herramientas normales y avisar al usuario.
 
-Recordatorio automático: `.claude/settings.json` tiene un hook `UserPromptSubmit` que, en
-cada prompt, recuerda usar graphify si existe `graphify-out/graph.json`.
+Automatización en `.claude/settings.json`: un hook `UserPromptSubmit` recuerda en cada prompt consultar el
+grafo antes de modificar código (si existe `graphify-out/graph.json`) y un hook `Stop` corre
+`graphify update .` al terminar cada respuesta para mantenerlo al día.
 
 ## frontend-angular — migración a Angular
 
