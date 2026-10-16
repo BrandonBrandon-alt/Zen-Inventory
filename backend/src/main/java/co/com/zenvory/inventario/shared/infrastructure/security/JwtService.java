@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.util.Map;
 
 /**
  * Servicio compartido para generación y validación de tokens JWT.
@@ -19,6 +18,8 @@ import java.util.Map;
  */
 @Service
 public class JwtService {
+
+    private static final String USER_ID_CLAIM = "uid";
 
     private final SecretKey signingKey;
     private final long expirationMs;
@@ -32,20 +33,20 @@ public class JwtService {
     }
 
     /**
-     * Genera un token JWT con el email como subject y el rol como claim adicional.
+     * Genera un token JWT con el email como subject y el id del usuario en el claim {@code uid}.
      *
-     * @param email     identificador único del usuario
-     * @param rol         nombre del rol (ADMIN, MANAGER, OPERADOR_INVENTARIO)
-     * @param sucursalId ID de la sucursal asignada (puede ser null para ADMIN)
+     * <p>El rol y la sucursal no viajan en el token: se leen de la base de datos en cada petición, así que
+     * un cambio de rol o de sucursal rige de inmediato. El {@code uid} ata el token a la persona y no solo al
+     * correo: si el correo se reasigna a otra cuenta, los tokens anteriores dejan de servir.</p>
+     *
+     * @param userId identificador del usuario
+     * @param email  correo del usuario (subject)
      * @return token JWT firmado con HS256
      */
-    public String generateToken(String email, String rol, Long sucursalId) {
+    public String generateToken(Long userId, String email) {
         return Jwts.builder()
                 .subject(email)
-                .claims(Map.of(
-                        "rol", rol,
-                        "sucursalId", sucursalId != null ? sucursalId : ""
-                ))
+                .claim(USER_ID_CLAIM, userId)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expirationMs))
                 .signWith(signingKey)
@@ -60,16 +61,9 @@ public class JwtService {
         return parseClaims(token).getSubject();
     }
 
-    /**
-     * Verifica si el token es válido y no ha expirado.
-     */
-    public boolean isTokenValid(String token) {
-        try {
-            Claims claims = parseClaims(token);
-            return !claims.getExpiration().before(new Date());
-        } catch (Exception e) {
-            return false;
-        }
+    /** Id del usuario al que pertenece el token, o {@code null} si el token no lo trae (emitido antes del claim). */
+    public Long extractUserId(String token) {
+        return parseClaims(token).get(USER_ID_CLAIM, Long.class);
     }
 
     /** Resultado de inspeccionar un token: permite distinguir "venció" de "no es válido". */

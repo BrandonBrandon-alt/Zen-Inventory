@@ -74,7 +74,9 @@ export class AuthApi {
         return new AuthError('disabled', api.message);
       case 'VALIDATION_FAILED':
         return new AuthError('validation', api.message, api.fieldErrors);
+      // TOO_MANY_REQUESTS: el mensaje del backend explica que hay que esperar; el login lo muestra igual.
       case 'INVALID_CREDENTIALS':
+      case 'TOO_MANY_REQUESTS':
         return new AuthError('credentials', api.message);
       default:
         return this.fromOther(api);

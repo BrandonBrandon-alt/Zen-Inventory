@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 /** Códigos de error del backend (`ErrorCode.java`). El frontend decide por código, nunca por el texto. */
 const BACKEND_CODES = [
   'INVALID_CREDENTIALS',
+  'TOO_MANY_REQUESTS',
   'ACCOUNT_DISABLED',
   'UNAUTHENTICATED',
   'TOKEN_EXPIRED',

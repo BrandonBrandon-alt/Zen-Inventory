@@ -4,7 +4,9 @@ import co.com.zenvory.inventario.alert.domain.exception.AlertAlreadyResolvedExce
 import co.com.zenvory.inventario.auth.domain.exception.AccountDisabledException;
 import co.com.zenvory.inventario.auth.domain.exception.InvalidCredentialsException;
 import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException;
+import co.com.zenvory.inventario.auth.domain.exception.DuplicateEmailException;
 import co.com.zenvory.inventario.auth.domain.exception.RoleNotFoundException;
+import co.com.zenvory.inventario.auth.domain.exception.TooManyLoginAttemptsException;
 import co.com.zenvory.inventario.auth.domain.exception.UserNotFoundException;
 import co.com.zenvory.inventario.branch.domain.exception.BranchNotFoundException;
 import co.com.zenvory.inventario.catalog.domain.exception.DuplicateSkuException;
@@ -73,6 +75,8 @@ class GlobalExceptionHandlerTest {
                 Arguments.of("account-disabled", 401, "ACCOUNT_DISABLED", null),
                 Arguments.of("unauthorized-action", 403, "FORBIDDEN_ACTION", "Sede no permitida"),
                 Arguments.of("role-not-found", 404, "RESOURCE_NOT_FOUND", null),
+                Arguments.of("too-many-attempts", 429, "TOO_MANY_REQUESTS", null),
+                Arguments.of("duplicate-email", 409, "DATA_INTEGRITY", "Ya existe un usuario con ese correo."),
                 Arguments.of("user-not-found", 404, "RESOURCE_NOT_FOUND", null),
                 Arguments.of("branch-not-found", 404, "RESOURCE_NOT_FOUND", "Sucursal no encontrada con ID: 7"),
                 Arguments.of("product-not-found", 404, "RESOURCE_NOT_FOUND", null),
@@ -247,6 +251,8 @@ class GlobalExceptionHandlerTest {
                 case "account-disabled" -> new AccountDisabledException();
                 case "unauthorized-action" -> new UnauthorizedActionException("Sede no permitida");
                 case "role-not-found" -> new RoleNotFoundException(9L);
+                case "too-many-attempts" -> new TooManyLoginAttemptsException();
+                case "duplicate-email" -> new DuplicateEmailException();
                 case "user-not-found" -> new UserNotFoundException(3L);
                 case "branch-not-found" -> new BranchNotFoundException(7L);
                 case "product-not-found" -> new ProductNotFoundException(1L);

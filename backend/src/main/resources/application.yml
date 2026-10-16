@@ -33,7 +33,7 @@ server:
 
 security:
   jwt:
-    secret: ${SECURITY_JWT_SECRET:dGhpcy1pcy1hLXZlcnktc2VjdXJlLWtleS1mb3Itb3B0aXBsYW50LWFwaS10ZXN0}
+    secret: ${SECURITY_JWT_SECRET} # obligatoria: sin ella la app no arranca (en Docker viene de JWT_SECRET)
     expiration: 86400000 # 1 day in ms
 
 # VALOR AGREGADO: Logs específicos para ver nuestra arquitectura hexagonal en acción

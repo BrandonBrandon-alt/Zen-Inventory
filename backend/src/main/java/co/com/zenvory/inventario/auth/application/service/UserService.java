@@ -2,16 +2,19 @@ package co.com.zenvory.inventario.auth.application.service;
 
 import co.com.zenvory.inventario.auth.application.port.in.UserUseCase;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
+import co.com.zenvory.inventario.auth.domain.exception.DuplicateEmailException;
 import co.com.zenvory.inventario.auth.domain.exception.RoleNotFoundException;
 import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException;
 import co.com.zenvory.inventario.auth.domain.exception.UserNotFoundException;
 import co.com.zenvory.inventario.auth.domain.model.Role;
 import co.com.zenvory.inventario.auth.domain.model.User;
+import co.com.zenvory.inventario.branch.application.port.in.BranchUseCase;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -31,24 +34,25 @@ public class UserService implements UserUseCase {
 
     private final UserRepositoryPort userRepositoryPort;
     private final PasswordEncoder passwordEncoder;
+    private final BranchUseCase branchUseCase;
 
     /**
      * Constructor con inyección de dependencias.
      * 
      * @param userRepositoryPort Puerto de salida para persistencia de usuarios.
      * @param passwordEncoder Componente para el hash de contraseñas.
+     * @param branchUseCase Para comprobar que la sucursal asignada existe.
      */
-    public UserService(UserRepositoryPort userRepositoryPort, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepositoryPort userRepositoryPort, PasswordEncoder passwordEncoder, BranchUseCase branchUseCase) {
         this.userRepositoryPort = userRepositoryPort;
         this.passwordEncoder = passwordEncoder;
+        this.branchUseCase = branchUseCase;
     }
 
     @Override
     public List<User> getAllUsers(String actorEmail) {
         Long branchId = scopeBranch(actor(actorEmail));
-        return userRepositoryPort.findAll().stream()
-                .filter(user -> branchId == null || branchId.equals(user.getSucursalId()))
-                .toList();
+        return branchId == null ? userRepositoryPort.findAll() : userRepositoryPort.findBySucursalId(branchId);
     }
 
     /**
@@ -72,12 +76,18 @@ public class UserService implements UserUseCase {
     @Override
     public User createUser(User user, String plainPassword, String actorEmail) {
         User actor = actor(actorEmail);
+        if (plainPassword == null || plainPassword.isBlank()) {
+            throw new IllegalArgumentException("La contraseña es obligatoria.");
+        }
         Role role = findRole(user.getRole().getId());
         if (!isAdmin(actor)) {
             Long branchId = managerBranch(actor);
             requireAssignable(role);
             forceOwnBranch(user, branchId, "Solo puede crear usuarios en su propia sucursal.");
         }
+        user.setEmail(normalizeEmail(user.getEmail()));
+        requireUniqueEmail(user.getEmail(), null);
+        requireBranchFor(role, user.getSucursalId());
 
         user.setPasswordHash(passwordEncoder.encode(plainPassword));
         user.setActive(true);
@@ -112,15 +122,17 @@ public class UserService implements UserUseCase {
             forceOwnBranch(updated, branchId, "No puede mover usuarios a otra sucursal.");
         }
 
+        String email = normalizeEmail(updated.getEmail());
+        requireUniqueEmail(email, existing.getId());
+        // Actualización parcial: sin sucursalId o sin rol en la petición se conservan los actuales.
+        Role effectiveRole = newRole != null ? newRole : existing.getRole();
+        Long effectiveBranch = updated.getSucursalId() != null ? updated.getSucursalId() : existing.getSucursalId();
+        requireBranchFor(effectiveRole, effectiveBranch);
+
         existing.setNombre(updated.getNombre());
-        existing.setEmail(updated.getEmail());
-        // Actualización parcial: sin sucursalId en la petición se conserva la actual.
-        if (updated.getSucursalId() != null) {
-            existing.setSucursalId(updated.getSucursalId());
-        }
-        if (newRole != null) {
-            existing.setRole(newRole);
-        }
+        existing.setEmail(email);
+        existing.setSucursalId(effectiveBranch);
+        existing.setRole(effectiveRole);
         if (plainPassword != null && !plainPassword.isBlank()) {
             existing.setPasswordHash(passwordEncoder.encode(plainPassword));
         }
@@ -224,6 +236,30 @@ public class UserService implements UserUseCase {
         if (Boolean.FALSE.equals(newActive)) {
             throw new UnauthorizedActionException("No puede desactivar su propia cuenta.");
         }
+    }
+
+    /** El correo se guarda recortado y en minúsculas: es el identificador de inicio de sesión. */
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private void requireUniqueEmail(String email, Long ownerId) {
+        userRepositoryPort.findByEmail(email)
+                .filter(other -> !other.getId().equals(ownerId))
+                .ifPresent(other -> {
+                    throw new DuplicateEmailException();
+                });
+    }
+
+    /** Todo rol salvo ADMIN pertenece a una sucursal que debe existir. */
+    private void requireBranchFor(Role role, Long branchId) {
+        if (ADMIN.equals(role.getNombre())) {
+            return;
+        }
+        if (branchId == null) {
+            throw new IllegalArgumentException("Debe indicar la sucursal del usuario.");
+        }
+        branchUseCase.getBranchById(branchId);
     }
 
     private void requireAssignable(Role role) {

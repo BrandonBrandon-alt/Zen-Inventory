@@ -68,15 +68,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String email = jwtService.extractEmail(token);
+        Long tokenUserId = jwtService.extractUserId(token);
 
         // Solo autenticar si no hay una autenticación previa en el contexto
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserEntity user = userRepository.findByEmail(email).orElse(null);
 
-            if (user != null && Boolean.FALSE.equals(user.getActiva())) {
+            if (user == null || !user.getId().equals(tokenUserId)) {
+                // Usuario inexistente, correo reasignado a otra persona o token sin identidad: ya no sirve.
+                request.setAttribute(RestAuthenticationEntryPoint.AUTH_ERROR_ATTRIBUTE, ErrorCode.INVALID_TOKEN);
+            } else if (Boolean.FALSE.equals(user.getActiva())) {
                 // Un token vigente de una cuenta desactivada no da acceso: se responde 401 ACCOUNT_DISABLED.
                 request.setAttribute(RestAuthenticationEntryPoint.AUTH_ERROR_ATTRIBUTE, ErrorCode.ACCOUNT_DISABLED);
-            } else if (user != null) {
+            } else {
                 String roleName = "ROLE_" + user.getRole().getNombre();
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(

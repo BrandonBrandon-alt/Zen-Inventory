@@ -9,6 +9,7 @@ package co.com.zenvory.inventario.shared.infrastructure.web;
 public enum ErrorCode {
     // Autenticación y autorización
     INVALID_CREDENTIALS,
+    TOO_MANY_REQUESTS,
     ACCOUNT_DISABLED,
     UNAUTHENTICATED,
     TOKEN_EXPIRED,

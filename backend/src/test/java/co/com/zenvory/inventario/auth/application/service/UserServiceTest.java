@@ -1,10 +1,14 @@
 package co.com.zenvory.inventario.auth.application.service;
 
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
+import co.com.zenvory.inventario.auth.domain.exception.DuplicateEmailException;
 import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException;
 import co.com.zenvory.inventario.auth.domain.exception.UserNotFoundException;
 import co.com.zenvory.inventario.auth.domain.model.Role;
 import co.com.zenvory.inventario.auth.domain.model.User;
+import co.com.zenvory.inventario.branch.application.port.in.BranchUseCase;
+import co.com.zenvory.inventario.branch.domain.exception.BranchNotFoundException;
+import co.com.zenvory.inventario.branch.domain.model.Branch;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -17,6 +21,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @DisplayName("UserService — alcance por rol")
 class UserServiceTest {
@@ -40,9 +46,10 @@ class UserServiceTest {
             return u;
         }
 
-        @Override public Optional<User> findByEmail(String email) { return users.stream().filter(u -> u.getEmail().equals(email)).findFirst(); }
+        @Override public Optional<User> findByEmail(String email) { return users.stream().filter(u -> u.getEmail().equalsIgnoreCase(email)).findFirst(); }
         @Override public Optional<User> findById(Long id) { return users.stream().filter(u -> u.getId().equals(id)).findFirst(); }
         @Override public List<User> findAll() { return List.copyOf(users); }
+        @Override public List<User> findBySucursalId(Long id) { return users.stream().filter(u -> id.equals(u.getSucursalId())).toList(); }
         @Override public User save(User user) {
             if (user.getId() == null) { user.setId(nextId++); users.add(user); }
             return user;
@@ -66,7 +73,11 @@ class UserServiceTest {
             @Override public String encode(CharSequence raw) { return "hash:" + raw; }
             @Override public boolean matches(CharSequence raw, String encoded) { return encoded.equals("hash:" + raw); }
         };
-        service = new UserService(repo, encoder);
+        BranchUseCase branches = mock(BranchUseCase.class);
+        when(branches.getBranchById(MY_BRANCH)).thenReturn(Branch.builder().id(MY_BRANCH).name("Mía").build());
+        when(branches.getBranchById(OTHER_BRANCH)).thenReturn(Branch.builder().id(OTHER_BRANCH).name("Otra").build());
+        when(branches.getBranchById(999L)).thenThrow(new BranchNotFoundException(999L));
+        service = new UserService(repo, encoder, branches);
         admin = repo.add("admin@x.co", ADMIN, null);
         manager = repo.add("manager@x.co", MANAGER, MY_BRANCH);
         mySeller = repo.add("seller@x.co", SELLER, MY_BRANCH);
@@ -163,7 +174,9 @@ class UserServiceTest {
         @DisplayName("MANAGER crea SELLER y OPERADOR en su sucursal")
         void managerCreatesLowerRoles() {
             assertThat(service.createUser(newUser(SELLER, MY_BRANCH), "secret1", "manager@x.co").getSucursalId()).isEqualTo(MY_BRANCH);
-            assertThat(service.createUser(newUser(OPERADOR, MY_BRANCH), "secret1", "manager@x.co").getRole().getNombre())
+            User operador = newUser(OPERADOR, MY_BRANCH);
+            operador.setEmail("operador@x.co");
+            assertThat(service.createUser(operador, "secret1", "manager@x.co").getRole().getNombre())
                     .isEqualTo("OPERADOR_INVENTARIO");
         }
 
@@ -261,6 +274,74 @@ class UserServiceTest {
                     .isInstanceOf(UnauthorizedActionException.class);
             assertThat(mySeller.getRole().getNombre()).isEqualTo("SELLER");
             assertThat(mySeller.getSucursalId()).isEqualTo(MY_BRANCH);
+        }
+    }
+
+    @Nested
+    @DisplayName("integridad de los datos")
+    class Integrity {
+        @Test
+        @DisplayName("crear exige contraseña: nula o en blanco es 400, no 500")
+        void passwordRequiredOnCreate() {
+            assertThatThrownBy(() -> service.createUser(newUser(SELLER, MY_BRANCH), null, "admin@x.co"))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> service.createUser(newUser(SELLER, MY_BRANCH), "      ", "admin@x.co"))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("el correo se guarda recortado y en minúsculas")
+        void emailNormalized() {
+            User user = newUser(SELLER, MY_BRANCH);
+            user.setEmail("  Nuevo@X.CO ");
+            assertThat(service.createUser(user, "secret1", "admin@x.co").getEmail()).isEqualTo("nuevo@x.co");
+        }
+
+        @Test
+        @DisplayName("un correo ya usado (aunque difiera en mayúsculas) es 409, al crear y al editar")
+        void duplicateEmail() {
+            User dup = newUser(SELLER, MY_BRANCH);
+            dup.setEmail("SELLER@x.co");
+            assertThatThrownBy(() -> service.createUser(dup, "secret1", "admin@x.co")).isInstanceOf(DuplicateEmailException.class);
+            User edit = User.builder().nombre("E").email("Manager@x.co").build();
+            assertThatThrownBy(() -> service.updateUser(mySeller.getId(), edit, null, "admin@x.co")).isInstanceOf(DuplicateEmailException.class);
+        }
+
+        @Test
+        @DisplayName("editar conservando el propio correo no es un duplicado")
+        void keepingOwnEmailIsFine() {
+            User edit = User.builder().nombre("E").email("SELLER@x.co").build();
+            assertThat(service.updateUser(mySeller.getId(), edit, null, "admin@x.co").getEmail()).isEqualTo("seller@x.co");
+        }
+
+        @Test
+        @DisplayName("un rol distinto de ADMIN exige una sucursal que exista")
+        void branchRequiredAndMustExist() {
+            assertThatThrownBy(() -> service.createUser(newUser(MANAGER, null), "secret1", "admin@x.co"))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> service.createUser(newUser(MANAGER, 999L), "secret1", "admin@x.co"))
+                    .isInstanceOf(BranchNotFoundException.class);
+            assertThat(service.createUser(newUser(ADMIN, null), "secret1", "admin@x.co").getSucursalId()).isNull();
+        }
+
+        @Test
+        @DisplayName("al editar, pasar un usuario a un rol con sucursal sin tenerla es 400; ADMIN -> SELLER sin sucursal también")
+        void editingIntoRoleNeedingBranch() {
+            User toSeller = User.builder().nombre("A").email("otro-admin@x.co").role(Role.builder().id(SELLER.getId()).build()).build();
+            User other = repo.add("otro-admin@x.co", ADMIN, null);
+            assertThatThrownBy(() -> service.updateUser(other.getId(), toSeller, null, "admin@x.co"))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @Test
+        @DisplayName("siempre queda un ADMIN activo: el que actúa no puede quitarse a sí mismo y un ADMIN inactivo no actúa")
+        void alwaysAnActiveAdminRemains() {
+            User second = repo.add("admin2@x.co", ADMIN, null);
+            service.deactivateUser(second.getId(), "admin@x.co"); // otro ADMIN sí se puede desactivar
+            assertThat(second.getActive()).isFalse();
+            assertThatThrownBy(() -> service.deactivateUser(admin.getId(), "admin@x.co")).isInstanceOf(UnauthorizedActionException.class);
+            assertThatThrownBy(() -> service.deactivateUser(admin.getId(), "admin2@x.co")).isInstanceOf(UnauthorizedActionException.class);
+            assertThat(admin.getActive()).isTrue();
         }
     }
 

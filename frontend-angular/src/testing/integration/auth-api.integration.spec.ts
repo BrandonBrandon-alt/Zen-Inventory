@@ -66,6 +66,16 @@ describe('AuthApi (contrato HTTP real con MSW)', () => {
     expect(await fail()).toMatchObject({ kind: 'credentials', message: 'Credenciales incorrectas. Inténtalo de nuevo.' });
   });
 
+  it('TOO_MANY_REQUESTS (429): se muestra el mensaje del backend y no hay sesión', async () => {
+    server.use(
+      http.post(LOGIN, () =>
+        HttpResponse.json(apiErrorBody(429, 'TOO_MANY_REQUESTS', 'Demasiados intentos fallidos. Espera unos minutos antes de intentarlo de nuevo.'), { status: 429 }),
+      ),
+    );
+    expect(await fail()).toMatchObject({ kind: 'credentials', message: expect.stringContaining('Demasiados intentos') });
+    expect(store.isAuthenticated()).toBe(false);
+  });
+
   it('ACCOUNT_DISABLED: "disabled" con el mensaje del backend', async () => {
     server.use(
       http.post(LOGIN, () =>

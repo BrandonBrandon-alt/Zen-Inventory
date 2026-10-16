@@ -105,7 +105,7 @@ class SecurityErrorResponsesTest {
     @DisplayName("Token firmado con otra clave: 401 INVALID_TOKEN")
     void tokenSignedWithAnotherKey() throws Exception {
         String forged = new JwtService("otra-clave-secreta-de-al-menos-32-bytes-0123456789", 60_000)
-                .generateToken("ana@zen.com", "MANAGER", 1L);
+                .generateToken(1L, "ana@zen.com");
         mockMvc.perform(get("/api/probe/any").header("Authorization", bearer(forged)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_TOKEN"));
@@ -114,7 +114,7 @@ class SecurityErrorResponsesTest {
     @Test
     @DisplayName("Token vencido: 401 TOKEN_EXPIRED, para que el frontend cierre la sesión")
     void expiredToken() throws Exception {
-        String expired = new JwtService(secret, -5_000).generateToken("ana@zen.com", "MANAGER", 1L);
+        String expired = new JwtService(secret, -5_000).generateToken(1L, "ana@zen.com");
         mockMvc.perform(get("/api/probe/any").header("Authorization", bearer(expired)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("TOKEN_EXPIRED"))
@@ -122,18 +122,39 @@ class SecurityErrorResponsesTest {
     }
 
     @Test
-    @DisplayName("Token válido de un usuario que ya no existe: 401 UNAUTHENTICATED")
+    @DisplayName("Token válido de un usuario que ya no existe: 401 INVALID_TOKEN")
     void validTokenOfDeletedUser() throws Exception {
-        String token = jwtService.generateToken("borrado@zen.com", "MANAGER", 1L);
+        String token = jwtService.generateToken(99L, "borrado@zen.com");
         mockMvc.perform(get("/api/probe/any").header("Authorization", bearer(token)))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+                .andExpect(jsonPath("$.code").value("INVALID_TOKEN"));
+    }
+
+    @Test
+    @DisplayName("Token de otra persona con el mismo correo (correo reasignado): 401 INVALID_TOKEN")
+    void tokenOfPreviousOwnerOfTheEmail() throws Exception {
+        String token = jwtService.generateToken(55L, "ana@zen.com"); // ana@zen.com es hoy el usuario 1
+        mockMvc.perform(get("/api/probe/any").header("Authorization", bearer(token)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_TOKEN"));
+    }
+
+    @Test
+    @DisplayName("Token sin identidad de usuario (emitido antes del claim uid): 401 INVALID_TOKEN")
+    void tokenWithoutUserId() throws Exception {
+        String legacy = io.jsonwebtoken.Jwts.builder().subject("ana@zen.com")
+                .expiration(new java.util.Date(System.currentTimeMillis() + 60_000))
+                .signWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor(secret.getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                .compact();
+        mockMvc.perform(get("/api/probe/any").header("Authorization", bearer(legacy)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_TOKEN"));
     }
 
     @Test
     @DisplayName("Token válido de una cuenta desactivada: 401 ACCOUNT_DISABLED")
     void validTokenOfDisabledUser() throws Exception {
-        String token = jwtService.generateToken("inactiva@zen.com", "MANAGER", 2L);
+        String token = jwtService.generateToken(3L, "inactiva@zen.com");
         mockMvc.perform(get("/api/probe/any").header("Authorization", bearer(token)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_DISABLED"));
@@ -142,7 +163,7 @@ class SecurityErrorResponsesTest {
     @Test
     @DisplayName("Token válido: el recurso responde con normalidad")
     void validToken() throws Exception {
-        String token = jwtService.generateToken("ana@zen.com", "MANAGER", 1L);
+        String token = jwtService.generateToken(1L, "ana@zen.com");
         mockMvc.perform(get("/api/probe/any").header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(content().string("ok"));
@@ -151,7 +172,7 @@ class SecurityErrorResponsesTest {
     @Test
     @DisplayName("Autenticado sin el rol necesario: 403 ACCESS_DENIED con contrato JSON")
     void authenticatedWithoutRole() throws Exception {
-        String token = jwtService.generateToken("ana@zen.com", "MANAGER", 1L);
+        String token = jwtService.generateToken(1L, "ana@zen.com");
         mockMvc.perform(get("/api/probe/admin").header("Authorization", bearer(token)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403))
@@ -162,7 +183,7 @@ class SecurityErrorResponsesTest {
     @Test
     @DisplayName("Con el rol necesario: 200")
     void authenticatedWithRole() throws Exception {
-        String token = jwtService.generateToken("root@zen.com", "ADMIN", 1L);
+        String token = jwtService.generateToken(1L, "root@zen.com");
         mockMvc.perform(get("/api/probe/admin").header("Authorization", bearer(token)))
                 .andExpect(status().isOk());
     }

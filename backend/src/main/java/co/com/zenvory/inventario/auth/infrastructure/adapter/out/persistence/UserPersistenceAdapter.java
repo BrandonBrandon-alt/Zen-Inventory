@@ -56,6 +56,13 @@ public class UserPersistenceAdapter implements UserRepositoryPort {
      * Obtiene todos los usuarios registrados en el sistema.
      */
     @Override
+    public List<User> findBySucursalId(Long sucursalId) {
+        return jpaRepository.findBySucursalId(sucursalId).stream()
+                .map(UserEntity::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public List<User> findAll() {
         return jpaRepository.findAll().stream()
                 .map(UserEntity::toDomain)
