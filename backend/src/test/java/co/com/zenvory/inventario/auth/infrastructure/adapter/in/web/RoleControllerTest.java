@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -39,9 +40,9 @@ class RoleControllerTest {
     @DisplayName("GET /api/roles: returns 200 with role list")
     void getAll_returns200() throws Exception {
         Role role = Role.builder().id(1L).nombre("ROLE_ADMIN").build();
-        when(userUseCase.getAllRoles()).thenReturn(List.of(role));
+        when(userUseCase.getAssignableRoles(any())).thenReturn(List.of(role));
 
-        mockMvc.perform(get("/api/roles"))
+        mockMvc.perform(get("/api/roles").principal(() -> "admin@x.co"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].nombre").value("ROLE_ADMIN"));

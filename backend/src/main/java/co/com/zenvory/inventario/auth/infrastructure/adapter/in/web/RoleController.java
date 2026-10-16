@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.security.Principal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -15,11 +16,11 @@ import java.util.stream.Collectors;
  * Adaptador de entrada (Primary Adapter) para la consulta del catálogo de roles.
  * 
  * <p>Expone el listado de perfiles de acceso definidos en el sistema.
- * Solo accesible para usuarios con privilegios de administrador ('ADMIN').</p>
+ * Devuelve los roles que quien consulta puede asignar: todos para 'ADMIN'; solo los inferiores para 'MANAGER'.</p>
  */
 @RestController
 @RequestMapping("/api/roles")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
 public class RoleController {
 
     private final UserUseCase userUseCase;
@@ -38,8 +39,8 @@ public class RoleController {
      * @return Lista de roles en formato {@link RoleResponse}.
      */
     @GetMapping
-    public ResponseEntity<List<RoleResponse>> getAll() {
-        List<RoleResponse> response = userUseCase.getAllRoles().stream()
+    public ResponseEntity<List<RoleResponse>> getAll(Principal principal) {
+        List<RoleResponse> response = userUseCase.getAssignableRoles(principal.getName()).stream()
                 .map(role -> RoleResponse.builder()
                         .id(role.getId())
                         .nombre(role.getNombre())

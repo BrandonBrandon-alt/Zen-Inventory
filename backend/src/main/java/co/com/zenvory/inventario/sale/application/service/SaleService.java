@@ -12,7 +12,8 @@ import co.com.zenvory.inventario.sale.application.port.out.SaleRepositoryPort;
 import co.com.zenvory.inventario.sale.domain.model.Sale;
 import co.com.zenvory.inventario.sale.domain.model.SaleDetail;
 import co.com.zenvory.inventario.branch.application.port.in.BranchUseCase;
-import co.com.zenvory.inventario.auth.application.port.in.UserUseCase;
+import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
+import co.com.zenvory.inventario.auth.domain.exception.UserNotFoundException;
 import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
 import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException;
 import co.com.zenvory.inventario.sale.domain.exception.SaleNotFoundException;
@@ -29,17 +30,17 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
     private final ProductUseCase productUseCase;
     private final InventoryUseCase inventoryUseCase;
     private final BranchUseCase branchUseCase;
-    private final UserUseCase userUseCase;
+    private final UserRepositoryPort userRepositoryPort;
     private final PriceListUseCase priceListUseCase;
     private final AlertUseCase alertUseCase;
 
     public SaleService(SaleRepositoryPort saleRepositoryPort, ProductUseCase productUseCase, InventoryUseCase inventoryUseCase,
-                       BranchUseCase branchUseCase, UserUseCase userUseCase, PriceListUseCase priceListUseCase, AlertUseCase alertUseCase) {
+                       BranchUseCase branchUseCase, UserRepositoryPort userRepositoryPort, PriceListUseCase priceListUseCase, AlertUseCase alertUseCase) {
         this.saleRepositoryPort = saleRepositoryPort;
         this.productUseCase = productUseCase;
         this.inventoryUseCase = inventoryUseCase;
         this.branchUseCase = branchUseCase;
-        this.userUseCase = userUseCase;
+        this.userRepositoryPort = userRepositoryPort;
         this.priceListUseCase = priceListUseCase;
         this.alertUseCase = alertUseCase;
     }
@@ -84,7 +85,8 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
 
         // 2. Obtener nombres de sucursal y vendedor para el snapshot
         String branchName = branchUseCase.getBranchById(command.branchId()).getName();
-        String userName = userUseCase.getUserById(command.userId()).getNombre();
+        String userName = userRepositoryPort.findById(command.userId())
+                .orElseThrow(() -> new UserNotFoundException(command.userId())).getNombre();
 
         // 3. Crear el agregado (con información de cliente)
         Sale sale = Sale.create(

@@ -2,6 +2,7 @@ package co.com.zenvory.inventario.auth.application.service;
 
 import co.com.zenvory.inventario.auth.application.port.in.UserUseCase;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
+import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException;
 import co.com.zenvory.inventario.auth.domain.exception.UserNotFoundException;
 import co.com.zenvory.inventario.auth.domain.model.Role;
 import co.com.zenvory.inventario.auth.domain.model.User;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Servicio de aplicación que implementa la lógica de gestión de usuarios.
@@ -20,6 +22,11 @@ import java.util.List;
  */
 @Service
 public class UserService implements UserUseCase {
+
+    private static final String ADMIN = "ADMIN";
+    private static final String MANAGER = "MANAGER";
+    /** Roles que un MANAGER puede asignar y administrar: siempre inferiores al suyo. */
+    private static final Set<String> MANAGER_ASSIGNABLE = Set.of("SELLER", "OPERADOR_INVENTARIO");
 
     private final UserRepositoryPort userRepositoryPort;
     private final PasswordEncoder passwordEncoder;
@@ -35,80 +42,107 @@ public class UserService implements UserUseCase {
         this.passwordEncoder = passwordEncoder;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public List<User> getAllUsers() {
-        return userRepositoryPort.findAll();
+    public List<User> getAllUsers(String actorEmail) {
+        User actor = actor(actorEmail);
+        if (isAdmin(actor)) {
+            return userRepositoryPort.findAll();
+        }
+        Long branchId = managerBranch(actor);
+        return userRepositoryPort.findAll().stream()
+                .filter(user -> branchId.equals(user.getSucursalId()))
+                .toList();
     }
 
     /**
      * {@inheritDoc}
-     * @throws UserNotFoundException Si el identificador no corresponde a ningún usuario activo.
+     * @throws UserNotFoundException Si el identificador no corresponde a ningún usuario.
      */
     @Override
-    public User getUserById(Long id) {
-        return userRepositoryPort.findById(id)
-                .orElseThrow(() -> new UserNotFoundException(id));
+    public User getUserById(Long id, String actorEmail) {
+        User actor = actor(actorEmail);
+        User target = find(id);
+        if (!isAdmin(actor)) {
+            requireSameBranch(actor, target);
+        }
+        return target;
     }
 
     /**
      * {@inheritDoc}
-     * <p>Este método cifra la contraseña recibida antes de proceder al guardado físico.</p>
+     * <p>Cifra la contraseña antes de guardar. Un MANAGER crea siempre en su propia sucursal.</p>
      */
     @Override
-    public User createUser(User user, String plainPassword) {
+    public User createUser(User user, String plainPassword, String actorEmail) {
+        User actor = actor(actorEmail);
+        Role role = findRole(user.getRole().getId());
+        if (!isAdmin(actor)) {
+            Long branchId = managerBranch(actor);
+            requireAssignable(role);
+            if (user.getSucursalId() != null && !branchId.equals(user.getSucursalId())) {
+                throw new UnauthorizedActionException("Solo puede crear usuarios en su propia sucursal.");
+            }
+            user.setSucursalId(branchId);
+        }
+
         user.setPasswordHash(passwordEncoder.encode(plainPassword));
         user.setActive(true);
         user.setCreatedAt(LocalDateTime.now());
-        
-        // Cargar el rol completo desde el puerto de salida para asegurar consistencia
-        Role role = userRepositoryPort.findRoleById(user.getRole().getId())
-                .orElseThrow(() -> new RuntimeException("Rol no encontrado: " + user.getRole().getId()));
         user.setRole(role);
-        
         return userRepositoryPort.save(user);
     }
 
     /**
      * {@inheritDoc}
-     * <p>Permite la actualización parcial. Si plainPassword es nulo o vacío, se preserva el hash existente.</p>
+     * <p>Actualización parcial: si plainPassword es nulo o vacío se conserva el hash existente. Un MANAGER solo
+     * puede editar usuarios de su sucursal con rol inferior, y no puede moverlos de sucursal ni ascenderlos.</p>
      */
     @Override
-    public User updateUser(Long id, User updated, String plainPassword) {
-        User existing = userRepositoryPort.findById(id)
-                .orElseThrow(() -> new UserNotFoundException(id));
+    public User updateUser(Long id, User updated, String plainPassword, String actorEmail) {
+        User actor = actor(actorEmail);
+        User existing = find(id);
+        Role newRole = updated.getRole() != null && updated.getRole().getId() != null
+                ? findRole(updated.getRole().getId())
+                : null;
+
+        if (!isAdmin(actor)) {
+            Long branchId = managerBranch(actor);
+            requireManageable(actor, existing);
+            if (newRole != null) {
+                requireAssignable(newRole);
+            }
+            if (updated.getSucursalId() != null && !branchId.equals(updated.getSucursalId())) {
+                throw new UnauthorizedActionException("No puede mover usuarios a otra sucursal.");
+            }
+            updated.setSucursalId(branchId);
+        }
 
         existing.setNombre(updated.getNombre());
         existing.setEmail(updated.getEmail());
         existing.setSucursalId(updated.getSucursalId());
-        
-        if (updated.getRole() != null && updated.getRole().getId() != null) {
-            Role role = userRepositoryPort.findRoleById(updated.getRole().getId())
-                    .orElseThrow(() -> new RuntimeException("Rol no encontrado"));
-            existing.setRole(role);
+        if (newRole != null) {
+            existing.setRole(newRole);
         }
-
         if (plainPassword != null && !plainPassword.isBlank()) {
             existing.setPasswordHash(passwordEncoder.encode(plainPassword));
         }
-
         if (updated.getActive() != null) {
             existing.setActive(updated.getActive());
         }
-
         return userRepositoryPort.save(existing);
     }
 
     /**
      * {@inheritDoc}
-     * <p>Implementa una desactivación lógica para preservar la integridad de trazabilidad en auditorías.</p>
+     * <p>Desactivación lógica para preservar la trazabilidad de auditoría.</p>
      */
     @Override
-    public void deactivateUser(Long id) {
-        User existing = userRepositoryPort.findById(id)
-                .orElseThrow(() -> new UserNotFoundException(id));
+    public void deactivateUser(Long id, String actorEmail) {
+        User actor = actor(actorEmail);
+        User existing = find(id);
+        if (!isAdmin(actor)) {
+            requireManageable(actor, existing);
+        }
         existing.setActive(false);
         userRepositoryPort.save(existing);
     }
@@ -117,8 +151,66 @@ public class UserService implements UserUseCase {
      * {@inheritDoc}
      */
     @Override
-    public List<Role> getAllRoles() {
-        return userRepositoryPort.findAllRoles();
+    public List<Role> getAssignableRoles(String actorEmail) {
+        User actor = actor(actorEmail);
+        List<Role> all = userRepositoryPort.findAllRoles();
+        if (isAdmin(actor)) {
+            return all;
+        }
+        managerBranch(actor);
+        return all.stream().filter(role -> MANAGER_ASSIGNABLE.contains(role.getNombre())).toList();
+    }
+
+    // ---- Reglas de alcance ----
+
+    private User actor(String email) {
+        User actor = userRepositoryPort.findByEmail(email)
+                .orElseThrow(() -> new UnauthorizedActionException("No se pudo identificar al usuario autenticado."));
+        String role = actor.getRole().getNombre();
+        if (!ADMIN.equals(role) && !MANAGER.equals(role)) {
+            throw new UnauthorizedActionException("No tiene permisos para gestionar usuarios.");
+        }
+        return actor;
+    }
+
+    private boolean isAdmin(User actor) {
+        return ADMIN.equals(actor.getRole().getNombre());
+    }
+
+    /** Sucursal del MANAGER; sin sucursal asignada no puede gestionar a nadie. */
+    private Long managerBranch(User manager) {
+        if (manager.getSucursalId() == null) {
+            throw new UnauthorizedActionException("Su usuario no tiene una sucursal asignada.");
+        }
+        return manager.getSucursalId();
+    }
+
+    private void requireSameBranch(User manager, User target) {
+        if (!managerBranch(manager).equals(target.getSucursalId())) {
+            throw new UnauthorizedActionException("Solo puede gestionar usuarios de su propia sucursal.");
+        }
+    }
+
+    /** El usuario objetivo debe ser de la sucursal del MANAGER y de un rol inferior (ni ADMIN ni MANAGER). */
+    private void requireManageable(User manager, User target) {
+        requireSameBranch(manager, target);
+        if (!MANAGER_ASSIGNABLE.contains(target.getRole().getNombre())) {
+            throw new UnauthorizedActionException("No puede gestionar usuarios con rol " + target.getRole().getNombre() + ".");
+        }
+    }
+
+    private void requireAssignable(Role role) {
+        if (!MANAGER_ASSIGNABLE.contains(role.getNombre())) {
+            throw new UnauthorizedActionException("No puede asignar el rol " + role.getNombre() + ".");
+        }
+    }
+
+    private User find(Long id) {
+        return userRepositoryPort.findById(id).orElseThrow(() -> new UserNotFoundException(id));
+    }
+
+    private Role findRole(Long id) {
+        return userRepositoryPort.findRoleById(id)
+                .orElseThrow(() -> new RuntimeException("Rol no encontrado: " + id));
     }
 }
-

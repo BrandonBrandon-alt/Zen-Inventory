@@ -5,7 +5,12 @@ import co.com.zenvory.inventario.auth.domain.model.Role;
 import java.util.List;
 
 /**
- * Puerto de entrada (Input Port) para la gestión administrativa de usuarios y roles.
+ * Puerto de entrada (Input Port) para la gestión de usuarios y roles.
+ *
+ * <p>Todas las operaciones reciben el correo de quien las ejecuta ({@code actorEmail}) porque el alcance depende
+ * de su rol: un ADMIN gestiona cualquier usuario; un MANAGER solo los de su sucursal y únicamente con roles
+ * inferiores al suyo (SELLER y OPERADOR_INVENTARIO). Una violación lanza
+ * {@link co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException} (403 FORBIDDEN_ACTION).</p>
  */
 public interface UserUseCase {
 
@@ -14,7 +19,7 @@ public interface UserUseCase {
      * 
      * @return Lista de modelos de dominio {@link User}.
      */
-    List<User> getAllUsers();
+    List<User> getAllUsers(String actorEmail);
 
     /**
      * Busca un usuario por su identificador primario.
@@ -23,7 +28,7 @@ public interface UserUseCase {
      * @return El usuario encontrado.
      * @throws co.com.zenvory.inventario.shared.domain.exception.ResourceNotFoundException Si no existe.
      */
-    User getUserById(Long id);
+    User getUserById(Long id, String actorEmail);
 
     /**
      * Crea un nuevo usuario en el sistema, cifrando su contraseña.
@@ -32,7 +37,7 @@ public interface UserUseCase {
      * @param plainPassword Contraseña en texto plano para ser procesada.
      * @return El usuario persistido.
      */
-    User createUser(User user, String plainPassword);
+    User createUser(User user, String plainPassword, String actorEmail);
 
     /**
      * Actualiza la información de un usuario existente.
@@ -42,20 +47,20 @@ public interface UserUseCase {
      * @param plainPassword Nueva contraseña (opcional, null si no se cambia).
      * @return El usuario actualizado.
      */
-    User updateUser(Long id, User user, String plainPassword);
+    User updateUser(Long id, User user, String plainPassword, String actorEmail);
 
     /**
      * Desactiva lógicamente a un usuario.
      * 
      * @param id ID del usuario a desactivar.
      */
-    void deactivateUser(Long id);
+    void deactivateUser(Long id, String actorEmail);
 
     /**
-     * Obtiene el listado de roles de usuario disponibles en el sistema.
+     * Roles que quien ejecuta puede asignar: todos para ADMIN; SELLER y OPERADOR_INVENTARIO para MANAGER.
      * 
      * @return Lista de objetos de dominio {@link Role}.
      */
-    List<Role> getAllRoles();
+    List<Role> getAssignableRoles(String actorEmail);
 }
 
