@@ -36,12 +36,12 @@
   <ng-template appCell="acciones" let-user>
     <div class="flex justify-end gap-1">
       @if (canManage(user) && canOpenForm()) {
-        <button appButton variant="ghost" size="sm" type="button" [attr.aria-label]="'Editar ' + user.nombre" (click)="openEdit(user)">
+        <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Editar ' + user.nombre" (click)="openEdit(user)">
           <svg lucidePencil [size]="16" />
         </button>
       }
       @if (canDeactivate(user)) {
-        <button appButton variant="ghost" size="sm" type="button" [attr.aria-label]="'Desactivar ' + user.nombre" (click)="askDeactivate(user)">
+        <button appButton variant="ghost-danger" size="sm" type="button" [attr.aria-label]="'Desactivar ' + user.nombre" (click)="askDeactivate(user)">
           <svg lucideBan [size]="16" />
         </button>
       }

@@ -48,6 +48,8 @@ describe('Button', () => {
     ['primary', 'bg-primary'],
     ['ghost', 'bg-transparent'],
     ['danger', 'text-danger'],
+    ['ghost-brand', 'enabled:hover:text-brand'],
+    ['ghost-danger', 'enabled:hover:text-danger'],
   ])('la variante %s aplica su estilo', async (variant, expectedClass) => {
     await render(`<button appButton variant="${variant}">X</button>`, { imports: [Button] });
     expect(screen.getByRole('button')).toHaveClass(expectedClass);

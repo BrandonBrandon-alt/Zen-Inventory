@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, booleanAttribute, computed, input } from '@angular/core';
 import { Spinner } from '../spinner/spinner';
 
-export type ButtonVariant = 'primary' | 'ghost' | 'danger';
+export type ButtonVariant = 'primary' | 'ghost' | 'ghost-brand' | 'ghost-danger' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const BASE =
@@ -14,6 +14,11 @@ const VARIANTS: Record<ButtonVariant, string> = {
   primary:
     'bg-primary text-primary-fg border border-transparent enabled:hover:bg-primary-hover enabled:hover:shadow-lg',
   ghost: 'bg-transparent text-fg-muted border border-transparent enabled:hover:bg-hover',
+  // Acciones de fila con icono: neutras en reposo; al pasar el cursor, color principal (editar) o rojo (desactivar).
+  'ghost-brand':
+    'bg-transparent text-fg-muted border border-transparent enabled:hover:bg-brand/10 enabled:hover:text-brand',
+  'ghost-danger':
+    'bg-transparent text-fg-muted border border-transparent enabled:hover:bg-danger/10 enabled:hover:text-danger',
   danger: 'bg-danger/10 text-danger border border-danger/30 enabled:hover:bg-danger/20',
 };
 
