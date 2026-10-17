@@ -38,6 +38,13 @@ services:
       dockerfile: Dockerfile
     container_name: zenvory-backend
     restart: on-failure
+    # `docker compose watch`: vigila estos archivos y reconstruye solo este servicio cuando cambian.
+    develop:
+      watch:
+        - action: rebuild
+          path: ./backend/src
+        - action: rebuild
+          path: ./backend/pom.xml
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${DB_NAME}
       - SPRING_DATASOURCE_USERNAME=${DB_USER}
@@ -76,6 +83,19 @@ services:
       dockerfile: Dockerfile
     container_name: zenvory-frontend-angular
     restart: on-failure
+    # `docker compose watch`: vigila estos archivos y reconstruye solo este servicio cuando cambian.
+    develop:
+      watch:
+        - action: rebuild
+          path: ./frontend-angular/src
+        - action: rebuild
+          path: ./frontend-angular/nginx
+        - action: rebuild
+          path: ./frontend-angular/package.json
+        - action: rebuild
+          path: ./frontend-angular/package-lock.json
+        - action: rebuild
+          path: ./frontend-angular/angular.json
     environment:
       # nginx reenvía /api/* a esta dirección (red interna de Docker)
       - BACKEND_URL=http://backend:8080

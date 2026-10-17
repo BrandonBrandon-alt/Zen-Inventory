@@ -5,8 +5,9 @@ FROM node:24-alpine AS builder
 WORKDIR /app
 
 # Dependencias primero para aprovechar la caché de capas de Docker
+# --mount=type=cache conserva la caché de npm entre construcciones: si cambia el lockfile solo se bajan los paquetes nuevos.
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 COPY . .
 RUN npm run build

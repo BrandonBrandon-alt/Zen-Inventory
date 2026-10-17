@@ -4,13 +4,14 @@
 FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
 WORKDIR /app
 
-# Copiar solo el pom.xml primero para aprovechar la caché de Docker
+# Copiar solo el pom.xml primero para aprovechar la caché de Docker.
+# --mount=type=cache conserva ~/.m2 entre construcciones: aunque cambie el pom.xml, no se vuelve a bajar todo.
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
+RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -B
 
 # Copiar el código fuente y compilar
 COPY src ./src
-RUN mvn clean package -DskipTests
+RUN --mount=type=cache,target=/root/.m2 mvn clean package -DskipTests -B
 
 # ==========================================
 # Etapa 2: Ejecución (Runner)

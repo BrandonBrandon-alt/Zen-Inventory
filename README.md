@@ -200,6 +200,16 @@ docker-compose up --build -d
 - **Backend API:** `http://localhost:8080/api`
 - **pgAdmin:** `http://localhost:5050`
 
+**Aplicar cambios sin indicar servicios.** `docker compose up -d --build` reconstruye solo lo que cambió (caché de capas, y de dependencias Maven/npm) y recrea únicamente los contenedores afectados.
+
+**Reconstrucción automática mientras desarrollas:**
+
+```bash
+docker compose watch
+```
+
+Vigila `backend/src`, `backend/pom.xml` y `frontend-angular/` (código, `nginx/`, `package*.json`, `angular.json`); al guardar un cambio reconstruye y reemplaza solo ese servicio. Requiere que los contenedores ya existan (`docker compose up -d` una vez antes) y se detiene con `Ctrl+C` (los contenedores siguen corriendo). El frontend de Next.js no se vigila.
+
 ### 3. Ejecución en Modo Desarrollo (Local)
 
 **Backend:**
