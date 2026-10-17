@@ -8,7 +8,6 @@ import { isRole, type Role } from '@core/auth/roles/role';
 
 type UserResponse = components['schemas']['UserResponse'];
 type RoleResponse = components['schemas']['RoleResponse'];
-type BranchResponse = components['schemas']['BranchResponse'];
 
 /** Usuario con los campos que la app necesita siempre presentes (el OpenAPI los marca todos como opcionales). */
 export interface AppUser {
@@ -24,13 +23,6 @@ export interface AppUser {
 export interface RoleOption {
   readonly id: number;
   readonly nombre: Role;
-}
-
-/** Sucursal elegible para un usuario. */
-export interface BranchOption {
-  readonly id: number;
-  readonly nombre: string;
-  readonly activa: boolean;
 }
 
 /** Datos del formulario de usuario. */
@@ -113,18 +105,6 @@ export class UsersApi {
     return this.http.get<RoleResponse[]>(`${this.baseUrl}/api/roles`, this.options).pipe(
       map((items) =>
         items.flatMap((role) => (typeof role.id === 'number' && isRole(role.nombre) ? [{ id: role.id, nombre: role.nombre }] : [])),
-      ),
-    );
-  }
-
-  branches(): Observable<BranchOption[]> {
-    return this.http.get<BranchResponse[]>(`${this.baseUrl}/api/branches`, this.options).pipe(
-      map((items) =>
-        items.flatMap((branch) =>
-          typeof branch.id === 'number' && branch.nombre?.trim()
-            ? [{ id: branch.id, nombre: branch.nombre.trim(), activa: branch.activa !== false }]
-            : [],
-        ),
       ),
     );
   }

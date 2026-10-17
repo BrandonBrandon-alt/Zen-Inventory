@@ -8,7 +8,8 @@ import { API_BASE_URL } from '@core/api/api-base-url';
 import { errorInterceptor } from '@core/api/error.interceptor';
 import { NotificationService } from '@core/notifications/notification.service';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
-import type { AppUser, BranchOption, RoleOption } from '../../data-access/users-api';
+import type { BranchOption } from '@core/branches/branch-options-api';
+import type { AppUser, RoleOption } from '../../data-access/users-api';
 import { UserFormModal } from './user-form-modal';
 
 const USERS = `${TEST_API}/api/users`;

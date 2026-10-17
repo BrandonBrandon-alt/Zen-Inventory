@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { type AbstractControl, NonNullableFormBuilder, ReactiveFormsModule, type ValidationErrors, Validators } from '@angular/forms';
 import { LucideBriefcase, LucidePackage, LucideShield, LucideShoppingBag, LucideStore, type LucideIconData } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
+import type { BranchOption } from '@core/branches/branch-options-api';
 import { NotificationService } from '@core/notifications/notification.service';
 import { applyServerErrors } from '@shared/forms/apply-server-errors';
 import { controlError } from '@shared/forms/control-error';
@@ -11,7 +12,7 @@ import { Button } from '@shared/ui/button/button';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Modal } from '@shared/ui/modal/modal';
 import { Select, type SelectOption } from '@shared/ui/select/select';
-import { type AppUser, type BranchOption, type RoleOption, UsersApi } from '../../data-access/users-api';
+import { type AppUser, type RoleOption, UsersApi } from '../../data-access/users-api';
 
 const NAME_MIN = 3;
 const PASSWORD_MIN = 6;

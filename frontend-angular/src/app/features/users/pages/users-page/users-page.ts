@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { firstValueFrom } from 'rxjs';
 import { LucideBan, LucidePencil, LucidePlus } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
+import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { NotificationService } from '@core/notifications/notification.service';
 import { type BadgeVariant, Badge } from '@shared/ui/badge/badge';
@@ -9,7 +10,7 @@ import { Button } from '@shared/ui/button/button';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog/confirm-dialog';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
 import { UserFormModal } from '../../components/user-form-modal/user-form-modal';
-import { type AppUser, type BranchOption, type RoleOption, UsersApi } from '../../data-access/users-api';
+import { type AppUser, type RoleOption, UsersApi } from '../../data-access/users-api';
 
 /** Fila de la tabla: el usuario más el nombre de su sucursal (para mostrarlo y ordenarlo). */
 interface UserRow extends AppUser {
@@ -41,6 +42,7 @@ const rowKey = (user: UserRow): number => user.id;
 })
 export class UsersPage {
   private readonly api = inject(UsersApi);
+  private readonly branchOptions = inject(BranchOptionsApi);
   private readonly notifications = inject(NotificationService);
   private readonly session = inject(AuthStore).session;
 
@@ -118,7 +120,7 @@ export class UsersPage {
   /** Roles y sucursales de los selects; si fallan, la tabla sigue funcionando y se avisa del motivo. */
   private async loadOptions(): Promise<void> {
     try {
-      const [roles, branches] = await Promise.all([firstValueFrom(this.api.roles()), firstValueFrom(this.api.branches())]);
+      const [roles, branches] = await Promise.all([firstValueFrom(this.api.roles()), firstValueFrom(this.branchOptions.list())]);
       this.roles.set(roles);
       this.branches.set(branches);
     } catch (error) {

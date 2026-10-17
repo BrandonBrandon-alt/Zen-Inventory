@@ -97,11 +97,4 @@ describe('UsersApi (contrato HTTP con MSW)', () => {
     expect(await firstValueFrom(api.roles())).toEqual([{ id: 3, nombre: 'SELLER' }]);
   });
 
-  it('sucursales: id, nombre y si está activa', async () => {
-    server.use(http.get(`${TEST_API}/api/branches`, () => HttpResponse.json([{ id: 1, nombre: ' Norte ', direccion: 'x' }, { id: 2, nombre: 'Sur', activa: false }, { nombre: 'Sin id' }])));
-    expect(await firstValueFrom(api.branches())).toEqual([
-      { id: 1, nombre: 'Norte', activa: true },
-      { id: 2, nombre: 'Sur', activa: false },
-    ]);
-  });
 });
