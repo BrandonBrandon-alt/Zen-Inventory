@@ -276,7 +276,9 @@ public class AlertService implements AlertUseCase {
                 List.of(new CreatePurchaseCommand.Detail(
                         alert.getProductId(), 
                         quantity,
-                        product.getAverageCost(),
+                        // Un producto que nunca se compró no tiene costo promedio: la orden nace con precio 0
+                        // (por definir) en vez de fallar, y un precio 0 no altera el costo al recibirse.
+                        product.getAverageCost() != null ? product.getAverageCost() : BigDecimal.ZERO,
                         BigDecimal.ZERO
                 ))
         );

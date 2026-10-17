@@ -1,0 +1,101 @@
+package co.com.zenvory.inventario.alert.application.service;
+
+import co.com.zenvory.inventario.alert.application.port.out.AlertRepositoryPort;
+import co.com.zenvory.inventario.alert.domain.model.StockAlert;
+import co.com.zenvory.inventario.branch.application.port.in.BranchUseCase;
+import co.com.zenvory.inventario.catalog.application.port.in.ProductUseCase;
+import co.com.zenvory.inventario.catalog.domain.model.Product;
+import co.com.zenvory.inventario.inventory.application.port.in.InventoryUseCase;
+import co.com.zenvory.inventario.inventory.domain.event.StockLevelDroppedEvent;
+import co.com.zenvory.inventario.purchase.application.port.in.CreatePurchaseCommand;
+import co.com.zenvory.inventario.purchase.application.port.in.PurchaseUseCase;
+import co.com.zenvory.inventario.purchase.domain.model.PurchaseOrder;
+import co.com.zenvory.inventario.transfer.application.port.in.TransferUseCase;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.context.event.EventListener;
+import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
+import org.springframework.core.type.filter.AnnotationTypeFilter;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionalEventListener;
+
+import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@DisplayName("AlertService")
+class AlertServiceTest {
+
+    private AlertRepositoryPort alerts;
+    private ProductUseCase products;
+    private PurchaseUseCase purchases;
+    private AlertService service;
+
+    @BeforeEach
+    void setUp() {
+        alerts = mock(AlertRepositoryPort.class);
+        products = mock(ProductUseCase.class);
+        purchases = mock(PurchaseUseCase.class);
+        service = new AlertService(alerts, mock(InventoryUseCase.class), products, mock(BranchUseCase.class),
+                mock(TransferUseCase.class), purchases);
+        when(alerts.findById(1L)).thenReturn(Optional.of(StockAlert.create(3L, 5L, "Stock bajo")));
+        PurchaseOrder order = mock(PurchaseOrder.class);
+        when(order.getId()).thenReturn(40L);
+        when(purchases.createOrder(any(), org.mockito.ArgumentMatchers.anyBoolean())).thenReturn(order);
+    }
+
+    private BigDecimal priceSentToPurchase() {
+        ArgumentCaptor<CreatePurchaseCommand> cmd = ArgumentCaptor.forClass(CreatePurchaseCommand.class);
+        verify(purchases).createOrder(cmd.capture(), org.mockito.ArgumentMatchers.anyBoolean());
+        return cmd.getValue().items().get(0).unitPrice();
+    }
+
+    @Test
+    @DisplayName("resolver por compra un producto sin costo promedio (nunca comprado) no falla: precio 0 por definir")
+    void resolveViaPurchaseWithoutAverageCost() {
+        when(products.getProductById(5L)).thenReturn(Product.builder().id(5L).name("Nuevo").averageCost(null).build());
+        service.resolveViaPurchaseOrder(1L, 3, BigDecimal.TEN, 9L, true, 7L);
+        assertThat(priceSentToPurchase()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    @DisplayName("con costo promedio, la orden usa ese costo")
+    void resolveViaPurchaseWithAverageCost() {
+        when(products.getProductById(5L)).thenReturn(Product.builder().id(5L).name("Viejo").averageCost(new BigDecimal("12.5")).build());
+        service.resolveViaPurchaseOrder(1L, 3, BigDecimal.TEN, 9L, true, 7L);
+        assertThat(priceSentToPurchase()).isEqualByComparingTo("12.5");
+    }
+
+    @Test
+    @DisplayName("cada evento de stock bajo tiene un único manejador: dos duplicarían las alertas y atarían la venta a su éxito")
+    void singleHandlerPerStockDroppedEvent() {
+        ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter(new AnnotationTypeFilter(Component.class));
+        List<String> handlers = new ArrayList<>();
+        for (var bean : scanner.findCandidateComponents("co.com.zenvory.inventario")) {
+            Class<?> type;
+            try {
+                type = Class.forName(bean.getBeanClassName());
+            } catch (ClassNotFoundException e) {
+                continue;
+            }
+            for (Method method : type.getDeclaredMethods()) {
+                boolean listener = method.isAnnotationPresent(EventListener.class) || method.isAnnotationPresent(TransactionalEventListener.class);
+                if (listener && method.getParameterCount() == 1 && method.getParameterTypes()[0] == StockLevelDroppedEvent.class) {
+                    handlers.add(type.getSimpleName() + "." + method.getName());
+                }
+            }
+        }
+        assertThat(handlers).containsExactly("AlertService.onStockLevelDropped");
+    }
+}

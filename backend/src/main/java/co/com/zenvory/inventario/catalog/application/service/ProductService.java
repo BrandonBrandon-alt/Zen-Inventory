@@ -89,7 +89,11 @@ public class ProductService implements ProductUseCase {
 
         existing.setSku(newSku);
         existing.setName(product.getName());
-        existing.setAverageCost(product.getAverageCost());
+        // El costo promedio lo calcula el sistema con cada compra: editar el producto sin enviarlo (o con otro
+        // valor desactualizado) no debe borrarlo. Solo se cambia si la petición lo trae explícitamente.
+        if (product.getAverageCost() != null) {
+            existing.setAverageCost(product.getAverageCost());
+        }
         existing.setSalePrice(product.getSalePrice());
         existing.setUnitId(product.getUnitId());
         existing.setSuppliersDetails(product.getSuppliersDetails());
