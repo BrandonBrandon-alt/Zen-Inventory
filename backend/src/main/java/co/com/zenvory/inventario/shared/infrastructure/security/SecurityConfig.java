@@ -40,12 +40,19 @@ public class SecurityConfig {
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
 
+    private final List<String> allowedOrigins;
+    private final boolean docsPublic;
+
     public SecurityConfig(JwtAuthenticationFilter jwtAuthFilter,
                           RestAuthenticationEntryPoint authenticationEntryPoint,
-                          RestAccessDeniedHandler accessDeniedHandler) {
+                          RestAccessDeniedHandler accessDeniedHandler,
+                          @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins:}") List<String> allowedOrigins,
+                          @org.springframework.beans.factory.annotation.Value("${app.docs.public:false}") boolean docsPublic) {
         this.jwtAuthFilter = jwtAuthFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+        this.allowedOrigins = allowedOrigins.stream().map(String::trim).filter(origin -> !origin.isEmpty()).toList();
+        this.docsPublic = docsPublic;
     }
 
     @Bean
@@ -55,14 +62,16 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        // Endpoint de login: público
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-                        // Swagger/OpenAPI (si se agrega en el futuro)
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
-                        // Todo lo demás requiere autenticación
-                        .anyRequest().authenticated()
-                )
+                .authorizeHttpRequests(auth -> {
+                    // Endpoint de login: público
+                    auth.requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll();
+                    // Swagger/OpenAPI: públicos solo si se habilita (perfil "dev"); en producción exigen sesión.
+                    if (docsPublic) {
+                        auth.requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll();
+                    }
+                    // Todo lo demás requiere autenticación
+                    auth.anyRequest().authenticated();
+                })
                 // Errores de seguridad con el mismo contrato JSON que el resto de la API (401 / 403)
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint(authenticationEntryPoint)
@@ -81,15 +90,15 @@ public class SecurityConfig {
     }
 
     /**
-     * Configuración de CORS para permitir solicitudes del Frontend
-     * (Ej. Next.js o React ejecutándose en localhost:3000)
+     * Configuración de CORS: solo los orígenes de {@code app.cors.allowed-origins} (variable CORS_ALLOWED_ORIGINS,
+     * separados por comas; admite patrones como {@code http://localhost:*}). Vacío = ningún origen cruzado.
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:*")); // Permite cualquier puerto local (e.g. 3000, 5173)
+        configuration.setAllowedOriginPatterns(allowedOrigins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Accept-Language", "X-Requested-With"));
         configuration.setAllowCredentials(true); // Necesario si envían cookies o auth headers
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

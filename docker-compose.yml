@@ -43,6 +43,9 @@ services:
       - SPRING_DATASOURCE_USERNAME=${DB_USER}
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
       - SECURITY_JWT_SECRET=${JWT_SECRET}
+      # Perfil de la API: "dev" abre Swagger, permite CORS desde localhost y registra SQL. En producción: SPRING_PROFILES_ACTIVE=prod
+      # y CORS_ALLOWED_ORIGINS=https://tu-dominio (sin definirla, no se permite ningún origen cruzado).
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
     ports:
       - "${SPRING_LOCAL_PORT}:8080"
     depends_on:

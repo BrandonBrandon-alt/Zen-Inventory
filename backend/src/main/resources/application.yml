@@ -4,9 +4,9 @@ spring:
 
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/inventario_multisucursal}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    # Debe coincidir con DB_PASSWORD en .env
-    password: ${SPRING_DATASOURCE_PASSWORD:admin123}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    # Sin valor por defecto: se define con SPRING_DATASOURCE_PASSWORD (en Docker viene de DB_PASSWORD, en .env)
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -15,10 +15,9 @@ spring:
       # Flyway es quien gestiona el DDL (CREATE TABLE, ALTER TABLE).
       # Esto evita conflictos entre Flyway y Hibernate.
       ddl-auto: validate
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
   flyway:
@@ -36,9 +35,17 @@ security:
     secret: ${SECURITY_JWT_SECRET} # obligatoria: sin ella la app no arranca (en Docker viene de JWT_SECRET)
     expiration: 86400000 # 1 day in ms
 
-# VALOR AGREGADO: Logs específicos para ver nuestra arquitectura hexagonal en acción
+# Logs: por defecto solo los de la aplicación. El SQL y los valores enlazados (que incluyen hashes de contraseña,
+# correos y datos de clientes) NO se registran fuera del perfil "dev" (ver application-dev.yml).
 logging:
   level:
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE # Muestra los valores reales insertados en los '?' del SQL
-    co.com.zenvory.inventario: INFO # Muestra los logs de nuestros Casos de Uso
+    co.com.zenvory.inventario: INFO
+
+# Integración con el frontend. Cada despliegue define sus orígenes: sin CORS_ALLOWED_ORIGINS no se permite
+# ningún origen distinto del propio (el perfil "dev" permite localhost).
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  docs:
+    # Swagger / OpenAPI abiertos sin autenticación: solo en "dev".
+    public: ${APP_DOCS_PUBLIC:false}
