@@ -98,4 +98,24 @@ class AlertServiceTest {
         }
         assertThat(handlers).containsExactly("AlertService.onStockLevelDropped");
     }
+
+    @Test
+    @DisplayName("al preparar un traslado se cierran solo las alertas de solicitud de traslado de sus productos")
+    void transferPreparedDismissesMatchingAlerts() {
+        StockAlert match = new StockAlert(100L, 3L, 5L, "Solicitud de Traslado pendiente", java.time.LocalDateTime.now(), false,
+                null, null, null, null, null);
+        StockAlert otherProduct = new StockAlert(101L, 3L, 6L, "Solicitud de Traslado pendiente", java.time.LocalDateTime.now(), false,
+                null, null, null, null, null);
+        StockAlert lowStock = new StockAlert(102L, 3L, 5L, "Stock bajo", java.time.LocalDateTime.now(), false,
+                null, null, null, null, null);
+        when(alerts.findActiveAlerts(3L)).thenReturn(List.of(match, otherProduct, lowStock));
+        when(alerts.findById(100L)).thenReturn(Optional.of(match));
+
+        service.onTransferPrepared(new co.com.zenvory.inventario.transfer.domain.event.TransferPreparedEvent(
+                9L, 3L, java.util.Set.of(5L)));
+
+        assertThat(match.isResolved()).isTrue();
+        assertThat(otherProduct.isResolved()).isFalse();
+        assertThat(lowStock.isResolved()).isFalse();
+    }
 }

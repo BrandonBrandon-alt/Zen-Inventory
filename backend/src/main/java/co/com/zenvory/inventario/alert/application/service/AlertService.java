@@ -125,6 +125,26 @@ public class AlertService implements AlertUseCase {
      * 
      * @param event Evento de restauración de niveles.
      */
+    /**
+     * Cierra las alertas de "solicitud de traslado" de los productos de un traslado cuando el origen autoriza su
+     * salida. Corre tras el commit y en su propia transacción: si falla, el traslado ya quedó preparado.
+     */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void onTransferPrepared(co.com.zenvory.inventario.transfer.domain.event.TransferPreparedEvent event) {
+        try {
+            for (StockAlert alert : alertRepository.findActiveAlerts(event.originBranchId())) {
+                boolean isTransferRequest = alert.getMessage() != null && alert.getMessage().contains("Solicitud de Traslado");
+                if (isTransferRequest && alert.getProductId() != null && event.productIds().contains(alert.getProductId())) {
+                    dismissAlert(alert.getId(), "Transferencia autorizada por el gerente");
+                }
+            }
+        } catch (Exception e) {
+            log.error("No se pudieron cerrar las alertas del traslado {}: {}", event.transferId(), e.getMessage());
+        }
+    }
+
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)

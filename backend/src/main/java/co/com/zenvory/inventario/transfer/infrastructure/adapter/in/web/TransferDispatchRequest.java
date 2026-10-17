@@ -7,13 +7,14 @@ import jakarta.validation.constraints.PositiveOrZero;
 import java.util.List;
 
 public record TransferDispatchRequest(
-        @NotNull(message = "El nombre del transportista es obligatorio.")
+        @jakarta.validation.constraints.NotBlank(message = "El nombre del transportista es obligatorio.")
         String carrier,
 
         @PositiveOrZero(message = "El costo de envío no puede ser negativo.")
         java.math.BigDecimal shippingCost,
 
         String trackingNumber,
+        @jakarta.validation.constraints.FutureOrPresent(message = "La fecha estimada de llegada no puede estar en el pasado.")
         java.time.LocalDateTime estimatedArrivalDate,
 
         @NotEmpty(message = "Debe enviar al menos un item.")

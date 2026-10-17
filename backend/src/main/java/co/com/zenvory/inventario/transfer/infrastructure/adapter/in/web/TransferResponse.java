@@ -40,7 +40,9 @@ public record TransferResponse(
             Integer requestedQuantity,
             Integer sentQuantity,
             Integer receivedQuantity,
-            Integer missingQuantity
+            Integer missingQuantity,
+            /** Pedido que el origen no envió (0 si se envió todo o aún no se despacha). */
+            Integer unsentQuantity
     ) {}
 
     public static TransferResponse fromDomain(Transfer transfer) {
@@ -77,7 +79,8 @@ public record TransferResponse(
                         d.getRequestedQuantity(),
                         d.getSentQuantity(),
                         d.getReceivedQuantity(),
-                        d.getMissingQuantity()
+                        d.getMissingQuantity(),
+                        d.getUnsentQuantity()
                 )).toList()
         );
     }

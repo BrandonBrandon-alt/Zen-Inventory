@@ -1,6 +1,8 @@
 package co.com.zenvory.inventario.transfer.application.service;
 
-import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
+import co.com.zenvory.inventario.branch.application.port.in.BranchUseCase;
+import co.com.zenvory.inventario.branch.domain.model.Branch;
+import org.springframework.context.ApplicationEventPublisher;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
 import co.com.zenvory.inventario.auth.domain.model.Role;
 import co.com.zenvory.inventario.auth.domain.model.User;
@@ -38,6 +40,8 @@ class TransferServiceTest {
     private TransferRepositoryPort repo;
     private InventoryUseCase inventory;
     private TransferService service;
+    private BranchUseCase branches;
+    private ApplicationEventPublisher publisher;
     private Transfer transfer;
 
     @BeforeEach
@@ -46,7 +50,10 @@ class TransferServiceTest {
         inventory = mock(InventoryUseCase.class);
         ProductUseCase products = mock(ProductUseCase.class);
         UserRepositoryPort users = mock(UserRepositoryPort.class);
-        service = new TransferService(repo, inventory, products, mock(AlertUseCase.class), users);
+        branches = mock(BranchUseCase.class);
+        publisher = mock(ApplicationEventPublisher.class);
+        when(branches.getBranchById(any())).thenAnswer(i -> Branch.builder().id(i.getArgument(0)).name("Sede").active(true).build());
+        service = new TransferService(repo, inventory, products, branches, users, publisher);
 
         User manager = User.builder().id(9L).nombre("Ana").email("ana@x.co").sucursalId(1L)
                 .role(Role.builder().id(2L).nombre("MANAGER").build()).build();
@@ -213,5 +220,92 @@ class TransferServiceTest {
         service.requestTransfer(new co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCommand(
                 1L, 2L, null, null, List.of(new co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCommand.Detail(5L, 3))));
         verify(inventory).reserveStock(1L, 5L, BigDecimal.valueOf(3));
+    }
+
+    @Test
+    @DisplayName("despachar todo en cero se rechaza: no deja un traslado en tránsito sin carga")
+    void dispatchAllZeroRejected() {
+        assertThatThrownBy(() -> service.dispatchTransfer(1L, dispatch(
+                new DispatchTransferCommand.DispatchDetail(11L, 0), new DispatchTransferCommand.DispatchDetail(12L, 0))))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(inventory, never()).releaseStock(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("enviar menos de lo pedido queda señalado como faltante de origen (unsentQuantity)")
+    void shortDispatchIsFlagged() {
+        service.dispatchTransfer(1L, dispatch(
+                new DispatchTransferCommand.DispatchDetail(11L, 7), new DispatchTransferCommand.DispatchDetail(12L, 4)));
+        assertThat(transfer.getDetails().get(0).getUnsentQuantity()).isEqualTo(3);
+        assertThat(transfer.getDetails().get(1).getUnsentQuantity()).isZero();
+    }
+
+    @Test
+    @DisplayName("preparar publica el evento que cierra las alertas (en vez de limpiarlas dentro de la transacción)")
+    void prepareCleansAlertsViaEvent() {
+        Transfer fresh = Transfer.create(1L, 2L, null, List.of(new TransferDetail(21L, 5L, "A", 3, 0, 0, 0)),
+                TransferPriority.NORMAL, 9L, "Ana");
+        fresh.approveDestination(9L, "Ana");
+        when(repo.findById(2L)).thenReturn(Optional.of(fresh));
+        service.prepareTransfer(2L, List.of());
+        org.mockito.ArgumentCaptor<co.com.zenvory.inventario.transfer.domain.event.TransferPreparedEvent> event =
+                org.mockito.ArgumentCaptor.forClass(co.com.zenvory.inventario.transfer.domain.event.TransferPreparedEvent.class);
+        verify(publisher).publishEvent(event.capture());
+        assertThat(event.getValue().originBranchId()).isEqualTo(1L);
+        assertThat(event.getValue().productIds()).containsExactly(5L);
+    }
+
+    @Test
+    @DisplayName("el reenvío por faltantes reserva stock en el origen")
+    void resendReservesStock() {
+        inTransit();
+        actAs("luis@x.co");
+        service.receiveTransfer(1L, new ReceiveTransferCommand("n", List.of(
+                new ReceiveTransferCommand.ReceivedDetail(11L, 6), new ReceiveTransferCommand.ReceivedDetail(12L, 4))));
+        service.resolveAsResend(1L);
+        verify(inventory).reserveStock(1L, 5L, BigDecimal.valueOf(4));
+    }
+
+    @Test
+    @DisplayName("solicitar con un producto repetido o con una sucursal inexistente se rechaza sin reservar")
+    void requestValidations() {
+        actAs("luis@x.co");
+        var dup = new co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCommand(1L, 2L, null, null, List.of(
+                new co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCommand.Detail(5L, 1),
+                new co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCommand.Detail(5L, 2)));
+        assertThatThrownBy(() -> service.requestTransfer(dup)).isInstanceOf(IllegalArgumentException.class);
+
+        when(branches.getBranchById(77L)).thenThrow(new co.com.zenvory.inventario.branch.domain.exception.BranchNotFoundException(77L));
+        var ghost = new co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCommand(77L, 2L, null, null, List.of(
+                new co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCommand.Detail(5L, 1)));
+        assertThatThrownBy(() -> service.requestTransfer(ghost)).isInstanceOf(co.com.zenvory.inventario.branch.domain.exception.BranchNotFoundException.class);
+
+        when(branches.getBranchById(78L)).thenReturn(Branch.builder().id(78L).name("Cerrada").active(false).build());
+        var closed = new co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCommand(78L, 2L, null, null, List.of(
+                new co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCommand.Detail(5L, 1)));
+        assertThatThrownBy(() -> service.requestTransfer(closed)).isInstanceOf(IllegalArgumentException.class);
+        verify(inventory, never()).reserveStock(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("leer un traslado ajeno es 403; el origen, el destino y el ADMIN sí pueden")
+    void readingAnotherBranchTransferIsForbidden() {
+        actAs("eva@x.co");
+        assertThatThrownBy(() -> service.getTransferForCurrentUser(1L))
+                .isInstanceOf(co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException.class);
+        for (String email : new String[] {"ana@x.co", "luis@x.co", "root@x.co"}) {
+            actAs(email);
+            assertThat(service.getTransferForCurrentUser(1L)).isSameAs(transfer);
+        }
+    }
+
+    @Test
+    @DisplayName("los informes se calculan solo con los traslados de la sucursal indicada")
+    void reportsAreScopedToBranch() {
+        when(repo.findByBranch(2L)).thenReturn(List.of(transfer));
+        when(repo.findAll()).thenReturn(List.of(transfer, transfer, transfer));
+        assertThat(service.getFulfillmentReport(2L).totalTransfers()).isEqualTo(1);
+        assertThat(service.getFulfillmentReport(null).totalTransfers()).isEqualTo(3);
+        assertThat(service.getLogisticsAnalytics(2L).globalMetrics().totalTransfers()).isEqualTo(1);
     }
 }

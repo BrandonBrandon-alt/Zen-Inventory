@@ -48,6 +48,11 @@ public class TransferDetail {
         this.missingQuantity = Math.max(0, this.sentQuantity - this.receivedQuantity);
     }
 
+    /** Lo pedido que no se envió (0 antes del despacho o si se envió todo): permite señalar el faltante de origen. */
+    public Integer getUnsentQuantity() {
+        return this.sentQuantity > 0 ? Math.max(0, this.requestedQuantity - this.sentQuantity) : 0;
+    }
+
     public Long getId() { return id; }
     public Long getProductId() { return productId; }
     public Integer getRequestedQuantity() { return requestedQuantity; }
