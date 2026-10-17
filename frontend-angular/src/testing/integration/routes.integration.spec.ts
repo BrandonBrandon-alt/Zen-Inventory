@@ -45,8 +45,13 @@ describe('rutas (guardas + shell + login)', () => {
     await harness.navigateByUrl('/');
     expect(router.url).toBe('/dashboard');
     expect(await screen.findByRole('navigation', { name: 'Principal' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Panel' })).toBeInTheDocument();
-    expect(screen.getByText(/todavía no está disponible/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: /^Buen(os|as) (días|tardes|noches)/ })).toBeInTheDocument();
+  });
+
+  it('una pantalla aún no migrada muestra el aviso en lugar de la vista', async () => {
+    const { harness } = await setup('ADMIN');
+    await harness.navigateByUrl('/purchases');
+    expect(await screen.findByText(/todavía no está disponible/)).toBeInTheDocument();
   });
 
   it('el enlace de la pantalla actual queda marcado como página actual', async () => {

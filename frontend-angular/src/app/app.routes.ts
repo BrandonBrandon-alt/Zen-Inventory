@@ -14,6 +14,7 @@ const loadNotMigrated = () =>
 const IMPLEMENTED: Readonly<Record<string, () => Promise<Type<unknown>>>> = {
   '/branches': () =>
     import('./features/branches/pages/branches-page/branches-page').then((m) => m.BranchesPage),
+  '/dashboard': () => import('./features/dashboard/pages/dashboard-page/dashboard-page').then((m) => m.DashboardPage),
   '/inventory': () => import('./features/inventory/pages/inventory-page/inventory-page').then((m) => m.InventoryPage),
   '/users': () => import('./features/users/pages/users-page/users-page').then((m) => m.UsersPage),
 };

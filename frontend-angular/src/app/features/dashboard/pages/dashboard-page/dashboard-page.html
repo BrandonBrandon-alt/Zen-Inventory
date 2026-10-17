@@ -1,0 +1,169 @@
+<header class="mb-8 animate-enter">
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">{{ hello() }}</h1>
+      @if (digest(); as text) {
+        <p class="mt-1 font-title text-lg text-fg-subtle">{{ text }}</p>
+      }
+    </div>
+    @if (hasAnalytics()) {
+      <app-segmented [options]="ranges" [(value)]="range" ariaLabel="Periodo" />
+    }
+  </div>
+</header>
+
+@if (!hasAnalytics()) {
+  <app-empty-state title="Tu cuenta no incluye indicadores" description="Usa el menú para ir a las pantallas de tu trabajo." />
+} @else {
+  <div class="grid animate-enter-delayed gap-8">
+    <!-- Cifras del periodo -->
+    <section aria-label="Cifras del periodo">
+      @if (overview.error(); as message) {
+        <app-alert variant="danger">
+          {{ message }}
+          <button type="button" class="ml-2 underline" (click)="retryOverview()">Reintentar</button>
+        </app-alert>
+      } @else if (overview.data(); as data) {
+        <dl class="grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4 lg:divide-x lg:divide-line">
+          @if (canSeeMoney()) {
+            <div class="lg:pr-6">
+              <dt class="text-sm text-fg-subtle">Ingresos</dt>
+              <dd class="mt-1 font-title text-3xl font-bold text-fg">{{ formatMoneyCompact(data.summary.revenue) }}</dd>
+            </div>
+          }
+          <div class="lg:px-6">
+            <dt class="text-sm text-fg-subtle">Unidades vendidas</dt>
+            <dd class="mt-1 font-title text-3xl font-bold text-fg">{{ formatQuantity(data.summary.units) }}</dd>
+          </div>
+          @if (canSeeMoney()) {
+            <div class="lg:px-6">
+              <dt class="text-sm text-fg-subtle">Ticket promedio</dt>
+              <dd class="mt-1 font-title text-3xl font-bold text-fg">{{ formatMoneyCompact(data.summary.averageTicket) }}</dd>
+            </div>
+            <div class="lg:pl-6">
+              <dt class="text-sm text-fg-subtle">Valor del inventario</dt>
+              <dd class="mt-1 font-title text-3xl font-bold text-fg">{{ formatMoneyCompact(data.summary.inventoryValue) }}</dd>
+            </div>
+          }
+        </dl>
+      } @else {
+        <div class="flex justify-center py-6"><app-spinner /></div>
+      }
+    </section>
+
+    @if (canSeeMoney()) {
+      <app-card title="Ingresos" description="Ventas por día en el periodo elegido" variant="plain">
+        @if (overview.data(); as data) {
+          @if (trendPoints().length > 1) {
+            <app-area-chart [points]="trendPoints()" [format]="formatMoneyCompact" ariaLabel="Ingresos por día" />
+          } @else {
+            <app-empty-state title="Sin ventas suficientes" description="Hacen falta al menos dos días con ventas para dibujar la tendencia." />
+          }
+        }
+      </app-card>
+    }
+
+    <div class="grid gap-8 lg:grid-cols-2">
+      <app-card title="Por atender" description="Reposición y traslados que esperan una acción">
+        @if (replenishment.error(); as message) {
+          <app-alert variant="danger">{{ message }}</app-alert>
+        } @else if (replenishment.data(); as items) {
+          @if (items.length === 0) {
+            <p class="text-sm text-fg-subtle">Ningún producto está por debajo de su mínimo.</p>
+          } @else {
+            <ul class="divide-y divide-line">
+              @for (item of attention(); track item.productId) {
+                <li class="flex items-center justify-between gap-3 py-2.5">
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-medium text-fg">{{ item.name }}</p>
+                    <p class="text-xs text-fg-subtle">{{ formatQuantity(item.stock) }} de {{ formatQuantity(item.minimum) }} mínimas</p>
+                  </div>
+                  <app-badge [variant]="priority[item.priority].variant">{{ priority[item.priority].label }}</app-badge>
+                </li>
+              }
+            </ul>
+            @if (items.length > maxItems) {
+              <p class="mt-3 text-xs text-fg-subtle">y {{ items.length - maxItems }} más en Inventario.</p>
+            }
+          }
+        } @else {
+          <app-spinner />
+        }
+      </app-card>
+
+      <app-card title="Más vendidos" description="Unidades en el periodo" variant="plain">
+        @if (overview.data()) {
+          <app-bar-list [items]="topProducts()" [format]="formatQuantity" emptyText="Sin ventas en este periodo" />
+        }
+      </app-card>
+    </div>
+
+    <div class="grid gap-8 lg:grid-cols-2">
+      <app-card title="Traslados en curso" variant="plain">
+        @if (transfers.error(); as message) {
+          <app-alert variant="danger">{{ message }}</app-alert>
+        } @else if (transfers.data(); as items) {
+          @if (items.length === 0) {
+            <p class="text-sm text-fg-subtle">No hay traslados en curso.</p>
+          } @else {
+            <ul class="divide-y divide-line">
+              @for (t of transferRows(); track t.id) {
+                <li class="flex items-center justify-between gap-3 py-2.5">
+                  <p class="min-w-0 truncate text-sm text-fg">{{ t.route }}</p>
+                  <app-badge variant="info">{{ transferStatus[t.status] ?? t.status }}</app-badge>
+                </li>
+              }
+            </ul>
+          }
+        } @else {
+          <app-spinner />
+        }
+      </app-card>
+
+      @if (isAdmin()) {
+        <app-card title="Por sede" description="Ingresos del periodo" variant="plain">
+          @if (overview.data()) {
+            <app-bar-list [items]="branchBars()" [format]="formatMoneyCompact" emptyText="Sin ventas en este periodo" />
+          }
+        </app-card>
+      } @else if (canSeeMoney()) {
+        <app-card title="Meses recientes" description="Ingresos por mes" variant="plain">
+          @if (monthly.error(); as message) {
+            <app-alert variant="danger">{{ message }}</app-alert>
+          } @else if (monthly.data()) {
+            <app-column-chart [items]="monthColumns()" emptyText="Sin ventas registradas" />
+          }
+        </app-card>
+      }
+    </div>
+
+    @if (isAdmin()) {
+      <app-card title="Meses recientes" description="Ingresos por mes" variant="plain">
+        @if (monthly.error(); as message) {
+          <app-alert variant="danger">{{ message }}</app-alert>
+        } @else if (monthly.data()) {
+          <app-column-chart [items]="monthColumns()" emptyText="Sin ventas registradas" />
+        }
+      </app-card>
+    }
+
+    <app-card title="Sin movimiento" description="Productos con existencias que no se han vendido" variant="plain">
+      @if (rotation.error(); as message) {
+        <app-alert variant="danger">{{ message }}</app-alert>
+      } @else if (rotation.data()) {
+        @if (stagnant().length === 0) {
+          <p class="text-sm text-fg-subtle">Todos los productos con existencias se han vendido recientemente.</p>
+        } @else {
+          <ul class="divide-y divide-line">
+            @for (item of stagnant(); track item.productId) {
+              <li class="flex items-center justify-between gap-3 py-2.5">
+                <p class="min-w-0 truncate text-sm text-fg">{{ item.name }}</p>
+                <p class="shrink-0 text-xs text-fg-subtle">{{ formatQuantity(item.stock) }} en stock · {{ item.inactiveDays }} días</p>
+              </li>
+            }
+          </ul>
+        }
+      }
+    </app-card>
+  </div>
+}
