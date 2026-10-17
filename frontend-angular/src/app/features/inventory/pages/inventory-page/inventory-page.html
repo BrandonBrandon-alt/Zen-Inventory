@@ -1,0 +1,80 @@
+<header class="mb-6 flex flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Inventario</h1>
+    @if (!loading() && !error() && items().length > 0) {
+      <p class="mt-1 text-sm text-fg-subtle">{{ summary() }}</p>
+    }
+  </div>
+  @if (isAdmin() && branchOptions().length > 0) {
+    <div class="w-64">
+      <app-select
+        [(value)]="branchId"
+        [options]="branchOptions()"
+        [icon]="storeIcon"
+        searchable
+        searchPlaceholder="Buscar sucursal…"
+        ariaLabel="Sucursal"
+        placeholder="Selecciona una sucursal"
+      />
+    </div>
+  }
+</header>
+
+@if (canSeeKardex()) {
+  <app-tabs class="mb-5" [tabs]="tabs()" [(active)]="activeTab" idPrefix="inventory" ariaLabel="Secciones del inventario" />
+}
+
+@if (activeTab() === 'stock') {
+  <div id="inventory-panel-stock" role="tabpanel" aria-labelledby="inventory-tab-stock">
+    <div class="mb-4 max-w-sm">
+      <app-form-field>
+        <input appInput type="search" placeholder="Buscar por producto o SKU…" aria-label="Buscar producto" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
+        <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
+      </app-form-field>
+    </div>
+
+    <app-data-table
+      caption="Existencias por producto"
+      [columns]="columns()"
+      [rows]="rows()"
+      [rowKey]="rowKey"
+      [loading]="loading()"
+      [error]="error()"
+      [pageSize]="15"
+      minWidth="52rem"
+      emptyTitle="No hay productos"
+      [emptyDescription]="search() ? 'Ningún producto coincide con la búsqueda.' : 'Los productos del catálogo aparecerán aquí con sus existencias.'"
+      (retry)="load()"
+    >
+      <ng-template appCell="stock" let-row>
+        <span class="inline-flex items-center justify-end gap-2">
+          @if (row.level === 'out') {
+            <app-badge variant="danger" dot>Agotado</app-badge>
+          } @else if (row.level === 'critical') {
+            <app-badge variant="warning" dot>Crítico</app-badge>
+          }
+          <span class="font-semibold tabular-nums">{{ formatQuantity(row.stock) }}</span>
+        </span>
+      </ng-template>
+      <ng-template appCell="acciones" let-row>
+        <div class="flex justify-end gap-1">
+          <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Ajustar stock de ' + row.nombre" (click)="openAdjust(row)">
+            <svg lucideArrowUpDown [size]="16" aria-hidden="true"></svg>
+          </button>
+          <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Configurar stock mínimo de ' + row.nombre" (click)="openMinimum(row)">
+            <svg lucideSlidersHorizontal [size]="16" aria-hidden="true"></svg>
+          </button>
+        </div>
+      </ng-template>
+    </app-data-table>
+  </div>
+} @else if (branchId() !== null) {
+  <div id="inventory-panel-kardex" role="tabpanel" aria-labelledby="inventory-tab-kardex">
+    <app-kardex-panel [branchId]="branchId()!" [products]="items()" />
+  </div>
+}
+
+@if (branchId() !== null) {
+  <app-adjust-stock-modal [(open)]="adjustOpen" [product]="adjusting()" [branchId]="branchId()!" (saved)="load(branchId(), true)" />
+  <app-minimum-stock-modal [(open)]="configOpen" [product]="configuring()" [branchId]="branchId()!" (saved)="load(branchId(), true)" />
+}

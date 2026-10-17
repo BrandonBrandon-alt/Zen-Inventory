@@ -171,6 +171,17 @@ describe('rutas (guardas + shell + login)', () => {
     expect(await screen.findByText('Todavía no hay usuarios')).toBeInTheDocument();
   });
 
+  it('Inventario ya está migrado y cualquier rol con sucursal entra', async () => {
+    server.use(
+      http.get(`${TEST_API}/api/catalog/products`, () => HttpResponse.json([{ id: 1, sku: 'A', nombre: 'Tornillo', unitAbbreviation: 'UND', activo: true }])),
+      http.get(`${TEST_API}/api/v1/inventory/branches/3`, () => HttpResponse.json([{ productId: 1, stockActual: 4, stockMinimo: 2 }])),
+    );
+    const { harness, router } = await setup('SELLER');
+    await harness.navigateByUrl('/inventory');
+    expect(router.url).toBe('/inventory');
+    expect(await screen.findByText('Tornillo')).toBeInTheDocument();
+  });
+
   it('un SELLER no entra a Usuarios: vuelve al panel', async () => {
     const { harness, router } = await setup('SELLER');
     await harness.navigateByUrl('/users');

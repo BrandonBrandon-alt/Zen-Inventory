@@ -10,9 +10,9 @@ export abstract class FieldControl {
   abstract readonly id: string;
 }
 
-/** Estilos de un `<input>` o `<select>` del sistema de diseño. Dentro de `app-form-field` hereda errores y etiqueta. */
+/** Estilos de un `<input>`, `<select>` o `<textarea>` del sistema de diseño. Dentro de `app-form-field` hereda errores y etiqueta. */
 @Directive({
-  selector: 'input[appInput], select[appInput]',
+  selector: 'input[appInput], select[appInput], textarea[appInput]',
   host: {
     class:
       'w-full rounded-md border border-line bg-card px-3.5 py-[11px] text-sm text-fg outline-none ' +
