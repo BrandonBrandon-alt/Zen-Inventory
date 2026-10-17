@@ -18,6 +18,7 @@ import co.com.zenvory.inventario.inventory.domain.exception.InventoryNotFoundExc
 import co.com.zenvory.inventario.purchase.domain.exception.InvalidPurchaseStateException;
 import co.com.zenvory.inventario.sale.domain.exception.EmptySaleException;
 import co.com.zenvory.inventario.sale.domain.exception.InvalidReturnOperationException;
+import co.com.zenvory.inventario.sale.domain.exception.InvalidSaleStateException;
 import co.com.zenvory.inventario.sale.domain.exception.ReturnRequestNotFoundException;
 import co.com.zenvory.inventario.sale.domain.exception.SaleNotFoundException;
 import co.com.zenvory.inventario.transfer.domain.exception.InvalidTransferStateException;
@@ -76,6 +77,7 @@ public class GlobalExceptionHandler {
             Map.entry(SaleNotFoundException.class, new Mapping(HttpStatus.NOT_FOUND, ErrorCode.RESOURCE_NOT_FOUND)),
             Map.entry(ReturnRequestNotFoundException.class, new Mapping(HttpStatus.NOT_FOUND, ErrorCode.RESOURCE_NOT_FOUND)),
             Map.entry(DuplicateSkuException.class, new Mapping(HttpStatus.CONFLICT, ErrorCode.DUPLICATE_SKU)),
+            Map.entry(InvalidSaleStateException.class, new Mapping(HttpStatus.CONFLICT, ErrorCode.INVALID_STATE)),
             Map.entry(InvalidTransferStateException.class, new Mapping(HttpStatus.CONFLICT, ErrorCode.INVALID_STATE)),
             Map.entry(InvalidPurchaseStateException.class, new Mapping(HttpStatus.CONFLICT, ErrorCode.INVALID_STATE)),
             Map.entry(AlertAlreadyResolvedException.class, new Mapping(HttpStatus.CONFLICT, ErrorCode.ALREADY_RESOLVED)),

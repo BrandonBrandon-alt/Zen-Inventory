@@ -169,7 +169,8 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
                     sale.getUserId(), 
                     sale.getId(),
                     "ANULACION_VENTA",
-                    detail.getUnitPriceApplied(),
+                    // Sin costo: reponer unidades no es una compra, y el precio de venta no debe entrar al costo promedio.
+                    null,
                     "Anulación #" + id + ": " + reason,
                     null
             );

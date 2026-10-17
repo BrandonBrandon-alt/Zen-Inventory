@@ -1,5 +1,6 @@
 package co.com.zenvory.inventario.sale.domain.model;
 
+import co.com.zenvory.inventario.sale.domain.exception.InvalidSaleStateException;
 import co.com.zenvory.inventario.sale.domain.exception.EmptySaleException;
 
 import java.math.BigDecimal;
@@ -59,7 +60,11 @@ public class Sale {
 
     public void cancel(String reason) {
         if (this.status == SaleStatus.CANCELED) {
-            throw new IllegalStateException("Esta venta ya se encuentra anulada.");
+            throw new InvalidSaleStateException("Esta venta ya se encuentra anulada.");
+        }
+        if (this.status == SaleStatus.RETURNED) {
+            // Ya se repuso stock por la devolución aprobada: anularla repondría de nuevo las mismas unidades.
+            throw new InvalidSaleStateException("Esta venta tiene devoluciones aprobadas y ya no puede anularse.");
         }
         if (reason == null || reason.trim().isEmpty()) {
             throw new IllegalArgumentException("El motivo de la anulación es obligatorio.");
@@ -70,7 +75,7 @@ public class Sale {
 
     public void markAsReturned() {
         if (this.status == SaleStatus.CANCELED) {
-            throw new IllegalStateException("No se puede marcar como devolución una venta ya anulada.");
+            throw new InvalidSaleStateException("No se puede marcar como devolución una venta ya anulada.");
         }
         this.status = SaleStatus.RETURNED;
     }

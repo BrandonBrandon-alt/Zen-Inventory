@@ -46,6 +46,7 @@ public class ReturnRequestService implements ReturnRequestUseCase {
     public ReturnRequest createRequest(CreateReturnRequestCommand command) {
         // 1. Obtener la venta original
         Sale sale = saleManagementUseCase.getSaleById(command.saleId());
+        requireNotCanceled(sale);
         
         // 2. Mapear detalles originales para validación rápida
         Map<Long, SaleDetail> originalDetails = sale.getDetails().stream()
@@ -108,6 +109,8 @@ public class ReturnRequestService implements ReturnRequestUseCase {
     @Transactional
     public void approveRequest(Long requestId, Long managerId, String comment) {
         ReturnRequest request = getRequestById(requestId);
+        // Una venta anulada ya repuso su stock: aprobar la devolución lo repondría dos veces.
+        requireNotCanceled(saleManagementUseCase.getSaleById(request.getSaleId()));
         
         // 1. Transición de estado en el dominio
         request.approve(managerId, comment);
@@ -126,7 +129,8 @@ public class ReturnRequestService implements ReturnRequestUseCase {
                 managerId,
                 request.getSaleId(), // Referenciamos a la venta original para trazabilidad
                 "DEVOLUCION",
-                detail.getUnitPricePaid(),
+                // Sin costo: reponer unidades devueltas no es una compra y no debe alterar el costo promedio.
+                null,
                 "Devolución Aprobada Solicitud #" + requestId + ": " + detail.getReasonSpecific(),
                 null
             );
@@ -134,6 +138,12 @@ public class ReturnRequestService implements ReturnRequestUseCase {
 
         // 4. Marcar la venta original como 'RETURNED' para bloquear futuros flujos (Anulación/Nuevas Solicitudes)
         saleManagementUseCase.updateSaleStatus(request.getSaleId(), SaleStatus.RETURNED);
+    }
+
+    private void requireNotCanceled(Sale sale) {
+        if (sale.getStatus() == SaleStatus.CANCELED) {
+            throw new InvalidReturnOperationException("No se pueden gestionar devoluciones de una venta anulada.");
+        }
     }
 
     @Override
