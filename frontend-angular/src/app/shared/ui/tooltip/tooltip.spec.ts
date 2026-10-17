@@ -1,0 +1,115 @@
+import { render, screen } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { computeTooltipPosition, Tooltip } from './tooltip';
+
+const HOST = '<button [appTooltip]="text" tooltipDelay="0" aria-label="Ajustar">i</button><button>otro</button>';
+
+async function setup(text = 'Ajustar existencias') {
+  await render(HOST, { imports: [Tooltip], componentProperties: { text } });
+  return screen.getByRole('button', { name: 'Ajustar' });
+}
+
+describe('Tooltip', () => {
+  it('al pasar el cursor muestra la descripción y al salir la oculta', async () => {
+    const button = await setup();
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    await userEvent.hover(button);
+    await vi.waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent('Ajustar existencias'));
+    await userEvent.unhover(button);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('con el teclado aparece al enfocar y desaparece al perder el foco', async () => {
+    const button = await setup();
+    await userEvent.tab();
+    expect(button).toHaveFocus();
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Ajustar existencias');
+    await userEvent.tab();
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('el elemento queda descrito por la descripción mientras se muestra, y deja de estarlo después', async () => {
+    const button = await setup();
+    expect(button).not.toHaveAttribute('aria-describedby');
+    await userEvent.tab();
+    expect(button).toHaveAccessibleDescription('Ajustar existencias');
+    await userEvent.tab();
+    expect(button).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('Escape la oculta sin propagarse al resto de la página (no cierra un modal)', async () => {
+    await setup();
+    await userEvent.tab();
+    const outer = vi.fn(); // se registra después del Tab: solo importa lo que ocurra con Escape
+    document.addEventListener('keydown', outer);
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    expect(outer).not.toHaveBeenCalled();
+    document.removeEventListener('keydown', outer);
+  });
+
+  it('sin descripción visible, Escape sigue su camino', async () => {
+    await setup();
+    const outer = vi.fn();
+    document.addEventListener('keydown', outer);
+    screen.getByRole('button', { name: 'otro' }).focus();
+    await userEvent.keyboard('{Escape}');
+    expect(outer).toHaveBeenCalled();
+    document.removeEventListener('keydown', outer);
+  });
+
+  it('con texto vacío no se muestra nada', async () => {
+    const button = await setup('');
+    await userEvent.hover(button);
+    await userEvent.tab();
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('la espera al pasar el cursor se respeta: no aparece de inmediato', async () => {
+    await render('<button [appTooltip]="text" tooltipDelay="300" aria-label="X">i</button>', { imports: [Tooltip], componentProperties: { text: 'Hola' } });
+    await userEvent.hover(screen.getByRole('button'));
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.getByRole('tooltip')).toBeInTheDocument());
+  });
+
+  it('al destruir el componente la descripción se retira del documento', async () => {
+    await render('<button [appTooltip]="text" tooltipDelay="0" aria-label="X">i</button>', { imports: [Tooltip], componentProperties: { text: 'Hola' } }).then(async ({ fixture }) => {
+      await userEvent.tab();
+      expect(screen.getByRole('tooltip')).toBeInTheDocument();
+      fixture.destroy();
+    });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+});
+
+describe('computeTooltipPosition', () => {
+  const viewport = { width: 1000, height: 800 };
+  const tip = { width: 120, height: 30 };
+
+  it('por defecto va encima y centrada', () => {
+    const r = computeTooltipPosition({ top: 400, left: 500, width: 40, height: 40 }, tip, viewport, 'top');
+    expect(r).toEqual({ placement: 'top', top: 400 - 8 - 30, left: 500 + 20 - 60 });
+  });
+
+  it('si encima no cabe, pasa abajo', () => {
+    const r = computeTooltipPosition({ top: 10, left: 500, width: 40, height: 40 }, tip, viewport, 'top');
+    expect(r.placement).toBe('bottom');
+    expect(r.top).toBe(10 + 40 + 8);
+  });
+
+  it('si se pide abajo y no cabe, pasa arriba', () => {
+    const r = computeTooltipPosition({ top: 770, left: 500, width: 40, height: 40 }, tip, viewport, 'bottom');
+    expect(r.placement).toBe('top');
+  });
+
+  it('no se sale por los lados de la ventana', () => {
+    expect(computeTooltipPosition({ top: 400, left: 0, width: 20, height: 20 }, tip, viewport, 'top').left).toBe(8);
+    expect(computeTooltipPosition({ top: 400, left: 990, width: 20, height: 20 }, tip, viewport, 'top').left).toBe(1000 - 120 - 8);
+  });
+
+  it('si no cabe ni arriba ni abajo, se queda en el lado pedido', () => {
+    const r = computeTooltipPosition({ top: 20, left: 500, width: 40, height: 760 }, tip, viewport, 'top');
+    expect(r.placement).toBe('top');
+  });
+});

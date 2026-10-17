@@ -10,6 +10,7 @@ import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-tabl
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { type TabItem, Tabs } from '@shared/ui/tabs/tabs';
+import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { AdjustStockModal } from '../../components/adjust-stock-modal/adjust-stock-modal';
 import { KardexPanel } from '../../components/kardex-panel/kardex-panel';
 import { MinimumStockModal } from '../../components/minimum-stock-modal/minimum-stock-modal';
@@ -54,6 +55,7 @@ const normalize = (text: string): string => text.normalize('NFD').replace(/\p{Di
     InputDirective,
     Select,
     Tabs,
+    Tooltip,
     AdjustStockModal,
     MinimumStockModal,
     KardexPanel,

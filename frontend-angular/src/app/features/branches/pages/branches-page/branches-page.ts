@@ -6,6 +6,7 @@ import { LucideBan, LucidePencil, LucidePlus } from '@lucide/angular';
 import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog/confirm-dialog';
+import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
 import { type Branch, BranchesApi } from '../../data-access/branches-api';
 import { BranchFormModal } from '../../components/branch-form-modal/branch-form-modal';
@@ -22,7 +23,7 @@ const rowKey = (branch: Branch): number => branch.id;
 
 @Component({
   selector: 'app-branches-page',
-  imports: [DataTable, DataTableCell, Badge, Button, ConfirmDialog, BranchFormModal, LucideBan, LucidePencil, LucidePlus],
+  imports: [DataTable, DataTableCell, Badge, Button, ConfirmDialog, BranchFormModal, Tooltip, LucideBan, LucidePencil, LucidePlus],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './branches-page.html',

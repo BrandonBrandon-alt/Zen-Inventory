@@ -65,6 +65,7 @@ con sus roles y cambia su `loadComponent` en `app.routes.ts` (mientras tanto mue
 - Botones de acción de fila con icono: `variant="ghost-brand"` (editar, hover en color principal) y `variant="ghost-danger"` (desactivar, hover rojo). Los botones del pie de un modal se separan solos al ir dentro de `<div data-slot="footer">`.
 - Inventario (`/inventory`): existencias por sucursal (ADMIN elige sucursal; el resto trabaja en la suya) con búsqueda, nivel crítico/agotado, ajuste manual de stock (ingreso/retiro con motivo y justificación) y stock mínimo; pestaña Kardex con el historial filtrable por producto. Costo y precio solo para ADMIN/MANAGER; el vendedor no ve acciones ni Kardex. Compra, venta y traslado no se ajustan aquí: tienen su propia pantalla.
 - `Tabs` (`shared/ui/tabs`) para pestañas accesibles y `shared/format` para pesos, cantidades y fechas.
+- Descripciones emergentes: `appTooltip="texto"` (`shared/ui/tooltip`) en botones de solo icono o datos abreviados. Aparece al pasar el cursor (con una breve espera) o al enfocar con el teclado, se oculta con Escape y va en la capa superior del navegador. Un botón de solo icono sigue necesitando su `aria-label`: el tooltip complementa, no sustituye. Ya está en las acciones de Sucursales, Usuarios e Inventario, la paginación y el cierre de los modales.
 - Un componente sube a `shared/ui` solo cuando lo usa una segunda pantalla.
 - Cada pantalla migrada entra con sus tests; el E2E se corre a pedido (necesita backend).
 - El token JWT solo se envía a la API propia, nunca a otros orígenes.

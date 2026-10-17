@@ -58,10 +58,10 @@
       </ng-template>
       <ng-template appCell="acciones" let-row>
         <div class="flex justify-end gap-1">
-          <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Ajustar stock de ' + row.nombre" (click)="openAdjust(row)">
+          <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Ajustar stock de ' + row.nombre" appTooltip="Ajustar existencias: registrar un ingreso o un retiro" (click)="openAdjust(row)">
             <svg lucideArrowUpDown [size]="16" aria-hidden="true"></svg>
           </button>
-          <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Configurar stock mínimo de ' + row.nombre" (click)="openMinimum(row)">
+          <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Configurar stock mínimo de ' + row.nombre" appTooltip="Stock mínimo: con esta cantidad o menos el producto se marca como crítico" (click)="openMinimum(row)">
             <svg lucideSlidersHorizontal [size]="16" aria-hidden="true"></svg>
           </button>
         </div>

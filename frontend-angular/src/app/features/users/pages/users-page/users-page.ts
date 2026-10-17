@@ -8,6 +8,7 @@ import { NotificationService } from '@core/notifications/notification.service';
 import { type BadgeVariant, Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog/confirm-dialog';
+import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
 import { UserFormModal } from '../../components/user-form-modal/user-form-modal';
 import { type AppUser, type RoleOption, UsersApi } from '../../data-access/users-api';
@@ -35,7 +36,7 @@ const rowKey = (user: UserRow): number => user.id;
 
 @Component({
   selector: 'app-users-page',
-  imports: [DataTable, DataTableCell, Badge, Button, ConfirmDialog, UserFormModal, LucideBan, LucidePencil, LucidePlus],
+  imports: [DataTable, DataTableCell, Badge, Button, ConfirmDialog, UserFormModal, Tooltip, LucideBan, LucidePencil, LucidePlus],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './users-page.html',

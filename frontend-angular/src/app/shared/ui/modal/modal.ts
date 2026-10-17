@@ -15,6 +15,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { LucideX } from '@lucide/angular';
+import { Tooltip } from '../tooltip/tooltip';
 
 export type ModalSize = 'sm' | 'md' | 'lg';
 
@@ -45,7 +46,7 @@ let scrollLocks = 0;
  */
 @Component({
   selector: 'app-modal',
-  imports: [LucideX],
+  imports: [LucideX, Tooltip],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
   template: `
@@ -85,6 +86,7 @@ let scrollLocks = 0;
           type="button"
           class="absolute top-4 right-4 flex size-8 cursor-pointer items-center justify-center rounded-md text-fg-subtle transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
           aria-label="Cerrar"
+          appTooltip="Cerrar"
           (click)="requestClose()"
         >
           <svg lucideX [size]="18" />

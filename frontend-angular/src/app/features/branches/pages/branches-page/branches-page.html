@@ -25,11 +25,11 @@
   </ng-template>
   <ng-template appCell="acciones" let-branch>
     <div class="flex justify-end gap-1">
-      <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Editar ' + branch.nombre" (click)="openEdit(branch)">
+      <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Editar ' + branch.nombre" appTooltip="Editar sucursal" (click)="openEdit(branch)">
         <svg lucidePencil [size]="16" />
       </button>
       @if (branch.activa) {
-        <button appButton variant="ghost-danger" size="sm" type="button" [attr.aria-label]="'Desactivar ' + branch.nombre" (click)="askDeactivate(branch)">
+        <button appButton variant="ghost-danger" size="sm" type="button" [attr.aria-label]="'Desactivar ' + branch.nombre" appTooltip="Desactivar sucursal" (click)="askDeactivate(branch)">
           <svg lucideBan [size]="16" />
         </button>
       }
