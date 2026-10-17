@@ -61,6 +61,8 @@ con sus roles y cambia su `loadComponent` en `app.routes.ts` (mientras tanto mue
 - Sucursales (`/branches`) es solo ADMIN (igual que las acciones del backend): crear, editar y desactivar; la lista se recarga sin parpadeo tras cada acción.
 - Usuarios (`/users`): ADMIN gestiona a todos; MANAGER solo a los de su sucursal con rol SELLER u OPERADOR_INVENTARIO (el backend lo exige con 403; la pantalla además oculta las acciones que no corresponden y no muestra el selector de sucursal al MANAGER). `<select appInput>` funciona dentro de `app-form-field` igual que un `<input>`.
 - Tipografía: Inter para texto, Lora para detalles de marca (`font-serif`) y **Junicode** para los títulos (`font-title`, paquete `@typopro/web-junicode`, licencia OFL). Para destacar palabras dentro de un título: `<h1>Panel de <span class="italic">control</span></h1>` (cara itálica real de Junicode, sin swashes).
+- Selector desplegable: `<app-select>` (`shared/ui/select`) reemplaza al `<select>` nativo. Opciones con icono y descripción, búsqueda interna (`searchable`), teclado completo y panel en la capa superior del navegador (no lo recorta un modal). Funciona con `formControlName`, con `[(value)]` y dentro de `app-form-field`. Ejemplo: `features/users/components/user-form-modal`.
+- Botones de acción de fila con icono: `variant="ghost-brand"` (editar, hover en color principal) y `variant="ghost-danger"` (desactivar, hover rojo). Los botones del pie de un modal se separan solos al ir dentro de `<div data-slot="footer">`.
 - Un componente sube a `shared/ui` solo cuando lo usa una segunda pantalla.
 - Cada pantalla migrada entra con sus tests; el E2E se corre a pedido (necesita backend).
 - El token JWT solo se envía a la API propia, nunca a otros orígenes.

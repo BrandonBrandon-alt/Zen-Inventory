@@ -1,6 +1,6 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
-import { render, screen, within } from '@testing-library/angular';
+import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -57,8 +57,14 @@ async function setup(props: Partial<Props> = {}) {
 const nombre = () => screen.getByLabelText('Nombre completo');
 const correo = () => screen.getByLabelText('Correo');
 const password = () => screen.getByLabelText(/contraseña/i);
-const rol = () => screen.getByLabelText('Rol');
-const sucursal = () => screen.getByLabelText('Sucursal');
+const rol = () => screen.getByRole('combobox', { name: 'Rol' });
+const sucursal = () => screen.getByRole('combobox', { name: 'Sucursal' });
+
+/** Abre el selector con ese nombre y elige la opción: el selector es un componente propio, no un <select>. */
+async function choose(label: 'Rol' | 'Sucursal', option: string) {
+  await userEvent.click(screen.getByRole('combobox', { name: label }));
+  await userEvent.click(screen.getByRole('option', { name: new RegExp(`^${option}`) }));
+}
 const submit = (label: string) => screen.getByRole('button', { name: label });
 
 async function fillCommon() {
@@ -77,6 +83,7 @@ describe('UserFormModal', () => {
       await setup();
       expect(screen.getByRole('dialog', { name: 'Nuevo usuario' })).toBeInTheDocument();
       expect(nombre()).toHaveValue('');
+      await userEvent.click(rol());
       expect(screen.getAllByRole('option').map((o) => o.textContent?.trim())).toEqual(
         expect.arrayContaining(['ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO', 'SELLER']),
       );
@@ -90,8 +97,8 @@ describe('UserFormModal', () => {
       expect(nombre()).toHaveValue('Luis Pérez');
       expect(correo()).toHaveValue('luis@zen.com');
       expect(password()).toHaveValue('');
-      expect(rol()).toHaveDisplayValue('SELLER');
-      expect(sucursal()).toHaveDisplayValue('Sucursal Norte');
+      expect(rol()).toHaveTextContent('SELLER');
+      expect(sucursal()).toHaveTextContent('Sucursal Norte');
       expect(screen.getByLabelText('Usuario activo')).toBeChecked();
     });
   });
@@ -100,16 +107,16 @@ describe('UserFormModal', () => {
     it('no se pide hasta elegir un rol; con un rol operativo aparece y con ADMIN desaparece', async () => {
       await setup();
       expect(screen.queryByLabelText('Sucursal')).not.toBeInTheDocument();
-      await userEvent.selectOptions(rol(), 'SELLER');
+      await choose('Rol', 'SELLER');
       expect(sucursal()).toBeInTheDocument();
-      await userEvent.selectOptions(rol(), 'ADMIN');
+      await choose('Rol', 'ADMIN');
       expect(screen.queryByLabelText('Sucursal')).not.toBeInTheDocument();
     });
 
     it('solo ofrece sucursales activas (más la actual del usuario aunque esté inactiva)', async () => {
       await setup({ user: { ...EXISTING, sucursalId: 30 } });
-      expect(within(sucursal()).getAllByRole('option').map((o) => o.textContent?.trim())).toEqual([
-        'Selecciona una sucursal',
+      await userEvent.click(sucursal());
+      expect(screen.getAllByRole('option').map((o) => o.textContent?.trim())).toEqual([
         'Sede Central',
         'Sucursal Norte',
         'Sucursal Cerrada (inactiva)',
@@ -121,7 +128,7 @@ describe('UserFormModal', () => {
       server.use(http.post(USERS, async ({ request }) => { body = (await request.json()) as Record<string, unknown>; return HttpResponse.json(SAVED_RESPONSE, { status: 201 }); }));
       const { host } = await setup({ locked: true, roles: ROLES.slice(2) });
       await fillCommon();
-      await userEvent.selectOptions(rol(), 'SELLER');
+      await choose('Rol', 'SELLER');
       expect(screen.queryByLabelText('Sucursal')).not.toBeInTheDocument();
       await userEvent.click(submit('Crear usuario'));
       await vi.waitFor(() => expect(host.onSaved).toHaveBeenCalled());
@@ -156,7 +163,7 @@ describe('UserFormModal', () => {
     it('un rol que no es ADMIN exige elegir sucursal', async () => {
       await setup();
       await fillCommon();
-      await userEvent.selectOptions(rol(), 'SELLER');
+      await choose('Rol', 'SELLER');
       await userEvent.click(submit('Crear usuario'));
       expect(screen.getByText('Elige una sucursal.')).toBeInTheDocument();
     });
@@ -180,8 +187,8 @@ describe('UserFormModal', () => {
       server.use(http.post(USERS, async ({ request }) => { body = await request.json(); return HttpResponse.json(SAVED_RESPONSE, { status: 201 }); }));
       const { host } = await setup();
       await fillCommon();
-      await userEvent.selectOptions(rol(), 'SELLER');
-      await userEvent.selectOptions(sucursal(), 'Sede Central');
+      await choose('Rol', 'SELLER');
+      await choose('Sucursal', 'Sede Central');
       await userEvent.click(submit('Crear usuario'));
 
       await vi.waitFor(() => expect(host.onSaved).toHaveBeenCalledTimes(1));
@@ -196,9 +203,9 @@ describe('UserFormModal', () => {
       server.use(http.post(USERS, async ({ request }) => { body = (await request.json()) as Record<string, unknown>; return HttpResponse.json(SAVED_RESPONSE, { status: 201 }); }));
       const { host } = await setup();
       await fillCommon();
-      await userEvent.selectOptions(rol(), 'SELLER');
-      await userEvent.selectOptions(sucursal(), 'Sede Central');
-      await userEvent.selectOptions(rol(), 'ADMIN');
+      await choose('Rol', 'SELLER');
+      await choose('Sucursal', 'Sede Central');
+      await choose('Rol', 'ADMIN');
       await userEvent.click(submit('Crear usuario'));
       await vi.waitFor(() => expect(host.onSaved).toHaveBeenCalled());
       expect(body['rolId']).toBe(1);
@@ -224,7 +231,7 @@ describe('UserFormModal', () => {
       server.use(http.post(USERS, async () => { calls++; await delay(150); return HttpResponse.json(SAVED_RESPONSE, { status: 201 }); }));
       const { host } = await setup({ locked: true });
       await fillCommon();
-      await userEvent.selectOptions(rol(), 'SELLER');
+      await choose('Rol', 'SELLER');
       await userEvent.dblClick(submit('Crear usuario'));
       expect(screen.queryByRole('button', { name: 'Cerrar' })).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Cancelar' })).toBeDisabled();
@@ -245,7 +252,7 @@ describe('UserFormModal', () => {
       );
       const { host } = await setup({ locked: true });
       await fillCommon();
-      await userEvent.selectOptions(rol(), 'SELLER');
+      await choose('Rol', 'SELLER');
       await userEvent.click(submit('Crear usuario'));
 
       expect(await screen.findByText('Ese correo ya está registrado')).toBeInTheDocument();
@@ -258,7 +265,7 @@ describe('UserFormModal', () => {
       server.use(http.post(USERS, () => HttpResponse.json(apiErrorBody(403, 'FORBIDDEN_ACTION', 'No puede asignar el rol ADMIN.'), { status: 403 })));
       const { host } = await setup({ locked: true });
       await fillCommon();
-      await userEvent.selectOptions(rol(), 'SELLER');
+      await choose('Rol', 'SELLER');
       await userEvent.click(submit('Crear usuario'));
 
       expect(await screen.findByRole('alert')).toHaveTextContent('No puede asignar el rol ADMIN.');
@@ -271,7 +278,7 @@ describe('UserFormModal', () => {
       server.use(http.post(USERS, () => new HttpResponse(null, { status: 500 })));
       await setup({ locked: true });
       await fillCommon();
-      await userEvent.selectOptions(rol(), 'SELLER');
+      await choose('Rol', 'SELLER');
       await userEvent.click(submit('Crear usuario'));
       await screen.findByRole('alert');
       await userEvent.type(nombre(), 'x');
@@ -325,8 +332,8 @@ describe('UserFormModal', () => {
       await update({ open: false });
       await update({ user: { ...EXISTING, id: 8, nombre: 'Marta Ruiz', rol: 'OPERADOR_INVENTARIO', sucursalId: 10 }, open: true });
       expect(nombre()).toHaveValue('Marta Ruiz');
-      expect(rol()).toHaveDisplayValue('OPERADOR_INVENTARIO');
-      expect(sucursal()).toHaveDisplayValue('Sede Central');
+      expect(rol()).toHaveTextContent('OPERADOR_INVENTARIO');
+      expect(sucursal()).toHaveTextContent('Sede Central');
     });
   });
 });

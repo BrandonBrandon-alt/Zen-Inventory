@@ -54,6 +54,11 @@ const renderPage = () =>
     providers: [provideHttpClient(withInterceptors([errorInterceptor])), { provide: API_BASE_URL, useValue: TEST_API }],
   });
 
+async function choose(label: 'Rol' | 'Sucursal', option: string) {
+  await userEvent.click(screen.getByRole('combobox', { name: label }));
+  await userEvent.click(screen.getByRole('option', { name: new RegExp(`^${option}`) }));
+}
+
 const row = (name: string) => screen.getByRole('row', { name: new RegExp(name) });
 
 describe('UsersPage', () => {
@@ -172,8 +177,8 @@ describe('UsersPage', () => {
       await userEvent.type(screen.getByLabelText('Nombre completo'), 'Nora Nueva');
       await userEvent.type(screen.getByLabelText('Correo'), 'nora@zen.com');
       await userEvent.type(screen.getByLabelText('Contraseña'), 'secret1');
-      await userEvent.selectOptions(screen.getByLabelText('Rol'), 'SELLER');
-      await userEvent.selectOptions(screen.getByLabelText('Sucursal'), 'Sucursal Norte');
+      await choose('Rol', 'SELLER');
+      await choose('Sucursal', 'Sucursal Norte');
       await userEvent.click(screen.getByRole('button', { name: 'Crear usuario' }));
 
       expect(await screen.findByText('5 usuarios, 4 activos')).toBeInTheDocument();
@@ -188,9 +193,10 @@ describe('UsersPage', () => {
       await screen.findByText('Sofia Vendedora');
       await vi.waitFor(() => expect(screen.getByRole('button', { name: /Nuevo usuario/ })).toBeEnabled());
       await userEvent.click(screen.getByRole('button', { name: /Nuevo usuario/ }));
-      const roleOptions = within(screen.getByLabelText('Rol')).getAllByRole('option').map((o) => o.textContent?.trim());
-      expect(roleOptions).toEqual(['Selecciona un rol', 'OPERADOR_INVENTARIO', 'SELLER']);
-      await userEvent.selectOptions(screen.getByLabelText('Rol'), 'SELLER');
+      await userEvent.click(screen.getByRole('combobox', { name: 'Rol' }));
+      const roleOptions = screen.getAllByRole('option').map((o) => o.textContent?.trim());
+      expect(roleOptions).toEqual(['OPERADOR_INVENTARIO', 'SELLER']);
+      await userEvent.click(screen.getByRole('option', { name: /^SELLER/ }));
       expect(screen.queryByLabelText('Sucursal')).not.toBeInTheDocument();
     });
 
@@ -201,10 +207,10 @@ describe('UsersPage', () => {
       await screen.findByText('Sofia Vendedora');
       await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Editar Root Admin' })).toBeEnabled());
       await userEvent.click(screen.getByRole('button', { name: 'Editar Root Admin' }));
-      expect(screen.getByLabelText('Rol')).toBeDisabled();
+      expect(screen.getByRole('combobox', { name: 'Rol' })).toBeDisabled();
       await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
       await userEvent.click(screen.getByRole('button', { name: 'Editar Sofia Vendedora' }));
-      expect(screen.getByLabelText('Rol')).toBeEnabled();
+      expect(screen.getByRole('combobox', { name: 'Rol' })).toBeEnabled();
     });
 
     it('editar abre el formulario con los datos de esa fila', async () => {
@@ -216,7 +222,7 @@ describe('UsersPage', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Editar Sofia Vendedora' }));
       expect(screen.getByRole('dialog', { name: 'Editar usuario' })).toBeInTheDocument();
       expect(screen.getByLabelText('Nombre completo')).toHaveValue('Sofia Vendedora');
-      expect(screen.getByLabelText('Rol')).toHaveDisplayValue('SELLER');
+      expect(screen.getByRole('combobox', { name: 'Rol' })).toHaveTextContent('SELLER');
     });
   });
 

@@ -1,6 +1,14 @@
-import { ChangeDetectionStrategy, Component, Directive, contentChild, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Directive, contentChild, forwardRef, inject, input } from '@angular/core';
 
 let nextId = 0;
+
+/**
+ * Cualquier control que `app-form-field` pueda etiquetar: la etiqueta apunta a su `id`. Lo implementan el
+ * `<input>`/`<select>` con `appInput` y el componente `app-select`.
+ */
+export abstract class FieldControl {
+  abstract readonly id: string;
+}
 
 /** Estilos de un `<input>` o `<select>` del sistema de diseño. Dentro de `app-form-field` hereda errores y etiqueta. */
 @Directive({
@@ -17,8 +25,9 @@ let nextId = 0;
     '[attr.aria-invalid]': 'field?.error() ? true : null',
     '[attr.aria-describedby]': 'field?.error() ? field?.errorId : null',
   },
+  providers: [{ provide: FieldControl, useExisting: forwardRef(() => InputDirective) }],
 })
-export class InputDirective {
+export class InputDirective implements FieldControl {
   readonly id = `app-input-${nextId++}`;
   protected readonly field = inject(FormField, { optional: true });
 }
@@ -59,5 +68,5 @@ export class FormField {
   readonly error = input<string | null>(null);
 
   readonly errorId = `app-field-error-${nextId++}`;
-  protected readonly control = contentChild(InputDirective);
+  protected readonly control = contentChild(FieldControl);
 }

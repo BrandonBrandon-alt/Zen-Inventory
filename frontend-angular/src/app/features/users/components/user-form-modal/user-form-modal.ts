@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, model, output, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { type AbstractControl, NonNullableFormBuilder, ReactiveFormsModule, type ValidationErrors, Validators } from '@angular/forms';
+import { LucideBriefcase, LucidePackage, LucideShield, LucideShoppingBag, LucideStore, type LucideIconData } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { NotificationService } from '@core/notifications/notification.service';
 import { applyServerErrors } from '@shared/forms/apply-server-errors';
@@ -9,6 +10,7 @@ import { Alert } from '@shared/ui/alert/alert';
 import { Button } from '@shared/ui/button/button';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Modal } from '@shared/ui/modal/modal';
+import { Select, type SelectOption } from '@shared/ui/select/select';
 import { type AppUser, type BranchOption, type RoleOption, UsersApi } from '../../data-access/users-api';
 
 const NAME_MIN = 3;
@@ -27,6 +29,14 @@ const PASSWORD_MESSAGES: Record<string, string> = {
 const ROLE_MESSAGES: Record<string, string> = { required: 'Elige un rol.' };
 const BRANCH_MESSAGES: Record<string, string> = { required: 'Elige una sucursal.' };
 
+/** Un icono por rol: se reconoce de un vistazo en la lista. */
+const ROLE_ICONS: Record<string, LucideIconData> = {
+  ADMIN: LucideShield.icon,
+  MANAGER: LucideBriefcase.icon,
+  OPERADOR_INVENTARIO: LucidePackage.icon,
+  SELLER: LucideShoppingBag.icon,
+};
+
 let nextId = 0;
 
 /**
@@ -38,7 +48,7 @@ let nextId = 0;
  */
 @Component({
   selector: 'app-user-form-modal',
-  imports: [ReactiveFormsModule, Modal, Button, Alert, FormField, InputDirective],
+  imports: [ReactiveFormsModule, Modal, Button, Alert, FormField, InputDirective, Select],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-modal
@@ -61,21 +71,18 @@ let nextId = 0;
           <input appInput type="password" formControlName="password" autocomplete="new-password" />
         </app-form-field>
         <app-form-field label="Rol" [error]="error('rolId')">
-          <select appInput formControlName="rolId">
-            <option [ngValue]="null" disabled>Selecciona un rol</option>
-            @for (role of roles(); track role.id) {
-              <option [ngValue]="role.id">{{ role.nombre }}</option>
-            }
-          </select>
+          <app-select formControlName="rolId" [options]="roleOptions()" [icon]="shieldIcon" placeholder="Selecciona un rol" />
         </app-form-field>
         @if (showBranch()) {
           <app-form-field label="Sucursal" [error]="error('sucursalId')">
-            <select appInput formControlName="sucursalId">
-              <option [ngValue]="null" disabled>Selecciona una sucursal</option>
-              @for (branch of branchChoices(); track branch.id) {
-                <option [ngValue]="branch.id">{{ branch.nombre }}{{ branch.activa ? '' : ' (inactiva)' }}</option>
-              }
-            </select>
+            <app-select
+              formControlName="sucursalId"
+              [options]="branchOptions()"
+              [icon]="storeIcon"
+              searchable
+              searchPlaceholder="Buscar sucursal…"
+              placeholder="Selecciona una sucursal"
+            />
           </app-form-field>
         }
         @if (user() && !self()) {
@@ -131,11 +138,22 @@ export class UserFormModal {
     activo: [true],
   });
 
+  protected readonly shieldIcon = LucideShield.icon;
+  protected readonly storeIcon = LucideStore.icon;
+
+  protected readonly roleOptions = computed<SelectOption<number>[]>(() =>
+    this.roles().map((role) => ({ value: role.id, label: role.nombre, icon: ROLE_ICONS[role.nombre] })),
+  );
+
   /** Sucursales activas, más la actual del usuario aunque esté inactiva (para no perderla al editar). */
   protected readonly branchChoices = computed(() => {
     const current = this.user()?.sucursalId;
     return this.branches().filter((branch) => branch.activa || branch.id === current);
   });
+
+  protected readonly branchOptions = computed<SelectOption<number>[]>(() =>
+    this.branchChoices().map((branch) => ({ value: branch.id, label: branch.nombre + (branch.activa ? '' : ' (inactiva)') })),
+  );
 
   constructor() {
     // Cada vez que se abre, el formulario parte de cero (o del usuario a editar).
