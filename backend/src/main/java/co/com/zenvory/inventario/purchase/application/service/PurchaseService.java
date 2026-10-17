@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Set;
 import java.util.Map;
 import java.util.Optional;
 
@@ -114,13 +116,26 @@ public class PurchaseService implements PurchaseUseCase {
     public PurchaseReceiptResult receiveOrder(Long orderId, Long userId, Map<Long, PurchaseUseCase.ItemReceiptInfo> items) {
         PurchaseOrder order = getOrderById(orderId);
         List<PurchaseReceiptResult.CppImpact> impacts = new ArrayList<>();
+
+        // Se valida todo antes de mover stock: ni aprobada pendiente, ni líneas ajenas, ni sobrerrecepción.
+        order.requireReceivable();
+        Set<Long> orderDetailIds = order.getDetails().stream().map(PurchaseOrderDetail::getId).collect(Collectors.toSet());
+        if (!orderDetailIds.containsAll(items.keySet())) {
+            throw new IllegalArgumentException("La recepción incluye líneas que no pertenecen a la orden.");
+        }
+        for (PurchaseOrderDetail detail : order.getDetails()) {
+            BigDecimal incoming = items.getOrDefault(detail.getId(), new PurchaseUseCase.ItemReceiptInfo(BigDecimal.ZERO, null)).quantity();
+            if (incoming.compareTo(detail.pendingQuantity()) > 0) {
+                throw new IllegalArgumentException("No se puede recibir más de lo pendiente en el producto " + detail.getProductId() + ".");
+            }
+        }
         
-        boolean allMet = true;
         for (PurchaseOrderDetail detail : order.getDetails()) {
             PurchaseUseCase.ItemReceiptInfo receiptInfo = items.getOrDefault(detail.getId(), new PurchaseUseCase.ItemReceiptInfo(BigDecimal.ZERO, null));
             BigDecimal qtyNow = receiptInfo.quantity();
             
             if (qtyNow.compareTo(BigDecimal.ZERO) > 0) {
+                detail.registerReceipt(qtyNow);
                 // Capturar CPP anterior para auditoría de impacto
                 Product productBefore = productUseCase.getProductById(detail.getProductId());
                 BigDecimal oldCpp = productBefore.getAverageCost();
@@ -135,7 +150,7 @@ public class PurchaseService implements PurchaseUseCase {
                         userId,
                         order.getId(),
                         "ORDEN_COMPRA",
-                        detail.getUnitPrice(),
+                        detail.effectiveUnitPrice(),
                         null,
                         null
                 );
@@ -152,13 +167,10 @@ public class PurchaseService implements PurchaseUseCase {
                         qtyNow
                 ));
             }
-
-            // Verificación simplificada de cumplimiento de línea
-            if (qtyNow.compareTo(detail.getQuantity()) < 0) {
-                allMet = false;
-            }
         }
 
+        // El cumplimiento se mide sobre lo acumulado de todas las recepciones, no solo sobre esta entrega.
+        boolean allMet = order.getDetails().stream().allMatch(PurchaseOrderDetail::isFullyReceived);
         order.receive(userId, allMet);
         PurchaseOrder savedOrder = repository.save(order);
         

@@ -131,12 +131,28 @@ public class PurchaseOrder {
      * @param userId       ID del usuario que recibe físicamente el pedido.
      * @param totalsAreMet Si todas las cantidades cuadran al 100%.
      */
+    /** Valida que la orden pueda recibir mercancía (antes de mover stock). */
+    public void requireReceivable() {
+        if (this.receptionStatus == ReceptionStatus.RECEIVED_TOTAL) {
+            throw new InvalidPurchaseStateException("La orden ya ha sido recibida completamente.");
+        }
+        if (this.receptionStatus == ReceptionStatus.CANCELLED) {
+            throw new InvalidPurchaseStateException("No se puede recibir una orden cancelada.");
+        }
+        if (this.receptionStatus == ReceptionStatus.AWAITING_APPROVAL) {
+            throw new InvalidPurchaseStateException("La orden aún no ha sido aprobada, no se puede recibir.");
+        }
+    }
+
     public void receive(Long userId, boolean totalsAreMet) {
         if (this.receptionStatus == ReceptionStatus.RECEIVED_TOTAL) {
             throw new InvalidPurchaseStateException("La orden ya ha sido recibida completamente.");
         }
         if (this.receptionStatus == ReceptionStatus.CANCELLED) {
             throw new InvalidPurchaseStateException("No se puede recibir una orden cancelada.");
+        }
+        if (this.receptionStatus == ReceptionStatus.AWAITING_APPROVAL) {
+            throw new InvalidPurchaseStateException("La orden aún no ha sido aprobada, no se puede recibir.");
         }
 
         this.receptionStatus = totalsAreMet ? ReceptionStatus.RECEIVED_TOTAL : ReceptionStatus.RECEIVED_PARTIAL;

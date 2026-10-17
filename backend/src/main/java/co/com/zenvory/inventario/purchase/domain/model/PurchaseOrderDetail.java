@@ -67,6 +67,37 @@ public class PurchaseOrderDetail {
     }
 
     /**
+     * Precio unitario real de compra: el pactado menos el descuento de la línea. Es el costo que debe entrar al
+     * costo promedio ponderado (con el precio de lista se sobrestimaría cuando hay descuento).
+     */
+    public BigDecimal effectiveUnitPrice() {
+        BigDecimal factor = BigDecimal.ONE.subtract(this.discountPct.divide(new BigDecimal("100")));
+        return this.unitPrice.multiply(factor).setScale(4, java.math.RoundingMode.HALF_UP);
+    }
+
+    /** Lo que aún falta por recibir de esta línea. */
+    public BigDecimal pendingQuantity() {
+        return this.quantity.subtract(this.receivedQuantity);
+    }
+
+    /**
+     * Acumula una recepción física. No se puede recibir más de lo pendiente.
+     *
+     * @throws IllegalArgumentException si la cantidad supera lo que falta por recibir.
+     */
+    public void registerReceipt(BigDecimal received) {
+        if (received.compareTo(pendingQuantity()) > 0) {
+            throw new IllegalArgumentException("No se puede recibir más de lo pendiente (" + pendingQuantity().stripTrailingZeros().toPlainString() + ").");
+        }
+        this.receivedQuantity = this.receivedQuantity.add(received);
+    }
+
+    /** @return {@code true} si ya se recibió todo lo pedido. */
+    public boolean isFullyReceived() {
+        return this.receivedQuantity.compareTo(this.quantity) >= 0;
+    }
+
+    /**
      * Calcula el subtotal monetario del ítem aplicando el descuento correspondiente.
      * 
      * @return {@link BigDecimal} con el valor neto calculado.
