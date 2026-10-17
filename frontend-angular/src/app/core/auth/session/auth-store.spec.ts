@@ -37,6 +37,25 @@ describe('AuthStore', () => {
     expect(JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) ?? 'null')).toEqual(session);
   });
 
+  it('update() cambia nombre y versión de la foto, conserva el resto y lo persiste', () => {
+    const store = createStore();
+    store.start(session);
+    store.update({ nombre: 'Ana María', avatarVersion: '2026-10-01T08:00:00' });
+    expect(store.session()).toEqual({ ...session, nombre: 'Ana María', avatarVersion: '2026-10-01T08:00:00' });
+    expect(store.token()).toBe('jwt-123');
+    expect(JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) ?? 'null').avatarVersion).toBe('2026-10-01T08:00:00');
+    // Al quitar la foto la versión desaparece (la sesión vuelve a las iniciales).
+    store.update({ avatarVersion: undefined });
+    expect(store.session()?.avatarVersion).toBeUndefined();
+  });
+
+  it('update() sin sesión no crea una', () => {
+    const store = createStore();
+    store.update({ nombre: 'Nadie' });
+    expect(store.session()).toBeNull();
+    expect(localStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+  });
+
   it('restaura una sesión válida guardada', () => {
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
     expect(createStore().session()).toEqual(session);

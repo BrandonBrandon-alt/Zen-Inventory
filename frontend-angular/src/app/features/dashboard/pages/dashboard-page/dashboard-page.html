@@ -1,10 +1,15 @@
 <header class="mb-8 animate-enter">
   <div class="flex flex-wrap items-end justify-between gap-4">
-    <div>
-      <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">{{ hello() }}</h1>
-      @if (digest(); as text) {
-        <p class="mt-1 font-title text-lg text-fg-subtle">{{ text }}</p>
+    <div class="flex items-center gap-4">
+      @if (auth.session(); as me) {
+        <app-user-avatar [userId]="me.id" [name]="me.nombre" [version]="me.avatarVersion" size="lg" />
       }
+      <div>
+        <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">{{ hello() }}</h1>
+        @if (digest(); as text) {
+          <p class="mt-1 font-title text-lg text-fg-subtle">{{ text }}</p>
+        }
+      </div>
     </div>
     @if (hasAnalytics()) {
       <app-segmented [options]="ranges" [(value)]="range" ariaLabel="Periodo" />

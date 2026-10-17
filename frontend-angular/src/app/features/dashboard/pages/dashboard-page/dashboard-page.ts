@@ -5,6 +5,7 @@ import { AuthStore } from '@core/auth/session/auth-store';
 import { formatMoney, formatMoneyCompact, formatQuantity, formatShortDate } from '@shared/format/format';
 import { Loadable } from '@shared/state/loadable';
 import { Alert } from '@shared/ui/alert/alert';
+import { UserAvatar } from '@shared/ui/avatar/user-avatar';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
 import { Card } from '@shared/ui/card/card';
 import { AreaChart } from '@shared/ui/charts/area-chart';
@@ -46,7 +47,7 @@ const plural = (n: number, one: string, many: string): string => `${n} ${n === 1
 
 @Component({
   selector: 'app-dashboard-page',
-  imports: [Alert, Badge, Card, AreaChart, BarList, ColumnChart, EmptyState, Segmented, Spinner],
+  imports: [Alert, UserAvatar, Badge, Card, AreaChart, BarList, ColumnChart, EmptyState, Segmented, Spinner],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './dashboard-page.html',
@@ -54,7 +55,7 @@ const plural = (n: number, one: string, many: string): string => `${n} ${n === 1
 export class DashboardPage {
   private readonly api = inject(DashboardApi);
   private readonly branchApi = inject(BranchOptionsApi);
-  private readonly auth = inject(AuthStore);
+  protected readonly auth = inject(AuthStore);
 
   protected readonly ranges = RANGES;
   protected readonly priority = PRIORITY;

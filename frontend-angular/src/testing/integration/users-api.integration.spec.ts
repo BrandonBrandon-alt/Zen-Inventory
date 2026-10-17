@@ -26,14 +26,14 @@ describe('UsersApi (contrato HTTP con MSW)', () => {
       ),
     );
     expect(await firstValueFrom(api.list())).toEqual([
-      { id: 1, nombre: 'Ana', email: 'ana@zen.com', rol: 'SELLER', sucursalId: 3, activo: true },
+      { id: 1, nombre: 'Ana', email: 'ana@zen.com', rol: 'SELLER', sucursalId: 3, activo: true, avatarVersion: null },
     ]);
   });
 
   it('completa lo que falta: sin sucursal es null, sin activo es activo, sin nombre usa el correo', async () => {
     server.use(http.get(USERS, () => HttpResponse.json([{ id: 2, email: 'root@zen.com', role: { id: 1, nombre: 'ADMIN' } }])));
     expect(await firstValueFrom(api.list())).toEqual([
-      { id: 2, nombre: 'root@zen.com', email: 'root@zen.com', rol: 'ADMIN', sucursalId: null, activo: true },
+      { id: 2, nombre: 'root@zen.com', email: 'root@zen.com', rol: 'ADMIN', sucursalId: null, activo: true, avatarVersion: null },
     ]);
   });
 

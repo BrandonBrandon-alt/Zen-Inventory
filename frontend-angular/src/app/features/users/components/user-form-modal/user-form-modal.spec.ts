@@ -24,7 +24,7 @@ const BRANCHES: BranchOption[] = [
   { id: 20, nombre: 'Sucursal Norte', activa: true },
   { id: 30, nombre: 'Sucursal Cerrada', activa: false },
 ];
-const EXISTING: AppUser = { id: 7, nombre: 'Luis Pérez', email: 'luis@zen.com', rol: 'SELLER', sucursalId: 20, activo: true };
+const EXISTING: AppUser = { id: 7, nombre: 'Luis Pérez', email: 'luis@zen.com', rol: 'SELLER', sucursalId: 20, activo: true, avatarVersion: null };
 const SAVED_RESPONSE = { id: 9, nombre: 'Ana Gómez', email: 'ana@zen.com', role: { id: 4, nombre: 'SELLER' }, sucursalId: 10, activo: true };
 
 const TEMPLATE = `<app-user-form-modal [(open)]="open" [user]="user" [roles]="roles" [branches]="branches" [branchLocked]="locked" [self]="self" (saved)="onSaved($event)" />`;

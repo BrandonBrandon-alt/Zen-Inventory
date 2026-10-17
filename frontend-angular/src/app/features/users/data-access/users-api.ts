@@ -17,6 +17,8 @@ export interface AppUser {
   readonly rol: Role;
   readonly sucursalId: number | null;
   readonly activo: boolean;
+  /** Versión de la foto de perfil; `null` si no tiene. */
+  readonly avatarVersion: string | null;
 }
 
 /** Rol asignable (para el select del formulario). */
@@ -49,6 +51,7 @@ function toUser(raw: UserResponse): AppUser | null {
     rol,
     sucursalId: raw.sucursalId ?? null,
     activo: raw.activo !== false,
+    avatarVersion: raw.avatarActualizadoEn ?? null,
   };
 }
 

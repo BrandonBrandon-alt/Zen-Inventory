@@ -48,6 +48,12 @@ describe('AuthApi (contrato HTTP real con MSW)', () => {
     expect(store.session()).toEqual(session);
   });
 
+  it('guarda la versión de la foto de perfil que devuelve el login', async () => {
+    server.use(http.post(LOGIN, () => HttpResponse.json({ ...okLogin, avatarActualizadoEn: '2026-10-01T08:00:00' })));
+    const session = await api.login(credentials);
+    expect(session.avatarVersion).toBe('2026-10-01T08:00:00');
+  });
+
   it('INVALID_CREDENTIALS (contraseña incorrecta o correo inexistente): "credentials" con el mensaje del backend y sin sesión', async () => {
     server.use(http.post(LOGIN, () => HttpResponse.json(apiErrorBody(401, 'INVALID_CREDENTIALS', 'Credenciales incorrectas'), { status: 401 })));
     const error = await fail();

@@ -6,6 +6,8 @@ export interface AuthSession {
   rol: string;
   id: number;
   sucursalId?: number;
+  /** Versión de la foto de perfil (cuándo cambió); ausente si no tiene foto. Sirve para pedirla de nuevo al cambiar. */
+  avatarVersion?: string;
 }
 
 export function isAuthSession(value: unknown): value is AuthSession {
@@ -18,6 +20,7 @@ export function isAuthSession(value: unknown): value is AuthSession {
     typeof v['nombre'] === 'string' &&
     typeof v['rol'] === 'string' &&
     typeof v['id'] === 'number' &&
-    (v['sucursalId'] === undefined || typeof v['sucursalId'] === 'number')
+    (v['sucursalId'] === undefined || typeof v['sucursalId'] === 'number') &&
+    (v['avatarVersion'] === undefined || typeof v['avatarVersion'] === 'string')
   );
 }

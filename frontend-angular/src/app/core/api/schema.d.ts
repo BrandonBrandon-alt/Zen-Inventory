@@ -1211,6 +1211,8 @@ export interface components {
             activo?: boolean;
             /** Format: date-time */
             createdAt?: string;
+            /** Format: date-time */
+            avatarActualizadoEn?: string;
         };
         UnitOfMeasureRequest: {
             nombre: string;
@@ -1657,6 +1659,8 @@ export interface components {
             sucursalId?: number;
             /** Format: int64 */
             id?: number;
+            /** Format: date-time */
+            avatarActualizadoEn?: string;
         };
         TransferFulfillmentReport: {
             /** Format: int64 */

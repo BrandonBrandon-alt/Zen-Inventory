@@ -28,6 +28,12 @@
   emptyDescription="Los usuarios que se registren aparecerán aquí."
   (retry)="load()"
 >
+  <ng-template appCell="nombre" let-user>
+    <span class="flex items-center gap-3">
+      <app-user-avatar [userId]="user.id" [name]="user.nombre" [version]="user.avatarVersion" size="sm" />
+      <span class="min-w-0 truncate">{{ user.nombre }}</span>
+    </span>
+  </ng-template>
   <ng-template appCell="rol" let-user>
     <app-badge [variant]="roleVariant(user)">{{ user.rol }}</app-badge>
   </ng-template>

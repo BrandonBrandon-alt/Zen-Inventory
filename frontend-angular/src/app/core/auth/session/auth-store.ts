@@ -43,6 +43,15 @@ export class AuthStore {
     writeStoredSession(session);
   }
 
+  /** Actualiza los datos de la sesión que el usuario puede cambiar desde su perfil, sin volver a iniciar sesión. */
+  update(changes: Partial<Pick<AuthSession, 'nombre' | 'avatarVersion'>>): void {
+    const current = this.state();
+    if (current === null) return;
+    const next = { ...current, ...changes };
+    this.state.set(next);
+    writeStoredSession(next);
+  }
+
   clear(): void {
     this.state.set(null);
     writeStoredSession(null);

@@ -44,6 +44,13 @@ export const routes: Routes = [
     loadComponent: () => import('./layout/shell/shell').then((m) => m.Shell),
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      // Cuenta propia: no está en el menú, se llega desde la tarjeta del usuario. Cualquier rol con sesión puede entrar.
+      {
+        path: 'profile',
+        title: `Mi perfil | ${APP_TITLE}`,
+        data: { title: 'Mi perfil' },
+        loadComponent: () => import('./features/profile/pages/profile-page/profile-page').then((m) => m.ProfilePage),
+      },
       ...menuRoutes,
     ],
   },

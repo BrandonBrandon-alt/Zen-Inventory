@@ -5,6 +5,7 @@ import { toApiError } from '@core/api/api-error';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { NotificationService } from '@core/notifications/notification.service';
+import { UserAvatar } from '@shared/ui/avatar/user-avatar';
 import { type BadgeVariant, Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog/confirm-dialog';
@@ -36,7 +37,7 @@ const rowKey = (user: UserRow): number => user.id;
 
 @Component({
   selector: 'app-users-page',
-  imports: [DataTable, DataTableCell, Badge, Button, ConfirmDialog, UserFormModal, Tooltip, LucideBan, LucidePencil, LucidePlus],
+  imports: [DataTable, DataTableCell, UserAvatar, Badge, Button, ConfirmDialog, UserFormModal, Tooltip, LucideBan, LucidePencil, LucidePlus],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './users-page.html',
