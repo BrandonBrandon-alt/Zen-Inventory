@@ -83,7 +83,7 @@ export class DashboardPage {
   protected readonly isAdmin = computed(() => this.role() === 'ADMIN');
 
   protected readonly hello = computed(() => {
-    const name = this.auth.session()?.nombre.trim().split(/\s+/)[0];
+    const name = this.auth.session()?.nombre.trim().replace(/\s+/g, ' ');
     return `${greeting(new Date().getHours())}${name ? `, ${name}` : ''}`;
   });
 

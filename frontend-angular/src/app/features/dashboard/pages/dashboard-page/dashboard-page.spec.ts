@@ -49,7 +49,7 @@ describe('DashboardPage', () => {
     useSession('ADMIN');
     stub();
     await renderPage();
-    expect(screen.getByRole('heading', { level: 1, name: /^Buen(os|as) (días|tardes|noches), Ana$/ })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1, name: /^Buen(os|as) (días|tardes|noches), Ana Pérez$/ })).toBeTruthy();
     expect(await screen.findByText('Hay 1 producto por reponer.')).toBeTruthy();
   });
 
