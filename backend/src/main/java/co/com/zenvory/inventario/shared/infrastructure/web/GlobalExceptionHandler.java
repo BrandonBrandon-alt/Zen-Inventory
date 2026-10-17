@@ -23,13 +23,25 @@ import co.com.zenvory.inventario.sale.domain.exception.ReturnRequestNotFoundExce
 import co.com.zenvory.inventario.sale.domain.exception.SaleNotFoundException;
 import co.com.zenvory.inventario.transfer.domain.exception.InvalidTransferStateException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
+import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -54,7 +66,7 @@ import java.util.stream.Collectors;
  * de dominio conocidas (tabla {@link #DOMAIN}) exponen su mensaje, porque están escritas para el usuario.</p>
  */
 @RestControllerAdvice
-public class GlobalExceptionHandler {
+public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
@@ -88,71 +100,162 @@ public class GlobalExceptionHandler {
             Map.entry(IllegalArgumentException.class, new Mapping(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_ARGUMENT))
     );
 
+    /** Paquete base de la aplicación: una excepción lanzada desde aquí tiene un mensaje escrito para el usuario. */
+    private static final String APP_PACKAGE = "co.com.zenvory";
+
     /** Excepciones de dominio conocidas; cualquier otra RuntimeException se trata como error inesperado. */
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntime(RuntimeException ex, HttpServletRequest request) {
         Mapping mapping = mappingFor(ex);
         if (mapping != null) {
-            return respond(mapping.status(), mapping.code(), ex.getMessage(), request);
+            return respond(mapping.status(), mapping.code(), safeMessage(ex, mapping, request), request);
         }
         return unexpected(ex, request);
     }
 
-    /** 400 – Fallo de validación Bean Validation (@Valid), con errores por campo. */
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
-        List<ErrorResponse.FieldError> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
-                .map(e -> new ErrorResponse.FieldError(e.getField(), e.getDefaultMessage()))
+    /**
+     * El mensaje de una excepción de dominio es apto para el usuario; el de una {@link IllegalArgumentException}
+     * lanzada por una librería (Hibernate, Jackson, JDK…) no: puede traer nombres de clases, entidades o SQL.
+     * Se distingue por quién la lanzó.
+     */
+    private String safeMessage(RuntimeException ex, Mapping mapping, HttpServletRequest request) {
+        if (ex instanceof IllegalArgumentException && !thrownByApplication(ex)) {
+            String traceId = ErrorResponse.newTraceId();
+            log.warn("[{}] IllegalArgumentException de librería en {} {}: {}", traceId, request.getMethod(), request.getRequestURI(), ex.toString());
+            return "La solicitud contiene un valor que no es válido. Código: " + traceId;
+        }
+        return ex.getMessage();
+    }
+
+    private static boolean thrownByApplication(Throwable ex) {
+        StackTraceElement[] trace = ex.getStackTrace();
+        return trace.length > 0 && trace[0].getClassName().startsWith(APP_PACKAGE);
+    }
+
+    // ------------------------------------------------- excepciones estándar de Spring MVC
+    // Se extiende ResponseEntityExceptionHandler para que TODA excepción de MVC conserve su estado HTTP (4xx) y no
+    // caiga en el 500 genérico; aquí solo se reemplaza el cuerpo por el contrato uniforme de la API.
+
+    /** 400 – Fallo de validación Bean Validation (@Valid), con errores por campo (y los de nivel de clase). */
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex, HttpHeaders headers,
+                                                                  HttpStatusCode status, WebRequest request) {
+        List<ErrorResponse.FieldError> fieldErrors = new java.util.ArrayList<>();
+        for (ObjectError error : ex.getBindingResult().getAllErrors()) {
+            // Los errores de nivel de clase (@AssertTrue, validadores cruzados) no tienen campo: se nombran por el objeto.
+            String field = error instanceof FieldError fe ? fe.getField() : error.getObjectName();
+            fieldErrors.add(new ErrorResponse.FieldError(field, error.getDefaultMessage()));
+        }
+        return validationFailed(fieldErrors, request);
+    }
+
+    /** 400 – Validación de parámetros de método (@Validated sobre @RequestParam/@PathVariable, Spring 6.1+). */
+    @Override
+    protected ResponseEntity<Object> handleHandlerMethodValidationException(HandlerMethodValidationException ex, HttpHeaders headers,
+                                                                            HttpStatusCode status, WebRequest request) {
+        List<ErrorResponse.FieldError> fieldErrors = new java.util.ArrayList<>();
+        ex.getParameterValidationResults().forEach(result -> result.getResolvableErrors().forEach(error ->
+                fieldErrors.add(new ErrorResponse.FieldError(
+                        result.getMethodParameter().getParameterName() != null ? result.getMethodParameter().getParameterName() : "parametro",
+                        error.getDefaultMessage()))));
+        return validationFailed(fieldErrors, request);
+    }
+
+    /** 400 – Restricciones de Bean Validation sobre parámetros (@Validated en la clase). */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex, HttpServletRequest request) {
+        List<ErrorResponse.FieldError> fieldErrors = ex.getConstraintViolations().stream()
+                .map(this::toFieldError)
                 .toList();
-        // `message` conserva el resumen en una sola cadena para los clientes que aún no usan fieldErrors.
-        String message = fieldErrors.stream()
-                .map(e -> e.field() + ": " + e.message())
-                .collect(Collectors.joining(", "));
-        ErrorResponse body = ErrorResponse.of(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_FAILED,
-                message, request.getRequestURI(), ErrorResponse.newTraceId(), fieldErrors);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+        return ResponseEntity.badRequest().body(validationBody(fieldErrors, request.getRequestURI()));
+    }
+
+    private ErrorResponse.FieldError toFieldError(ConstraintViolation<?> violation) {
+        String path = violation.getPropertyPath().toString();
+        return new ErrorResponse.FieldError(path.substring(path.lastIndexOf('.') + 1), violation.getMessage());
     }
 
     /** 400 – Cuerpo ilegible (JSON mal formado, tipos incorrectos). No se expone el detalle de Jackson. */
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ErrorResponse> handleMalformedBody(HttpMessageNotReadableException ex, HttpServletRequest request) {
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex, HttpHeaders headers,
+                                                                  HttpStatusCode status, WebRequest request) {
         log.debug("Cuerpo de solicitud ilegible: {}", ex.getMessage());
-        return respond(HttpStatus.BAD_REQUEST, ErrorCode.MALFORMED_REQUEST,
-                "El cuerpo de la solicitud no es válido.", request);
+        return body(HttpStatus.BAD_REQUEST, ErrorCode.MALFORMED_REQUEST, "El cuerpo de la solicitud no es válido.", request);
     }
 
     /** 400 – Parámetro de ruta o consulta con tipo incorrecto. */
-    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
-        return respond(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_PARAMETER,
-                "El valor del parámetro '" + ex.getName() + "' no es válido.", request);
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(TypeMismatchException ex, HttpHeaders headers,
+                                                        HttpStatusCode status, WebRequest request) {
+        String name = ex instanceof MethodArgumentTypeMismatchException m ? m.getName() : ex.getPropertyName();
+        return body(HttpStatus.BAD_REQUEST, ErrorCode.INVALID_PARAMETER,
+                "El valor del parámetro '" + name + "' no es válido.", request);
     }
 
     /** 400 – Falta un parámetro obligatorio. */
-    @ExceptionHandler(MissingServletRequestParameterException.class)
-    public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException ex, HttpServletRequest request) {
-        return respond(HttpStatus.BAD_REQUEST, ErrorCode.MISSING_PARAMETER,
+    @Override
+    protected ResponseEntity<Object> handleMissingServletRequestParameter(MissingServletRequestParameterException ex, HttpHeaders headers,
+                                                                          HttpStatusCode status, WebRequest request) {
+        return body(HttpStatus.BAD_REQUEST, ErrorCode.MISSING_PARAMETER,
                 "Falta el parámetro obligatorio '" + ex.getParameterName() + "'.", request);
     }
 
     /** 405 – Método HTTP no permitido en la ruta. */
-    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<ErrorResponse> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
-        return respond(HttpStatus.METHOD_NOT_ALLOWED, ErrorCode.METHOD_NOT_ALLOWED,
+    @Override
+    protected ResponseEntity<Object> handleHttpRequestMethodNotSupported(HttpRequestMethodNotSupportedException ex, HttpHeaders headers,
+                                                                         HttpStatusCode status, WebRequest request) {
+        return body(HttpStatus.METHOD_NOT_ALLOWED, ErrorCode.METHOD_NOT_ALLOWED,
                 "El método " + ex.getMethod() + " no está permitido para esta ruta.", request);
     }
 
     /** 415 – Tipo de contenido no soportado. */
-    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
-    public ResponseEntity<ErrorResponse> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException ex, HttpServletRequest request) {
-        return respond(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ErrorCode.UNSUPPORTED_MEDIA_TYPE,
+    @Override
+    protected ResponseEntity<Object> handleHttpMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex, HttpHeaders headers,
+                                                                     HttpStatusCode status, WebRequest request) {
+        return body(HttpStatus.UNSUPPORTED_MEDIA_TYPE, ErrorCode.UNSUPPORTED_MEDIA_TYPE,
                 "El tipo de contenido de la solicitud no está soportado.", request);
     }
 
     /** 404 – Ruta inexistente. */
-    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
-    public ResponseEntity<ErrorResponse> handleRouteNotFound(Exception ex, HttpServletRequest request) {
-        return respond(HttpStatus.NOT_FOUND, ErrorCode.ROUTE_NOT_FOUND, "El recurso solicitado no existe.", request);
+    @Override
+    protected ResponseEntity<Object> handleNoResourceFoundException(NoResourceFoundException ex, HttpHeaders headers,
+                                                                    HttpStatusCode status, WebRequest request) {
+        return body(HttpStatus.NOT_FOUND, ErrorCode.ROUTE_NOT_FOUND, "El recurso solicitado no existe.", request);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleNoHandlerFoundException(NoHandlerFoundException ex, HttpHeaders headers,
+                                                                   HttpStatusCode status, WebRequest request) {
+        return body(HttpStatus.NOT_FOUND, ErrorCode.ROUTE_NOT_FOUND, "El recurso solicitado no existe.", request);
+    }
+
+    /**
+     * Resto de excepciones estándar de MVC (cabecera o variable de ruta ausente, {@code Accept} no soportado,
+     * {@code ResponseStatusException}…): conservan su estado HTTP y se responden con el contrato uniforme, sin
+     * exponer el mensaje interno.
+     */
+    @Override
+    protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object ignored, HttpHeaders headers,
+                                                             HttpStatusCode statusCode, WebRequest request) {
+        HttpStatus status = HttpStatus.resolve(statusCode.value()) != null ? HttpStatus.valueOf(statusCode.value()) : HttpStatus.BAD_REQUEST;
+        if (status.is5xxServerError()) {
+            return unexpectedBody(ex, request);
+        }
+        ErrorCode code = switch (status) {
+            case NOT_FOUND -> ErrorCode.RESOURCE_NOT_FOUND;
+            case NOT_ACCEPTABLE -> ErrorCode.UNSUPPORTED_MEDIA_TYPE;
+            case FORBIDDEN -> ErrorCode.ACCESS_DENIED;
+            case CONFLICT -> ErrorCode.INVALID_STATE;
+            default -> ErrorCode.INVALID_PARAMETER;
+        };
+        String message = switch (status) {
+            case NOT_FOUND -> "El recurso solicitado no existe.";
+            case NOT_ACCEPTABLE -> "No es posible responder en el formato solicitado.";
+            case FORBIDDEN -> "No tienes permisos para realizar esta acción.";
+            case CONFLICT -> "La operación entra en conflicto con el estado actual de los datos.";
+            default -> "La solicitud no es válida.";
+        };
+        return body(status, code, message, request);
     }
 
     /** 403 – Falta de roles (seguridad por método). */
@@ -162,24 +265,47 @@ public class GlobalExceptionHandler {
                 "No tienes permisos para realizar esta acción.", request);
     }
 
+    // ------------------------------------------------------------- datos y concurrencia
+
     /** 409 – Conflicto de integridad de datos (ej: SKU duplicado a nivel DB). */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex, HttpServletRequest request) {
-        log.warn("Data integrity violation: {}", ex.getMessage());
-        String detail = ex.getMessage() == null ? "" : ex.getMessage().toLowerCase();
-        if (detail.contains("producto_sku_key") || detail.contains("sku")) {
+        // Se registra solo el nombre de la restricción: el mensaje del driver trae SQL y valores de las filas.
+        String constraint = constraintName(ex);
+        log.warn("Violación de integridad en {} {} (restricción: {})", request.getMethod(), request.getRequestURI(), constraint);
+        if (constraint != null && constraint.toLowerCase(java.util.Locale.ROOT).contains("sku")) {
             return respond(HttpStatus.CONFLICT, ErrorCode.DUPLICATE_SKU, "Ya existe un producto con el SKU indicado.", request);
         }
         return respond(HttpStatus.CONFLICT, ErrorCode.DATA_INTEGRITY,
                 "No se pudo realizar la operación porque viola una restricción de integridad (posible duplicado).", request);
     }
 
+    private static String constraintName(Throwable ex) {
+        for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException violation) {
+                return violation.getConstraintName();
+            }
+        }
+        return null;
+    }
+
     /** 409 – Otro usuario modificó el mismo registro. */
-    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-    public ResponseEntity<ErrorResponse> handleOptimisticLocking(ObjectOptimisticLockingFailureException ex, HttpServletRequest request) {
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLocking(OptimisticLockingFailureException ex, HttpServletRequest request) {
         log.warn("Optimistic locking failure: {}", ex.getMessage());
         return respond(HttpStatus.CONFLICT, ErrorCode.CONCURRENT_MODIFICATION,
                 "El documento fue modificado por otro usuario. Por favor, recarga la página e intenta de nuevo.", request);
+    }
+
+    /**
+     * 409 – Otra operación tenía bloqueados los mismos datos (tiempo de espera agotado, interbloqueo). Es
+     * reintentable: el inventario usa bloqueo de filas, así que esto ocurre bajo carga y no es un fallo del servidor.
+     */
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handlePessimisticLocking(PessimisticLockingFailureException ex, HttpServletRequest request) {
+        log.warn("Bloqueo de datos no obtenido en {} {}: {}", request.getMethod(), request.getRequestURI(), ex.getClass().getSimpleName());
+        return respond(HttpStatus.CONFLICT, ErrorCode.CONCURRENT_MODIFICATION,
+                "Otra operación está usando estos datos en este momento. Inténtalo de nuevo en unos segundos.", request);
     }
 
     /** 500 – Cualquier otra excepción (no RuntimeException): mensaje genérico. */
@@ -196,6 +322,34 @@ public class GlobalExceptionHandler {
             if (mapping != null) return mapping;
         }
         return null;
+    }
+
+    private static String path(WebRequest request) {
+        return request instanceof ServletWebRequest web ? web.getRequest().getRequestURI() : "";
+    }
+
+    private ResponseEntity<Object> body(HttpStatus status, ErrorCode code, String message, WebRequest request) {
+        return ResponseEntity.status(status).body(ErrorResponse.of(status, code, message, path(request), ErrorResponse.newTraceId()));
+    }
+
+    private ResponseEntity<Object> validationFailed(List<ErrorResponse.FieldError> fieldErrors, WebRequest request) {
+        return ResponseEntity.badRequest().body(validationBody(fieldErrors, path(request)));
+    }
+
+    private ErrorResponse validationBody(List<ErrorResponse.FieldError> fieldErrors, String path) {
+        // `message` conserva el resumen en una sola cadena para los clientes que aún no usan fieldErrors.
+        String message = fieldErrors.isEmpty()
+                ? "La solicitud no es válida."
+                : fieldErrors.stream().map(e -> e.field() + ": " + e.message()).collect(Collectors.joining(", "));
+        return ErrorResponse.of(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_FAILED, message, path, ErrorResponse.newTraceId(), fieldErrors);
+    }
+
+    private ResponseEntity<Object> unexpectedBody(Exception ex, WebRequest request) {
+        String traceId = ErrorResponse.newTraceId();
+        log.error("[{}] Error inesperado en {}", traceId, path(request), ex);
+        String message = "Ocurrió un error inesperado. Si el problema continúa, comunica este código al administrador: " + traceId;
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ErrorResponse.of(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.INTERNAL_ERROR, message, path(request), traceId));
     }
 
     private ResponseEntity<ErrorResponse> unexpected(Exception ex, HttpServletRequest request) {

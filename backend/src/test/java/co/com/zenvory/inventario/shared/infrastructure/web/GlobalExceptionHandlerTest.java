@@ -209,6 +209,69 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("Un mensaje que menciona 'sku' pero de otra restricción NO es SKU duplicado")
+    void messageMentioningSkuIsNotDuplicateSku() throws Exception {
+        mockMvc.perform(get("/t/integrity/message-only-sku"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DATA_INTEGRITY"));
+    }
+
+    @Test
+    @DisplayName("Bloqueo de filas no obtenido o interbloqueo: 409 reintentable, no 500")
+    void pessimisticLocking() throws Exception {
+        for (String kind : new String[] {"timeout", "deadlock"}) {
+            mockMvc.perform(get("/t/pessimistic/" + kind))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("CONCURRENT_MODIFICATION"))
+                    .andExpect(jsonPath("$.message", containsString("Inténtalo de nuevo")));
+        }
+    }
+
+    @Test
+    @DisplayName("Errores 4xx del framework conservan su estado y el contrato: cabecera ausente, ResponseStatusException, Accept no soportado")
+    void frameworkClientErrorsStayClientErrors() throws Exception {
+        mockMvc.perform(get("/t/header"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
+        mockMvc.perform(get("/t/status"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.message", not(containsString("detalle interno"))));
+        // Con Accept: application/xml no se puede serializar el cuerpo JSON, pero el estado correcto (406, no 500) se conserva.
+        mockMvc.perform(get("/t/json").accept("application/xml"))
+                .andExpect(status().isNotAcceptable());
+    }
+
+    @Test
+    @DisplayName("Restricciones sobre parámetros (@Min): 400 VALIDATION_FAILED con el campo")
+    void parameterConstraints() throws Exception {
+        mockMvc.perform(get("/t/min?n=0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("Debe ser al menos 1"));
+    }
+
+    @Test
+    @DisplayName("Una IllegalArgumentException de una librería no filtra su mensaje interno")
+    void libraryIllegalArgumentDoesNotLeak() throws Exception {
+        mockMvc.perform(get("/t/enum"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
+                .andExpect(jsonPath("$.message", not(containsString("No enum constant"))))
+                .andExpect(jsonPath("$.message", not(containsString("Thread"))));
+    }
+
+    @Test
+    @DisplayName("Errores de validación de nivel de clase aparecen en fieldErrors")
+    void classLevelValidationErrors() throws Exception {
+        mockMvc.perform(post("/t/cross").contentType("application/json").content("{\"from\": 5, \"to\": 1}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("El rango no es válido"));
+    }
+
+    @Test
     @DisplayName("Bloqueo optimista: 409 CONCURRENT_MODIFICATION")
     void optimisticLock() throws Exception {
         mockMvc.perform(get("/t/lock"))
@@ -239,6 +302,11 @@ class GlobalExceptionHandlerTest {
     @RestController
     @RequestMapping("/t")
     static class ProbeController {
+
+        record Cross(int from, int to) {
+            @jakarta.validation.constraints.AssertTrue(message = "El rango no es válido")
+            boolean isRange() { return from <= to; }
+        }
 
         record Body(
                 @NotBlank(message = "El nombre es obligatorio") String nombre,
@@ -289,11 +357,43 @@ class GlobalExceptionHandlerTest {
 
         @GetMapping("/integrity/{kind}")
         void integrity(@PathVariable String kind) {
-            String detail = kind.equals("sku")
-                    ? "ERROR: duplicate key value violates unique constraint \"producto_sku_key\""
-                    : "ERROR: insert or update on table violates foreign key constraint";
-            throw new DataIntegrityViolationException(detail);
+            // El tipo de violación se decide por el nombre real de la restricción, no por el texto del mensaje.
+            String constraint = kind.equals("sku") ? "producto_sku_key" : "detalle_fk";
+            String detail = kind.equals("message-only-sku")
+                    ? "ERROR: null value in column \"sku_ref\" violates not-null constraint"
+                    : "ERROR: violates constraint " + constraint;
+            throw new DataIntegrityViolationException(detail, new org.hibernate.exception.ConstraintViolationException(
+                    detail, new java.sql.SQLException(detail), kind.equals("message-only-sku") ? "detalle_nn" : constraint));
         }
+
+        @GetMapping("/pessimistic/{kind}")
+        void pessimistic(@PathVariable String kind) {
+            throw kind.equals("deadlock")
+                    ? new org.springframework.dao.DeadlockLoserDataAccessException("deadlock", null)
+                    : new org.springframework.dao.CannotAcquireLockException("lock timeout");
+        }
+
+        @GetMapping("/header")
+        void header(@org.springframework.web.bind.annotation.RequestHeader("X-Tenant") String tenant) {}
+
+        @GetMapping("/status")
+        void status() {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "detalle interno de ruta");
+        }
+
+        @GetMapping(value = "/json", produces = "application/json")
+        String json() { return "{}"; }
+
+        @GetMapping("/min")
+        void min(@RequestParam @jakarta.validation.constraints.Min(value = 1, message = "Debe ser al menos 1") int n) {}
+
+        @GetMapping("/enum")
+        void enumValue() {
+            Thread.State.valueOf("NOPE");
+        }
+
+        @PostMapping("/cross")
+        void cross(@Valid @RequestBody Cross body) {}
 
         @GetMapping("/lock")
         void lock() {

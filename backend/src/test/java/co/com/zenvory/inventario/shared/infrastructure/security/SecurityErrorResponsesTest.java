@@ -59,6 +59,9 @@ class SecurityErrorResponsesTest {
         when(userRepository.findByEmail("inactiva@zen.com")).thenReturn(Optional.of(
                 UserEntity.builder().id(3L).email("inactiva@zen.com").nombre("Inactiva").activa(false)
                         .role(RoleEntity.builder().id(2L).nombre("MANAGER").build()).build()));
+        when(userRepository.findByEmail("falla@zen.com")).thenThrow(new RuntimeException("conexión caída: jdbc:postgresql://db:5432/zen"));
+        when(userRepository.findByEmail("sinrol@zen.com")).thenReturn(Optional.of(
+                UserEntity.builder().id(8L).email("sinrol@zen.com").nombre("Sin rol").build()));
         when(userRepository.findByEmail("root@zen.com")).thenReturn(Optional.of(user("root@zen.com", "ADMIN")));
     }
 
@@ -158,6 +161,27 @@ class SecurityErrorResponsesTest {
         mockMvc.perform(get("/api/probe/any").header("Authorization", bearer(token)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_DISABLED"));
+    }
+
+    @Test
+    @DisplayName("Fallo de base de datos al autenticar: 500 con el contrato JSON y sin filtrar el detalle")
+    void databaseFailureWhileAuthenticating() throws Exception {
+        String token = jwtService.generateToken(5L, "falla@zen.com");
+        mockMvc.perform(get("/api/probe/any").header("Authorization", bearer(token)))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("jdbc"))));
+    }
+
+    @Test
+    @DisplayName("Usuario sin rol: 401 INVALID_TOKEN en vez de un error interno")
+    void userWithoutRole() throws Exception {
+        String token = jwtService.generateToken(8L, "sinrol@zen.com");
+        mockMvc.perform(get("/api/probe/any").header("Authorization", bearer(token)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_TOKEN"));
     }
 
     @Test

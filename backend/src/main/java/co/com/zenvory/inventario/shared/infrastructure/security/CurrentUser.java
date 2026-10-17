@@ -5,6 +5,8 @@ import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionExcepti
 import co.com.zenvory.inventario.auth.domain.model.User;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Usuario autenticado de la petición y sus límites de sucursal.
@@ -27,6 +29,12 @@ public final class CurrentUser {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getName() == null) {
             throw new UnauthorizedActionException("No se pudo identificar al usuario autenticado.");
+        }
+        // El filtro JWT ya cargó al usuario en esta petición: se reutiliza en vez de consultarlo otra vez.
+        if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes
+                && attributes.getRequest().getAttribute(JwtAuthenticationFilter.AUTHENTICATED_USER_ATTRIBUTE) instanceof User loaded
+                && auth.getName().equals(loaded.getEmail())) {
+            return new CurrentUser(loaded);
         }
         return new CurrentUser(users.findByEmail(auth.getName())
                 .orElseThrow(() -> new UnauthorizedActionException("No se pudo identificar al usuario autenticado.")));

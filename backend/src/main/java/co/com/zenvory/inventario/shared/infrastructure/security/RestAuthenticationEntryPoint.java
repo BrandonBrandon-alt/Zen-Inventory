@@ -24,6 +24,8 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     /** Atributo de la petición donde el filtro JWT deja el {@link ErrorCode} del token rechazado. */
     public static final String AUTH_ERROR_ATTRIBUTE = "zen.auth.error";
+    /** Código de seguimiento ya registrado en el log cuando el filtro falló por un error interno. */
+    public static final String AUTH_TRACE_ATTRIBUTE = "zen.auth.trace";
 
     private final ErrorResponseWriter writer;
 
@@ -37,8 +39,12 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
         ErrorCode code = request.getAttribute(AUTH_ERROR_ATTRIBUTE) instanceof ErrorCode rejected
                 ? rejected
                 : ErrorCode.UNAUTHENTICATED;
-        writer.write(response, ErrorResponse.of(HttpStatus.UNAUTHORIZED, code, messageFor(code),
-                request.getRequestURI(), ErrorResponse.newTraceId()));
+        String traceId = request.getAttribute(AUTH_TRACE_ATTRIBUTE) instanceof String t ? t : ErrorResponse.newTraceId();
+        HttpStatus status = code == ErrorCode.INTERNAL_ERROR ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.UNAUTHORIZED;
+        String message = code == ErrorCode.INTERNAL_ERROR
+                ? "Ocurrió un error inesperado. Si el problema continúa, comunica este código al administrador: " + traceId
+                : messageFor(code);
+        writer.write(response, ErrorResponse.of(status, code, message, request.getRequestURI(), traceId));
     }
 
     private static String messageFor(ErrorCode code) {

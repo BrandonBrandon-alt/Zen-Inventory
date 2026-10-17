@@ -22,6 +22,7 @@ public class JwtService {
     private static final String USER_ID_CLAIM = "uid";
 
     private final SecretKey signingKey;
+    private final io.jsonwebtoken.JwtParser parser;
     private final long expirationMs;
 
     public JwtService(
@@ -29,6 +30,7 @@ public class JwtService {
             @Value("${security.jwt.expiration:86400000}") long expirationMs) {
         // Derivamos la clave desde el string configurado
         this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        this.parser = Jwts.parser().verifyWith(signingKey).build();
         this.expirationMs = expirationMs;
     }
 
@@ -53,38 +55,25 @@ public class JwtService {
                 .compact();
     }
 
-    /**
-     * Extrae el email (subject) del token.
-     * @throws io.jsonwebtoken.JwtException si el token es inválido o expiró
-     */
-    public String extractEmail(String token) {
-        return parseClaims(token).getSubject();
-    }
-
-    /** Id del usuario al que pertenece el token, o {@code null} si el token no lo trae (emitido antes del claim). */
-    public Long extractUserId(String token) {
-        return parseClaims(token).get(USER_ID_CLAIM, Long.class);
-    }
 
     /** Resultado de inspeccionar un token: permite distinguir "venció" de "no es válido". */
     public enum TokenStatus { VALID, EXPIRED, INVALID }
 
-    public TokenStatus inspect(String token) {
-        try {
-            parseClaims(token);
-            return TokenStatus.VALID;
-        } catch (io.jsonwebtoken.ExpiredJwtException e) {
-            return TokenStatus.EXPIRED;
-        } catch (Exception e) {
-            return TokenStatus.INVALID;
-        }
-    }
+    /**
+     * Resultado de analizar un token: su estado y, si es válido, el correo (subject) y el id de usuario (claim
+     * {@code uid}, {@code null} en tokens emitidos antes de existir ese claim).
+     */
+    public record TokenInfo(TokenStatus status, String email, Long userId) {}
 
-    private Claims parseClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(signingKey)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+    /** Verifica la firma y lee el token una sola vez (antes se verificaba tres veces por petición). */
+    public TokenInfo parse(String token) {
+        try {
+            Claims claims = parser.parseSignedClaims(token).getPayload();
+            return new TokenInfo(TokenStatus.VALID, claims.getSubject(), claims.get(USER_ID_CLAIM, Long.class));
+        } catch (io.jsonwebtoken.ExpiredJwtException e) {
+            return new TokenInfo(TokenStatus.EXPIRED, null, null);
+        } catch (Exception e) {
+            return new TokenInfo(TokenStatus.INVALID, null, null);
+        }
     }
 }
