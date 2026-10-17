@@ -74,13 +74,23 @@ public class InventoryService implements InventoryUseCase {
     @Override
     public LocalInventory getInventory(Long branchId, Long productId) {
         return localInventoryRepository.findByBranchAndProduct(branchId, productId)
-                .orElseGet(() -> LocalInventory.builder()
-                        .branchId(branchId)
-                        .productId(productId)
-                        .currentQuantity(BigDecimal.ZERO)
-                        .minimumStock(BigDecimal.ZERO)
-                        .committedQuantity(BigDecimal.ZERO)
-                        .build());
+                .orElseGet(() -> emptyInventory(branchId, productId));
+    }
+
+    /** Saldo para modificarlo: la fila queda bloqueada hasta el fin de la transacción (evita pérdidas de actualización). */
+    private LocalInventory lockedInventory(Long branchId, Long productId) {
+        return localInventoryRepository.findByBranchAndProductForUpdate(branchId, productId)
+                .orElseGet(() -> emptyInventory(branchId, productId));
+    }
+
+    private LocalInventory emptyInventory(Long branchId, Long productId) {
+        return LocalInventory.builder()
+                .branchId(branchId)
+                .productId(productId)
+                .currentQuantity(BigDecimal.ZERO)
+                .minimumStock(BigDecimal.ZERO)
+                .committedQuantity(BigDecimal.ZERO)
+                .build();
     }
 
     @Override
@@ -93,7 +103,7 @@ public class InventoryService implements InventoryUseCase {
             finalQuantity = applyConversion(productId, unitId, quantity, null).quantity();
         }
 
-        LocalInventory inventory = getInventory(branchId, productId);
+        LocalInventory inventory = lockedInventory(branchId, productId);
         
         if (!inventory.hasSufficientStock(finalQuantity)) {
             throw new InsufficientStockException(productName, finalQuantity, inventory.getCurrentQuantity());
@@ -136,13 +146,7 @@ public class InventoryService implements InventoryUseCase {
             finalUnitCost = result.unitCost();
         }
 
-        LocalInventory inventory = localInventoryRepository.findByBranchAndProduct(branchId, productId)
-                .orElseGet(() -> LocalInventory.builder()
-                        .branchId(branchId)
-                        .productId(productId)
-                        .currentQuantity(BigDecimal.ZERO)
-                        .minimumStock(BigDecimal.ZERO)
-                        .build());
+        LocalInventory inventory = lockedInventory(branchId, productId);
 
         // Recalcular Costo Promedio si se proporciona un costo unitario
         if (finalUnitCost != null && finalUnitCost.compareTo(BigDecimal.ZERO) > 0) {
@@ -212,7 +216,7 @@ public class InventoryService implements InventoryUseCase {
     @Override
     @Transactional
     public void reserveStock(Long branchId, Long productId, BigDecimal quantity) {
-        LocalInventory inventory = getInventory(branchId, productId);
+        LocalInventory inventory = lockedInventory(branchId, productId);
         
         if (!inventory.hasSufficientStock(quantity)) {
             Product product = productUseCase.getProductById(productId);
@@ -229,7 +233,7 @@ public class InventoryService implements InventoryUseCase {
     @Override
     @Transactional
     public void releaseStock(Long branchId, Long productId, BigDecimal quantity) {
-        LocalInventory inventory = getInventory(branchId, productId);
+        LocalInventory inventory = lockedInventory(branchId, productId);
         BigDecimal currentCommitted = inventory.getCommittedQuantity() != null ? inventory.getCommittedQuantity() : BigDecimal.ZERO;
         
         BigDecimal newCommitted = currentCommitted.subtract(quantity);
@@ -306,13 +310,7 @@ public class InventoryService implements InventoryUseCase {
     @Override
     @Transactional
     public LocalInventory updateMinimumStock(Long branchId, Long productId, BigDecimal minimumStock) {
-        LocalInventory inventory = localInventoryRepository.findByBranchAndProduct(branchId, productId)
-                .orElseGet(() -> LocalInventory.builder()
-                        .branchId(branchId)
-                        .productId(productId)
-                        .currentQuantity(BigDecimal.ZERO) // Empieza en 0
-                        .committedQuantity(BigDecimal.ZERO)
-                        .build());
+        LocalInventory inventory = lockedInventory(branchId, productId);
 
         inventory.setMinimumStock(minimumStock);
         inventory.setLastUpdated(LocalDateTime.now());

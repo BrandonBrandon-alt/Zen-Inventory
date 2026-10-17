@@ -38,6 +38,12 @@ public class LocalInventoryPersistenceAdapter implements LocalInventoryRepositor
     }
 
     @Override
+    public Optional<LocalInventory> findByBranchAndProductForUpdate(Long branchId, Long productId) {
+        return localInventoryRepository.findByBranchIdAndProductIdForUpdate(branchId, productId)
+                .map(LocalInventoryEntity::toDomain);
+    }
+
+    @Override
     public LocalInventory save(LocalInventory localInventory) {
         LocalInventoryEntity entity = LocalInventoryEntity.fromDomain(localInventory);
         return localInventoryRepository.save(entity).toDomain();

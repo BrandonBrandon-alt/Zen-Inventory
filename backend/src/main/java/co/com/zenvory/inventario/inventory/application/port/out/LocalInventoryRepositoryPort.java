@@ -24,6 +24,12 @@ public interface LocalInventoryRepositoryPort {
     Optional<LocalInventory> findByBranchAndProduct(Long branchId, Long productId);
 
     /**
+     * Como {@link #findByBranchAndProduct} pero bloquea la fila hasta el fin de la transacción. Es obligatorio
+     * para cualquier operación que lea el saldo y luego lo modifique (retiros, ingresos, reservas).
+     */
+    Optional<LocalInventory> findByBranchAndProductForUpdate(Long branchId, Long productId);
+
+    /**
      * Persiste o actualiza el registro de inventario local.
      * 
      * @param localInventory Modelo de dominio a guardar.
