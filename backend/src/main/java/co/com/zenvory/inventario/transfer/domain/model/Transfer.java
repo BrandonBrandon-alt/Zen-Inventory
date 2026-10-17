@@ -93,6 +93,9 @@ public class Transfer {
 
     public static Transfer create(Long originBranchId, Long destinationBranchId, LocalDateTime estimatedArrival, 
                                  List<TransferDetail> details, TransferPriority priority, Long userId, String userName) {
+        if (originBranchId != null && originBranchId.equals(destinationBranchId)) {
+            throw new IllegalArgumentException("La sucursal de origen y la de destino deben ser distintas.");
+        }
         return new Transfer(null, TransferStatus.PENDING, LocalDateTime.now(), estimatedArrival, null, 
                 originBranchId, destinationBranchId, null, null, details, null, priority, null, null, null, null, null, 0,
                 userId, userName, null, null, null, null, null, null, null, null);

@@ -10,6 +10,9 @@ import co.com.zenvory.inventario.transfer.application.port.in.TransferUseCase;
 import co.com.zenvory.inventario.transfer.application.port.out.TransferRepositoryPort;
 import co.com.zenvory.inventario.transfer.domain.model.Transfer;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Set;
+import java.util.HashSet;
 import co.com.zenvory.inventario.transfer.domain.model.TransferDetail;
 import co.com.zenvory.inventario.transfer.domain.model.TransferStatus;
 import co.com.zenvory.inventario.transfer.application.port.in.UpdateQuantityCommand;
@@ -102,6 +105,18 @@ public class TransferService implements TransferUseCase {
         return savedTransfer;
     }
 
+    /** Las cantidades deben cubrir exactamente todas las líneas de la transferencia, sin repetir ninguna. */
+    private void requireEveryLine(Transfer transfer, List<Long> providedIds) {
+        Set<Long> provided = new HashSet<>(providedIds);
+        if (provided.size() != providedIds.size()) {
+            throw new IllegalArgumentException("Hay productos repetidos en la solicitud.");
+        }
+        Set<Long> expected = transfer.getDetails().stream().map(TransferDetail::getId).collect(Collectors.toSet());
+        if (!provided.equals(expected)) {
+            throw new IllegalArgumentException("Debe indicar la cantidad de todos los productos de la transferencia.");
+        }
+    }
+
     @Override
     @Transactional
     public Transfer approveDestination(Long id) {
@@ -128,6 +143,9 @@ public class TransferService implements TransferUseCase {
                 user.getNombre()
         ); 
 
+        // Cada producto debe traer su cantidad enviada: una línea omitida dejaría su reserva bloqueada para siempre.
+        requireEveryLine(transfer, command.items().stream().map(DispatchTransferCommand.DispatchDetail::detailId).toList());
+
         // Operamos contra el Inventario de la sucursal origen
         for (DispatchTransferCommand.DispatchDetail dDetail : command.items()) {
             TransferDetail detail = transfer.getDetails().stream()
@@ -147,19 +165,21 @@ public class TransferService implements TransferUseCase {
                     BigDecimal.valueOf(detail.getRequestedQuantity())
             );
 
-            inventoryUseCase.withdrawStock(
-                    transfer.getOriginBranchId(),
-                    detail.getProductId(),
-                    productName,
-                    BigDecimal.valueOf(detail.getSentQuantity()),
-                    null,
-                    MovementReason.TRASLADO,
-                    user.getId(),
-                    transfer.getId(),
-                    "TRANSFERENCIA_OUT",
-                    null,
-                    null
-            );
+            if (detail.getSentQuantity() > 0) {
+                inventoryUseCase.withdrawStock(
+                        transfer.getOriginBranchId(),
+                        detail.getProductId(),
+                        productName,
+                        BigDecimal.valueOf(detail.getSentQuantity()),
+                        null,
+                        MovementReason.TRASLADO,
+                        user.getId(),
+                        transfer.getId(),
+                        "TRANSFERENCIA_OUT",
+                        null,
+                        null
+                );
+            }
         }
 
         return transferRepositoryPort.save(transfer);
@@ -195,6 +215,9 @@ public class TransferService implements TransferUseCase {
         User user = getCurrentUser();
         
         boolean hasIssues = false;
+
+        // Una línea sin cantidad recibida quedaría como "recibida 0" sin faltante reportado.
+        requireEveryLine(transfer, command.items().stream().map(ReceiveTransferCommand.ReceivedDetail::detailId).toList());
 
         // Procesar detalles primero para calcular si hay novedades
         for (ReceiveTransferCommand.ReceivedDetail rDetail : command.items()) {
