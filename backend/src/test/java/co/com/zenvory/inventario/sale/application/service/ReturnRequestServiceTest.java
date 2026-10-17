@@ -43,7 +43,7 @@ class ReturnRequestServiceTest {
         service = new ReturnRequestService(repo, sales, inventory, mock(AlertUseCase.class));
         sale = Sale.create(1L, "Sede", 2L, "Ana", "C", "1", BigDecimal.ZERO,
                 List.of(SaleDetail.create(5L, "P", 3, new BigDecimal("25"), BigDecimal.ZERO)));
-        when(sales.getSaleById(10L)).thenReturn(sale);
+        when(sales.getSaleForUpdate(10L)).thenReturn(sale);
         when(repo.findBySaleId(10L)).thenReturn(List.of());
         when(repo.save(any())).thenAnswer(i -> i.getArgument(0));
     }
@@ -84,5 +84,47 @@ class ReturnRequestServiceTest {
         service.approveRequest(77L, 9L, "ok");
         verify(inventory).addStock(any(), any(), any(), any(), any(), any(), any(), any(), org.mockito.ArgumentMatchers.isNull(), any(), any());
         verify(sales).updateSaleStatus(10L, SaleStatus.RETURNED);
+    }
+
+    @Test
+    @DisplayName("líneas repetidas del mismo producto en la solicitud se suman: dos de 3 sobre una venta de 3 se rechaza")
+    void duplicatedItemsAreSummed() {
+        CreateReturnRequestCommand twice = new CreateReturnRequestCommand(10L, 1L, 2L, "m", List.of(
+                new CreateReturnRequestCommand.Detail(5L, 3, "a", null), new CreateReturnRequestCommand.Detail(5L, 3, "b", null)));
+        assertThatThrownBy(() -> service.createRequest(twice)).isInstanceOf(InvalidReturnOperationException.class);
+        verify(repo, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("líneas repetidas dentro del tope se unen en un solo detalle")
+    void duplicatedItemsWithinLimitAreMerged() {
+        CreateReturnRequestCommand twice = new CreateReturnRequestCommand(10L, 1L, 2L, "m", List.of(
+                new CreateReturnRequestCommand.Detail(5L, 1, "a", null), new CreateReturnRequestCommand.Detail(5L, 2, "b", null)));
+        ReturnRequest saved = service.createRequest(twice);
+        org.assertj.core.api.Assertions.assertThat(saved.getDetails()).hasSize(1);
+        org.assertj.core.api.Assertions.assertThat(saved.getDetails().get(0).getQuantity()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("una venta con el mismo producto en dos líneas (distinto descuento) sí admite devolución")
+    void saleWithDuplicateProductLinesCanBeReturned() {
+        Sale split = Sale.create(1L, "Sede", 2L, "Ana", "C", "1", BigDecimal.ZERO, List.of(
+                SaleDetail.create(5L, "P", 2, new BigDecimal("100"), new BigDecimal("10")),
+                SaleDetail.create(5L, "P", 2, new BigDecimal("100"), BigDecimal.ZERO)));
+        when(sales.getSaleForUpdate(10L)).thenReturn(split);
+        CreateReturnRequestCommand ok = new CreateReturnRequestCommand(10L, 1L, 2L, "m",
+                List.of(new CreateReturnRequestCommand.Detail(5L, 4, "d", null)));
+        org.assertj.core.api.Assertions.assertThat(service.createRequest(ok).getDetails().get(0).getQuantity()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("el precio devuelto es lo realmente pagado: 100 con 20 % de línea y 10 % global = 72")
+    void returnPriceIncludesDiscounts() {
+        Sale discounted = Sale.create(1L, "Sede", 2L, "Ana", "C", "1", new BigDecimal("10"),
+                List.of(SaleDetail.create(5L, "P", 3, new BigDecimal("100"), new BigDecimal("20"))));
+        when(sales.getSaleForUpdate(10L)).thenReturn(discounted);
+        CreateReturnRequestCommand cmd = new CreateReturnRequestCommand(10L, 1L, 2L, "m",
+                List.of(new CreateReturnRequestCommand.Detail(5L, 1, "d", null)));
+        org.assertj.core.api.Assertions.assertThat(service.createRequest(cmd).getDetails().get(0).getUnitPricePaid()).isEqualByComparingTo("72");
     }
 }

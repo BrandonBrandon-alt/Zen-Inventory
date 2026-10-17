@@ -44,9 +44,8 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional
-    public void updateStatus(Long saleId, co.com.zenvory.inventario.sale.domain.model.SaleStatus status) {
-        jpaSaleRepository.updateStatus(saleId, status);
+    public Optional<Sale> findByIdForUpdate(Long id) {
+        return jpaSaleRepository.findByIdForUpdate(id).map(this::toDomain);
     }
 
     private SaleEntity toEntity(Sale domain) {
