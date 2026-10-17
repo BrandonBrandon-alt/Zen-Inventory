@@ -113,4 +113,35 @@ class AlertControllerTest {
         org.mockito.Mockito.verify(alertUseCase).resolveViaPurchaseOrder(org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(5L), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any());
     }
+
+    @Test
+    @DisplayName("un MANAGER sin sucursal asignada no obtiene alertas de ninguna sucursal (403, no listado global)")
+    void listWithoutBranchIs403() throws Exception {
+        actAsManagerOfBranch(null);
+        mockMvc.perform(get("/api/v1/alerts")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/alerts?branchId=2")).andExpect(status().isForbidden());
+        org.mockito.Mockito.verify(alertUseCase, org.mockito.Mockito.never()).getGlobalActiveAlerts();
+    }
+
+    @Test
+    @DisplayName("un MANAGER solo ve las alertas de su sucursal aunque pida otra en la consulta")
+    void listIsScopedToOwnBranch() throws Exception {
+        actAsManagerOfBranch(1L);
+        when(alertUseCase.getActiveAlerts(1L)).thenReturn(java.util.List.of());
+        mockMvc.perform(get("/api/v1/alerts?branchId=2")).andExpect(status().isOk());
+        org.mockito.Mockito.verify(alertUseCase).getActiveAlerts(1L);
+        org.mockito.Mockito.verify(alertUseCase, org.mockito.Mockito.never()).getActiveAlerts(2L);
+    }
+
+    @Test
+    @DisplayName("resolver sin datos obligatorios es 400 y no llega al servicio")
+    void resolveWithoutRequiredFieldsIs400() throws Exception {
+        actAsManagerOfBranch(1L);
+        when(alertUseCase.getAlertById(10L)).thenReturn(co.com.zenvory.inventario.alert.domain.model.StockAlert.create(1L, 3L, "x"));
+        mockMvc.perform(post("/api/v1/alerts/10/resolve/transfer").contentType("application/json").content("{\"quantity\": 0}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/alerts/10/resolve/purchase").contentType("application/json").content("{\"quantity\": 5}"))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verify(alertUseCase, org.mockito.Mockito.never()).resolveViaTransfer(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
 }

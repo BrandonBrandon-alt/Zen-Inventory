@@ -24,7 +24,9 @@ import co.com.zenvory.inventario.inventory.domain.event.StockLevelRestoredEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -54,6 +56,7 @@ public class AlertService implements AlertUseCase {
     private final BranchUseCase branchUseCase;
     private final TransferUseCase transferUseCase;
     private final PurchaseUseCase purchaseUseCase;
+    private final TransactionTemplate perItemTransaction;
     private static final Logger log = LoggerFactory.getLogger(AlertService.class);
 
     /**
@@ -71,13 +74,17 @@ public class AlertService implements AlertUseCase {
                         ProductUseCase productUseCase,
                         BranchUseCase branchUseCase,
                         TransferUseCase transferUseCase,
-                        PurchaseUseCase purchaseUseCase) {
+                        PurchaseUseCase purchaseUseCase,
+                        PlatformTransactionManager transactionManager) {
         this.alertRepository = alertRepository;
         this.inventoryUseCase = inventoryUseCase;
         this.productUseCase = productUseCase;
         this.branchUseCase = branchUseCase;
         this.transferUseCase = transferUseCase;
         this.purchaseUseCase = purchaseUseCase;
+        // Cada elemento del escaneo va en su propia transacción: un registro dañado no revierte los demás.
+        this.perItemTransaction = new TransactionTemplate(transactionManager);
+        this.perItemTransaction.setPropagationBehavior(TransactionTemplate.PROPAGATION_REQUIRES_NEW);
     }
 
     /**
@@ -89,13 +96,23 @@ public class AlertService implements AlertUseCase {
      * </p>
      */
     @Override
-    @Transactional
     @Scheduled(fixedDelayString = "300000", initialDelayString = "30000")
     public void scanForAlerts() {
         log.debug("Iniciando escaneo programado de alertas de bajo stock...");
-        List<LocalInventory> lowStockInventories = inventoryUseCase.getLowStockInventories();
-        for (LocalInventory inv : lowStockInventories) {
-            handleLowStockCheck(inv);
+        // Una sola consulta con las alertas de stock bajo ya abiertas, en vez de una por cada fila de stock bajo.
+        java.util.Set<String> alreadyAlerted = alertRepository.findAllUnresolvedByType(StockAlert.AlertType.LOW_STOCK).stream()
+                .map(a -> a.getBranchId() + ":" + a.getProductId())
+                .collect(java.util.stream.Collectors.toSet());
+        for (LocalInventory inv : inventoryUseCase.getLowStockInventories()) {
+            if (alreadyAlerted.contains(inv.getBranchId() + ":" + inv.getProductId())) {
+                continue;
+            }
+            try {
+                perItemTransaction.executeWithoutResult(status -> handleLowStockCheck(inv));
+            } catch (RuntimeException e) {
+                log.error("No se pudo evaluar la alerta de stock bajo (sucursal {}, producto {}): {}",
+                        inv.getBranchId(), inv.getProductId(), e.getMessage());
+            }
         }
     }
 
@@ -120,12 +137,6 @@ public class AlertService implements AlertUseCase {
     }
 
     /**
-     * Reacciona de forma asíncrona cuando un evento indica que el stock se ha restaurado.
-     * Permite limpiar o resolver alertas automáticas que ya no son necesarias.
-     * 
-     * @param event Evento de restauración de niveles.
-     */
-    /**
      * Cierra las alertas de "solicitud de traslado" de los productos de un traslado cuando el origen autoriza su
      * salida. Corre tras el commit y en su propia transacción: si falla, el traslado ya quedó preparado.
      */
@@ -135,9 +146,13 @@ public class AlertService implements AlertUseCase {
     public void onTransferPrepared(co.com.zenvory.inventario.transfer.domain.event.TransferPreparedEvent event) {
         try {
             for (StockAlert alert : alertRepository.findActiveAlerts(event.originBranchId())) {
-                boolean isTransferRequest = alert.getMessage() != null && alert.getMessage().contains("Solicitud de Traslado");
-                if (isTransferRequest && alert.getProductId() != null && event.productIds().contains(alert.getProductId())) {
-                    dismissAlert(alert.getId(), "Transferencia autorizada por el gerente");
+                if (alert.getType() == StockAlert.AlertType.TRANSFER_REQUEST && event.productIds().contains(alert.getProductId())) {
+                    try {
+                        dismissAlert(alert.getId(), "Transferencia autorizada por el gerente");
+                    } catch (RuntimeException e) {
+                        // Una alerta ya resuelta por otro lado no debe impedir cerrar las demás.
+                        log.warn("No se pudo cerrar la alerta {} del traslado {}: {}", alert.getId(), event.transferId(), e.getMessage());
+                    }
                 }
             }
         } catch (Exception e) {
@@ -145,6 +160,12 @@ public class AlertService implements AlertUseCase {
         }
     }
 
+    /**
+     * Reacciona de forma asíncrona cuando un evento indica que el stock se ha restaurado.
+     * Permite limpiar o resolver alertas de stock bajo que ya no son necesarias.
+     * 
+     * @param event Evento de restauración de niveles.
+     */
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -169,9 +190,12 @@ public class AlertService implements AlertUseCase {
         // Condición: stock disponible (lo que hay menos lo comprometido en traslados) <= mínimo, y el mínimo está definido (>0)
         if (inv.availableQuantity().compareTo(inv.getMinimumStock()) <= 0 && inv.getMinimumStock().compareTo(java.math.BigDecimal.ZERO) > 0) {
             
-            // Verificación de redundancia: si ya hay una alerta activa para este producto/sucursal, no creamos otra.
-            List<StockAlert> unresolves = alertRepository.findUnresolvedByBranchAndProduct(inv.getBranchId(),
-                    inv.getProductId());
+            // Verificación de redundancia: si ya hay una alerta de STOCK BAJO activa para este producto/sucursal, no
+            // creamos otra. Otras alertas abiertas (solicitud de traslado, novedades…) no la reemplazan. El candado
+            // evita que el escaneo y el listener asíncrono comprueben a la vez y creen dos.
+            alertRepository.lockForCreation(inv.getBranchId(), inv.getProductId());
+            List<StockAlert> unresolves = alertRepository.findUnresolvedByBranchProductAndType(inv.getBranchId(),
+                    inv.getProductId(), StockAlert.AlertType.LOW_STOCK);
             
             if (unresolves.isEmpty()) {
                 String actual = inv.availableQuantity().stripTrailingZeros().toPlainString();
@@ -201,7 +225,14 @@ public class AlertService implements AlertUseCase {
     @Override
     @Transactional
     public void handleRestoredStockCheck(Long branchId, Long productId) {
-        List<StockAlert> activeAlerts = alertRepository.findUnresolvedByBranchAndProduct(branchId, productId);
+        // Solo se cierran las alertas de STOCK BAJO, y solo si lo disponible realmente superó el mínimo (el evento
+        // puede llegar tarde o por un ingreso pequeño que aún no alcanza).
+        LocalInventory inv = inventoryUseCase.getInventory(branchId, productId);
+        if (inv.getMinimumStock() != null && inv.getMinimumStock().signum() > 0
+                && inv.availableQuantity().compareTo(inv.getMinimumStock()) <= 0) {
+            return;
+        }
+        List<StockAlert> activeAlerts = alertRepository.findUnresolvedByBranchProductAndType(branchId, productId, StockAlert.AlertType.LOW_STOCK);
         for (StockAlert alert : activeAlerts) {
             alert.resolve(ResolutionType.DISMISSED, null, "Stock restaurado a niveles seguros automáticamente");
             alertRepository.save(alert);
@@ -239,9 +270,6 @@ public class AlertService implements AlertUseCase {
         return alertRepository.getGlobalActiveAlerts();
     }
 
-    /**
-     * Resuelve una alerta sin realizar acciones adicionales en el sistema.
-     */
     @Override
     public StockAlert getAlertById(Long alertId) {
         return findAlert(alertId);
@@ -250,7 +278,7 @@ public class AlertService implements AlertUseCase {
     @Override
     @Transactional
     public void resolveAlert(Long alertId) {
-        StockAlert alert = findAlert(alertId);
+        StockAlert alert = findAlertForUpdate(alertId);
         alert.resolve(ResolutionType.DISMISSED, null, "Resolución manual genérica");
         alertRepository.save(alert);
     }
@@ -262,14 +290,23 @@ public class AlertService implements AlertUseCase {
     @Override
     @Transactional
     public void resolveViaTransfer(Long alertId, Long originBranchId, Integer quantity, Long userId, String priority) {
-        StockAlert alert = findAlert(alertId);
-        
-        // Mapeo manual de prioridad de texto a ENUM del dominio de transferencias
+        // La alerta se bloquea y se comprueba ANTES de crear el traslado: dos resoluciones simultáneas (doble clic, dos
+        // gerentes) generarían dos documentos, y la segunda solo fallaría al intentar marcar la alerta.
+        StockAlert alert = findAlertForUpdate(alertId);
+        requireOpen(alert);
+        if (originBranchId == null || originBranchId.equals(alert.getBranchId())) {
+            throw new IllegalArgumentException("La sucursal de origen debe indicarse y ser distinta de la de la alerta.");
+        }
+        if (quantity == null || quantity <= 0) {
+            throw new IllegalArgumentException("La cantidad a trasladar debe ser mayor a cero.");
+        }
+        co.com.zenvory.inventario.transfer.domain.model.TransferPriority transferPriority = parsePriority(priority);
+
         RequestTransferCommand cmd = new RequestTransferCommand(
                 originBranchId,
                 alert.getBranchId(),
                 LocalDateTime.now().plusDays(2),
-                priority != null ? co.com.zenvory.inventario.transfer.domain.model.TransferPriority.valueOf(priority.toUpperCase()) : co.com.zenvory.inventario.transfer.domain.model.TransferPriority.HIGH,
+                transferPriority,
                 List.of(new RequestTransferCommand.Detail(alert.getProductId(), quantity))
         );
         
@@ -288,13 +325,26 @@ public class AlertService implements AlertUseCase {
     @Override
     @Transactional
     public void resolveViaPurchaseOrder(Long alertId, Integer leadTimeDays, BigDecimal quantity, Long userId, boolean isManager, Long supplierId) {
-        StockAlert alert = findAlert(alertId);
+        StockAlert alert = findAlertForUpdate(alertId);
+        requireOpen(alert);
+        if (userId == null) {
+            throw new IllegalArgumentException("No se pudo identificar al usuario que genera la orden.");
+        }
+        if (supplierId == null) {
+            throw new IllegalArgumentException("Debe indicar el proveedor.");
+        }
+        if (quantity == null || quantity.signum() <= 0) {
+            throw new IllegalArgumentException("La cantidad a comprar debe ser mayor a cero.");
+        }
+        if (leadTimeDays == null || leadTimeDays <= 0) {
+            throw new IllegalArgumentException("El tiempo de entrega debe ser mayor a cero.");
+        }
         Product product = productUseCase.getProductById(alert.getProductId());
         
         // Creación del comando de compra basado en los datos de la alerta y el producto
         CreatePurchaseCommand cmd = new CreatePurchaseCommand(
                 supplierId,
-                userId != null ? userId : 1L,
+                userId,
                 alert.getBranchId(),
                 leadTimeDays,
                 30,
@@ -319,7 +369,7 @@ public class AlertService implements AlertUseCase {
     @Override
     @Transactional
     public void dismissAlert(Long alertId, String reason) {
-        StockAlert alert = findAlert(alertId);
+        StockAlert alert = findAlertForUpdate(alertId);
         alert.resolve(ResolutionType.DISMISSED, null, reason);
         alertRepository.save(alert);
     }
@@ -327,6 +377,28 @@ public class AlertService implements AlertUseCase {
     /**
      * Método auxiliar de búsqueda con validación de existencia.
      */
+    private StockAlert findAlertForUpdate(Long id) {
+        return alertRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new IllegalArgumentException("No se encontró la alerta de stock solicitada."));
+    }
+
+    private static void requireOpen(StockAlert alert) {
+        if (alert.isResolved()) {
+            throw new co.com.zenvory.inventario.alert.domain.exception.AlertAlreadyResolvedException("Esta alerta de stock ya se encuentra resuelta.");
+        }
+    }
+
+    private static co.com.zenvory.inventario.transfer.domain.model.TransferPriority parsePriority(String priority) {
+        if (priority == null || priority.isBlank()) {
+            return co.com.zenvory.inventario.transfer.domain.model.TransferPriority.HIGH;
+        }
+        try {
+            return co.com.zenvory.inventario.transfer.domain.model.TransferPriority.valueOf(priority.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("La prioridad '" + priority + "' no es válida.");
+        }
+    }
+
     private StockAlert findAlert(Long id) {
         return alertRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("No se encontró la alerta de stock solicitada."));

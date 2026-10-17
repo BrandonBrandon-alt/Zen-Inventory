@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -40,15 +41,19 @@ class AlertServiceTest {
     private ProductUseCase products;
     private PurchaseUseCase purchases;
     private AlertService service;
+    private InventoryUseCase inventory;
+    private TransferUseCase transfers;
 
     @BeforeEach
     void setUp() {
         alerts = mock(AlertRepositoryPort.class);
         products = mock(ProductUseCase.class);
         purchases = mock(PurchaseUseCase.class);
-        service = new AlertService(alerts, mock(InventoryUseCase.class), products, mock(BranchUseCase.class),
-                mock(TransferUseCase.class), purchases);
-        when(alerts.findById(1L)).thenReturn(Optional.of(StockAlert.create(3L, 5L, "Stock bajo")));
+        inventory = mock(InventoryUseCase.class);
+        transfers = mock(TransferUseCase.class);
+        service = new AlertService(alerts, inventory, products, mock(BranchUseCase.class),
+                transfers, purchases, mock(org.springframework.transaction.PlatformTransactionManager.class));
+        when(alerts.findByIdForUpdate(1L)).thenReturn(Optional.of(StockAlert.create(3L, 5L, "Stock bajo")));
         PurchaseOrder order = mock(PurchaseOrder.class);
         when(order.getId()).thenReturn(40L);
         when(purchases.createOrder(any(), org.mockito.ArgumentMatchers.anyBoolean())).thenReturn(order);
@@ -102,14 +107,17 @@ class AlertServiceTest {
     @Test
     @DisplayName("al preparar un traslado se cierran solo las alertas de solicitud de traslado de sus productos")
     void transferPreparedDismissesMatchingAlerts() {
-        StockAlert match = new StockAlert(100L, 3L, 5L, "Solicitud de Traslado pendiente", java.time.LocalDateTime.now(), false,
-                null, null, null, null, null);
-        StockAlert otherProduct = new StockAlert(101L, 3L, 6L, "Solicitud de Traslado pendiente", java.time.LocalDateTime.now(), false,
-                null, null, null, null, null);
-        StockAlert lowStock = new StockAlert(102L, 3L, 5L, "Stock bajo", java.time.LocalDateTime.now(), false,
-                null, null, null, null, null);
+        StockAlert match = new StockAlert(100L, 3L, 5L, "Solicitud", java.time.LocalDateTime.now(), false,
+                null, StockAlert.AlertType.TRANSFER_REQUEST, null, null, null);
+        StockAlert otherProduct = new StockAlert(101L, 3L, 6L, "Solicitud", java.time.LocalDateTime.now(), false,
+                null, StockAlert.AlertType.TRANSFER_REQUEST, null, null, null);
+        // Un mensaje que casualmente dice "Solicitud de Traslado" pero es de stock bajo NO se cierra (se decide por tipo).
+        StockAlert lowStock = new StockAlert(102L, 3L, 5L, "Solicitud de Traslado en el texto", java.time.LocalDateTime.now(), false,
+                null, StockAlert.AlertType.LOW_STOCK, null, null, null);
         when(alerts.findActiveAlerts(3L)).thenReturn(List.of(match, otherProduct, lowStock));
-        when(alerts.findById(100L)).thenReturn(Optional.of(match));
+        when(alerts.findByIdForUpdate(100L)).thenReturn(Optional.of(match));
+        when(alerts.findByIdForUpdate(101L)).thenReturn(Optional.of(otherProduct));
+        when(alerts.findByIdForUpdate(102L)).thenReturn(Optional.of(lowStock));
 
         service.onTransferPrepared(new co.com.zenvory.inventario.transfer.domain.event.TransferPreparedEvent(
                 9L, 3L, java.util.Set.of(5L)));
@@ -125,10 +133,10 @@ class AlertServiceTest {
         when(products.getProductById(5L)).thenReturn(Product.builder().id(5L).name("P").build());
         var branches = mock(BranchUseCase.class);
         var alertsRepo = mock(AlertRepositoryPort.class);
-        when(alertsRepo.findUnresolvedByBranchAndProduct(3L, 5L)).thenReturn(List.of());
+        when(alertsRepo.findUnresolvedByBranchProductAndType(3L, 5L, StockAlert.AlertType.LOW_STOCK)).thenReturn(List.of());
         when(branches.getBranchById(3L)).thenReturn(co.com.zenvory.inventario.branch.domain.model.Branch.builder().id(3L).name("Sede").build());
         var svc = new AlertService(alertsRepo, mock(InventoryUseCase.class), products, branches,
-                mock(TransferUseCase.class), purchases);
+                mock(TransferUseCase.class), purchases, mock(org.springframework.transaction.PlatformTransactionManager.class));
 
         var committedHeavy = co.com.zenvory.inventario.inventory.domain.model.LocalInventory.builder().branchId(3L).productId(5L)
                 .currentQuantity(new BigDecimal("11")).committedQuantity(new BigDecimal("8")).minimumStock(new BigDecimal("5")).build();
@@ -140,5 +148,113 @@ class AlertServiceTest {
                 .currentQuantity(new BigDecimal("11")).committedQuantity(BigDecimal.ZERO).minimumStock(new BigDecimal("5")).build();
         svc.handleLowStockCheck(plenty); // disponible 11 > 5 -> sin alerta
         org.mockito.Mockito.verify(alertsRepo, org.mockito.Mockito.never()).save(any());
+    }
+
+    private StockAlert lowStockAlert(long id) {
+        return new StockAlert(id, 3L, 5L, "Stock bajo", java.time.LocalDateTime.now(), false, null, StockAlert.AlertType.LOW_STOCK, null, null, null);
+    }
+
+    private co.com.zenvory.inventario.inventory.domain.model.LocalInventory inv(String current, String committed, String min) {
+        return co.com.zenvory.inventario.inventory.domain.model.LocalInventory.builder().branchId(3L).productId(5L)
+                .currentQuantity(new BigDecimal(current)).committedQuantity(new BigDecimal(committed)).minimumStock(new BigDecimal(min)).build();
+    }
+
+    @Test
+    @DisplayName("al restaurar stock solo se cierran las alertas de STOCK BAJO, no las de solicitud de traslado u otras")
+    void restoredClosesOnlyLowStockAlerts() {
+        when(inventory.getInventory(3L, 5L)).thenReturn(inv("20", "0", "5"));
+        StockAlert low = lowStockAlert(10L);
+        when(alerts.findUnresolvedByBranchProductAndType(3L, 5L, StockAlert.AlertType.LOW_STOCK)).thenReturn(List.of(low));
+        service.handleRestoredStockCheck(3L, 5L);
+        assertThat(low.isResolved()).isTrue();
+        verify(alerts, org.mockito.Mockito.never()).findUnresolvedByBranchProductAndType(3L, 5L, StockAlert.AlertType.TRANSFER_REQUEST);
+    }
+
+    @Test
+    @DisplayName("al restaurar stock no se cierra la alerta si, con lo comprometido, sigue bajo el mínimo")
+    void restoredDoesNotCloseWhileStillBelowMinimum() {
+        when(inventory.getInventory(3L, 5L)).thenReturn(inv("10", "8", "5"));
+        StockAlert low = lowStockAlert(10L);
+        when(alerts.findUnresolvedByBranchProductAndType(3L, 5L, StockAlert.AlertType.LOW_STOCK)).thenReturn(List.of(low));
+        service.handleRestoredStockCheck(3L, 5L);
+        assertThat(low.isResolved()).isFalse();
+    }
+
+    @Test
+    @DisplayName("el escaneo sigue con las demás filas si una falla, y omite las que ya tienen alerta de stock bajo")
+    void scanContinuesAfterAFailureAndSkipsAlerted() {
+        var ok = inv("1", "0", "5");
+        var broken = co.com.zenvory.inventario.inventory.domain.model.LocalInventory.builder().branchId(3L).productId(6L)
+                .currentQuantity(BigDecimal.ONE).committedQuantity(BigDecimal.ZERO).minimumStock(new BigDecimal("5")).build();
+        var alreadyAlerted = co.com.zenvory.inventario.inventory.domain.model.LocalInventory.builder().branchId(3L).productId(7L)
+                .currentQuantity(BigDecimal.ONE).committedQuantity(BigDecimal.ZERO).minimumStock(new BigDecimal("5")).build();
+        when(inventory.getLowStockInventories()).thenReturn(List.of(broken, alreadyAlerted, ok));
+        when(alerts.findAllUnresolvedByType(StockAlert.AlertType.LOW_STOCK)).thenReturn(List.of(
+                new StockAlert(1L, 3L, 7L, "ya", java.time.LocalDateTime.now(), false, null, StockAlert.AlertType.LOW_STOCK, null, null, null)));
+        when(products.getProductById(6L)).thenThrow(new RuntimeException("producto roto"));
+        when(products.getProductById(5L)).thenReturn(Product.builder().id(5L).name("P").build());
+        var branches = mock(BranchUseCase.class);
+        when(branches.getBranchById(3L)).thenReturn(co.com.zenvory.inventario.branch.domain.model.Branch.builder().id(3L).name("Sede").build());
+        when(alerts.findUnresolvedByBranchProductAndType(any(), any(), any())).thenReturn(List.of());
+        var svc = new AlertService(alerts, inventory, products, branches, transfers, purchases,
+                mock(org.springframework.transaction.PlatformTransactionManager.class));
+
+        svc.scanForAlerts();
+
+        org.mockito.ArgumentCaptor<StockAlert> saved = org.mockito.ArgumentCaptor.forClass(StockAlert.class);
+        verify(alerts).save(saved.capture());
+        assertThat(saved.getValue().getProductId()).isEqualTo(5L);
+        verify(alerts, org.mockito.Mockito.never()).lockForCreation(3L, 7L);
+    }
+
+    @Test
+    @DisplayName("una alerta de otro tipo abierta no impide crear la alerta de stock bajo, y la creación se hace bajo candado")
+    void otherOpenAlertDoesNotSuppressLowStock() {
+        when(products.getProductById(5L)).thenReturn(Product.builder().id(5L).name("P").build());
+        var branches = mock(BranchUseCase.class);
+        when(branches.getBranchById(3L)).thenReturn(co.com.zenvory.inventario.branch.domain.model.Branch.builder().id(3L).name("Sede").build());
+        when(alerts.findUnresolvedByBranchProductAndType(3L, 5L, StockAlert.AlertType.LOW_STOCK)).thenReturn(List.of());
+        var svc = new AlertService(alerts, inventory, products, branches, transfers, purchases,
+                mock(org.springframework.transaction.PlatformTransactionManager.class));
+        svc.handleLowStockCheck(inv("1", "0", "5"));
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(alerts);
+        order.verify(alerts).lockForCreation(3L, 5L);
+        order.verify(alerts).findUnresolvedByBranchProductAndType(3L, 5L, StockAlert.AlertType.LOW_STOCK);
+        order.verify(alerts).save(any());
+    }
+
+    @Test
+    @DisplayName("resolver una alerta ya resuelta falla ANTES de crear el traslado o la orden (no hay documentos duplicados)")
+    void resolvingAnAlreadyResolvedAlertCreatesNothing() {
+        StockAlert resolved = StockAlert.create(3L, 5L, "x");
+        resolved.resolve(co.com.zenvory.inventario.alert.domain.model.ResolutionType.DISMISSED, null, "ya");
+        when(alerts.findByIdForUpdate(2L)).thenReturn(Optional.of(resolved));
+        assertThatThrownBy(() -> service.resolveViaTransfer(2L, 9L, 4, 7L, "HIGH"))
+                .isInstanceOf(co.com.zenvory.inventario.alert.domain.exception.AlertAlreadyResolvedException.class);
+        assertThatThrownBy(() -> service.resolveViaPurchaseOrder(2L, 3, BigDecimal.TEN, 7L, true, 1L))
+                .isInstanceOf(co.com.zenvory.inventario.alert.domain.exception.AlertAlreadyResolvedException.class);
+        verify(transfers, org.mockito.Mockito.never()).requestTransfer(any());
+        verify(purchases, org.mockito.Mockito.never()).createOrder(any(), org.mockito.ArgumentMatchers.anyBoolean());
+    }
+
+    @Test
+    @DisplayName("resolver por traslado valida origen, cantidad y prioridad antes de crear nada")
+    void transferResolutionValidatesInput() {
+        assertThatThrownBy(() -> service.resolveViaTransfer(1L, 3L, 4, 7L, "HIGH")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.resolveViaTransfer(1L, null, 4, 7L, "HIGH")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.resolveViaTransfer(1L, 9L, 0, 7L, "HIGH")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.resolveViaTransfer(1L, 9L, 4, 7L, "urgente")).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("prioridad");
+        verify(transfers, org.mockito.Mockito.never()).requestTransfer(any());
+    }
+
+    @Test
+    @DisplayName("resolver por compra valida los datos y no atribuye la orden a un usuario por defecto")
+    void purchaseResolutionValidatesInput() {
+        assertThatThrownBy(() -> service.resolveViaPurchaseOrder(1L, 3, BigDecimal.TEN, null, true, 1L)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.resolveViaPurchaseOrder(1L, 3, BigDecimal.ZERO, 7L, true, 1L)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.resolveViaPurchaseOrder(1L, 0, BigDecimal.TEN, 7L, true, 1L)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.resolveViaPurchaseOrder(1L, 3, BigDecimal.TEN, 7L, true, null)).isInstanceOf(IllegalArgumentException.class);
+        verify(purchases, org.mockito.Mockito.never()).createOrder(any(), org.mockito.ArgumentMatchers.anyBoolean());
     }
 }
