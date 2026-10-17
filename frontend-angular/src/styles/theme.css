@@ -109,6 +109,8 @@
   --radius-xl: 16px;
   --font-sans: 'Inter Variable', system-ui, -apple-system, sans-serif;
   --font-serif: 'Lora', Georgia, serif;
+  /* Títulos (h1/h2): clase `font-title`. */
+  --font-title: 'Junicode', Georgia, serif;
 }
 
 /* Animaciones de marca (utilidades animate-*). Los keyframes solo se emiten si la utilidad se usa. */

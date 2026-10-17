@@ -7,7 +7,7 @@ import { ActivatedRoute } from '@angular/router';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   template: `
-    <h1 class="mb-2 font-serif text-[28px] font-bold tracking-tight text-fg">{{ title }}</h1>
+    <h1 class="mb-2 font-title text-[28px] font-bold tracking-tight text-fg">{{ title }}</h1>
     <p class="text-sm text-fg-subtle">Esta pantalla todavía no está disponible en la nueva versión.</p>
   `,
 })

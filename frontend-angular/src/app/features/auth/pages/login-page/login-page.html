@@ -9,7 +9,7 @@
       <!-- El título se anima letra por letra; el nombre accesible es el texto completo. -->
       <h1
         aria-label="Zen Inventory"
-        class="flex flex-wrap justify-center gap-[0.15em] font-serif text-[clamp(48px,5.5vw,76px)] leading-[1.05] font-bold tracking-[-0.04em] text-fg"
+        class="flex flex-wrap justify-center gap-[0.15em] font-title text-[clamp(48px,5.5vw,76px)] leading-[1.05] font-bold tracking-[-0.04em] text-fg"
       >
         @for (letter of titleLetters; track $index) {
           <span
@@ -38,7 +38,7 @@
         <span class="font-serif text-xl font-bold text-fg">Zen Inventory</span>
       </div>
 
-      <h2 class="mb-2 font-serif text-[28px] leading-tight font-bold tracking-tight text-fg">
+      <h2 class="mb-2 font-title text-[28px] leading-tight font-bold tracking-tight text-fg">
         Bienvenido de vuelta
       </h2>
       <p class="mb-8 text-sm text-fg-subtle">Ingresa tus credenciales para continuar</p>

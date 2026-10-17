@@ -4,6 +4,29 @@
 @import '@fontsource/lora/600.css';
 @import './styles/theme.css';
 
+/* Junicode (OFL) para los títulos. Solo WOFF: es lo único que necesitan los navegadores actuales. */
+@font-face {
+  font-family: 'Junicode';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../node_modules/@typopro/web-junicode/TypoPRO-Junicode-Regular.woff') format('woff');
+}
+@font-face {
+  font-family: 'Junicode';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../node_modules/@typopro/web-junicode/TypoPRO-Junicode-Bold.woff') format('woff');
+}
+@font-face {
+  font-family: 'Junicode';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../node_modules/@typopro/web-junicode/TypoPRO-Junicode-Italic.woff') format('woff');
+}
+
 @layer base {
   /* Scroll estético y consistente en toda la app: barra fina del color neutral del tema, sin pista visible.
      Va en `*` porque `scrollbar-width` no se hereda: cada área con scroll necesita la propiedad. */
@@ -82,3 +105,14 @@
   }
 }
 
+
+/* Énfasis dentro de un título: `<h1>Hola <span class="italic">mundo</span></h1>`. Usa la cara itálica real de Junicode
+   (por eso no se sintetiza otra) y sin alternativas "swash". */
+@layer components {
+  :is(h1, h2) .italic {
+    font-family: var(--font-title);
+    font-feature-settings: 'swsh' 0;
+    font-style: italic;
+    font-weight: 400;
+  }
+}

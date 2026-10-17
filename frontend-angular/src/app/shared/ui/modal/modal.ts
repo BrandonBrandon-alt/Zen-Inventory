@@ -63,7 +63,7 @@ let scrollLocks = 0;
     >
       <div class="flex max-h-[85dvh] flex-col">
         <header class="px-6 pt-6 pb-4" [class.pr-14]="dismissible()">
-          <h2 [id]="titleId" class="font-serif text-xl font-bold tracking-tight text-fg">{{ title() }}</h2>
+          <h2 [id]="titleId" class="font-title text-xl font-bold tracking-tight text-fg">{{ title() }}</h2>
           @if (description(); as text) {
             <p [id]="descriptionId" class="mt-1 text-sm text-fg-subtle">{{ text }}</p>
           }
