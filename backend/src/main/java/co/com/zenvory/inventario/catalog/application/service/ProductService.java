@@ -44,6 +44,19 @@ public class ProductService implements ProductUseCase {
      * @throws ProductNotFoundException Si el ID solicitado no existe.
      */
     @Override
+    public Product getProductForCostUpdate(Long id) {
+        if (!productRepositoryPort.lockById(id)) {
+            throw new ProductNotFoundException(id);
+        }
+        return getProductById(id);
+    }
+
+    @Override
+    public void updateAverageCost(Long id, java.math.BigDecimal averageCost) {
+        productRepositoryPort.updateAverageCost(id, averageCost);
+    }
+
+    @Override
     public Product getProductById(Long id) {
         return productRepositoryPort.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException(id));

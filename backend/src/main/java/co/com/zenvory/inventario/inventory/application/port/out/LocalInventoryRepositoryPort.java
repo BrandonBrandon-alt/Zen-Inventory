@@ -29,6 +29,9 @@ public interface LocalInventoryRepositoryPort {
      */
     Optional<LocalInventory> findByBranchAndProductForUpdate(Long branchId, Long productId);
 
+    /** Crea el saldo en cero si todavía no existe (idempotente y seguro con operaciones simultáneas). */
+    void ensureExists(Long branchId, Long productId);
+
     /**
      * Persiste o actualiza el registro de inventario local.
      * 

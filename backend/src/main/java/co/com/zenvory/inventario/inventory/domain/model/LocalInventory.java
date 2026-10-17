@@ -39,6 +39,13 @@ public class LocalInventory {
     /** Fecha y hora de la última sincronización o movimiento. */
     private LocalDateTime lastUpdated;
 
+    /** Stock realmente disponible: lo que hay menos lo comprometido en traslados pendientes. */
+    public BigDecimal availableQuantity() {
+        BigDecimal current = this.currentQuantity != null ? this.currentQuantity : BigDecimal.ZERO;
+        BigDecimal committed = this.committedQuantity != null ? this.committedQuantity : BigDecimal.ZERO;
+        return current.subtract(committed);
+    }
+
     /**
      * Valida si existe stock disponible real (Actual - Comprometido) para satisfacer un requerimiento.
      * 

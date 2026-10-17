@@ -123,4 +123,33 @@ class InventoryControllerTest {
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(5L), org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
+
+    @Test
+    @DisplayName("el listado enriquecido (con costo y precio) de otra sucursal es 403, pero el stock de UN producto en otra sucursal se puede consultar (traslados)")
+    void listIsOwnBranchOnlyButSingleProductReadIsOpen() throws Exception {
+        actAsManagerOfBranch(1L);
+        mockMvc.perform(get("/api/v1/inventory/branches/2")).andExpect(status().isForbidden());
+        org.mockito.Mockito.verify(inventoryUseCase, org.mockito.Mockito.never()).getEnrichedInventoryByBranch(org.mockito.ArgumentMatchers.any());
+
+        when(inventoryUseCase.getInventory(2L, 3L)).thenReturn(
+                co.com.zenvory.inventario.inventory.domain.model.LocalInventory.builder().branchId(2L).productId(3L)
+                        .currentQuantity(java.math.BigDecimal.TEN).build());
+        mockMvc.perform(get("/api/v1/inventory/branches/2/products/3")).andExpect(status().isOk());
+        when(inventoryUseCase.getEnrichedInventoryByBranch(1L)).thenReturn(java.util.List.of());
+        mockMvc.perform(get("/api/v1/inventory/branches/1")).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("un stock mínimo negativo por la API es 400")
+    void negativeMinimumIs400() throws Exception {
+        actAsManagerOfBranch(1L);
+        mockMvc.perform(put("/api/v1/inventory/branches/1/products/3/config?minimumStock=-2")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("los movimientos de un MANAGER sin sucursal asignada son 403, no una consulta con null")
+    void movementsWithoutBranchIs403() throws Exception {
+        actAsManagerOfBranch(null);
+        mockMvc.perform(get("/api/v1/inventory/movements")).andExpect(status().isForbidden());
+    }
 }

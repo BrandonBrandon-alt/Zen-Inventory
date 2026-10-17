@@ -118,4 +118,27 @@ class AlertServiceTest {
         assertThat(otherProduct.isResolved()).isFalse();
         assertThat(lowStock.isResolved()).isFalse();
     }
+
+    @Test
+    @DisplayName("la alerta de stock bajo se decide con el stock DISPONIBLE (actual menos comprometido), no con el actual")
+    void lowStockUsesAvailableQuantity() {
+        when(products.getProductById(5L)).thenReturn(Product.builder().id(5L).name("P").build());
+        var branches = mock(BranchUseCase.class);
+        var alertsRepo = mock(AlertRepositoryPort.class);
+        when(alertsRepo.findUnresolvedByBranchAndProduct(3L, 5L)).thenReturn(List.of());
+        when(branches.getBranchById(3L)).thenReturn(co.com.zenvory.inventario.branch.domain.model.Branch.builder().id(3L).name("Sede").build());
+        var svc = new AlertService(alertsRepo, mock(InventoryUseCase.class), products, branches,
+                mock(TransferUseCase.class), purchases);
+
+        var committedHeavy = co.com.zenvory.inventario.inventory.domain.model.LocalInventory.builder().branchId(3L).productId(5L)
+                .currentQuantity(new BigDecimal("11")).committedQuantity(new BigDecimal("8")).minimumStock(new BigDecimal("5")).build();
+        svc.handleLowStockCheck(committedHeavy); // disponible 3 <= 5 -> alerta
+        verify(alertsRepo).save(any());
+
+        org.mockito.Mockito.clearInvocations(alertsRepo);
+        var plenty = co.com.zenvory.inventario.inventory.domain.model.LocalInventory.builder().branchId(3L).productId(5L)
+                .currentQuantity(new BigDecimal("11")).committedQuantity(BigDecimal.ZERO).minimumStock(new BigDecimal("5")).build();
+        svc.handleLowStockCheck(plenty); // disponible 11 > 5 -> sin alerta
+        org.mockito.Mockito.verify(alertsRepo, org.mockito.Mockito.never()).save(any());
+    }
 }

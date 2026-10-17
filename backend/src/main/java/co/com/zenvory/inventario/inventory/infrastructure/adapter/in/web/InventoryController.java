@@ -78,6 +78,9 @@ public class InventoryController {
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<List<co.com.zenvory.inventario.inventory.infrastructure.adapter.in.web.dto.InventoryProductResponse>> getInventoryByBranch(
             @PathVariable Long branchId) {
+        // Este listado incluye precio de venta y costo promedio (datos de margen): solo de la propia sucursal.
+        // (El stock de UN producto en otra sucursal sí se puede consultar: lo necesita quien pide un traslado.)
+        CurrentUser.resolve(userRepositoryPort).requireBranch(branchId);
         return ResponseEntity.ok(inventoryUseCase.getEnrichedInventoryByBranch(branchId).stream()
                 .map(inv -> co.com.zenvory.inventario.inventory.infrastructure.adapter.in.web.dto.InventoryProductResponse.builder()
                         .id(inv.getId())
@@ -108,7 +111,7 @@ public class InventoryController {
     public ResponseEntity<LocalInventory> updateConfig(
             @PathVariable Long branchId,
             @PathVariable Long productId,
-            @RequestParam BigDecimal minimumStock) {
+            @RequestParam @jakarta.validation.constraints.DecimalMin(value = "0", message = "El stock mínimo no puede ser negativo.") BigDecimal minimumStock) {
         CurrentUser.resolve(userRepositoryPort).requireBranch(branchId);
         return ResponseEntity.ok(inventoryUseCase.updateMinimumStock(branchId, productId, minimumStock));
     }
@@ -208,16 +211,13 @@ public class InventoryController {
     @GetMapping("/movements")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<List<InventoryMovement>> getAllMovements() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        User user = userRepositoryPort.findByEmail(auth.getName()).orElseThrow();
-        
-        List<InventoryMovement> movements;
-        if ("MANAGER".equals(user.getRole().getNombre()) || "OPERADOR_INVENTARIO".equals(user.getRole().getNombre())) {
-            movements = inventoryUseCase.getMovementsByBranch(user.getSucursalId());
-        } else {
-            movements = inventoryUseCase.getAllMovements();
-        }
-        
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
+
+        // El ADMIN ve los movimientos de todas las sucursales; el resto, solo los de la suya.
+        List<InventoryMovement> movements = current.isAdmin()
+                ? inventoryUseCase.getAllMovements()
+                : inventoryUseCase.getMovementsByBranch(current.resolveBranch(null));
+
         return ResponseEntity.ok(movements);
     }
 }

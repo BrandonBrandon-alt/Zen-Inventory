@@ -166,15 +166,15 @@ public class AlertService implements AlertUseCase {
      */
     @Transactional
     public void handleLowStockCheck(LocalInventory inv) {
-        // Condición: stock actual <= stock mínimo y el mínimo está definido (>0)
-        if (inv.getCurrentQuantity().compareTo(inv.getMinimumStock()) <= 0 && inv.getMinimumStock().compareTo(java.math.BigDecimal.ZERO) > 0) {
+        // Condición: stock disponible (lo que hay menos lo comprometido en traslados) <= mínimo, y el mínimo está definido (>0)
+        if (inv.availableQuantity().compareTo(inv.getMinimumStock()) <= 0 && inv.getMinimumStock().compareTo(java.math.BigDecimal.ZERO) > 0) {
             
             // Verificación de redundancia: si ya hay una alerta activa para este producto/sucursal, no creamos otra.
             List<StockAlert> unresolves = alertRepository.findUnresolvedByBranchAndProduct(inv.getBranchId(),
                     inv.getProductId());
             
             if (unresolves.isEmpty()) {
-                String actual = inv.getCurrentQuantity().stripTrailingZeros().toPlainString();
+                String actual = inv.availableQuantity().stripTrailingZeros().toPlainString();
                 String minimo = inv.getMinimumStock().stripTrailingZeros().toPlainString();
                 
                 // Enriquecimiento de datos para el mensaje descriptivo

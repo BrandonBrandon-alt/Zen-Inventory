@@ -36,6 +36,12 @@ public interface ProductRepositoryPort {
      */
     boolean existsBySku(String sku);
 
+    /** Bloquea la fila del producto hasta el fin de la transacción; {@code false} si no existe. */
+    boolean lockById(Long id);
+
+    /** Actualiza solo el costo promedio (no reescribe el resto del producto). */
+    void updateAverageCost(Long id, java.math.BigDecimal averageCost);
+
     /**
      * Persiste o actualiza un producto en el almacenamiento.
      * 

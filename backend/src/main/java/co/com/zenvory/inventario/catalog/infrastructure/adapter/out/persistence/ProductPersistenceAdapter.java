@@ -41,6 +41,16 @@ public class ProductPersistenceAdapter implements ProductRepositoryPort {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public boolean lockById(Long id) {
+        return !jpaRepository.lockById(id).isEmpty();
+    }
+
+    @Override
+    public void updateAverageCost(Long id, java.math.BigDecimal averageCost) {
+        jpaRepository.updateAverageCost(id, averageCost);
+    }
+
     /** {@inheritDoc} */
     @Override
     @Transactional(readOnly = true)
