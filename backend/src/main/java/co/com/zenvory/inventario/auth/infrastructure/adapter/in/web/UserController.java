@@ -114,22 +114,7 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Método auxiliar de mapeo entre modelo de dominio y DTO de respuesta.
-     */
     private UserResponse mapToResponse(User user) {
-        return UserResponse.builder()
-                .id(user.getId())
-                .nombre(user.getNombre())
-                .email(user.getEmail())
-                .role(RoleResponse.builder()
-                        .id(user.getRole().getId())
-                        .nombre(user.getRole().getNombre())
-                        .build())
-                .sucursalId(user.getSucursalId())
-                .activo(user.getActive())
-                .createdAt(user.getCreatedAt())
-                .build();
+        return UserResponse.from(user);
     }
 }
-

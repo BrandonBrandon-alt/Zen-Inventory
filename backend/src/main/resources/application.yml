@@ -9,6 +9,12 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
+  servlet:
+    multipart:
+      # Las fotos de perfil se reducen en el servidor; aquí solo se acota lo que se acepta subir.
+      max-file-size: 5MB
+      max-request-size: 6MB
+
   jpa:
     hibernate:
       # 'validate': JPA verifica que las entidades coincidan con el esquema.

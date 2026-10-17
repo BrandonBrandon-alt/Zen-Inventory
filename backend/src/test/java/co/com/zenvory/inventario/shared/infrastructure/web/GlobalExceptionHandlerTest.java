@@ -196,6 +196,15 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("Un archivo por encima del límite responde 413 PAYLOAD_TOO_LARGE con mensaje claro")
+    void uploadTooLarge() throws Exception {
+        mockMvc.perform(get("/t/too-large"))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.code").value("PAYLOAD_TOO_LARGE"))
+                .andExpect(jsonPath("$.message").value(containsString("5 MB")));
+    }
+
+    @Test
     @DisplayName("Violación de integridad por SKU: 409 DUPLICATE_SKU; otras: 409 DATA_INTEGRITY")
     void dataIntegrity() throws Exception {
         mockMvc.perform(get("/t/integrity/sku"))
@@ -311,6 +320,11 @@ class GlobalExceptionHandlerTest {
         record Body(
                 @NotBlank(message = "El nombre es obligatorio") String nombre,
                 @Size(min = 3, message = "Mínimo 3 caracteres") String direccion) {}
+
+        @GetMapping("/too-large")
+        void tooLarge() {
+            throw new org.springframework.web.multipart.MaxUploadSizeExceededException(5 * 1024 * 1024);
+        }
 
         @GetMapping("/domain/{kind}")
         void domain(@PathVariable String kind) {

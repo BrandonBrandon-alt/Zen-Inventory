@@ -25,6 +25,7 @@ public enum ErrorCode {
     INVALID_ARGUMENT,
     METHOD_NOT_ALLOWED,
     UNSUPPORTED_MEDIA_TYPE,
+    PAYLOAD_TOO_LARGE,
 
     // Recursos y reglas de negocio
     RESOURCE_NOT_FOUND,

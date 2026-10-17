@@ -36,6 +36,7 @@ import org.springframework.validation.ObjectError;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpStatus;
@@ -181,6 +182,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                                                                   HttpStatusCode status, WebRequest request) {
         log.debug("Cuerpo de solicitud ilegible: {}", ex.getMessage());
         return body(HttpStatus.BAD_REQUEST, ErrorCode.MALFORMED_REQUEST, "El cuerpo de la solicitud no es válido.", request);
+    }
+
+    /** 413 – Archivo subido por encima del límite configurado. */
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex, HttpHeaders headers,
+                                                                          HttpStatusCode status, WebRequest request) {
+        return body(HttpStatus.PAYLOAD_TOO_LARGE, ErrorCode.PAYLOAD_TOO_LARGE,
+                "El archivo es demasiado grande. El máximo permitido es 5 MB.", request);
     }
 
     /** 400 – Parámetro de ruta o consulta con tipo incorrecto. */
