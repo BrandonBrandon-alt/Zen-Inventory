@@ -1,4 +1,4 @@
-<header class="mb-6 flex flex-wrap items-start justify-between gap-4">
+<header class="mb-6 flex animate-enter flex-wrap items-start justify-between gap-4">
   <div>
     <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Usuarios</h1>
     @if (!loading() && !error() && users().length > 0) {
@@ -15,6 +15,7 @@
 </header>
 
 <app-data-table
+  class="block animate-enter-delayed"
   caption="Listado de usuarios"
   [columns]="columns"
   [rows]="rows()"

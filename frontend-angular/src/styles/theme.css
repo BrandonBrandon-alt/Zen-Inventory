@@ -118,6 +118,11 @@
   --animate-letter-reveal: letterReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-fade-in-up: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 
+  /* Entrada de las pantallas (la misma del Next): el encabezado sube y aparece; el contenido lo sigue unos ms después.
+     `backwards` (no `both`): al terminar no queda ningún `transform`, que crearía un contenedor para hijos con position fixed. */
+  --animate-enter: fadeInUp 0.4s ease backwards;
+  --animate-enter-delayed: fadeInUp 0.4s ease 0.07s backwards;
+
   /* Movimiento de interfaz: entradas rápidas y salidas aún más rápidas (la salida no debe hacer esperar). */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --animate-form-in: fadeInUp 0.6s var(--ease-out-expo) 0.1s both;

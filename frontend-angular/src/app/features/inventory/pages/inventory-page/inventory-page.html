@@ -1,4 +1,4 @@
-<header class="mb-6 flex flex-wrap items-start justify-between gap-4">
+<header class="mb-6 flex animate-enter flex-wrap items-start justify-between gap-4">
   <div>
     <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Inventario</h1>
     @if (!loading() && !error() && items().length > 0) {
@@ -21,11 +21,11 @@
 </header>
 
 @if (canSeeKardex()) {
-  <app-tabs class="mb-5" [tabs]="tabs()" [(active)]="activeTab" idPrefix="inventory" ariaLabel="Secciones del inventario" />
+  <app-tabs class="mb-5 animate-enter-delayed" [tabs]="tabs()" [(active)]="activeTab" idPrefix="inventory" ariaLabel="Secciones del inventario" />
 }
 
 @if (activeTab() === 'stock') {
-  <div id="inventory-panel-stock" role="tabpanel" aria-labelledby="inventory-tab-stock">
+  <div id="inventory-panel-stock" role="tabpanel" aria-labelledby="inventory-tab-stock" class="animate-enter-delayed">
     <div class="mb-4 max-w-sm">
       <app-form-field>
         <input appInput type="search" placeholder="Buscar por producto o SKU…" aria-label="Buscar producto" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
@@ -69,7 +69,7 @@
     </app-data-table>
   </div>
 } @else if (branchId() !== null) {
-  <div id="inventory-panel-kardex" role="tabpanel" aria-labelledby="inventory-tab-kardex">
+  <div id="inventory-panel-kardex" role="tabpanel" aria-labelledby="inventory-tab-kardex" class="animate-enter-delayed">
     <app-kardex-panel [branchId]="branchId()!" [products]="items()" />
   </div>
 }
