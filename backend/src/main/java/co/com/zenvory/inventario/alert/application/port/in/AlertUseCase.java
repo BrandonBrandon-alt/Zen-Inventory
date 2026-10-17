@@ -42,6 +42,9 @@ public interface AlertUseCase {
      * @param alertId Identificador de la alerta a resolver.
      */
     void resolveAlert(Long alertId);
+
+    /** Alerta por su identificador (para comprobar a qué sucursal pertenece antes de actuar sobre ella). */
+    StockAlert getAlertById(Long alertId);
     
     /**
      * Resuelve una alerta mediante una solicitud de traslado desde otra sucursal.

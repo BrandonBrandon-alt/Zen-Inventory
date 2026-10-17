@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import co.com.zenvory.inventario.shared.infrastructure.security.CurrentUser;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
@@ -33,9 +34,11 @@ public class SaleController {
     @PostMapping
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<SaleResponse> createSale(@Valid @RequestBody SaleRequest request) {
+        // Quién vende y en qué sucursal salen de la sesión, no del cuerpo (que se podría falsificar).
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
         CreateSaleCommand command = new CreateSaleCommand(
-                request.branchId(),
-                request.userId(),
+                current.resolveBranch(request.branchId()),
+                current.id(),
                 request.customerName(),
                 request.customerDocument(),
                 request.globalDiscountPercentage(),
@@ -78,6 +81,7 @@ public class SaleController {
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<SaleResponse> getSale(@PathVariable Long id) {
         Sale sale = saleManagementUseCase.getSaleById(id);
+        CurrentUser.resolve(userRepositoryPort).requireBranch(sale.getBranchId());
         return ResponseEntity.ok(SaleResponse.fromDomain(sale));
     }
 

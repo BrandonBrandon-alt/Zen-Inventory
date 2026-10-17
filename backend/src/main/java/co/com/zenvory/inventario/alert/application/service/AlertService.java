@@ -223,6 +223,11 @@ public class AlertService implements AlertUseCase {
      * Resuelve una alerta sin realizar acciones adicionales en el sistema.
      */
     @Override
+    public StockAlert getAlertById(Long alertId) {
+        return findAlert(alertId);
+    }
+
+    @Override
     @Transactional
     public void resolveAlert(Long alertId) {
         StockAlert alert = findAlert(alertId);

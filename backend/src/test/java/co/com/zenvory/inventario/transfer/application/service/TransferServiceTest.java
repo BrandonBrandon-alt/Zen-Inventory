@@ -50,7 +50,16 @@ class TransferServiceTest {
 
         User manager = User.builder().id(9L).nombre("Ana").email("ana@x.co").sucursalId(1L)
                 .role(Role.builder().id(2L).nombre("MANAGER").build()).build();
+        User destinationManager = User.builder().id(10L).nombre("Luis").email("luis@x.co").sucursalId(2L)
+                .role(Role.builder().id(2L).nombre("MANAGER").build()).build();
+        User outsider = User.builder().id(11L).nombre("Eva").email("eva@x.co").sucursalId(99L)
+                .role(Role.builder().id(2L).nombre("MANAGER").build()).build();
+        User admin = User.builder().id(12L).nombre("Root").email("root@x.co")
+                .role(Role.builder().id(1L).nombre("ADMIN").build()).build();
         when(users.findByEmail("ana@x.co")).thenReturn(Optional.of(manager));
+        when(users.findByEmail("luis@x.co")).thenReturn(Optional.of(destinationManager));
+        when(users.findByEmail("eva@x.co")).thenReturn(Optional.of(outsider));
+        when(users.findByEmail("root@x.co")).thenReturn(Optional.of(admin));
         when(products.getProductById(any())).thenReturn(Product.builder().name("P").build());
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("ana@x.co", null, List.of()));
 
@@ -61,6 +70,10 @@ class TransferServiceTest {
         transfer.prepare(9L, "Ana");
         when(repo.findById(1L)).thenReturn(Optional.of(transfer));
         when(repo.save(any())).thenAnswer(i -> i.getArgument(0));
+    }
+
+    private void actAs(String email) {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(email, null, List.of()));
     }
 
     @AfterEach
@@ -115,6 +128,7 @@ class TransferServiceTest {
     @DisplayName("no se puede recibir más de lo enviado (no se crea stock de la nada)")
     void receiveRejectsExcess() {
         inTransit();
+        actAs("luis@x.co");
         assertThatThrownBy(() -> service.receiveTransfer(1L, new ReceiveTransferCommand("n", List.of(
                 new ReceiveTransferCommand.ReceivedDetail(11L, 500), new ReceiveTransferCommand.ReceivedDetail(12L, 4)))))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -125,6 +139,7 @@ class TransferServiceTest {
     @DisplayName("recibir exige todas las líneas")
     void receiveMustCoverEveryLine() {
         inTransit();
+        actAs("luis@x.co");
         assertThatThrownBy(() -> service.receiveTransfer(1L, new ReceiveTransferCommand("n", List.of(
                 new ReceiveTransferCommand.ReceivedDetail(11L, 10)))))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -134,9 +149,69 @@ class TransferServiceTest {
     @DisplayName("recepción con faltante: ingresa lo recibido y marca la novedad")
     void receiveWithShortage() {
         inTransit();
+        actAs("luis@x.co");
         service.receiveTransfer(1L, new ReceiveTransferCommand("n", List.of(
                 new ReceiveTransferCommand.ReceivedDetail(11L, 7), new ReceiveTransferCommand.ReceivedDetail(12L, 4))));
         verify(inventory).addStock(any(), any(), org.mockito.ArgumentMatchers.eq(BigDecimal.valueOf(7)), any(), any(), any(), any(), any(), any(), any(), any());
         assertThat(transfer.getStatus().name()).isEqualTo("WITH_ISSUE");
+    }
+
+    @Test
+    @DisplayName("quien no pertenece a la sucursal de origen no puede despachar")
+    void outsiderCannotDispatch() {
+        actAs("eva@x.co");
+        assertThatThrownBy(() -> service.dispatchTransfer(1L, dispatch(
+                new DispatchTransferCommand.DispatchDetail(11L, 10), new DispatchTransferCommand.DispatchDetail(12L, 4))))
+                .isInstanceOf(co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException.class);
+        verify(inventory, never()).releaseStock(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("la sucursal de destino no puede despachar (el stock sale del origen)")
+    void destinationCannotDispatch() {
+        actAs("luis@x.co");
+        assertThatThrownBy(() -> service.dispatchTransfer(1L, dispatch(
+                new DispatchTransferCommand.DispatchDetail(11L, 10), new DispatchTransferCommand.DispatchDetail(12L, 4))))
+                .isInstanceOf(co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException.class);
+    }
+
+    @Test
+    @DisplayName("el origen no puede recibir su propio envío")
+    void originCannotReceive() {
+        inTransit();
+        assertThatThrownBy(() -> service.receiveTransfer(1L, new ReceiveTransferCommand("n", List.of(
+                new ReceiveTransferCommand.ReceivedDetail(11L, 10), new ReceiveTransferCommand.ReceivedDetail(12L, 4)))))
+                .isInstanceOf(co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException.class);
+        verify(inventory, never()).addStock(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("un ADMIN actúa en cualquier paso, sea cual sea su sucursal")
+    void adminCanActAnywhere() {
+        actAs("root@x.co");
+        service.dispatchTransfer(1L, dispatch(
+                new DispatchTransferCommand.DispatchDetail(11L, 10), new DispatchTransferCommand.DispatchDetail(12L, 4)));
+        service.receiveTransfer(1L, new ReceiveTransferCommand("n", List.of(
+                new ReceiveTransferCommand.ReceivedDetail(11L, 10), new ReceiveTransferCommand.ReceivedDetail(12L, 4))));
+        assertThat(transfer.getStatus().name()).isEqualTo("DELIVERED");
+    }
+
+    @Test
+    @DisplayName("solo se solicitan traslados hacia la propia sucursal")
+    void requestOnlyTowardsOwnBranch() {
+        // Ana (sucursal 1) pide stock "hacia" la sucursal 2: no es su sucursal.
+        assertThatThrownBy(() -> service.requestTransfer(new co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCommand(
+                3L, 2L, null, null, List.of(new co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCommand.Detail(5L, 1)))))
+                .isInstanceOf(co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException.class);
+        verify(inventory, never()).reserveStock(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("el destino sí puede solicitar el traslado: el stock se reserva en el origen")
+    void destinationCanRequest() {
+        actAs("luis@x.co");
+        service.requestTransfer(new co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCommand(
+                1L, 2L, null, null, List.of(new co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCommand.Detail(5L, 3))));
+        verify(inventory).reserveStock(1L, 5L, BigDecimal.valueOf(3));
     }
 }

@@ -47,6 +47,10 @@ public class ReturnRequestService implements ReturnRequestUseCase {
         // 1. Obtener la venta original
         Sale sale = saleManagementUseCase.getSaleById(command.saleId());
         requireNotCanceled(sale);
+        if (!sale.getBranchId().equals(command.branchId())) {
+            // El stock devuelto vuelve a la sucursal de la solicitud: tiene que ser la de la venta.
+            throw new InvalidReturnOperationException("La venta no pertenece a la sucursal indicada.");
+        }
         
         // 2. Mapear detalles originales para validación rápida
         Map<Long, SaleDetail> originalDetails = sale.getDetails().stream()

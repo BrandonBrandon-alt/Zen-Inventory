@@ -8,6 +8,7 @@ import co.com.zenvory.inventario.inventory.infrastructure.adapter.in.web.dto.Sto
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import co.com.zenvory.inventario.shared.infrastructure.security.CurrentUser;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
@@ -108,6 +109,7 @@ public class InventoryController {
             @PathVariable Long branchId,
             @PathVariable Long productId,
             @RequestParam BigDecimal minimumStock) {
+        CurrentUser.resolve(userRepositoryPort).requireBranch(branchId);
         return ResponseEntity.ok(inventoryUseCase.updateMinimumStock(branchId, productId, minimumStock));
     }
 
@@ -123,6 +125,7 @@ public class InventoryController {
     public ResponseEntity<List<InventoryMovement>> getKardex(
             @PathVariable Long branchId, 
             @PathVariable Long productId) {
+        CurrentUser.resolve(userRepositoryPort).requireBranch(branchId);
         List<InventoryMovement> kardex = inventoryUseCase.getKardex(branchId, productId);
         return ResponseEntity.ok(kardex);
     }
@@ -142,6 +145,9 @@ public class InventoryController {
             @PathVariable Long productId,
             @Valid @RequestBody StockRequest request) {
         
+        // Solo se mueve el stock de la propia sucursal y el movimiento queda a nombre de quien lo hace.
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
+        current.requireBranch(branchId);
         String productName = productUseCase.getProductById(productId).getName();
         
         inventoryUseCase.withdrawStock(
@@ -151,7 +157,7 @@ public class InventoryController {
                 request.getQuantity(), 
                 request.getUnitId(),
                 request.getReason(), 
-                request.getUserId(), 
+                current.id(), 
                 request.getReferenceId(), 
                 request.getReferenceType(),
                 request.getObservations(),
@@ -175,13 +181,15 @@ public class InventoryController {
             @PathVariable Long productId,
             @Valid @RequestBody StockRequest request) {
         
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
+        current.requireBranch(branchId);
         inventoryUseCase.addStock(
                 branchId, 
                 productId, 
                 request.getQuantity(), 
                 request.getUnitId(),
                 request.getReason(), 
-                request.getUserId(), 
+                current.id(), 
                 request.getReferenceId(), 
                 request.getReferenceType(),
                 request.getUnitCost(),

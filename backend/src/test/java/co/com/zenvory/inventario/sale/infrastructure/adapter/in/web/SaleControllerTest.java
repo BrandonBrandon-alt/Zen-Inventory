@@ -98,5 +98,51 @@ class SaleControllerTest {
         mockMvc.perform(delete("/api/v1/sales/1?reason=Test"))
                 .andExpect(status().isNoContent());
     }
-}
 
+    private void actAsManagerOfBranch(Long branchId) {
+        co.com.zenvory.inventario.auth.domain.model.User manager = co.com.zenvory.inventario.auth.domain.model.User.builder()
+                .id(5L).email("test@example.com").nombre("Gerente").sucursalId(branchId)
+                .role(co.com.zenvory.inventario.auth.domain.model.Role.builder().nombre("MANAGER").build()).build();
+        org.mockito.Mockito.when(userRepositoryPort.findByEmail("test@example.com")).thenReturn(java.util.Optional.of(manager));
+    }
+
+    private static final String SALE_BODY = "{\"branchId\": %d, \"userId\": 99, \"items\": [{\"productId\": 1, \"quantity\": 1}]}";
+
+    @Test
+    @DisplayName("POST /sales: el vendedor y la sucursal salen de la sesión, no del cuerpo (userId falso se ignora)")
+    void create_usesSessionIdentity() throws Exception {
+        actAsManagerOfBranch(1L);
+        Sale sale = mock(Sale.class);
+        when(sale.getStatus()).thenReturn(co.com.zenvory.inventario.sale.domain.model.SaleStatus.COMPLETED);
+        when(sale.getDetails()).thenReturn(List.of());
+        when(createSaleUseCase.execute(org.mockito.ArgumentMatchers.any())).thenReturn(sale);
+
+        mockMvc.perform(post("/api/v1/sales").contentType("application/json").content(String.format(SALE_BODY, 1)))
+                .andExpect(status().isCreated());
+
+        org.mockito.ArgumentCaptor<co.com.zenvory.inventario.sale.application.port.in.CreateSaleCommand> captor =
+                org.mockito.ArgumentCaptor.forClass(co.com.zenvory.inventario.sale.application.port.in.CreateSaleCommand.class);
+        org.mockito.Mockito.verify(createSaleUseCase).execute(captor.capture());
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().userId()).isEqualTo(5L);
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().branchId()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("POST /sales: vender a nombre de otra sucursal es 403 y no registra nada")
+    void create_otherBranch_returns403() throws Exception {
+        actAsManagerOfBranch(1L);
+        mockMvc.perform(post("/api/v1/sales").contentType("application/json").content(String.format(SALE_BODY, 2)))
+                .andExpect(status().isForbidden());
+        org.mockito.Mockito.verify(createSaleUseCase, org.mockito.Mockito.never()).execute(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("GET /sales/{id}: una venta de otra sucursal es 403")
+    void getById_otherBranch_returns403() throws Exception {
+        actAsManagerOfBranch(1L);
+        Sale sale = mock(Sale.class);
+        when(sale.getBranchId()).thenReturn(2L);
+        when(saleManagementUseCase.getSaleById(1L)).thenReturn(sale);
+        mockMvc.perform(get("/api/v1/sales/1")).andExpect(status().isForbidden());
+    }
+}

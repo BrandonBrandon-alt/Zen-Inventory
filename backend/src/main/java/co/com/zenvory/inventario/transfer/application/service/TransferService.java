@@ -9,6 +9,8 @@ import co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCom
 import co.com.zenvory.inventario.transfer.application.port.in.TransferUseCase;
 import co.com.zenvory.inventario.transfer.application.port.out.TransferRepositoryPort;
 import co.com.zenvory.inventario.transfer.domain.model.Transfer;
+import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException;
+import co.com.zenvory.inventario.shared.infrastructure.security.CurrentUser;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.Set;
@@ -48,6 +50,28 @@ public class TransferService implements TransferUseCase {
         this.userRepositoryPort = userRepositoryPort;
     }
 
+    /** Quién puede ejecutar cada paso de un traslado: la sucursal que da el stock, la que lo recibe, o cualquiera de las dos. */
+    private enum Side { ORIGIN, DESTINATION, EITHER }
+
+    /** El ADMIN actúa sobre cualquier traslado; el resto solo si su sucursal es la que corresponde al paso. */
+    private void requireSide(Transfer transfer, User user, Side side) {
+        CurrentUser current = new CurrentUser(user);
+        if (current.isAdmin()) {
+            return;
+        }
+        Long branch = user.getSucursalId();
+        boolean isOrigin = branch != null && branch.equals(transfer.getOriginBranchId());
+        boolean isDestination = branch != null && branch.equals(transfer.getDestinationBranchId());
+        boolean allowed = switch (side) {
+            case ORIGIN -> isOrigin;
+            case DESTINATION -> isDestination;
+            case EITHER -> isOrigin || isDestination;
+        };
+        if (!allowed) {
+            throw new UnauthorizedActionException("Su sucursal no participa en este paso del traslado.");
+        }
+    }
+
     private User getCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
@@ -68,6 +92,10 @@ public class TransferService implements TransferUseCase {
                 .toList();
 
         User user = getCurrentUser();
+        // Quien solicita pide para su propia sucursal (destino); el stock se reserva en la sucursal de origen.
+        if (!new CurrentUser(user).isAdmin() && !command.destinationBranchId().equals(user.getSucursalId())) {
+            throw new UnauthorizedActionException("Solo puede solicitar traslados hacia su propia sucursal.");
+        }
 
         Transfer transfer = Transfer.create(
                 command.originBranchId(),
@@ -122,6 +150,7 @@ public class TransferService implements TransferUseCase {
     public Transfer approveDestination(Long id) {
         Transfer transfer = getTransferById(id);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.DESTINATION);
                 
         transfer.approveDestination(user.getId(), user.getNombre());
         return transferRepositoryPort.save(transfer);
@@ -132,6 +161,7 @@ public class TransferService implements TransferUseCase {
     public Transfer dispatchTransfer(Long transferId, DispatchTransferCommand command) {
         Transfer transfer = getTransferById(transferId);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.ORIGIN);
         
         // El agregado valida su estado internamente
         transfer.dispatch(
@@ -190,6 +220,7 @@ public class TransferService implements TransferUseCase {
     public Transfer prepareTransfer(Long transferId, List<UpdateQuantityCommand> items) {
         Transfer transfer = getTransferById(transferId);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.ORIGIN);
 
         transfer.prepare(user.getId(), user.getNombre());
 
@@ -213,6 +244,7 @@ public class TransferService implements TransferUseCase {
     public Transfer receiveTransfer(Long transferId, ReceiveTransferCommand command) {
         Transfer transfer = getTransferById(transferId);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.DESTINATION);
         
         boolean hasIssues = false;
 
@@ -260,6 +292,7 @@ public class TransferService implements TransferUseCase {
     public void cancelTransfer(Long id, String reason) {
         Transfer transfer = getTransferById(id);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.EITHER);
 
         TransferStatus previousStatus = transfer.getStatus();
         
@@ -303,6 +336,7 @@ public class TransferService implements TransferUseCase {
     public void rejectTransfer(Long id, String reason) {
         Transfer transfer = getTransferById(id);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.EITHER);
 
         TransferStatus previousStatus = transfer.getStatus();
         
@@ -346,6 +380,7 @@ public class TransferService implements TransferUseCase {
     public void resolveAsShrinkage(Long id) {
         Transfer transfer = getTransferById(id);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.EITHER);
                 
         transfer.resolveAsShrinkage(user.getId(), user.getNombre());
         transferRepositoryPort.save(transfer);
@@ -356,6 +391,7 @@ public class TransferService implements TransferUseCase {
     public void resolveAsResend(Long id) {
         Transfer transfer = getTransferById(id);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.EITHER);
         
         // Crear nuevo traslado para los faltantes
         List<TransferDetail> relativeDetails = transfer.getDetails().stream()
@@ -378,6 +414,7 @@ public class TransferService implements TransferUseCase {
     public void resolveAsClaim(Long id) {
         Transfer transfer = getTransferById(id);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.EITHER);
         transfer.resolveAsClaim(user.getId(), user.getNombre());
         transferRepositoryPort.save(transfer);
     }

@@ -4,6 +4,7 @@ import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
 import co.com.zenvory.inventario.auth.domain.model.User;
 import org.springframework.http.ResponseEntity;
+import co.com.zenvory.inventario.shared.infrastructure.security.CurrentUser;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -71,6 +72,13 @@ public class AlertController {
         return user.getSucursalId(); // Restricción obligatoria por sede
     }
 
+    /** Solo se actúa sobre alertas de la propia sucursal (el ADMIN, sobre cualquiera). */
+    private CurrentUser requireAlertBranch(Long alertId) {
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
+        current.requireBranch(alertUseCase.getAlertById(alertId).getBranchId());
+        return current;
+    }
+
     /**
      * Ejecuta manualmente el motor de escaneo de niveles de stock.
      * Solo accesible para administradores debido al alto consumo de recursos.
@@ -120,6 +128,7 @@ public class AlertController {
     @PatchMapping("/{id}/resolve")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<MessageResponse> resolveAlert(@PathVariable Long id) {
+        requireAlertBranch(id);
         alertUseCase.resolveAlert(id);
         return ResponseEntity.ok(new MessageResponse("Alerta #" + id + " marcada como resuelta."));
     }
@@ -135,7 +144,9 @@ public class AlertController {
     public ResponseEntity<MessageResponse> resolveViaTransfer(
             @PathVariable Long id, 
             @RequestBody TransferResolutionRequest request) {
-        alertUseCase.resolveViaTransfer(id, request.originBranchId(), request.quantity(), request.userId(), request.priority());
+        // Quien resuelve es el usuario de la sesión (request.userId() se ignora: era falsificable).
+        CurrentUser current = requireAlertBranch(id);
+        alertUseCase.resolveViaTransfer(id, request.originBranchId(), request.quantity(), current.id(), request.priority());
         return ResponseEntity.ok(new MessageResponse("Alerta resuelta mediante solicitud de transferencia interna."));
     }
 
@@ -155,10 +166,12 @@ public class AlertController {
             @RequestBody PurchaseResolutionRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
         
-        // Verificamos si el usuario tiene 권한 de aprobación inmediata (isManager)
+        // Verificamos si el usuario tiene permiso de aprobación inmediata (isManager)
         boolean isManager = httpRequest.isUserInRole("ADMIN") || httpRequest.isUserInRole("MANAGER");
-        
-        alertUseCase.resolveViaPurchaseOrder(id, request.leadTimeDays(), request.quantity(), request.userId(), isManager, request.supplierId());
+
+        // El creador de la orden es el usuario de la sesión (request.userId() se ignora: era falsificable).
+        CurrentUser current = requireAlertBranch(id);
+        alertUseCase.resolveViaPurchaseOrder(id, request.leadTimeDays(), request.quantity(), current.id(), isManager, request.supplierId());
         return ResponseEntity.ok(new MessageResponse("Alerta resuelta mediante generación de orden de compra."));
     }
 
@@ -174,6 +187,7 @@ public class AlertController {
     public ResponseEntity<MessageResponse> dismissAlert(
             @PathVariable Long id, 
             @RequestBody DismissResolutionRequest request) {
+        requireAlertBranch(id);
         alertUseCase.dismissAlert(id, request.reason());
         return ResponseEntity.ok(new MessageResponse("Alerta descartada exitosamente."));
     }
