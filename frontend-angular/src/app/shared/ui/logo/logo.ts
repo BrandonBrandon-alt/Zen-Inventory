@@ -55,7 +55,7 @@ const VEINS: readonly { readonly x2: number; readonly y2: number }[] = [
       }
     </svg>
     @if (showText()) {
-      <span class="text-sm font-bold tracking-[0.15em] uppercase">Zen Inventory</span>
+      <span class="text-sm font-bold tracking-[0.15em] text-(--neutral-50)">Zen Inventory</span>
     }
   `,
 })
