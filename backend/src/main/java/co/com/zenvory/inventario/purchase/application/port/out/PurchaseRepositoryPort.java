@@ -35,5 +35,7 @@ public interface PurchaseRepositoryPort {
      * @return Lista de órdenes de compra.
      */
     List<PurchaseOrder> findAll();
-}
 
+    /** Órdenes de una sucursal (la consulta filtra en base de datos en vez de cargar todas). */
+    List<PurchaseOrder> findByBranchId(Long branchId);
+}

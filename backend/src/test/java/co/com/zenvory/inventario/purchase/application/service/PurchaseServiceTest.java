@@ -1,6 +1,5 @@
 package co.com.zenvory.inventario.purchase.application.service;
 
-import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
 import co.com.zenvory.inventario.catalog.application.port.in.ProductUseCase;
 import co.com.zenvory.inventario.catalog.domain.model.Product;
 import co.com.zenvory.inventario.inventory.application.port.in.InventoryUseCase;
@@ -46,7 +45,7 @@ class PurchaseServiceTest {
         inventory = mock(InventoryUseCase.class);
         ProductUseCase products = mock(ProductUseCase.class);
         when(products.getProductById(any())).thenReturn(Product.builder().name("P").averageCost(bd("10")).build());
-        service = new PurchaseService(repo, inventory, products, mock(AlertUseCase.class));
+        service = new PurchaseService(repo, inventory, products);
         // Línea 1: 10 uds a 100 con 20 % de descuento; línea 2: 5 uds a 50 sin descuento.
         order = PurchaseOrder.create(1L, 2L, 3L, null, null, List.of(
                 new PurchaseOrderDetail(11L, 5L, bd("10"), bd("100"), bd("20"), null),
@@ -109,5 +108,53 @@ class PurchaseServiceTest {
     void totalIsFinal() {
         service.receiveOrder(1L, 9L, Map.of(11L, qty("10"), 12L, qty("5")));
         assertThatThrownBy(() -> service.receiveOrder(1L, 9L, Map.of(11L, qty("1")))).isInstanceOf(InvalidPurchaseStateException.class);
+    }
+
+    @Test
+    @DisplayName("una recepción vacía, en ceros o negativa se rechaza: no cambia el estado de la orden")
+    void emptyOrNegativeReceiptRejected() {
+        assertThatThrownBy(() -> service.receiveOrder(1L, 9L, Map.of())).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.receiveOrder(1L, 9L, Map.of(11L, qty("0")))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.receiveOrder(1L, 9L, Map.of(11L, qty("-1"), 12L, qty("2")))).isInstanceOf(IllegalArgumentException.class);
+        assertThat(order.getReceptionStatus()).isEqualTo(ReceptionStatus.PENDING);
+        verify(inventory, never()).addStock(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("una línea en cero es válida si otra trae cantidad")
+    void zeroLineAllowedWhenAnotherHasQuantity() {
+        service.receiveOrder(1L, 9L, Map.of(11L, qty("0"), 12L, qty("2")));
+        assertThat(order.getDetails().get(1).getReceivedQuantity()).isEqualByComparingTo("2");
+    }
+
+    @Test
+    @DisplayName("no se admite unidad alterna al recibir: cantidad y costo van en la unidad base")
+    void alternateUnitRejected() {
+        assertThatThrownBy(() -> service.receiveOrder(1L, 9L, Map.of(11L, new ItemReceiptInfo(bd("1"), 5L))))
+                .isInstanceOf(IllegalArgumentException.class);
+        verify(inventory, never()).addStock(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("una orden aprobada (PENDING) se puede recibir sin marcarla en tránsito: es el flujo del Next")
+    void pendingOrderCanBeReceived() {
+        assertThat(order.getReceptionStatus()).isEqualTo(ReceptionStatus.PENDING);
+        service.receiveOrder(1L, 9L, Map.of(11L, qty("10"), 12L, qty("5")));
+        assertThat(order.getReceptionStatus()).isEqualTo(ReceptionStatus.RECEIVED_TOTAL);
+    }
+
+    @Test
+    @DisplayName("aprobar la excepción dos veces no pisa quién la aprobó primero")
+    void approveExceptionOnlyOnce() {
+        order.approveException(100L);
+        assertThatThrownBy(() -> order.approveException(200L)).isInstanceOf(InvalidPurchaseStateException.class);
+    }
+
+    @Test
+    @DisplayName("el descuento debe estar entre 0 y 100 al crear una línea")
+    void discountMustBeInRange() {
+        assertThatThrownBy(() -> PurchaseOrderDetail.create(5L, bd("1"), bd("10"), bd("150"))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> PurchaseOrderDetail.create(5L, bd("1"), bd("10"), bd("-1"))).isInstanceOf(IllegalArgumentException.class);
+        assertThat(PurchaseOrderDetail.create(5L, bd("1"), bd("10"), bd("100")).effectiveUnitPrice()).isEqualByComparingTo("0");
     }
 }

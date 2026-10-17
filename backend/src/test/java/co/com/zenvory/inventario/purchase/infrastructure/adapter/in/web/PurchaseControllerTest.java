@@ -133,11 +133,31 @@ class PurchaseControllerTest {
         }
         when(mine.getBranchId()).thenReturn(1L);
         when(mine.getId()).thenReturn(10L);
-        when(other.getBranchId()).thenReturn(2L);
-        when(other.getId()).thenReturn(20L);
-        when(purchaseUseCase.getAllOrders()).thenReturn(List.of(mine, other));
+        when(purchaseUseCase.getOrdersByBranch(1L)).thenReturn(List.of(mine));
 
         mockMvc.perform(get("/api/v1/purchases")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
+        org.mockito.Mockito.verify(purchaseUseCase, org.mockito.Mockito.never()).getAllOrders();
+    }
+
+    @Test
+    @DisplayName("una recepción con una línea repetida se rechaza (no se descarta una en silencio)")
+    void receiveWithRepeatedLineRejected() throws Exception {
+        PurchaseOrder order = mock(PurchaseOrder.class);
+        when(order.getBranchId()).thenReturn(3L);
+        when(purchaseUseCase.getOrderById(1L)).thenReturn(order);
+        mockMvc.perform(post("/api/v1/purchases/1/receive").contentType("application/json")
+                .content("{\"items\": [{\"detailId\": 7, \"quantityReceived\": 5}, {\"detailId\": 7, \"quantityReceived\": 3}]}"))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verify(purchaseUseCase, org.mockito.Mockito.never()).receiveOrder(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("crear una orden con descuento fuera de 0-100 o plazo de pago negativo es 400")
+    void createWithInvalidDiscountOrDueDays() throws Exception {
+        String bad = "{\"supplierId\":1,\"branchId\":3,\"leadTimeDays\":2,\"paymentDueDays\":%d,\"items\":[{\"productId\":1,\"quantity\":1,\"unitPrice\":10,\"discountPct\":%d}]}";
+        mockMvc.perform(post("/api/v1/purchases").contentType("application/json").content(String.format(bad, 30, 150))).andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/purchases").contentType("application/json").content(String.format(bad, -5, 10))).andExpect(status().isBadRequest());
+        org.mockito.Mockito.verify(purchaseUseCase, org.mockito.Mockito.never()).createOrder(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean());
     }
 }

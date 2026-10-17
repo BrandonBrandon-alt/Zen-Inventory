@@ -63,6 +63,9 @@ public class PurchaseOrderDetail {
      * @return Nueva instancia de {@link PurchaseOrderDetail}.
      */
     public static PurchaseOrderDetail create(Long productId, BigDecimal quantity, BigDecimal unitPrice, BigDecimal discountPct) {
+        if (discountPct != null && (discountPct.signum() < 0 || discountPct.compareTo(new BigDecimal("100")) > 0)) {
+            throw new IllegalArgumentException("El descuento debe estar entre 0 y 100.");
+        }
         return new PurchaseOrderDetail(null, productId, quantity, unitPrice, discountPct, BigDecimal.ZERO);
     }
 

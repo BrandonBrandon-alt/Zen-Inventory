@@ -5,7 +5,8 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public record ReceiveOrderRequest(
-    @NotNull Long userId,
+    /** Se ignora: quien recibe es el usuario de la sesión. */
+    Long userId,
     @NotNull List<ItemReceipt> items
 ) {
     public record ItemReceipt(

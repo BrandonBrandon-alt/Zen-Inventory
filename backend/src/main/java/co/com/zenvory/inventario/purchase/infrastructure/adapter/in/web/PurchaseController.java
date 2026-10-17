@@ -63,8 +63,7 @@ public class PurchaseController {
     @PostMapping("/{id}/approve")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<PurchaseResponse> approveOrder(
-            @PathVariable Long id,
-            @RequestParam(required = false) Long userId) {
+            @PathVariable Long id) {
         PurchaseOrder order = purchaseUseCase.approveOrder(id, requireOrderAccess(id).id());
         return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
     }
@@ -72,8 +71,7 @@ public class PurchaseController {
     @PostMapping("/{id}/approve-exception")
     @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<PurchaseResponse> approveException(
-            @PathVariable Long id,
-            @RequestParam(required = false) Long userId) {
+            @PathVariable Long id) {
         PurchaseOrder order = purchaseUseCase.approveException(id, requireOrderAccess(id).id());
         return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
     }
@@ -94,8 +92,13 @@ public class PurchaseController {
         
         CurrentUser current = requireOrderAccess(id);
         java.util.Map<Long, co.com.zenvory.inventario.purchase.application.port.in.PurchaseUseCase.ItemReceiptInfo> itemsInMap = new java.util.HashMap<>();
-        request.items().forEach(item -> itemsInMap.put(item.detailId(), 
-                new co.com.zenvory.inventario.purchase.application.port.in.PurchaseUseCase.ItemReceiptInfo(item.quantityReceived(), item.unitId())));
+        request.items().forEach(item -> {
+            var previous = itemsInMap.put(item.detailId(),
+                    new co.com.zenvory.inventario.purchase.application.port.in.PurchaseUseCase.ItemReceiptInfo(item.quantityReceived(), item.unitId()));
+            if (previous != null) {
+                throw new IllegalArgumentException("La línea " + item.detailId() + " aparece repetida en la recepción.");
+            }
+        });
 
         co.com.zenvory.inventario.purchase.application.port.in.PurchaseReceiptResult result = 
                 purchaseUseCase.receiveOrder(id, current.id(), itemsInMap);
@@ -119,8 +122,7 @@ public class PurchaseController {
     @PostMapping("/{id}/close-shortfall")
     @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<PurchaseResponse> closeShortfall(
-            @PathVariable Long id,
-            @RequestParam(required = false) Long userId) {
+            @PathVariable Long id) {
         PurchaseOrder order = purchaseUseCase.closeShortfall(id, requireOrderAccess(id).id());
         return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
     }
@@ -145,8 +147,8 @@ public class PurchaseController {
     @GetMapping("/{id}")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<PurchaseResponse> getOrder(@PathVariable Long id) {
-        requireOrderAccess(id);
         PurchaseOrder order = purchaseUseCase.getOrderById(id);
+        CurrentUser.resolve(userRepositoryPort).requireBranch(order.getBranchId());
         return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
     }
 
@@ -156,13 +158,13 @@ public class PurchaseController {
             @RequestParam(required = false) Long supplierId,
             @RequestParam(required = false) Long productId) {
         
-        List<PurchaseOrder> allOrders = purchaseUseCase.getAllOrders();
-        
-        // Solo el ADMIN ve las órdenes de todas las sucursales; el resto, las de la suya.
+        // Solo el ADMIN ve las órdenes de todas las sucursales; el resto, las de la suya (filtrado en base de datos).
         CurrentUser current = CurrentUser.resolve(userRepositoryPort);
-        // Filtrado básico (por ahora en memoria, se puede optimizar en repository)
-        List<PurchaseResponse> filtered = allOrders.stream()
-                .filter(o -> current.isAdmin() || o.getBranchId().equals(current.branchId()))
+        List<PurchaseOrder> scoped = current.isAdmin()
+                ? purchaseUseCase.getAllOrders()
+                : purchaseUseCase.getOrdersByBranch(current.resolveBranch(null));
+
+        List<PurchaseResponse> filtered = scoped.stream()
                 .filter(o -> supplierId == null || o.getSupplierId().equals(supplierId))
                 .filter(o -> productId == null || o.getDetails().stream().anyMatch(d -> d.getProductId().equals(productId)))
                 .map(PurchaseResponse::fromDomain)

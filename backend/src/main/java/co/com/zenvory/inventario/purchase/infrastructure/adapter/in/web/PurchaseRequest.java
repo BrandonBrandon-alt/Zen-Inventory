@@ -14,10 +14,10 @@ public record PurchaseRequest(
         @NotNull(message = "El proveedor es obligatorio.")
         Long supplierId,
 
-        @NotNull(message = "El usuario tramitador es obligatorio.")
+        /** Se ignora: el tramitador es el usuario de la sesión. Se mantiene por compatibilidad con clientes antiguos. */
         Long userId,
 
-        @NotNull(message = "La sucursal destino es obligatoria.")
+        /** Sucursal destino; quien no es ADMIN siempre opera en la suya. */
         Long branchId,
 
         @NotNull(message = "El tiempo de entrega es obligatorio.")
@@ -25,6 +25,7 @@ public record PurchaseRequest(
         Integer leadTimeDays,
         
         @NotNull(message = "El plazo de pago es obligatorio.")
+        @jakarta.validation.constraints.Min(value = 0, message = "El plazo de pago no puede ser negativo.")
         Integer paymentDueDays,
 
         @NotEmpty(message = "La orden de compra no puede estar vacía.")
@@ -43,6 +44,8 @@ public record PurchaseRequest(
             @Positive(message = "El precio de compra debe ser mayor a cero.")
             BigDecimal unitPrice,
 
+            @jakarta.validation.constraints.DecimalMin(value = "0", message = "El descuento no puede ser negativo.")
+            @jakarta.validation.constraints.DecimalMax(value = "100", message = "El descuento no puede superar el 100%.")
             BigDecimal discountPct
     ) {}
 }
