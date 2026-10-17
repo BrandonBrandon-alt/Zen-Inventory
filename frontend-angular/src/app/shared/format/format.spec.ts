@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDateTime, formatMoney, formatQuantity } from './format';
+import { formatDateTime, formatMoney, formatMoneyCompact, formatQuantity, formatShortDate, formatShortMonth } from './format';
 
 // Intl separa el símbolo con un espacio duro (U+00A0): se normaliza para comparar.
 const NBSP = String.fromCharCode(160);
@@ -32,5 +32,22 @@ describe('format', () => {
     const text = formatDateTime(new Date(2026, 0, 2, 15, 30));
     expect(text).toContain('2026');
     expect(text).toMatch(/15:30|3:30/);
+  });
+
+  it('formatMoneyCompact: completo bajo el millón y en millones desde ahí', () => {
+    expect(plain(formatMoneyCompact(48200))).toBe('$ 48.200');
+    expect(formatMoneyCompact(12_400_000)).toBe('$ 12,4 M');
+    expect(formatMoneyCompact(2_100_000_000)).toBe('$ 2.100 M');
+    expect(formatMoneyCompact(1_000_000)).toBe('$ 1 M');
+    expect(formatMoneyCompact(null)).toBe('—');
+  });
+
+  it('formatShortDate: día y mes abreviado, sin "de"', () => {
+    expect(formatShortDate(new Date(2026, 9, 15))).toBe('15 oct');
+    expect(formatShortDate(null)).toBe('—');
+  });
+
+  it('formatShortMonth: mes abreviado', () => {
+    expect(formatShortMonth(new Date(2026, 4, 1))).toMatch(/^may/);
   });
 });

@@ -15,3 +15,24 @@ export function formatQuantity(value: number | null | undefined): string {
 export function formatDateTime(value: Date | null | undefined): string {
   return value instanceof Date && !Number.isNaN(value.getTime()) ? DATE_TIME.format(value) : '—';
 }
+
+const COMPACT = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 });
+const SHORT_DATE = new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'short' });
+const SHORT_MONTH = new Intl.DateTimeFormat('es-CO', { month: 'short' });
+
+/** Pesos para cifras grandes: hasta un millón completos (`$ 48.200`); desde ahí en millones (`$ 12,4 M`, `$ 2.100 M`). */
+export function formatMoneyCompact(value: number | null | undefined): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  if (Math.abs(value) < 1_000_000) return formatMoney(value);
+  return `$ ${COMPACT.format(value / 1_000_000)} M`;
+}
+
+/** `15 oct`: para ejes y listas donde el año sobra. */
+export function formatShortDate(value: Date | null | undefined): string {
+  return value instanceof Date && !Number.isNaN(value.getTime()) ? SHORT_DATE.format(value).replace(' de ', ' ') : '—';
+}
+
+/** `may.`: mes abreviado de una fecha. */
+export function formatShortMonth(value: Date): string {
+  return SHORT_MONTH.format(value);
+}
