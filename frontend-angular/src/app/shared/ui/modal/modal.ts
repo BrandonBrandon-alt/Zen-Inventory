@@ -17,12 +17,13 @@ import {
 import { LucideX } from '@lucide/angular';
 import { Tooltip } from '../tooltip/tooltip';
 
-export type ModalSize = 'sm' | 'md' | 'lg';
+export type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
 const SIZES: Record<ModalSize, string> = {
   sm: 'max-w-sm',
   md: 'max-w-lg',
   lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
 };
 
 let nextId = 0;
