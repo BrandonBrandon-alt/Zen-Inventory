@@ -1,0 +1,77 @@
+<app-modal
+  [(open)]="open"
+  title="Resolver alerta"
+  [description]="productName() ? productName() + ': ' + (alert()?.message ?? '') : (alert()?.message ?? '')"
+  [dismissible]="!busy()"
+>
+  @if (error(); as message) {
+    <app-alert class="mb-4">{{ message }}</app-alert>
+  }
+
+  @if (isStock()) {
+    <app-tabs class="mb-5" [tabs]="tabs()" [(active)]="method" idPrefix="alert-resolution" ariaLabel="Cómo resolver la alerta" />
+
+    @switch (method()) {
+      @case ('transfer') {
+        <form id="alert-resolution-form" role="tabpanel" aria-labelledby="alert-resolution-tab-transfer" class="flex flex-col gap-4" [formGroup]="transferForm" novalidate (ngSubmit)="submit()">
+          <p class="text-sm text-fg-subtle">Pide el producto a otra sucursal. Se crea una solicitud de traslado.</p>
+          <app-form-field label="Sucursal que lo envía" [error]="fieldError('transfer', 'originBranchId')">
+            <app-select formControlName="originBranchId" [options]="originOptions()" [icon]="storeIcon" searchable searchPlaceholder="Buscar sucursal…" placeholder="Selecciona una sucursal" />
+          </app-form-field>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <app-form-field label="Cantidad" [error]="fieldError('transfer', 'quantity')">
+              <input appInput type="number" min="1" step="1" inputmode="numeric" formControlName="quantity" />
+            </app-form-field>
+            <app-form-field label="Prioridad">
+              <app-select formControlName="priority" [options]="priorities" />
+            </app-form-field>
+          </div>
+        </form>
+      }
+      @case ('purchase') {
+        <form id="alert-resolution-form" role="tabpanel" aria-labelledby="alert-resolution-tab-purchase" class="flex flex-col gap-4" [formGroup]="purchaseForm" novalidate (ngSubmit)="submit()">
+          <p class="text-sm text-fg-subtle">Compra el producto a un proveedor. Se crea una orden de compra.</p>
+          <app-form-field label="Proveedor" [error]="fieldError('purchase', 'supplierId')">
+            <app-select formControlName="supplierId" [options]="supplierOptions()" [icon]="truckIcon" searchable searchPlaceholder="Buscar proveedor…" [placeholder]="suppliersLoading() ? 'Cargando proveedores…' : suppliers().length ? 'Selecciona un proveedor' : 'Este producto no tiene proveedores'" />
+          </app-form-field>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <app-form-field label="Cantidad" [error]="fieldError('purchase', 'quantity')">
+              <input appInput type="number" min="0" step="any" inputmode="decimal" formControlName="quantity" />
+            </app-form-field>
+            <app-form-field label="Tiempo de entrega (días)" [error]="fieldError('purchase', 'leadTimeDays')">
+              <input appInput type="number" min="1" step="1" inputmode="numeric" formControlName="leadTimeDays" />
+            </app-form-field>
+          </div>
+        </form>
+      }
+      @case ('dismiss') {
+        <form id="alert-resolution-form" role="tabpanel" aria-labelledby="alert-resolution-tab-dismiss" class="flex flex-col gap-4" [formGroup]="dismissForm" novalidate (ngSubmit)="submit()">
+          <p class="text-sm text-fg-subtle">No se mueve mercancía: la alerta se cierra y queda el motivo.</p>
+          <app-form-field label="Motivo" [error]="fieldError('dismiss', 'reason')">
+            <app-select formControlName="reason" [options]="dismissReasons" placeholder="Selecciona un motivo" />
+          </app-form-field>
+          @if (otherReason()) {
+            <app-form-field label="¿Cuál?" [error]="fieldError('dismiss', 'other')">
+              <input appInput type="text" formControlName="other" autocomplete="off" />
+            </app-form-field>
+          }
+        </form>
+      }
+    }
+  } @else {
+    <p class="text-sm text-fg-muted">
+      Esta alerta no se resuelve moviendo mercancía. Cuando ya la hayas atendido, márcala como resuelta.
+    </p>
+  }
+
+  <div data-slot="footer">
+    <button appButton variant="ghost" type="button" [disabled]="busy()" (click)="open.set(false)">Cancelar</button>
+    @if (isStock()) {
+      <button appButton type="submit" form="alert-resolution-form" [loading]="busy()">
+        {{ method() === 'transfer' ? 'Solicitar traslado' : method() === 'purchase' ? 'Crear orden de compra' : 'Descartar alerta' }}
+      </button>
+    } @else if (canDismiss()) {
+      <button appButton type="button" [loading]="busy()" (click)="markResolved()">Marcar como resuelta</button>
+    }
+  </div>
+</app-modal>

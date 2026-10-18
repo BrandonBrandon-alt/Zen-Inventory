@@ -160,7 +160,7 @@ describe('rutas (guardas + shell + login)', () => {
 
   it('las pantallas sin migrar siguen mostrando el marcador', async () => {
     const { harness } = await setup('ADMIN');
-    await harness.navigateByUrl('/alerts');
+    await harness.navigateByUrl('/returns');
     expect(await screen.findByText(/todavía no está disponible/)).toBeInTheDocument();
   });
 

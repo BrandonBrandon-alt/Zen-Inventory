@@ -43,7 +43,7 @@ describe('Sidebar', () => {
   it('un OPERADOR_INVENTARIO no ve administración ni maestros', async () => {
     await renderSidebar('OPERADOR_INVENTARIO');
     expect(screen.getByRole('link', { name: 'Inventario' })).toBeInTheDocument();
-    for (const name of ['Usuarios', 'Alertas', 'Productos', 'Sucursales']) {
+    for (const name of ['Usuarios', 'Productos', 'Sucursales']) {
       expect(screen.queryByRole('link', { name })).not.toBeInTheDocument();
     }
     expect(screen.queryByText('Maestros')).not.toBeInTheDocument();
