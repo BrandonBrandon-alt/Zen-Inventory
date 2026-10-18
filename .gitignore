@@ -96,3 +96,7 @@ yarn-error.log*
 # graphify — cada desarrollador genera su grafo local (graphify update .)
 # =========================================================================
 graphify-out/
+
+# Python
+__pycache__/
+*.pyc
