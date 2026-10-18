@@ -59,6 +59,109 @@ describe('InventoryPage', () => {
     document.body.style.overflow = '';
   });
 
+  describe('filtros', () => {
+    const STORE = 'zen:filters:1:inventory';
+    const openAdvanced = async () => userEvent.click(await screen.findByRole('button', { name: /Más filtros/ }));
+
+    it('filtra por nivel de existencias: agotados, críticos y normales', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await screen.findByText('Tornillo');
+      await chooseOption('Nivel de existencias', 'Críticos');
+      expect(names()).toEqual(['Tuérca']);
+      await chooseOption('Nivel de existencias', 'Agotados');
+      expect(names()).toEqual(['Arandela']);
+      await chooseOption('Nivel de existencias', 'Con existencias normales');
+      expect(names()).toEqual(['Tornillo']);
+    });
+
+    it('filtra por rango de existencias y por «solo sin mínimo definido» desde «Más filtros»', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await screen.findByText('Tornillo');
+      await openAdvanced();
+      await userEvent.type(screen.getByLabelText('Existencias desde'), '3');
+      await userEvent.type(screen.getByLabelText('Existencias hasta'), '12');
+      expect(names().sort()).toEqual(['Tornillo', 'Tuérca']);
+      await userEvent.clear(screen.getByLabelText('Existencias desde'));
+      await userEvent.clear(screen.getByLabelText('Existencias hasta'));
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Solo sin mínimo definido' }));
+      expect(names()).toEqual(['Arandela']);
+      expect(screen.getByLabelText('1 filtro activo')).toBeInTheDocument();
+    });
+
+    it('las etiquetas se quitan una a una y todas juntas', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await screen.findByText('Tornillo');
+      await chooseOption('Nivel de existencias', 'Críticos');
+      await userEvent.type(screen.getByLabelText('Buscar producto'), 'tu');
+      expect(screen.getByRole('group', { name: 'Filtros aplicados' })).toHaveTextContent('Búsqueda:');
+      await userEvent.click(screen.getByRole('button', { name: /Quitar filtro Existencias: Críticos/ }));
+      expect(names()).toEqual(['Tuérca']); // queda la búsqueda
+      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+      expect(names()).toHaveLength(3);
+    });
+
+    it('el ADMIN vuelve a la sucursal que dejó, y los filtros también se recuerdan; la búsqueda no', async () => {
+      useSession('ADMIN');
+      stub();
+      const first = await renderPage();
+      await screen.findByText('Tornillo');
+      await chooseOption('Sucursal', 'Sucursal Norte');
+      await vi.waitFor(() => expect(row('Tornillo')).toHaveTextContent('99')); // ya está en la otra sucursal
+      await chooseOption('Nivel de existencias', 'Con existencias normales');
+      await openAdvanced();
+      await userEvent.type(screen.getByLabelText('Buscar producto'), 'zzz');
+      await vi.waitFor(() => expect(JSON.parse(localStorage.getItem(STORE) ?? '{}')).toMatchObject({ branch: 20, level: 'ok', advancedOpen: true }));
+      first.fixture.destroy();
+      TestBed.resetTestingModule(); // otra visita
+
+      await renderPage();
+      await vi.waitFor(() => expect(screen.getByRole('combobox', { name: 'Sucursal' })).toHaveTextContent('Sucursal Norte'));
+      expect(screen.getByRole('combobox', { name: 'Nivel de existencias' })).toHaveTextContent('Con existencias normales');
+      expect(screen.getByLabelText('Buscar producto')).toHaveValue('');
+    });
+
+    it('si la sucursal recordada ya no existe, abre la primera activa', async () => {
+      useSession('ADMIN');
+      localStorage.setItem(STORE, JSON.stringify({ branch: 999 }));
+      stub();
+      await renderPage();
+      await vi.waitFor(() => expect(screen.getByRole('combobox', { name: 'Sucursal' })).toHaveTextContent('Sede Central'));
+    });
+
+    it('quien no es ADMIN trabaja siempre en su sucursal aunque haya otra guardada', async () => {
+      useSession('MANAGER', 10);
+      localStorage.setItem(STORE, JSON.stringify({ branch: 20 }));
+      stub();
+      await renderPage();
+      expect(await screen.findByText('Tornillo')).toBeInTheDocument();
+      expect(names()).toContain('Tuérca'); // datos de la sucursal 10
+    });
+
+    it('un valor guardado dañado se ignora', async () => {
+      useSession('ADMIN');
+      localStorage.setItem(STORE, JSON.stringify({ level: 'INVENTADO', minStock: 'x', branch: 'y' }));
+      stub();
+      await renderPage();
+      expect(await screen.findByText('Tornillo')).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
+    });
+
+    it('el panel abierto no tiene problemas de accesibilidad detectables', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await screen.findByText('Tornillo');
+      await openAdvanced();
+      await expectAccessible();
+    });
+  });
+
   describe('existencias', () => {
     it('no tiene problemas de accesibilidad detectables', async () => {
       useSession('ADMIN');
@@ -103,7 +206,7 @@ describe('InventoryPage', () => {
       expect(names()).toEqual(['Tornillo']);
       await userEvent.clear(search);
       await userEvent.type(search, 'zzz');
-      expect(screen.getByText('Ningún producto coincide con la búsqueda.')).toBeInTheDocument();
+      expect(screen.getByText('Prueba quitando algún filtro.')).toBeInTheDocument();
     });
 
     it('si falla la carga muestra el error en la tabla, sin aviso global, y reintentar recupera', async () => {

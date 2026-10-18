@@ -4,8 +4,12 @@ import { toApiError } from '@core/api/api-error';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { formatMoney, formatQuantity, normalizeText } from '@shared/format/format';
+import { inNumberRange, numberFromInput } from '@shared/filters/filter-helpers';
+import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
 import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
+import { ActiveFilters, type ActiveFilter } from '@shared/ui/filters/active-filters';
+import { AdvancedFilters } from '@shared/ui/filters/advanced-filters';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Select, type SelectOption } from '@shared/ui/select/select';
@@ -61,6 +65,8 @@ const rowKey = (row: InventoryRow): number => row.productId;
     LucideArrowUpDown,
     LucideSearch,
     LucideSlidersHorizontal,
+    ActiveFilters,
+    AdvancedFilters,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
@@ -88,7 +94,9 @@ export class InventoryPage {
   protected readonly activeTab = signal('stock');
 
   protected readonly branches = signal<readonly BranchOption[]>([]);
-  protected readonly branchId = signal<number | null>(null);
+  // Los filtros se recuerdan por persona (la búsqueda de texto no: se escribe cada vez). Quien no es ADMIN trabaja siempre en su sucursal.
+  private static readonly SCREEN = 'inventory';
+  protected readonly branchId = persistedFilter(InventoryPage.SCREEN, 'branch', null as number | null, codecs.nullable(codecs.number()));
   protected readonly branchOptions = computed<SelectOption<number>[]>(() =>
     this.branches().map((branch) => ({ value: branch.id, label: branch.nombre + (branch.activa ? '' : ' (inactiva)') })),
   );
@@ -97,6 +105,18 @@ export class InventoryPage {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly search = signal('');
+  protected readonly levelFilter = persistedFilter(InventoryPage.SCREEN, 'level', 'all' as 'all' | StockLevel, codecs.oneOf(['all', 'out', 'critical', 'ok'] as const));
+  protected readonly minStock = persistedFilter(InventoryPage.SCREEN, 'minStock', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly maxStock = persistedFilter(InventoryPage.SCREEN, 'maxStock', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly noMinimum = persistedFilter(InventoryPage.SCREEN, 'noMinimum', false, codecs.bool());
+  protected readonly advancedOpen = persistedFilter(InventoryPage.SCREEN, 'advancedOpen', false, codecs.bool());
+  protected readonly numberFromInput = numberFromInput;
+  protected readonly levelOptions: readonly SelectOption<'all' | StockLevel>[] = [
+    { value: 'all', label: 'Todas las existencias' },
+    { value: 'out', label: 'Agotados' },
+    { value: 'critical', label: 'Críticos (en o bajo el mínimo)' },
+    { value: 'ok', label: 'Con existencias normales' },
+  ];
 
   protected readonly columns = computed<readonly TableColumn<InventoryRow>[]>(() => [
     ...BASE_COLUMNS,
@@ -107,8 +127,28 @@ export class InventoryPage {
   private readonly allRows = computed<InventoryRow[]>(() => this.items().map((item) => ({ ...item, level: stockLevel(item) })));
   protected readonly rows = computed<InventoryRow[]>(() => {
     const needle = normalizeText(this.search().trim());
-    if (needle === '') return this.allRows();
-    return this.allRows().filter((row) => normalizeText(`${row.nombre} ${row.sku}`).includes(needle));
+    const level = this.levelFilter();
+    const { min, max, noMinimum } = { min: this.minStock(), max: this.maxStock(), noMinimum: this.noMinimum() };
+    return this.allRows()
+      .filter((row) => level === 'all' || row.level === level)
+      .filter((row) => inNumberRange(row.stock, min, max))
+      .filter((row) => !noMinimum || row.minimum <= 0)
+      .filter((row) => !needle || normalizeText(`${row.nombre} ${row.sku}`).includes(needle));
+  });
+
+  /** Los filtros del panel «Más filtros» que están aplicados (el botón muestra cuántos). */
+  protected readonly advancedCount = computed(() => [this.minStock() !== null, this.maxStock() !== null, this.noMinimum()].filter(Boolean).length);
+
+  /** Todos los filtros aplicados, para mostrarlos como etiquetas que se quitan. */
+  protected readonly activeFilters = computed<ActiveFilter[]>(() => {
+    const list: ActiveFilter[] = [];
+    const level = this.levelFilter();
+    if (level !== 'all') list.push({ id: 'level', label: 'Existencias', text: this.levelOptions.find((o) => o.value === level)?.label ?? level });
+    if (this.minStock() !== null) list.push({ id: 'minStock', label: 'Existencias desde', text: formatQuantity(this.minStock()) });
+    if (this.maxStock() !== null) list.push({ id: 'maxStock', label: 'Existencias hasta', text: formatQuantity(this.maxStock()) });
+    if (this.noMinimum()) list.push({ id: 'noMinimum', label: 'Sin', text: 'mínimo definido' });
+    if (this.search().trim()) list.push({ id: 'search', label: 'Búsqueda', text: this.search().trim() });
+    return list;
   });
 
   protected readonly summary = computed(() => {
@@ -153,7 +193,9 @@ export class InventoryPage {
     try {
       const branches = await new Promise<BranchOption[]>((resolve, reject) => this.branchApi.list().subscribe({ next: resolve, error: reject }));
       this.branches.set(branches);
-      const first = branches.find((branch) => branch.activa) ?? branches[0];
+      // La sucursal que se dejó la última vez, si todavía existe; si no, la primera activa.
+      const saved = branches.find((branch) => branch.id === this.branchId());
+      const first = saved ?? branches.find((branch) => branch.activa) ?? branches[0];
       if (first) this.branchId.set(first.id);
       else this.loading.set(false);
     } catch (error) {
@@ -183,6 +225,20 @@ export class InventoryPage {
 
   protected onSearch(event: Event): void {
     this.search.set((event.target as HTMLInputElement).value);
+  }
+
+  protected removeFilter(id: string): void {
+    switch (id) {
+      case 'level': this.levelFilter.set('all'); break;
+      case 'minStock': this.minStock.set(null); break;
+      case 'maxStock': this.maxStock.set(null); break;
+      case 'noMinimum': this.noMinimum.set(false); break;
+      case 'search': this.search.set(''); break;
+    }
+  }
+
+  protected clearFilters(): void {
+    for (const filter of this.activeFilters()) this.removeFilter(filter.id);
   }
 
   protected openAdjust(item: InventoryItem): void {
