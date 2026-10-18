@@ -30,7 +30,22 @@
   (retry)="load()"
 >
   <ng-template appCell="suppliers" let-product>
-    <span [class.text-fg-subtle]="product.suppliers.length === 0">{{ suppliersLabel(product) }}</span>
+    @if (mainSupplier(product); as main) {
+      <span class="inline-flex items-center gap-2">
+        <span>{{ main.nombre }}</span>
+        @if (otherCount(product) > 0) {
+          <span
+            tabindex="0"
+            class="cursor-help rounded-full border border-line bg-hover px-2 py-0.5 text-[11px] font-semibold text-fg-subtle transition-colors hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
+            [appTooltip]="suppliersTooltip(product)"
+            [attr.aria-label]="'y ' + otherCount(product) + (otherCount(product) === 1 ? ' proveedor más' : ' proveedores más')"
+            >+{{ otherCount(product) }}</span
+          >
+        }
+      </span>
+    } @else {
+      <span class="text-fg-subtle">Sin proveedores</span>
+    }
   </ng-template>
   <ng-template appCell="activo" let-product>
     <app-badge [variant]="product.activo ? 'success' : 'neutral'" dot>{{ product.activo ? 'Activo' : 'Inactivo' }}</app-badge>

@@ -101,7 +101,7 @@ export class Tooltip {
     element.setAttribute('role', 'tooltip');
     element.textContent = text;
     element.className =
-      'pointer-events-none max-w-64 rounded-md border border-line bg-card px-2.5 py-1.5 text-xs font-medium text-fg shadow-xl animate-error-in';
+      'pointer-events-none max-w-64 rounded-md whitespace-pre-line border border-line bg-card px-2.5 py-1.5 text-xs font-medium text-fg shadow-xl animate-error-in';
     element.style.cssText = 'position: fixed; inset: auto; margin: 0; z-index: 1000;';
     if (typeof element.showPopover === 'function') element.setAttribute('popover', 'manual');
     this.document.body.appendChild(element);

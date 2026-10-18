@@ -62,10 +62,29 @@ describe('ProductsPage', () => {
       expect(screen.getByRole('heading', { level: 1, name: 'Productos' })).toBeInTheDocument();
       expect(screen.getByText('3 productos, 2 activos')).toBeInTheDocument();
       const row = screen.getByRole('row', { name: /Tornillo/ });
-      expect(within(row).getByText('Aceros del Sur +1')).toBeInTheDocument(); // el preferido, no el primero
+      expect(within(row).getByText('Aceros del Sur')).toBeInTheDocument(); // el preferido, no el primero
+      expect(within(row).getByText('+1')).toBeInTheDocument();
       expect(within(row).getByText('Activo')).toBeInTheDocument();
       expect(within(screen.getByRole('row', { name: /Tuérca/ })).getByText('Sin proveedores')).toBeInTheDocument();
       expect(within(screen.getByRole('row', { name: /Arandela/ })).getByText('Inactivo')).toBeInTheDocument();
+    });
+
+    it('el "+1" enfocado muestra el detalle de todos los proveedores, el preferido primero', async () => {
+      stub();
+      await renderPage();
+      await screen.findByText('Tornillo');
+      const more = within(screen.getByRole('row', { name: /Tornillo/ })).getByLabelText('y 1 proveedor más');
+      more.focus();
+      const tip = await screen.findByRole('tooltip');
+      expect(tip.textContent?.replaceAll(String.fromCharCode(160), ' ')).toBe('Aceros del Sur (preferido): $ 1.700 · 1 día\nFerretería Central: $ 1.800 · 3 días');
+      expect(more).toHaveAttribute('aria-describedby', tip.id);
+    });
+
+    it('un producto con un solo proveedor no muestra el "+N"', async () => {
+      stub([{ ...PRODUCTS[0], proveedores: [PRODUCTS[0].proveedores[0]] }]);
+      await renderPage();
+      expect(await screen.findByText('Ferretería Central')).toBeInTheDocument();
+      expect(screen.queryByText(/^\+\d/)).not.toBeInTheDocument();
     });
 
     it('busca por nombre o SKU sin distinguir mayúsculas ni acentos', async () => {

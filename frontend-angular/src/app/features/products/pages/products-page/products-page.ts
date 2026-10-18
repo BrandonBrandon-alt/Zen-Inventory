@@ -13,7 +13,7 @@ import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { ProductFormModal } from '../../components/product-form-modal/product-form-modal';
 import { ProductUnitsModal } from '../../components/product-units-modal/product-units-modal';
-import { type Product, ProductsApi } from '../../data-access/products-api';
+import { type Product, ProductsApi, type ProductSupplier } from '../../data-access/products-api';
 
 const COLUMNS: readonly TableColumn<Product>[] = [
   { key: 'sku', header: 'SKU', sortable: true },
@@ -120,11 +120,23 @@ export class ProductsPage {
     this.search.set((event.target as HTMLInputElement).value);
   }
 
-  protected suppliersLabel(product: Product): string {
-    if (product.suppliers.length === 0) return 'Sin proveedores';
-    const preferred = product.suppliers.find((s) => s.preferred) ?? product.suppliers[0];
-    const others = product.suppliers.length - 1;
-    return others > 0 ? `${preferred.nombre} +${others}` : preferred.nombre;
+  /** Proveedor que se muestra en la tabla: el preferido o, si no hay, el primero. */
+  protected mainSupplier(product: Product): ProductSupplier | null {
+    return product.suppliers.find((s) => s.preferred) ?? product.suppliers[0] ?? null;
+  }
+
+  /** Cuántos proveedores más tiene además del que se muestra. */
+  protected otherCount(product: Product): number {
+    return Math.max(0, product.suppliers.length - 1);
+  }
+
+  /** Detalle de todos los proveedores (uno por línea) para la descripción del "+N". */
+  protected suppliersTooltip(product: Product): string {
+    const main = this.mainSupplier(product);
+    return [...product.suppliers]
+      .sort((a, b) => Number(b === main) - Number(a === main))
+      .map((s) => `${s.nombre}${s === main && s.preferred ? ' (preferido)' : ''}: ${formatMoney(s.negotiatedPrice)} · ${s.deliveryDays === 1 ? '1 día' : `${s.deliveryDays} días`}`)
+      .join('\n');
   }
 
   protected openCreate(): void {
