@@ -10,6 +10,7 @@ import { applyServerErrors } from '@shared/forms/apply-server-errors';
 import { controlError } from '@shared/forms/control-error';
 import { Alert } from '@shared/ui/alert/alert';
 import { Button } from '@shared/ui/button/button';
+import { DatePicker } from '@shared/ui/date-picker/date-picker';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Modal } from '@shared/ui/modal/modal';
 import { Select, type SelectOption } from '@shared/ui/select/select';
@@ -44,7 +45,7 @@ type ItemGroup = ReturnType<typeof itemGroup>;
  */
 @Component({
   selector: 'app-transfer-request-modal',
-  imports: [ReactiveFormsModule, Modal, Button, Alert, FormField, InputDirective, Select, Tooltip, LucidePlus, LucideTrash2],
+  imports: [ReactiveFormsModule, Modal, Button, Alert, FormField, InputDirective, DatePicker, Select, Tooltip, LucidePlus, LucideTrash2],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './transfer-request-modal.html',
 })
@@ -72,7 +73,7 @@ export class TransferRequestModal {
     originBranchId: new FormControl<number | null>(null, Validators.required),
     destinationBranchId: new FormControl<number | null>(null, Validators.required),
     priority: this.fb.control<TransferPriority>('NORMAL'),
-    estimatedArrival: this.fb.control(''),
+    estimatedArrival: new FormControl<Date | null>(null),
     items: new FormArray<ItemGroup>([]),
   });
 
@@ -104,10 +105,8 @@ export class TransferRequestModal {
     }));
   }
 
-  /** Mínimo de la fecha estimada: ahora (el servidor no acepta fechas pasadas). */
-  protected minArrival(): string {
-    return toInputValue(new Date());
-  }
+  /** Mínimo de la fecha estimada: el momento en que se abre el formulario (el servidor no acepta fechas pasadas). */
+  protected readonly now = signal(new Date());
 
   constructor() {
     effect(() => {
@@ -115,7 +114,8 @@ export class TransferRequestModal {
       const own = this.ownBranchId();
       untracked(() => {
         this.form.controls.items.clear({ emitEvent: false });
-        this.form.reset({ originBranchId: null, destinationBranchId: own, priority: 'NORMAL', estimatedArrival: '' }, { emitEvent: false });
+        this.form.reset({ originBranchId: null, destinationBranchId: own, priority: 'NORMAL', estimatedArrival: null }, { emitEvent: false });
+        this.now.set(new Date());
         this.destination.set(own);
         this.origin.set(null);
         this.addItem();
@@ -152,7 +152,6 @@ export class TransferRequestModal {
     }
     if (this.form.invalid) return;
     const v = this.form.getRawValue();
-    const arrival = v.estimatedArrival ? new Date(v.estimatedArrival) : null;
 
     this.saving.set(true);
     this.form.disable({ emitEvent: false });
@@ -161,7 +160,7 @@ export class TransferRequestModal {
         originBranchId: v.originBranchId as number,
         destinationBranchId: v.destinationBranchId as number,
         priority: v.priority,
-        estimatedArrival: arrival && !Number.isNaN(arrival.getTime()) ? arrival : null,
+        estimatedArrival: v.estimatedArrival,
         items: v.items.map((i) => ({ productId: i.productId as number, quantity: i.quantity as number })),
       })
       .subscribe({
@@ -181,10 +180,4 @@ export class TransferRequestModal {
         },
       });
   }
-}
-
-/** `YYYY-MM-DDTHH:mm` en hora local: el formato que entiende `<input type="datetime-local">`. */
-export function toInputValue(date: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}T${p(date.getHours())}:${p(date.getMinutes())}`;
 }

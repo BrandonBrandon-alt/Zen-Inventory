@@ -9,12 +9,12 @@ import { controlError } from '@shared/forms/control-error';
 import { Alert } from '@shared/ui/alert/alert';
 import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
+import { DatePicker } from '@shared/ui/date-picker/date-picker';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Modal } from '@shared/ui/modal/modal';
 import { PRIORITY_INFO, STATUS_INFO } from '../../data-access/transfer-labels';
 import { type Actor, transferActions } from '../../data-access/transfer-permissions';
 import { type Transfer, type TransferLine, TransfersApi } from '../../data-access/transfers-api';
-import { toInputValue } from '../transfer-request-modal/transfer-request-modal';
 
 type Mode = 'view' | 'dispatch' | 'receive' | 'cancel' | 'reject';
 
@@ -35,7 +35,7 @@ interface Step {
  */
 @Component({
   selector: 'app-transfer-detail-modal',
-  imports: [ReactiveFormsModule, Modal, Button, Alert, Badge, FormField, InputDirective, LucideArrowRight],
+  imports: [ReactiveFormsModule, Modal, Button, Alert, Badge, DatePicker, FormField, InputDirective, LucideArrowRight],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './transfer-detail-modal.html',
 })
@@ -69,7 +69,7 @@ export class TransferDetailModal {
     carrier: ['', Validators.required],
     trackingNumber: [''],
     shippingCost: new FormControl<number | null>(0, [Validators.required, Validators.min(0)]),
-    estimatedArrival: [''],
+    estimatedArrival: new FormControl<Date | null>(null),
     sent: new FormArray<FormControl<number | null>>([]),
   });
 
@@ -182,13 +182,12 @@ export class TransferDetailModal {
       this.error.set('Debes enviar al menos una unidad.');
       return;
     }
-    const arrival = v.estimatedArrival ? new Date(v.estimatedArrival) : null;
     void this.run(
       this.api.dispatch(t.id, {
         carrier: v.carrier,
         shippingCost: v.shippingCost ?? 0,
         trackingNumber: v.trackingNumber,
-        estimatedArrival: arrival && !Number.isNaN(arrival.getTime()) ? arrival : null,
+        estimatedArrival: v.estimatedArrival,
         items,
       }),
       `Traslado #${t.id} despachado.`,
@@ -237,7 +236,8 @@ export class TransferDetailModal {
     const sent = this.dispatchForm.controls.sent;
     sent.clear({ emitEvent: false });
     for (const line of transfer.lines) sent.push(quantityControl(line.requested, line.requested), { emitEvent: false });
-    this.dispatchForm.reset({ carrier: '', trackingNumber: '', shippingCost: 0, estimatedArrival: '' }, { emitEvent: false });
+    this.dispatchForm.reset({ carrier: '', trackingNumber: '', shippingCost: 0, estimatedArrival: null }, { emitEvent: false });
+    this.now.set(new Date());
     sent.controls.forEach((control, i) => control.setValue(transfer.lines[i].requested, { emitEvent: false }));
 
     const received = this.receiveForm.controls.received;
@@ -249,9 +249,8 @@ export class TransferDetailModal {
     this.reasonForm.reset({ reason: '' }, { emitEvent: false });
   }
 
-  protected minArrival(): string {
-    return toInputValue(new Date());
-  }
+  /** Mínimo de la llegada estimada: el momento en que se abre el detalle (no puede estar en el pasado). */
+  protected readonly now = signal(new Date());
 
   protected lineSent(line: TransferLine): string {
     return line.sent === null ? '—' : String(line.sent);

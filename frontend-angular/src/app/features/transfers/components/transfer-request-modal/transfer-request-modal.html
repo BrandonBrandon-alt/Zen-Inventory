@@ -25,7 +25,7 @@
         <app-select formControlName="priority" [options]="priorities" />
       </app-form-field>
       <app-form-field label="Llegada estimada (opcional)">
-        <input appInput type="datetime-local" formControlName="estimatedArrival" [min]="minArrival()" />
+        <app-date-picker formControlName="estimatedArrival" showTime [min]="now()" placeholder="Sin fecha estimada" />
       </app-form-field>
     </div>
 
