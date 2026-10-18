@@ -6,18 +6,7 @@ import { SKIP_ERROR_NOTIFICATION } from '@core/api/error.interceptor';
 import type { components } from '@core/api/schema';
 import { parseDate } from '@shared/format/format';
 
-/**
- * Respuesta real del servidor. El OpenAPI describe mal los renglones (`items`): dos registros del backend se llaman
- * `Detail` y el documento se queda con el de la petición (`productId`, `quantity`…), no con el de la respuesta.
- */
-interface ReturnItemResponse {
-  id?: number;
-  productoId?: number;
-  cantidad?: number;
-  motivoEspecifico?: string;
-  precioUnidadVenta?: number;
-}
-type ReturnResponse = Omit<components['schemas']['ReturnRequestResponse'], 'items'> & { items?: ReturnItemResponse[] };
+type ReturnResponse = components['schemas']['ReturnRequestResponse'];
 type SaleResponse = components['schemas']['SaleResponse'];
 
 export const RETURN_STATUSES = ['PENDIENTE', 'APROBADA', 'RECHAZADA'] as const;

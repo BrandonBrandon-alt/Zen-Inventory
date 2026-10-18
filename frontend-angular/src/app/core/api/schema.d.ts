@@ -52,6 +52,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get"];
+        put: operations["update_1"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["changePassword"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["uploadAvatar"];
+        post?: never;
+        delete: operations["removeAvatar"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/catalog/units/{id}": {
         parameters: {
             query?: never;
@@ -60,7 +108,7 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getById_1"];
-        put: operations["update_1"];
+        put: operations["update_2"];
         post?: never;
         delete: operations["delete"];
         options?: never;
@@ -76,7 +124,7 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getById_2"];
-        put: operations["update_2"];
+        put: operations["update_3"];
         post?: never;
         delete: operations["delete_1"];
         options?: never;
@@ -92,7 +140,7 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getById_3"];
-        put: operations["update_3"];
+        put: operations["update_4"];
         post?: never;
         delete: operations["delete_2"];
         options?: never;
@@ -108,7 +156,7 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getById_4"];
-        put: operations["update_4"];
+        put: operations["update_5"];
         post?: never;
         delete: operations["delete_3"];
         options?: never;
@@ -1140,6 +1188,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/avatars/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/catalog/products/{productId}/units/{unitId}": {
         parameters: {
             query?: never;
@@ -1213,6 +1277,13 @@ export interface components {
             createdAt?: string;
             /** Format: date-time */
             avatarActualizadoEn?: string;
+        };
+        UpdateProfileRequest: {
+            nombre: string;
+        };
+        ChangePasswordRequest: {
+            contrasenaActual: string;
+            contrasenaNueva: string;
         };
         UnitOfMeasureRequest: {
             nombre: string;
@@ -1327,6 +1398,8 @@ export interface components {
             receivedQuantity?: number;
             /** Format: int32 */
             missingQuantity?: number;
+            /** Format: int32 */
+            unsentQuantity?: number;
         };
         TransferResponse: {
             /** Format: int64 */
@@ -1372,7 +1445,7 @@ export interface components {
         ResolutionRequest: {
             reason: string;
             /** Format: int64 */
-            userId: number;
+            userId?: number;
         };
         ReceivedItemRequest: {
             /** Format: int64 */
@@ -1469,15 +1542,25 @@ export interface components {
             /** Format: int64 */
             requesterId?: number;
             generalReason?: string;
-            items?: components["schemas"]["Detail"][];
+            items?: components["schemas"]["ReturnItemRequest"][];
         };
-        Detail: {
+        ReturnItemRequest: {
             /** Format: int64 */
             productId?: number;
             /** Format: int32 */
             quantity?: number;
             reasonSpecific?: string;
             unitPricePaid?: number;
+        };
+        ReturnItemResponse: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: int64 */
+            productoId?: number;
+            /** Format: int32 */
+            cantidad?: number;
+            motivoEspecifico?: string;
+            precioUnidadVenta?: number;
         };
         ReturnRequestResponse: {
             /** Format: int64 */
@@ -1498,7 +1581,7 @@ export interface components {
             fechaProcesamiento?: string;
             motivoGeneral?: string;
             comentarioAprobador?: string;
-            items?: components["schemas"]["Detail"][];
+            items?: components["schemas"]["ReturnItemResponse"][];
         };
         PurchaseDetailRequest: {
             /** Format: int64 */
@@ -1511,9 +1594,9 @@ export interface components {
             /** Format: int64 */
             supplierId: number;
             /** Format: int64 */
-            userId: number;
+            userId?: number;
             /** Format: int64 */
-            branchId: number;
+            branchId?: number;
             /** Format: int32 */
             leadTimeDays: number;
             /** Format: int32 */
@@ -1570,7 +1653,7 @@ export interface components {
         };
         ReceiveOrderRequest: {
             /** Format: int64 */
-            userId: number;
+            userId?: number;
             items: components["schemas"]["ItemReceipt"][];
         };
         CppImpact: {
@@ -1592,7 +1675,7 @@ export interface components {
             /** @enum {string} */
             reason: "VENTA" | "COMPRA" | "TRASLADO" | "MERMA" | "DEVOLUCION" | "AJUSTE_POSITIVO" | "AJUSTE_NEGATIVO";
             /** Format: int64 */
-            userId: number;
+            userId?: number;
             /** Format: int64 */
             referenceId?: number;
             referenceType?: string;
@@ -1604,9 +1687,9 @@ export interface components {
         };
         TransferResolutionRequest: {
             /** Format: int64 */
-            originBranchId?: number;
+            originBranchId: number;
             /** Format: int32 */
-            quantity?: number;
+            quantity: number;
             /** Format: int64 */
             userId?: number;
             priority?: string;
@@ -1616,12 +1699,12 @@ export interface components {
         };
         PurchaseResolutionRequest: {
             /** Format: int32 */
-            leadTimeDays?: number;
-            quantity?: number;
+            leadTimeDays: number;
+            quantity: number;
             /** Format: int64 */
             userId?: number;
             /** Format: int64 */
-            supplierId?: number;
+            supplierId: number;
         };
         DismissResolutionRequest: {
             reason?: string;
@@ -2014,6 +2097,119 @@ export interface operations {
             };
         };
     };
+    get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    update_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    changePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    uploadAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    archivo: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    removeAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
     getById_1: {
         parameters: {
             query?: never;
@@ -2036,7 +2232,7 @@ export interface operations {
             };
         };
     };
-    update_1: {
+    update_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -2104,7 +2300,7 @@ export interface operations {
             };
         };
     };
-    update_2: {
+    update_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -2172,7 +2368,7 @@ export interface operations {
             };
         };
     };
-    update_3: {
+    update_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -2240,7 +2436,7 @@ export interface operations {
             };
         };
     };
-    update_4: {
+    update_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -2791,9 +2987,7 @@ export interface operations {
     };
     closeShortfall: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 id: number;
@@ -2839,9 +3033,7 @@ export interface operations {
     };
     approveOrder: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 id: number;
@@ -2863,9 +3055,7 @@ export interface operations {
     };
     approveException: {
         parameters: {
-            query: {
-                userId: number;
-            };
+            query?: never;
             header?: never;
             path: {
                 id: number;
@@ -3969,6 +4159,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["SupplierResponse"][];
+                };
+            };
+        };
+    };
+    get_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                userId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
                 };
             };
         };

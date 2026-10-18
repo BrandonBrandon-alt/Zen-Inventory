@@ -19,6 +19,8 @@ public record ReturnRequestResponse(
     String comentarioAprobador,
     List<Detail> items
 ) {
+    // Nombre propio en el OpenAPI: «Detail» chocaba con el de la solicitud y un esquema pisaba al otro.
+    @io.swagger.v3.oas.annotations.media.Schema(name = "ReturnItemResponse")
     public record Detail(
         Long id,
         Long productoId,
