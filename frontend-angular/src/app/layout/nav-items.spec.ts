@@ -95,6 +95,12 @@ describe('navSectionsFor', () => {
     }
   });
 
+  it('Reportes es de ADMIN y MANAGER (el gerente ve solo las ventas de su sucursal)', () => {
+    expect(labels('ADMIN')).toContain('Reportes');
+    expect(labels('MANAGER')).toContain('Reportes');
+    for (const role of ['SELLER', 'OPERADOR_INVENTARIO'] as const) expect(labels(role)).not.toContain('Reportes');
+  });
+
   it('Sucursales es solo de ADMIN (la página y las acciones del backend lo exigen)', () => {
     expect(labels('ADMIN')).toContain('Sucursales');
     for (const role of ['MANAGER', 'SELLER', 'OPERADOR_INVENTARIO'] as const) {

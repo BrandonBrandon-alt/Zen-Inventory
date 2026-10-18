@@ -21,6 +21,7 @@ export const SCREENS: Readonly<Record<string, () => Promise<Type<unknown>>>> = {
   '/sales/pos': () => import('./features/sales/pages/pos-page/pos-page').then((m) => m.PosPage),
   '/sales/history': () => import('./features/sales/pages/sales-history-page/sales-history-page').then((m) => m.SalesHistoryPage),
   '/audit': () => import('./features/audit/pages/audit-page/audit-page').then((m) => m.AuditPage),
+  '/reports': () => import('./features/reports/pages/reports-page/reports-page').then((m) => m.ReportsPage),
   '/returns': () => import('./features/returns/pages/returns-page/returns-page').then((m) => m.ReturnsPage),
   '/inventory': () => import('./features/inventory/pages/inventory-page/inventory-page').then((m) => m.InventoryPage),
   '/users': () => import('./features/users/pages/users-page/users-page').then((m) => m.UsersPage),

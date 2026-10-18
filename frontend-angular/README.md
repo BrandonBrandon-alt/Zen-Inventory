@@ -135,3 +135,11 @@ COMPANY_INVOICE_FOOTER=Gracias por su compra
 
 Todas son opcionales: lo que quede vacío no se imprime. Es un comprobante interno, no una factura electrónica
 (DIAN): para eso hace falta un proveedor tecnológico autorizado.
+
+## Reportes (PDF)
+
+`/reports` (ADMIN y MANAGER): el cierre de caja de un día o el reporte de ventas de un rango, con totales, ventas por
+vendedor y productos más vendidos. "Descargar PDF" abre el reporte en formato A4 en el diálogo de impresión del
+navegador: ahí se imprime o se elige "Guardar como PDF" (el nombre sugerido es `cierre-de-caja-AAAA-MM-DD`). No usa
+ninguna librería de PDF. Las tablas también se pueden bajar en CSV. Se calcula en el navegador con las ventas que el
+servidor deja ver a cada rol (el gerente, solo las de su sucursal); una venta anulada no suma a lo vendido.

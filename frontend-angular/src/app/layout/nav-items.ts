@@ -1,5 +1,6 @@
 import {
   LucideBell,
+  LucideFileChartColumn,
   LucideFileText,
   LucideLayers,
   LucideLayoutDashboard,
@@ -42,6 +43,8 @@ const ADMIN_ONLY: readonly Role[] = ['ADMIN'];
 const STOCK_ROLES: readonly Role[] = ['ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO'];
 /** Quienes administran usuarios: el ADMIN (todos) y el MANAGER (los de su sucursal). */
 const USER_ADMINS: readonly Role[] = ['ADMIN', 'MANAGER'];
+/** Los reportes de ventas son de gerencia: el gerente ve los de su sucursal y el ADMIN los de todas. */
+const REPORT_ROLES: readonly Role[] = ['ADMIN', 'MANAGER'];
 
 /** Fuente única del menú y de las rutas protegidas del shell. */
 export const NAV_SECTIONS: readonly NavSection[] = [
@@ -56,6 +59,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { label: 'Ventas', description: 'Punto de venta: registra una venta nueva.', path: '/sales/pos', icon: LucideReceipt.icon, roles: EVERYONE },
       { label: 'Historial Ventas', description: 'Consulta las ventas ya registradas y anula las que lo necesiten.', path: '/sales/history', icon: LucideRotateCcwClock.icon, roles: EVERYONE },
       { label: 'Devoluciones', description: 'Registra y revisa las devoluciones de los clientes.', path: '/returns', icon: LucideUndo2.icon, roles: EVERYONE },
+      { label: 'Reportes', description: 'Cierre de caja y ventas por vendedor, para imprimir o guardar como PDF.', path: '/reports', icon: LucideFileChartColumn.icon, roles: REPORT_ROLES },
       { label: 'Sucursales', description: 'Crea y administra las sedes de la empresa.', path: '/branches', icon: LucideStore.icon, roles: ADMIN_ONLY },
       { label: 'Usuarios', description: 'Personas con acceso al sistema, sus roles y sus sucursales.', path: '/users', icon: LucideUsers.icon, roles: USER_ADMINS },
       { label: 'Auditoría Global', description: 'Registro de quién hizo qué en el sistema.', path: '/audit', icon: LucideFileText.icon, roles: ADMIN_ONLY },
