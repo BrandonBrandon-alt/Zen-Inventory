@@ -1,17 +1,38 @@
+@if (autoHidden()) {
+  <!-- Franja del borde izquierdo: al acercar el puntero (o enfocarla con el teclado) abre el menú oculto. -->
+  <button
+    type="button"
+    class="group absolute inset-y-0 left-0 flex w-2.5 cursor-e-resize items-center outline-none"
+    aria-label="Abrir menú"
+    title="Abrir menú (Ctrl + S)"
+    aria-keyshortcuts="Control+S Meta+S"
+    aria-controls="app-sidebar"
+    [attr.aria-expanded]="shown()"
+    (click)="onEnter()"
+  >
+    <span
+      class="pointer-events-none ml-0.5 h-14 w-1 rounded-full bg-brand/35 transition-[background-color,height] duration-200 group-hover:h-20 group-hover:bg-brand/70 group-focus-visible:h-20 group-focus-visible:bg-brand"
+      aria-hidden="true"
+    ></span>
+  </button>
+}
+
 <aside
   id="app-sidebar"
   class="flex h-full flex-col border-r border-line bg-base py-5"
-  [class]="resizing() ? '' : 'transition-[width] duration-300'"
+  [class]="asideClass()"
   [class.w-full]="!viewport.isDesktop()"
   [style.width.px]="viewport.isDesktop() ? widthPx() : null"
 >
   <header class="relative mb-6 flex items-center gap-2.5 px-4" [class.justify-center]="compact()">
     <app-logo [size]="32" [showText]="!compact()" />
-    @if (viewport.isDesktop()) {
+    @if (viewport.isDesktop() && !autoHidden()) {
       <button
         type="button"
         class="absolute top-2 -right-3 flex size-6 cursor-pointer items-center justify-center rounded-full border border-line bg-card text-fg-muted transition-colors hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
         [attr.aria-label]="state.collapsed() ? 'Expandir menú' : 'Contraer menú'"
+        [attr.title]="(state.collapsed() ? 'Expandir menú' : 'Contraer menú') + ' (Ctrl + S)'"
+        aria-keyshortcuts="Control+S Meta+S"
         [attr.aria-expanded]="!state.collapsed()"
         (click)="state.toggle()"
       >
@@ -21,7 +42,7 @@
           <svg lucideChevronLeft [size]="14" />
         }
       </button>
-    } @else {
+    } @else if (!viewport.isDesktop()) {
       <button
         type="button"
         class="ml-auto flex size-8 cursor-pointer items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
@@ -42,8 +63,8 @@
         {{ compact() ? '—' : section.title }}
       </p>
       <ul class="flex flex-col gap-0.5">
-        @for (item of section.items; track item.path) {
-          <li>
+        @for (item of section.items; track item.path; let i = $index) {
+          <li [class.animate-nav-in]="autoHidden() && shown()" [style.--i]="i">
             <a
               [routerLink]="item.path"
               routerLinkActive="bg-card font-semibold text-brand! before:absolute before:top-[20%] before:left-0 before:h-[60%] before:w-[3px] before:rounded-full before:bg-brand"
@@ -65,6 +86,26 @@
   </nav>
 
   <footer class="flex flex-col gap-1 px-3 pt-3">
+    @if (viewport.isDesktop()) {
+      <button
+        type="button"
+        class="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm text-fg-subtle transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
+        [class.justify-center]="compact()"
+        [attr.aria-pressed]="state.autoHide()"
+        [attr.aria-label]="state.autoHide() ? 'Fijar menú' : 'Ocultar menú automáticamente'"
+        (click)="state.toggleAutoHide()"
+      >
+        @if (state.autoHide()) {
+          <svg lucidePin [size]="18" class="shrink-0" />
+          <span>Fijar menú</span>
+        } @else {
+          <svg lucidePanelLeftClose [size]="18" class="shrink-0" />
+          @if (!compact()) {
+            <span>Ocultar automáticamente</span>
+          }
+        }
+      </button>
+    }
     <app-theme-toggle variant="row" [labelVisible]="!compact()" />
 
     <app-user-card [compact]="compact()" />
@@ -84,7 +125,7 @@
   </footer>
 </aside>
 
-@if (viewport.isDesktop() && !state.collapsed()) {
+@if (viewport.isDesktop() && !compact() && shown()) {
   <!-- Borde arrastrable (separador enfocable, patrón "window splitter" de WAI-ARIA). Empieza bajo la cabecera para no tapar el botón de colapsar. -->
   <div
     role="separator"

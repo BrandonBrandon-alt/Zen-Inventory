@@ -127,6 +127,16 @@
   --animate-draw-line: drawLine 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.25s backwards;
   --animate-area-in: areaIn 0.9s ease 0.55s backwards;
 
+  /* Los enlaces del menú oculto entran en cascada cuando el menú se abre (el retraso lo da --i, su posición). */
+  --animate-nav-in: navIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--i, 0) * 22ms + 60ms) backwards;
+
+  @keyframes navIn {
+    from {
+      opacity: 0;
+      transform: translateX(-10px);
+    }
+  }
+
   @keyframes drawLine {
     from {
       stroke-dashoffset: 1;
