@@ -73,11 +73,11 @@ let scrollLocks = 0;
         <div class="flex-1 overflow-y-auto px-6 pb-6"><ng-content /></div>
 
         <!-- Los botones van dentro del contenedor proyectado [data-slot=footer]: es él quien los separa (gap-3). -->
-        <div
+        <footer
           class="border-t border-line px-6 py-4 empty:hidden [&>[data-slot=footer]]:flex [&>[data-slot=footer]]:flex-wrap [&>[data-slot=footer]]:items-center [&>[data-slot=footer]]:justify-end [&>[data-slot=footer]]:gap-3"
         >
           <ng-content select="[data-slot=footer]" />
-        </div>
+        </footer>
       </div>
 
       <!-- Último en el DOM a propósito: el foco inicial cae en el primer campo del contenido, no en la X. -->
