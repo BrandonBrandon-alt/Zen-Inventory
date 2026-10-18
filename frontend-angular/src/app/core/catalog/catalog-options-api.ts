@@ -21,6 +21,14 @@ export interface ProductOption {
   readonly id: number;
   readonly nombre: string;
   readonly sku: string;
+  /** Precio de venta; sirve para mostrarlo al vender. */
+  readonly price: number;
+  /** Unidad base del producto (abreviatura), para mostrar cantidades. */
+  readonly unit: string;
+  /** Si el producto está activo (los inactivos no se ofrecen para comprar ni vender). */
+  readonly active: boolean;
+  /** Condiciones pactadas con cada proveedor: sirven para proponer el precio de una compra. */
+  readonly suppliers: readonly { supplierId: number; price: number; deliveryDays: number }[];
 }
 
 /** Proveedor elegible en un selector. */
@@ -71,7 +79,19 @@ export class CatalogOptionsApi {
       map((items) =>
         items.flatMap((product) =>
           typeof product.id === 'number' && product.nombre?.trim()
-            ? [{ id: product.id, nombre: product.nombre.trim(), sku: product.sku?.trim() ?? '' }]
+            ? [
+                {
+                  id: product.id,
+                  nombre: product.nombre.trim(),
+                  sku: product.sku?.trim() ?? '',
+                  price: product.precioVenta ?? 0,
+                  unit: product.unitAbbreviation?.trim() ?? '',
+                  active: product.activo !== false,
+                  suppliers: (product.proveedores ?? []).flatMap((s) =>
+                    typeof s.id === 'number' ? [{ supplierId: s.id, price: s.precioPactado ?? 0, deliveryDays: s.tiempoEntregaDias ?? 0 }] : [],
+                  ),
+                },
+              ]
             : [],
         ),
       ),

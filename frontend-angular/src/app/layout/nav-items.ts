@@ -39,8 +39,8 @@ export interface NavSection {
 const EVERYONE: readonly Role[] = ROLES;
 const MANAGEMENT: readonly Role[] = ['ADMIN', 'MANAGER', 'SELLER'];
 const ADMIN_ONLY: readonly Role[] = ['ADMIN'];
-/** Los traslados son de gerencia e inventario (el backend responde 403 al vendedor). */
-const TRANSFER_ROLES: readonly Role[] = ['ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO'];
+/** Traslados y compras son de gerencia e inventario (el backend responde 403 al vendedor). */
+const STOCK_ROLES: readonly Role[] = ['ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO'];
 /** Quienes administran usuarios: el ADMIN (todos) y el MANAGER (los de su sucursal). */
 const USER_ADMINS: readonly Role[] = ['ADMIN', 'MANAGER'];
 
@@ -52,8 +52,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { label: 'Panel', description: 'Resumen del negocio: ventas, inventario, traslados y lo que necesita atención.', path: '/dashboard', icon: LucideLayoutDashboard.icon, roles: EVERYONE },
       { label: 'Inventario', description: 'Existencias por producto, ajuste de stock, mínimos y el kardex de movimientos.', path: '/inventory', icon: LucideLayers.icon, roles: EVERYONE },
       { label: 'Alertas', description: 'Productos bajo su mínimo y otros avisos que esperan una acción.', path: '/alerts', icon: LucideBell.icon, roles: ALERT_ROLES, alertBadge: true },
-      { label: 'Traslados', description: 'Pedir, aprobar, despachar y recibir mercancía entre sucursales.', path: '/transfers', icon: LucideShuffle.icon, roles: TRANSFER_ROLES },
-      { label: 'Compras', description: 'Órdenes de compra a proveedores y recepción de la mercancía.', path: '/purchases', icon: LucideShoppingBag.icon, roles: EVERYONE },
+      { label: 'Traslados', description: 'Pedir, aprobar, despachar y recibir mercancía entre sucursales.', path: '/transfers', icon: LucideShuffle.icon, roles: STOCK_ROLES },
+      { label: 'Compras', description: 'Órdenes de compra a proveedores y recepción de la mercancía.', path: '/purchases', icon: LucideShoppingBag.icon, roles: STOCK_ROLES },
       { label: 'Ventas', description: 'Punto de venta: registra una venta nueva.', path: '/sales/pos', icon: LucideReceipt.icon, roles: EVERYONE },
       { label: 'Historial Ventas', description: 'Consulta las ventas ya registradas y anula las que lo necesiten.', path: '/sales/history', icon: LucideRotateCcwClock.icon, roles: EVERYONE },
       { label: 'Devoluciones', description: 'Registra y revisa las devoluciones de los clientes.', path: '/returns', icon: LucideUndo2.icon, roles: EVERYONE },

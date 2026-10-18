@@ -66,9 +66,9 @@ describe('navSectionsFor', () => {
     expect(navSectionsFor(role).map((section) => section.title)).toEqual(['Navegación']);
   });
 
-  it('Traslados es de ADMIN, MANAGER y OPERADOR_INVENTARIO (el backend responde 403 al vendedor)', () => {
-    for (const role of ['ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO'] as const) expect(labels(role)).toContain('Traslados');
-    expect(labels('SELLER')).not.toContain('Traslados');
+  it.each(['Traslados', 'Compras'])('%s es de ADMIN, MANAGER y OPERADOR_INVENTARIO (el backend responde 403 al vendedor)', (label) => {
+    for (const role of ['ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO'] as const) expect(labels(role)).toContain(label);
+    expect(labels('SELLER')).not.toContain(label);
   });
 
   it('Alertas es de ADMIN, MANAGER y OPERADOR_INVENTARIO (el backend responde 403 al vendedor)', () => {
