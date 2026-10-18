@@ -9,7 +9,7 @@ y **6 meses de historia** día a día: ~18.000 ventas (~45.000 líneas), ~2.200 
 python3 scripts/demo-data/demo_data.py load     # borra la demostración anterior (si hay) y carga una nueva (~10 s)
 python3 scripts/demo-data/demo_data.py clean    # deja la base sin los datos de demostración
 python3 scripts/demo-data/demo_data.py sql > demo.sql   # solo genera el SQL, sin tocar la base
-python3 -m unittest -q -C scripts/demo-data     # pruebas de la simulación
+(cd scripts/demo-data && python3 -m unittest -q)   # pruebas de la simulación
 ```
 
 Opciones: `--days 180` (historia), `--scale 1` (volumen de ventas), `--seed 42` (la misma semilla da siempre los

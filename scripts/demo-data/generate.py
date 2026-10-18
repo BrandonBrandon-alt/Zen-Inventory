@@ -429,7 +429,7 @@ class Sim:
             if b != branch:
                 continue
             product = self.products[p]
-            if item.stock + item.on_order > item.minimum * 1.25 or (b, p) in self.open_orders:
+            if item.stock + item.on_order > item.minimum * 1.6 or (b, p) in self.open_orders:
                 continue
             target = item.demand * 30 + item.minimum - item.stock - item.on_order
             qty = max(product.multiple, math.ceil(target / product.multiple) * product.multiple)
