@@ -56,7 +56,8 @@ export class AuthApi {
       rol: response.rol ?? '',
       id: response.id,
       sucursalId: response.sucursalId,
-      avatarVersion: response.avatarActualizadoEn,
+      // Sin foto el servidor manda `null` (no la omite): se normaliza a "sin versión".
+      avatarVersion: response.avatarActualizadoEn ?? undefined,
     };
     if (!isAuthSession(session)) {
       throw new AuthError('invalid-response', 'El servidor devolvió una respuesta de sesión incompleta.');
