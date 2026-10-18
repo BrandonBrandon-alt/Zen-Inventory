@@ -102,7 +102,7 @@
     @if (viewport.isDesktop()) {
       <button
         type="button"
-        class="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm text-fg-subtle transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
+        class="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm text-fg-subtle transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
         [class.justify-center]="compact()"
         [attr.aria-pressed]="state.autoHide()"
         [attr.aria-label]="state.autoHide() ? 'Fijar menú' : 'Ocultar menú automáticamente'"

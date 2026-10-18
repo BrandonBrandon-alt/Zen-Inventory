@@ -1,0 +1,53 @@
+<header class="mb-6 animate-enter">
+  <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Historial de ventas</h1>
+  @if (!loading() && !error() && sales().length > 0) {
+    <p class="mt-1 text-sm text-fg-subtle">{{ summary() }}</p>
+  }
+</header>
+
+<div class="mb-4 flex animate-enter-delayed flex-wrap items-center gap-3">
+  <div class="w-72 max-w-full">
+    <app-form-field>
+      <input appInput type="search" placeholder="Buscar por n.º, cliente, documento o vendedor…" aria-label="Buscar venta" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
+      <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
+    </app-form-field>
+  </div>
+  <div class="w-52">
+    <app-select [(value)]="statusFilter" [options]="statusOptions" [icon]="filterIcon" ariaLabel="Estado de la venta" />
+  </div>
+  @if (isAdmin() && branches().length > 0) {
+    <div class="w-60">
+      <app-select [(value)]="branchFilter" [options]="branchOptions()" [icon]="storeIcon" ariaLabel="Sucursal" />
+    </div>
+  }
+</div>
+
+<app-data-table
+  class="block animate-enter-delayed"
+  caption="Ventas registradas"
+  [columns]="columns()"
+  [rows]="rows()"
+  [rowKey]="rowKey"
+  [loading]="loading()"
+  [error]="error()"
+  [pageSize]="10"
+  [clickableRows]="true"
+  [emptyTitle]="search() || statusFilter() !== 'all' ? 'Ninguna venta coincide' : 'Todavía no hay ventas'"
+  [emptyDescription]="search() || statusFilter() !== 'all' ? 'Prueba con otra búsqueda o estado.' : 'Las ventas que registres en el punto de venta aparecerán aquí.'"
+  minWidth="52rem"
+  (rowClick)="openDetail($event)"
+  (retry)="load()"
+>
+  <ng-template appCell="statusLabel" let-s>
+    <app-badge [variant]="statusVariant(s)" dot>{{ s.statusLabel }}</app-badge>
+  </ng-template>
+  <ng-template appCell="acciones" let-s>
+    <div class="flex justify-end">
+      <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Ver venta ' + s.id" appTooltip="Ver detalle" (click)="openDetail(s)">
+        <svg lucideEye [size]="16" />
+      </button>
+    </div>
+  </ng-template>
+</app-data-table>
+
+<app-sale-detail-modal [(open)]="detailOpen" [sale]="selected()" [canCancel]="canCancel()" (changed)="load(true)" />
