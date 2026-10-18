@@ -118,15 +118,20 @@ export class SalesHistoryPage {
     });
   }
 
+  /** Solo la última petición manda: al cambiar de sucursal rápido, la respuesta de la anterior no debe pisar la lista. */
+  private loadId = 0;
+
   protected async load(silent = false, branch = this.branchFilter()): Promise<void> {
+    const id = ++this.loadId;
     if (!silent) this.loading.set(true);
     this.error.set(null);
     try {
-      this.sales.set(await firstValueFrom(this.api.list(this.isAdmin() ? branch : null)));
+      const sales = await firstValueFrom(this.api.list(this.isAdmin() ? branch : null));
+      if (id === this.loadId) this.sales.set(sales);
     } catch (error) {
-      this.error.set(toApiError(error).message);
+      if (id === this.loadId) this.error.set(toApiError(error).message);
     } finally {
-      this.loading.set(false);
+      if (id === this.loadId) this.loading.set(false);
     }
   }
 

@@ -417,6 +417,17 @@ describe('DataTable — exportar a CSV', () => {
     expect(lines[1]).toBe('Norte,10,Sí');
   });
 
+  it('el nombre del archivo lleva la fecha local, no la UTC (a las 11 p. m. sigue siendo el mismo día)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 18, 23, 30) });
+    try {
+      await setupExport('exportName="s"');
+      await userEvent.click(screen.getByRole('button', { name: /Exportar CSV/ }));
+      expect(captured.name).toBe('s-2026-10-18.csv');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('exporta todas las filas aunque la tabla esté paginada', async () => {
     await setupExport('exportName="s" [pageSize]="2"');
     expect(screen.getAllByRole('row').slice(1)).toHaveLength(2); // se ven 2

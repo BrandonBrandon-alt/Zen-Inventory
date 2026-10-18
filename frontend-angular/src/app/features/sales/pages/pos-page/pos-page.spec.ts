@@ -327,6 +327,29 @@ describe('PosPage', () => {
       expect(await screen.findByText('Aún no hay productos.')).toBeInTheDocument();
     });
 
+    it('si el catálogo de una sucursal anterior llega tarde, no pisa el de la elegida', async () => {
+      useSession('ADMIN');
+      stub();
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      server.use(
+        http.get(`${TEST_API}/api/v1/inventory/branches/:id`, async ({ params }) => {
+          if (params['id'] === '10') {
+            await gate; // el stock de la sede inicial tarda
+            return HttpResponse.json(STOCK);
+          }
+          return HttpResponse.json([]); // en Sucursal Norte no hay nada
+        }),
+      );
+      await renderPage();
+      await screen.findByRole('combobox', { name: 'Sucursal desde la que se vende' });
+      await chooseOption('Sucursal desde la que se vende', 'Sucursal Norte');
+      expect(await screen.findByRole('button', { name: 'Agregar Tornillo' })).toBeDisabled();
+      release();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(screen.getByRole('button', { name: 'Agregar Tornillo' })).toBeDisabled(); // sigue sin stock: no lo pisó el de la otra sede
+    });
+
     it('vende con la sucursal elegida', async () => {
       useSession('ADMIN');
       stub();

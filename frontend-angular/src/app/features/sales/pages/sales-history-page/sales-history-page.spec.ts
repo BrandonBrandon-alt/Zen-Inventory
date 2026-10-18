@@ -154,6 +154,31 @@ describe('SalesHistoryPage', () => {
       await vi.waitFor(() => expect(asked).toEqual([null, '20']));
     });
 
+    it('si la respuesta de una sucursal anterior llega tarde, no pisa la de la elegida', async () => {
+      useSession('ADMIN');
+      stub();
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      server.use(
+        http.get(URL_S, async ({ request }) => {
+          if (new URL(request.url).searchParams.get('branchId') === '20') {
+            await gate; // la respuesta de «Sucursal Norte» tarda
+            return HttpResponse.json([sale(9, 'COMPLETED')]);
+          }
+          return HttpResponse.json(SALES);
+        }),
+      );
+      await renderPage();
+      await screen.findByText('#4');
+      await chooseOption('Sucursal', 'Sucursal Norte');
+      await chooseOption('Sucursal', 'Todas las sucursales');
+      await screen.findByText('#4');
+      release();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(screen.getByText('#4')).toBeInTheDocument();
+      expect(screen.queryByText('#9')).not.toBeInTheDocument();
+    });
+
     it('un gerente no ve la sucursal ni su filtro', async () => {
       useSession('MANAGER', 10);
       stub();

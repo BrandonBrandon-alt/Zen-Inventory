@@ -80,6 +80,13 @@ describe('AuditPage', () => {
       expect(within(sale).getByText('Retiro')).toBeInTheDocument();
     });
 
+    it('descarta un movimiento con un motivo que la app no conoce (no lo muestra con un rótulo roto)', async () => {
+      stub([...MOVEMENTS, movement(9, { type: 'INGRESO', reason: 'MOTIVO_NUEVO', quantity: 1, productId: 1, branchId: 10 })]);
+      await renderPage();
+      await screen.findAllByRole('row', { name: /Tuerca/ });
+      expect(products()).toHaveLength(MOVEMENTS.length);
+    });
+
     it('un ajuste sin documento ni responsable se ve como tal', async () => {
       stub();
       await renderPage();

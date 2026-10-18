@@ -8,6 +8,7 @@ import { server, TEST_API } from '@testing/msw-server';
 import { ALERT_COUNT_INTERVAL, AlertCount } from './alert-count';
 
 const URL_ALERTS = `${TEST_API}/api/v1/alerts`;
+const alert = (id: number) => ({ id, branchId: 3, productId: 1, type: 'LOW_STOCK', message: `Alerta ${id}` });
 const session = (rol: string) => ({ token: 't', email: 'e', nombre: 'Ana', rol, id: 1, sucursalId: 3 });
 
 function setup(rol: string | null) {
@@ -29,7 +30,7 @@ describe('AlertCount', () => {
   afterEach(() => vi.useRealTimers());
 
   it('cuenta las alertas activas de quien tiene acceso', async () => {
-    server.use(http.get(URL_ALERTS, () => HttpResponse.json([{ id: 1 }, { id: 2 }, { id: 3 }])));
+    server.use(http.get(URL_ALERTS, () => HttpResponse.json([alert(1), alert(2), alert(3)])));
     const { counter } = setup('MANAGER');
     await flush();
     expect(counter.count()).toBe(3);
@@ -37,7 +38,7 @@ describe('AlertCount', () => {
 
   it('el vendedor no tiene acceso a las alertas: ni pregunta ni cuenta', async () => {
     let calls = 0;
-    server.use(http.get(URL_ALERTS, () => ((calls += 1), HttpResponse.json([{ id: 1 }]))));
+    server.use(http.get(URL_ALERTS, () => ((calls += 1), HttpResponse.json([alert(1)]))));
     const { counter } = setup('SELLER');
     await flush();
     counter.refresh();
@@ -55,12 +56,12 @@ describe('AlertCount', () => {
   });
 
   it('refresh() vuelve a contar (tras resolver una alerta)', async () => {
-    let alerts = [{ id: 1 }, { id: 2 }];
+    let alerts = [alert(1), alert(2)];
     server.use(http.get(URL_ALERTS, () => HttpResponse.json(alerts)));
     const { counter } = setup('ADMIN');
     await flush();
     expect(counter.count()).toBe(2);
-    alerts = [{ id: 2 }];
+    alerts = [alert(2)];
     counter.refresh();
     await flush();
     expect(counter.count()).toBe(1);
@@ -68,7 +69,7 @@ describe('AlertCount', () => {
 
   it('si la consulta falla conserva el último número y no avisa', async () => {
     let fail = false;
-    server.use(http.get(URL_ALERTS, () => (fail ? HttpResponse.error() : HttpResponse.json([{ id: 1 }]))));
+    server.use(http.get(URL_ALERTS, () => (fail ? HttpResponse.error() : HttpResponse.json([alert(1)]))));
     const { counter } = setup('ADMIN');
     await flush();
     fail = true;
@@ -78,7 +79,7 @@ describe('AlertCount', () => {
   });
 
   it('al cerrar sesión vuelve a 0', async () => {
-    server.use(http.get(URL_ALERTS, () => HttpResponse.json([{ id: 1 }, { id: 2 }])));
+    server.use(http.get(URL_ALERTS, () => HttpResponse.json([alert(1), alert(2)])));
     const { auth, counter } = setup('ADMIN');
     await flush();
     expect(counter.count()).toBe(2);
@@ -87,9 +88,50 @@ describe('AlertCount', () => {
     expect(counter.count()).toBe(0);
   });
 
+  it('no cuenta lo que la pantalla de Alertas no mostraría (tipo desconocido o sin datos)', async () => {
+    server.use(http.get(URL_ALERTS, () => HttpResponse.json([alert(1), { ...alert(2), type: 'OTRO' }, { id: 3 }])));
+    const { counter } = setup('ADMIN');
+    await flush();
+    expect(counter.count()).toBe(1);
+  });
+
+  it('una respuesta tardía de la sesión anterior no pinta su número tras cerrar sesión', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    server.use(http.get(URL_ALERTS, async () => (await gate, HttpResponse.json([alert(1), alert(2)]))));
+    const { auth, counter } = setup('ADMIN');
+    await flush();
+    auth.clear();
+    await flush();
+    release();
+    await flush();
+    expect(counter.count()).toBe(0);
+  });
+
+  it('con la pestaña oculta no consulta cada minuto y al volver actualiza', async () => {
+    let calls = 0;
+    server.use(http.get(URL_ALERTS, () => ((calls += 1), HttpResponse.json([alert(1)]))));
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    try {
+      setup('ADMIN');
+      await flush();
+      const first = calls;
+      vi.advanceTimersByTime(ALERT_COUNT_INTERVAL);
+      await flush();
+      expect(calls).toBe(first);
+      hidden.mockReturnValue(false);
+      document.dispatchEvent(new Event('visibilitychange'));
+      await flush();
+      expect(calls).toBe(first + 1);
+    } finally {
+      hidden.mockRestore();
+    }
+  });
+
   it('se actualiza solo cada minuto', async () => {
     let calls = 0;
-    server.use(http.get(URL_ALERTS, () => ((calls += 1), HttpResponse.json([{ id: 1 }]))));
+    server.use(http.get(URL_ALERTS, () => ((calls += 1), HttpResponse.json([alert(1)]))));
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     setup('ADMIN');
     await flush();

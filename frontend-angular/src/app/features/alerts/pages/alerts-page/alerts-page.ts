@@ -153,17 +153,23 @@ export class AlertsPage {
     });
   }
 
+  /** Solo la última petición manda: al cambiar de sucursal rápido, la respuesta de la anterior no debe pisar la lista. */
+  private loadId = 0;
+
   protected async load(silent = false): Promise<void> {
+    const id = ++this.loadId;
     if (!silent) this.loading.set(true);
     this.error.set(null);
     try {
-      this.alerts.set(await firstValueFrom(this.api.list(this.isAdmin() ? this.branchFilter() : null)));
+      const alerts = await firstValueFrom(this.api.list(this.isAdmin() ? this.branchFilter() : null));
+      if (id !== this.loadId) return;
+      this.alerts.set(alerts);
       // La insignia del menú cuenta todas las alertas, no solo las de la sucursal filtrada: se le pide el dato aparte.
       if (silent) this.alertCount.refresh();
     } catch (error) {
-      this.error.set(toApiError(error).message);
+      if (id === this.loadId) this.error.set(toApiError(error).message);
     } finally {
-      this.loading.set(false);
+      if (id === this.loadId) this.loading.set(false);
     }
   }
 

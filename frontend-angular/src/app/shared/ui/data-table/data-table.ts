@@ -196,7 +196,9 @@ export class DataTable<T> {
     const columns = (this.exportColumns() ?? this.columns()).filter((c) => c.export !== false && c.key !== 'acciones');
     const header = columns.map((c) => c.header);
     const body = this.sortedRows().map((row) => columns.map((c) => this.exportValue(c, row)));
-    const stamp = new Date().toISOString().slice(0, 10);
+    // Fecha local (no UTC): de noche el día del archivo no debe saltar al siguiente.
+    const now = new Date();
+    const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     downloadCsv(`${name}-${stamp}.csv`, toCsv([header, ...body]));
   }
 

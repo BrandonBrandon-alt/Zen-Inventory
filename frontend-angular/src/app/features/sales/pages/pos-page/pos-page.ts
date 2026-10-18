@@ -271,15 +271,20 @@ export class PosPage {
     }
   }
 
+  /** Solo el último catálogo pedido manda: el ADMIN puede cambiar de sucursal antes de que llegue el anterior. */
+  private catalogId = 0;
+
   private async loadCatalog(branch: number, silent = false): Promise<void> {
+    const id = ++this.catalogId;
     if (!silent) this.loading.set(true);
     this.loadError.set(null);
     try {
-      this.products.set(await firstValueFrom(this.api.catalog(branch)));
+      const products = await firstValueFrom(this.api.catalog(branch));
+      if (id === this.catalogId) this.products.set(products);
     } catch (error) {
-      this.loadError.set(toApiError(error).message);
+      if (id === this.catalogId) this.loadError.set(toApiError(error).message);
     } finally {
-      this.loading.set(false);
+      if (id === this.catalogId) this.loading.set(false);
     }
   }
 }

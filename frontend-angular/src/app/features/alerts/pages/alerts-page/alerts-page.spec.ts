@@ -138,6 +138,31 @@ describe('AlertsPage', () => {
       await vi.waitFor(() => expect(requested).toEqual([null, '20']));
     });
 
+    it('si la respuesta de una sucursal anterior llega tarde, no pisa la de la elegida', async () => {
+      useSession('ADMIN');
+      stub();
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      server.use(
+        http.get(ALERTS_URL, async ({ request }) => {
+          if (new URL(request.url).searchParams.get('branchId') === '20') {
+            await gate; // la respuesta de «Sucursal Norte» tarda
+            return HttpResponse.json([ALERTS[1]]);
+          }
+          return HttpResponse.json(ALERTS);
+        }),
+      );
+      await renderPage();
+      await screen.findByText('Stock bajo: quedan 2 de 10');
+      await chooseOption('Sucursal', 'Sucursal Norte');
+      await chooseOption('Sucursal', 'Todas las sucursales');
+      await screen.findByText('Stock bajo: quedan 2 de 10');
+      release();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(screen.getByText('Stock bajo: quedan 2 de 10')).toBeInTheDocument();
+      expect(screen.getByText('Venta #55 anulada')).toBeInTheDocument();
+    });
+
     it('si falla la carga muestra el error en la tabla, sin aviso global', async () => {
       useSession('ADMIN');
       stub();

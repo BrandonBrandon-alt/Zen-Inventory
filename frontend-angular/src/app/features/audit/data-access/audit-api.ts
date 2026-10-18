@@ -29,9 +29,11 @@ export interface AuditMovement {
   readonly observations: string;
 }
 
+const isReason = (value: unknown): value is MovementReason => (MOVEMENT_REASONS as readonly unknown[]).includes(value);
+
 function toMovement(raw: InventoryMovement): AuditMovement | null {
   if (typeof raw.id !== 'number' || typeof raw.productId !== 'number' || typeof raw.branchId !== 'number' || typeof raw.quantity !== 'number') return null;
-  if ((raw.type !== 'INGRESO' && raw.type !== 'RETIRO') || !raw.reason) return null;
+  if ((raw.type !== 'INGRESO' && raw.type !== 'RETIRO') || !isReason(raw.reason)) return null;
   const date = raw.date ? new Date(raw.date) : null;
   if (!date || Number.isNaN(date.getTime())) return null;
   return {

@@ -3,14 +3,9 @@ import { Injectable, inject } from '@angular/core';
 import { type Observable, map } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { SKIP_ERROR_NOTIFICATION } from '@core/api/error.interceptor';
-import type { components } from '@core/api/schema';
+import { ALERT_TYPES, type AlertType, type StockAlertResponse, isShowableAlert } from '@core/alerts/alert-types';
 
-type StockAlertResponse = components['schemas']['StockAlertResponse'];
-
-export const ALERT_TYPES = ['LOW_STOCK', 'TRANSFER_REQUEST', 'RETURN_REQUEST', 'PURCHASE_REQUEST', 'ISSUE_REPORTED', 'VOID_SALE'] as const;
-export type AlertType = (typeof ALERT_TYPES)[number];
-
-const isAlertType = (value: unknown): value is AlertType => (ALERT_TYPES as readonly unknown[]).includes(value);
+export { ALERT_TYPES, type AlertType };
 
 /** Alerta abierta con los campos que la app necesita siempre presentes. */
 export interface StockAlert {
@@ -25,8 +20,7 @@ export interface StockAlert {
 export type TransferPriority = 'HIGH' | 'NORMAL' | 'LOW';
 
 function toAlert(raw: StockAlertResponse): StockAlert | null {
-  if (typeof raw.id !== 'number' || typeof raw.branchId !== 'number' || typeof raw.productId !== 'number') return null;
-  if (!raw.message?.trim() || !isAlertType(raw.type)) return null;
+  if (!isShowableAlert(raw)) return null;
   const date = raw.alertDate ? new Date(raw.alertDate) : null;
   return {
     id: raw.id,
