@@ -90,11 +90,11 @@ let nextId = 0;
         aria-label="Calendario"
         [id]="panelId"
         [attr.popover]="supportsPopover ? 'manual' : null"
-        class="m-0 w-[19rem] max-w-[calc(100vw-1rem)] rounded-lg border border-line bg-card p-3 text-fg shadow-2xl animate-alert-in"
+        class="m-0 w-[17.5rem] max-w-[calc(100vw-1rem)] rounded-lg border border-line bg-card p-2.5 text-fg shadow-2xl animate-alert-in"
         style="position: fixed; inset: auto"
         (keydown)="onPanelKeydown($event)"
       >
-        <div class="mb-2 flex items-center justify-between gap-2">
+        <div class="mb-1 flex items-center justify-between gap-2">
           <button type="button" class="flex size-8 cursor-pointer items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none" aria-label="Mes anterior" (click)="moveMonth(-1)">
             <svg lucideChevronLeft [size]="16" aria-hidden="true" />
           </button>
@@ -110,13 +110,13 @@ let nextId = 0;
               <span role="columnheader" [attr.aria-label]="weekday.long" class="py-1">{{ weekday.short }}</span>
             }
           </div>
-          @for (week of weeks(); track $index) {
+          @for (week of visibleWeeks(); track week[0].getTime()) {
             <div role="row" class="grid grid-cols-7">
               @for (day of week; track day.getTime()) {
                 <div role="gridcell" class="flex justify-center" [attr.aria-selected]="isSelected(day)">
                   <button
                     type="button"
-                    class="flex size-9 cursor-pointer items-center justify-center rounded-md text-sm tabular-nums outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/60 disabled:cursor-not-allowed disabled:opacity-30"
+                    class="flex size-8 cursor-pointer items-center justify-center rounded-md text-[13px] tabular-nums outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/60 disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:bg-transparent"
                     [class]="dayClass(day)"
                     [attr.data-day]="key(day)"
                     [attr.tabindex]="isFocused(day) ? 0 : -1"
@@ -133,34 +133,34 @@ let nextId = 0;
           }
         </div>
 
-        @if (showTime()) {
-          <div class="mt-3 flex items-center gap-3 border-t border-line pt-3">
-            <label class="text-[13px] font-medium text-fg-muted" [for]="timeId">Hora</label>
-            <input
-              [id]="timeId"
-              type="time"
-              step="60"
-              class="rounded-md border border-line bg-card px-2.5 py-1.5 text-sm text-fg outline-none transition-[border-color,box-shadow] duration-200 focus:border-brand focus:ring-3 focus:ring-brand/20 disabled:opacity-50"
-              [value]="time()"
-              [disabled]="!value()"
-              (input)="onTime($event)"
-            />
-            @if (!value()) {
-              <span class="text-xs text-fg-subtle">Elige primero un día</span>
+        <div class="mt-2 flex flex-col gap-1.5 border-t border-line pt-2">
+          @if (showTime()) {
+            <div class="flex items-center justify-between gap-2">
+              <span class="flex items-center gap-1.5">
+                <select [class]="timeSelectClass" aria-label="Hora" [disabled]="!value()" (change)="onTimePart('hours', $event)">
+                  @for (hour of hours; track hour) {
+                    <option [value]="hour" [selected]="hour === hourValue()">{{ hour }}</option>
+                  }
+                </select>
+                <span class="text-fg-subtle" aria-hidden="true">:</span>
+                <select [class]="timeSelectClass" aria-label="Minutos" [disabled]="!value()" (change)="onTimePart('minutes', $event)">
+                  @for (minute of minuteOptions(); track minute) {
+                    <option [value]="minute" [selected]="minute === minuteValue()">{{ minute }}</option>
+                  }
+                </select>
+                @if (!value()) {
+                  <span class="text-xs text-fg-subtle">Elige un día</span>
+                }
+              </span>
+              <button type="button" class="cursor-pointer rounded-md bg-brand px-3 py-1.5 text-[13px] font-semibold text-white transition-colors hover:bg-brand/90 focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none" (click)="close(true)">Listo</button>
+            </div>
+          }
+          <div class="flex items-center justify-between gap-2">
+            <button type="button" class="cursor-pointer rounded-md px-2.5 py-1 text-[13px] font-semibold text-brand transition-colors hover:bg-brand/10 focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40" [disabled]="isOutOfRange(today)" (click)="pick(today)">Hoy</button>
+            @if (clearable() && value()) {
+              <button type="button" class="cursor-pointer rounded-md px-2.5 py-1 text-[13px] font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none" (click)="clear()">Quitar fecha</button>
             }
           </div>
-        }
-
-        <div class="mt-3 flex items-center justify-between gap-2 border-t border-line pt-3">
-          <button type="button" class="cursor-pointer rounded-md px-2.5 py-1.5 text-[13px] font-semibold text-brand transition-colors hover:bg-brand/10 focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40" [disabled]="isOutOfRange(today)" (click)="pick(today)">Hoy</button>
-          <span class="flex gap-1">
-            @if (clearable() && value()) {
-              <button type="button" class="cursor-pointer rounded-md px-2.5 py-1.5 text-[13px] font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none" (click)="clear()">Quitar fecha</button>
-            }
-            @if (showTime()) {
-              <button type="button" class="cursor-pointer rounded-md bg-brand px-3 py-1.5 text-[13px] font-semibold text-white transition-colors hover:bg-brand/90 focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none" (click)="close(true)">Listo</button>
-            }
-          </span>
         </div>
       </div>
     }
@@ -191,8 +191,7 @@ export class DatePicker implements ControlValueAccessor, FieldControl {
   protected readonly supportsPopover = typeof HTMLElement !== 'undefined' && typeof HTMLElement.prototype.showPopover === 'function';
 
   readonly id = `app-date-picker-${nextId}`;
-  protected readonly panelId = `app-date-picker-panel-${nextId}`;
-  protected readonly timeId = `app-date-picker-time-${nextId++}`;
+  protected readonly panelId = `app-date-picker-panel-${nextId++}`;
 
   protected readonly weekdays = WEEKDAYS;
   protected readonly today = startOfDay(new Date());
@@ -205,15 +204,26 @@ export class DatePicker implements ControlValueAccessor, FieldControl {
   private readonly formDisabled = signal(false);
   protected readonly isDisabled = computed(() => this.disabled() || this.formDisabled());
 
-  protected readonly weeks = computed(() => monthGrid(this.viewMonth()));
+  /** Cinco semanas; la sexta solo se dibuja si el mes la necesita (así el calendario es más bajo y cabe mejor). */
+  protected readonly visibleWeeks = computed(() => {
+    const month = this.viewMonth().getMonth();
+    return monthGrid(this.viewMonth()).filter((week, index) => index < 5 || week.some((day) => day.getMonth() === month));
+  });
   protected readonly title = computed(() => monthLabel(this.viewMonth()));
   protected readonly label = computed(() => {
     const value = this.value();
     return value ? formatTrigger(value, this.showTime()) : this.placeholder();
   });
-  protected readonly time = computed(() => {
-    const value = this.value();
-    return value ? toTimeValue(value) : '';
+  protected readonly hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+  protected readonly timeSelectClass =
+    'rounded-md border border-line bg-card px-2 py-1 text-sm tabular-nums text-fg outline-none transition-[border-color,box-shadow] duration-200 focus:border-brand focus:ring-3 focus:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-50';
+  protected readonly hourValue = computed(() => String(this.value()?.getHours() ?? 9).padStart(2, '0'));
+  protected readonly minuteValue = computed(() => String(this.value()?.getMinutes() ?? 0).padStart(2, '0'));
+  /** Minutos de cinco en cinco; si la hora elegida trae otro minuto (p. ej. un mínimo de "ahora"), también se ofrece. */
+  protected readonly minuteOptions = computed(() => {
+    const options = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+    const current = this.minuteValue();
+    return options.includes(current) ? options : [...options, current].sort();
   });
 
   private onChange: (value: Date | null) => void = () => undefined;
@@ -336,12 +346,12 @@ export class DatePicker implements ControlValueAccessor, FieldControl {
     this.close(true);
   }
 
-  protected onTime(event: Event): void {
+  protected onTimePart(part: 'hours' | 'minutes', event: Event): void {
     const current = this.value();
     if (!current) return;
-    const typed = (event.target as HTMLInputElement).value;
-    if (!typed) return;
-    this.set(this.clampToMin(withTime(current, typed)));
+    const chosen = (event.target as HTMLSelectElement).value;
+    const time = part === 'hours' ? `${chosen}:${this.minuteValue()}` : `${this.hourValue()}:${chosen}`;
+    this.set(this.clampToMin(withTime(current, time)));
   }
 
   /** Con un mínimo con hora (por ejemplo "ahora"), una hora anterior a él en ese mismo día se sube al mínimo. */

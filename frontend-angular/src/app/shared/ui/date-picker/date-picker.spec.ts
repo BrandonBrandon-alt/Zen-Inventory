@@ -250,17 +250,35 @@ describe('DatePicker', () => {
   });
 
   describe('con hora', () => {
+    const hour = () => screen.getByLabelText('Hora');
+    const minutes = () => screen.getByLabelText('Minutos');
+
     it('elegir un día no cierra el calendario: propone las 09:00 y permite ajustar la hora', async () => {
       const { control } = await setup({ showTime: true });
       await open();
       await userEvent.click(day('viernes, 16 de octubre de 2026'));
       expect(control.value).toEqual(d(2026, 10, 16, 9, 0));
       expect(panel()).toBeInTheDocument();
-      fireEvent.input(screen.getByLabelText('Hora'), { target: { value: '14:45' } });
+      await userEvent.selectOptions(hour(), '14');
+      await userEvent.selectOptions(minutes(), '45');
       expect(control.value).toEqual(d(2026, 10, 16, 14, 45));
       await userEvent.click(screen.getByRole('button', { name: 'Listo' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(screen.getByText('16 oct 2026, 14:45')).toBeInTheDocument();
+    });
+
+    it('la hora es de 24 horas (00 a 23) y los minutos de cinco en cinco', async () => {
+      await setup({ showTime: true, initial: d(2026, 10, 16, 9, 0) });
+      await open();
+      expect(within(hour()).getAllByRole('option')).toHaveLength(24);
+      expect(within(hour()).getAllByRole('option').at(-1)).toHaveTextContent('23');
+      expect(within(minutes()).getAllByRole('option').map((o) => o.textContent)).toEqual(['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55']);
+    });
+
+    it('si la hora trae un minuto que no es múltiplo de cinco, también se ofrece (no se pierde)', async () => {
+      await setup({ showTime: true, initial: d(2026, 10, 16, 9, 7) });
+      await open();
+      expect(minutes()).toHaveValue('07');
     });
 
     it('cambiar de día conserva la hora ya elegida', async () => {
@@ -273,8 +291,9 @@ describe('DatePicker', () => {
     it('la hora está deshabilitada hasta elegir un día', async () => {
       await setup({ showTime: true });
       await open();
-      expect(screen.getByLabelText('Hora')).toBeDisabled();
-      expect(screen.getByText('Elige primero un día')).toBeInTheDocument();
+      expect(hour()).toBeDisabled();
+      expect(minutes()).toBeDisabled();
+      expect(screen.getByText('Elige un día')).toBeInTheDocument();
     });
 
     it('con un mínimo con hora, elegir ese día no deja una hora anterior al mínimo', async () => {
@@ -282,10 +301,10 @@ describe('DatePicker', () => {
       await open();
       await userEvent.click(day('jueves, 15 de octubre de 2026'));
       expect(control.value).toEqual(d(2026, 10, 15, 14, 30)); // las 09:00 propuestas quedaron antes del mínimo
-      fireEvent.input(screen.getByLabelText('Hora'), { target: { value: '08:00' } });
+      await userEvent.selectOptions(hour(), '08');
       expect(control.value).toEqual(d(2026, 10, 15, 14, 30));
-      fireEvent.input(screen.getByLabelText('Hora'), { target: { value: '16:00' } });
-      expect(control.value).toEqual(d(2026, 10, 15, 16, 0));
+      await userEvent.selectOptions(hour(), '16');
+      expect(control.value).toEqual(d(2026, 10, 15, 16, 30));
     });
 
     it('sin hora no hay selector de hora ni botón "Listo"', async () => {
@@ -293,6 +312,21 @@ describe('DatePicker', () => {
       await open();
       expect(screen.queryByLabelText('Hora')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Listo' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('semanas', () => {
+    it('un mes que cabe en cinco semanas dibuja cinco filas (más bajo, cabe mejor)', async () => {
+      await setup(); // octubre de 2026
+      await open();
+      // Una fila de encabezado + cinco de días.
+      expect(within(panel()).getAllByRole('row')).toHaveLength(6);
+    });
+
+    it('un mes que necesita seis semanas dibuja seis filas', async () => {
+      await setup({ initial: d(2026, 8, 10) }); // agosto de 2026 empieza en sábado
+      await open();
+      expect(within(panel()).getAllByRole('row')).toHaveLength(7);
     });
   });
 
