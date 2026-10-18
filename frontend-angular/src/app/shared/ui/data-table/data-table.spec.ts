@@ -272,8 +272,8 @@ describe('DataTable — paginación', () => {
 });
 
 describe('DataTable — estados', () => {
-  it('cargando: muestra un esqueleto (sin filas de datos), marca la tabla como ocupada y lo anuncia', async () => {
-    await setup({ loading: true });
+  it('cargando sin datos: muestra un esqueleto (sin filas de datos), marca la tabla como ocupada y lo anuncia', async () => {
+    await setup({ loading: true, rows: [] });
     expect(screen.getByRole('table')).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByRole('status')).toHaveTextContent('Cargando datos…');
     expect(screen.queryByText('Norte')).not.toBeInTheDocument();
@@ -306,6 +306,43 @@ describe('DataTable — estados', () => {
     await setup({ loading: true, error: 'Falló' });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByRole('status')).toBeInTheDocument();
+  });
+
+  describe('recarga con datos a la vista (cambio de sucursal, filtro…)', () => {
+    const body = () => screen.getAllByRole('rowgroup')[1];
+
+    it('conserva las filas en lugar de volver al esqueleto, atenuadas y sin interacción', async () => {
+      await setup({ loading: true });
+      expect(firstColumn()).toEqual(['Norte', 'Álvaro Sur', 'Alberto Este', 'Zona Ñandú']);
+      expect(body()).toHaveClass('opacity-40');
+      expect(body()).toHaveClass('pointer-events-none');
+      expect(screen.getByRole('table')).toHaveAttribute('aria-busy', 'true');
+    });
+
+    it('muestra la barra de progreso mientras actualiza y desaparece al terminar', async () => {
+      const { container, fixture } = await setup({ loading: true });
+      expect(container.querySelector('.animate-progress')).toBeInTheDocument();
+      (fixture.componentInstance as { loading: boolean }).loading = false;
+      fixture.detectChanges();
+      expect(container.querySelector('.animate-progress')).not.toBeInTheDocument();
+      expect(body()).not.toHaveClass('opacity-40');
+    });
+
+    it('al terminar, el cuerpo vuelve a opacidad completa con una transición (no de golpe)', async () => {
+      await setup({ loading: true });
+      expect(body()).toHaveClass('transition-opacity');
+    });
+
+    it('la paginación sigue visible durante la recarga (no salta el pie de la tabla)', async () => {
+      await setup({ loading: true, pageSize: 2 });
+      expect(screen.getByRole('button', { name: 'Página siguiente' })).toBeInTheDocument();
+    });
+
+    it('sin datos previos sigue siendo un esqueleto, sin barra de progreso', async () => {
+      const { container } = await setup({ loading: true, rows: [] });
+      expect(container.querySelector('.animate-progress')).not.toBeInTheDocument();
+      expect(screen.queryByText('Norte')).not.toBeInTheDocument();
+    });
   });
 });
 

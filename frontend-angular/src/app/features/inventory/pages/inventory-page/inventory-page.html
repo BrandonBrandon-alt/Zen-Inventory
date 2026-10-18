@@ -1,7 +1,7 @@
 <header class="mb-6 flex animate-enter flex-wrap items-start justify-between gap-4">
   <div>
     <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Inventario</h1>
-    @if (!loading() && !error() && items().length > 0) {
+    @if (!error() && items().length > 0) {
       <p class="mt-1 text-sm text-fg-subtle">{{ summary() }}</p>
     }
   </div>

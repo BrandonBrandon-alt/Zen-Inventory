@@ -53,7 +53,7 @@
 
   body {
     min-height: 100vh;
-    background: var(--bg-base);
+    background: var(--neutral-100);
     color: var(--neutral-100);
     font-family: var(--font-sans);
     font-size: 15px;

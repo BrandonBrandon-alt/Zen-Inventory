@@ -130,6 +130,18 @@
   /* Los enlaces del menú oculto entran en cascada cuando el menú se abre (el retraso lo da --i, su posición). */
   --animate-nav-in: navIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--i, 0) * 22ms + 60ms) backwards;
 
+  /* Barra fina de "actualizando" sobre una tabla que ya tenía datos. */
+  --animate-progress: progressSlide 1.1s ease-in-out infinite;
+
+  @keyframes progressSlide {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
+  }
+
   @keyframes navIn {
     from {
       opacity: 0;

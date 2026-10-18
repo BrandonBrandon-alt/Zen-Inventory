@@ -112,6 +112,11 @@ export class DataTable<T> {
 
   private readonly templates = computed(() => new Map(this.cells().map((cell) => [cell.name(), cell.template])));
 
+  /** Primera carga (o tabla vacía): se dibuja el esqueleto. */
+  protected readonly skeleton = computed(() => this.loading() && (this.rows().length === 0 || !!this.error()));
+  /** Recarga con datos ya a la vista (cambio de sucursal, filtro…): se conservan atenuados hasta que llegan los nuevos. */
+  protected readonly refreshing = computed(() => this.loading() && this.rows().length > 0 && !this.error());
+
   protected readonly sortedRows = computed(() => {
     const sort = this.sort();
     const column = sort ? this.columns().find((c) => c.key === sort.key) : undefined;
