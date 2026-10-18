@@ -55,3 +55,9 @@ Tres capas de testing:
   caché de Vitest que puede ejecutar código fuente desactualizado y dar falsos verdes.
 - El E2E **solo a pedido explícito**: los flujos de negocio necesitan el backend real en `localhost:8080`.
 - Un cambio en el contrato del backend: `npm run openapi:gen` y corregir lo que deje de compilar.
+
+## Integración continua
+
+`.github/workflows/ci.yml` corre en cada PR y en `master`: backend (`./mvnw test`, sin base de datos) y frontend
+Angular (`npm run lint`, `npm test`, `npm run build`, que falla si el arranque pasa del presupuesto de `angular.json`).
+El E2E de Playwright no está en CI: necesita el backend real.
