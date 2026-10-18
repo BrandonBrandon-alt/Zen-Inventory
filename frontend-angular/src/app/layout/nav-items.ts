@@ -15,6 +15,7 @@ import {
   LucideUsers,
   type LucideIconData,
 } from '@lucide/angular';
+import { ALERT_ROLES } from '@core/alerts/alert-count';
 import { ROLES, type Role } from '@core/auth/roles/role';
 
 export interface NavItem {
@@ -23,6 +24,8 @@ export interface NavItem {
   readonly path: string;
   readonly icon: LucideIconData;
   readonly roles: readonly Role[];
+  /** Muestra en el menú cuántas alertas activas hay junto a este ítem. */
+  readonly alertBadge?: boolean;
 }
 
 export interface NavSection {
@@ -33,8 +36,6 @@ export interface NavSection {
 const EVERYONE: readonly Role[] = ROLES;
 const MANAGEMENT: readonly Role[] = ['ADMIN', 'MANAGER', 'SELLER'];
 const ADMIN_ONLY: readonly Role[] = ['ADMIN'];
-/** Las alertas son de gerencia y de inventario (el backend rechaza al vendedor). */
-const ALERT_ROLES: readonly Role[] = ['ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO'];
 /** Quienes administran usuarios: el ADMIN (todos) y el MANAGER (los de su sucursal). */
 const USER_ADMINS: readonly Role[] = ['ADMIN', 'MANAGER'];
 
@@ -45,7 +46,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     items: [
       { label: 'Panel', path: '/dashboard', icon: LucideLayoutDashboard.icon, roles: EVERYONE },
       { label: 'Inventario', path: '/inventory', icon: LucideLayers.icon, roles: EVERYONE },
-      { label: 'Alertas', path: '/alerts', icon: LucideBell.icon, roles: ALERT_ROLES },
+      { label: 'Alertas', path: '/alerts', icon: LucideBell.icon, roles: ALERT_ROLES, alertBadge: true },
       { label: 'Traslados', path: '/transfers', icon: LucideShuffle.icon, roles: EVERYONE },
       { label: 'Compras', path: '/purchases', icon: LucideShoppingBag.icon, roles: EVERYONE },
       { label: 'Ventas', path: '/sales/pos', icon: LucideReceipt.icon, roles: EVERYONE },

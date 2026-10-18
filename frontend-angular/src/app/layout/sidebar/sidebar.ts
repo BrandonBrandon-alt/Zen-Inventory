@@ -12,11 +12,12 @@ import {
   LucideX,
 } from '@lucide/angular';
 import { LOGIN_URL } from '@core/auth/auth-urls';
+import { AlertCount } from '@core/alerts/alert-count';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { Logo } from '@shared/ui/logo/logo';
 import { ThemeToggle } from '@shared/ui/theme-toggle/theme-toggle';
 import { MobileMenu } from '../mobile-menu';
-import { navSectionsFor } from '../nav-items';
+import { type NavItem, navSectionsFor } from '../nav-items';
 import {
   SIDEBAR_COLLAPSED_WIDTH,
   SIDEBAR_MAX_WIDTH,
@@ -78,6 +79,7 @@ export class Sidebar {
   protected readonly state = inject(SidebarState);
   protected readonly viewport = inject(Viewport);
   protected readonly menu = inject(MobileMenu);
+  protected readonly alertCount = inject(AlertCount).count;
 
   protected readonly minWidth = SIDEBAR_MIN_WIDTH;
   protected readonly maxWidth = SIDEBAR_MAX_WIDTH;
@@ -188,6 +190,16 @@ export class Sidebar {
   private clearHideTimer(): void {
     if (this.hideTimer) clearTimeout(this.hideTimer);
     this.hideTimer = null;
+  }
+
+  /** Texto de la insignia: más de 99 se resume como "99+". */
+  protected badgeText(count: number): string {
+    return count > 99 ? '99+' : String(count);
+  }
+
+  protected linkLabel(item: NavItem): string {
+    const count = item.alertBadge ? this.alertCount() : 0;
+    return count > 0 ? `${item.label}, ${count} ${count === 1 ? 'activa' : 'activas'}` : item.label;
   }
 
   protected logout(): void {

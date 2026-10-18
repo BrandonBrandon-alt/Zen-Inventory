@@ -4,6 +4,8 @@ import { fireEvent, render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { signal } from '@angular/core';
+import { AlertCount } from '@core/alerts/alert-count';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { ThemeService } from '@core/theme/theme.service';
 import { BranchLabelApi } from '../data-access/branch-label-api';
@@ -19,15 +21,22 @@ import { Sidebar } from './sidebar';
 
 const sessionFor = (rol: string) => ({ token: 't', email: 'e', nombre: 'Ana', rol, id: 1, sucursalId: 3 });
 
+const alertTotal = signal(0);
+
 async function renderSidebar(rol: string) {
   return render(Sidebar, {
-    providers: [provideRouter([]), { provide: BranchLabelApi, useValue: { labelFor: () => of('Norte') } }],
+    providers: [
+      provideRouter([]),
+      { provide: BranchLabelApi, useValue: { labelFor: () => of('Norte') } },
+      { provide: AlertCount, useValue: { count: alertTotal.asReadonly(), refresh: () => undefined } },
+    ],
     configureTestBed: (bed) => bed.inject(AuthStore).start(sessionFor(rol)),
   });
 }
 
 describe('Sidebar', () => {
   beforeEach(() => {
+    alertTotal.set(0);
     localStorage.clear();
     delete document.documentElement.dataset['theme'];
   });
@@ -421,6 +430,47 @@ describe('Sidebar', () => {
         await renderHidden();
         expect(screen.getByRole('button', { name: 'Abrir menú' })).toHaveAttribute('aria-keyshortcuts', 'Control+S Meta+S');
       });
+    });
+  });
+
+  describe('insignia de alertas', () => {
+    it('muestra cuántas alertas activas hay junto a "Alertas" y lo anuncia en su nombre accesible', async () => {
+      alertTotal.set(7);
+      await renderSidebar('ADMIN');
+      const link = screen.getByRole('link', { name: 'Alertas, 7 activas' });
+      expect(link).toHaveTextContent('7');
+    });
+
+    it('con una sola alerta lo dice en singular', async () => {
+      alertTotal.set(1);
+      await renderSidebar('ADMIN');
+      expect(screen.getByRole('link', { name: 'Alertas, 1 activa' })).toBeInTheDocument();
+    });
+
+    it('sin alertas no muestra insignia y el nombre queda limpio', async () => {
+      await renderSidebar('ADMIN');
+      expect(screen.getByRole('link', { name: 'Alertas' })).toHaveTextContent(/^\s*Alertas\s*$/);
+    });
+
+    it('más de 99 se resume como "99+"', async () => {
+      alertTotal.set(150);
+      await renderSidebar('ADMIN');
+      expect(screen.getByRole('link', { name: 'Alertas, 150 activas' })).toHaveTextContent('99+');
+    });
+
+    it('con el menú contraído la insignia sigue visible sobre el icono', async () => {
+      alertTotal.set(4);
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, 'true');
+      await renderSidebar('ADMIN');
+      const link = screen.getByRole('link', { name: 'Alertas, 4 activas' });
+      expect(link).toHaveTextContent('4');
+      expect(link).not.toHaveTextContent('Alertas');
+    });
+
+    it('solo "Alertas" lleva insignia', async () => {
+      alertTotal.set(3);
+      await renderSidebar('ADMIN');
+      expect(screen.getByRole('link', { name: 'Inventario' })).not.toHaveTextContent('3');
     });
   });
 });

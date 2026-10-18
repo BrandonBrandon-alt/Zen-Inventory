@@ -18,6 +18,7 @@ import {
   type LucideIconData,
 } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
+import { AlertCount } from '@core/alerts/alert-count';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { CatalogOptionsApi } from '@core/catalog/catalog-options-api';
@@ -67,6 +68,7 @@ export class AlertsPage {
   private readonly branchApi = inject(BranchOptionsApi);
   private readonly catalog = inject(CatalogOptionsApi);
   private readonly notifications = inject(NotificationService);
+  private readonly alertCount = inject(AlertCount);
   private readonly role = inject(AuthStore).role;
 
   protected readonly rowKey = rowKey;
@@ -156,6 +158,8 @@ export class AlertsPage {
     this.error.set(null);
     try {
       this.alerts.set(await firstValueFrom(this.api.list(this.isAdmin() ? this.branchFilter() : null)));
+      // La insignia del menú cuenta todas las alertas, no solo las de la sucursal filtrada: se le pide el dato aparte.
+      if (silent) this.alertCount.refresh();
     } catch (error) {
       this.error.set(toApiError(error).message);
     } finally {

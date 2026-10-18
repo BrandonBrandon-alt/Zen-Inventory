@@ -3,7 +3,9 @@ import { TestBed } from '@angular/core/testing';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AlertCount } from '@core/alerts/alert-count';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { errorInterceptor } from '@core/api/error.interceptor';
 import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
@@ -48,13 +50,25 @@ function stub(alerts: unknown[] = ALERTS) {
   );
 }
 
+// La insignia del menú tiene su propia prueba: aquí se aísla para contar solo las peticiones de la pantalla.
+const refreshBadge = vi.fn();
+
 const renderPage = () =>
-  render(AlertsPage, { providers: [provideHttpClient(withInterceptors([errorInterceptor])), { provide: API_BASE_URL, useValue: TEST_API }] });
+  render(AlertsPage, {
+    providers: [
+      provideHttpClient(withInterceptors([errorInterceptor])),
+      { provide: API_BASE_URL, useValue: TEST_API },
+      { provide: AlertCount, useValue: { count: signal(0).asReadonly(), refresh: refreshBadge } },
+    ],
+  });
 
 const products = () => screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[1]?.textContent?.trim());
 
 describe('AlertsPage', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    refreshBadge.mockClear();
+  });
   afterEach(() => localStorage.clear());
 
   describe('lista', () => {
@@ -157,6 +171,7 @@ describe('AlertsPage', () => {
       await userEvent.click(screen.getByRole('button', { name: /Revisar stock/ }));
       await vi.waitFor(() => expect(lists).toBe(2));
       expect(scans).toBe(1);
+      expect(refreshBadge).toHaveBeenCalledTimes(1); // la insignia del menú se actualiza
       expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ kind: 'success', message: 'Revisión de stock completada.' });
     });
   });
@@ -208,6 +223,7 @@ describe('AlertsPage', () => {
       await vi.waitFor(() => expect(body).toEqual({ originBranchId: 20, quantity: 5, priority: 'NORMAL' }));
       await vi.waitFor(() => expect(lists).toBe(2));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(refreshBadge).toHaveBeenCalledTimes(1);
       expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ kind: 'success' });
     });
 

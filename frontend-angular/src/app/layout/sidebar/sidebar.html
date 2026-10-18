@@ -71,12 +71,21 @@
               ariaCurrentWhenActive="page"
               class="relative flex items-center gap-3 rounded-md py-2.5 text-sm text-fg-muted transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
               [class]="compact() ? 'justify-center px-3' : 'px-3'"
-              [attr.aria-label]="item.label"
+              [attr.aria-label]="linkLabel(item)"
               [attr.title]="compact() ? item.label : null"
             >
               <svg [lucideIcon]="item.icon" [size]="18" [strokeWidth]="1.8" class="shrink-0" />
               @if (!compact()) {
                 <span class="truncate">{{ item.label }}</span>
+              }
+              @if (item.alertBadge && alertCount() > 0) {
+                <!-- Insignia de alertas activas: junto al texto, o sobre el icono cuando el menú está contraído. -->
+                <span
+                  class="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-brand px-1 text-[10px] leading-none font-bold text-white tabular-nums"
+                  [class]="compact() ? 'absolute top-1 right-2 ring-2 ring-base' : 'ml-auto'"
+                  aria-hidden="true"
+                  >{{ badgeText(alertCount()) }}</span
+                >
               }
             </a>
           </li>
