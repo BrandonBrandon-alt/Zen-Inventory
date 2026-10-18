@@ -8,6 +8,7 @@ import { errorInterceptor } from '@core/api/error.interceptor';
 import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
 import { chooseOption } from '@testing/select-helpers';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
+import { PrintService } from '@shared/print/print.service';
 import { PosPage } from './pos-page';
 
 const PRODUCTS = [
@@ -56,8 +57,15 @@ function stub(options: { lists?: unknown[] | 403; stock?: unknown[] } = {}) {
   );
 }
 
+const printed: string[] = [];
 const renderPage = () =>
-  render(PosPage, { providers: [provideHttpClient(withInterceptors([errorInterceptor])), { provide: API_BASE_URL, useValue: TEST_API }] });
+  render(PosPage, {
+    providers: [
+      provideHttpClient(withInterceptors([errorInterceptor])),
+      { provide: API_BASE_URL, useValue: TEST_API },
+      { provide: PrintService, useValue: { print: (html: string) => printed.push(html) } },
+    ],
+  });
 
 const add = async (name: string) => userEvent.click(await screen.findByRole('button', { name: `Agregar ${name}` }));
 const cart = () => screen.getByRole('region', { name: 'Venta actual' });
@@ -269,6 +277,11 @@ describe('PosPage', () => {
       // La caja queda limpia y el stock se vuelve a pedir.
       expect(screen.getByText('Aún no hay productos.')).toBeInTheDocument();
       await vi.waitFor(() => expect(catalogCalls).toBe(2));
+      // Al registrar la venta se puede imprimir la factura.
+      printed.length = 0;
+      await userEvent.click(within(receipt).getByRole('button', { name: 'Imprimir factura' }));
+      expect(printed).toHaveLength(1);
+      expect(printed[0]).toContain('FACTURA DE VENTA N° 000055');
       await userEvent.click(within(receipt).getByRole('button', { name: 'Nueva venta' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });

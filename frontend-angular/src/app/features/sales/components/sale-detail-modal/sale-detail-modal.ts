@@ -1,8 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, model, output, signal, untracked } from '@angular/core';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { LucidePrinter } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '@core/api/api-error';
 import { NotificationService } from '@core/notifications/notification.service';
+import { PrintService } from '@shared/print/print.service';
 import { formatDateTime, formatMoney, formatQuantity } from '@shared/format/format';
 import { controlError } from '@shared/forms/control-error';
 import { Alert } from '@shared/ui/alert/alert';
@@ -11,6 +13,7 @@ import { Button } from '@shared/ui/button/button';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Modal } from '@shared/ui/modal/modal';
 import { SALE_INFO, customerLabel } from '../../data-access/sale-labels';
+import { buildSaleReceiptHtml } from '../../data-access/sale-receipt';
 import { type Sale, SalesApi } from '../../data-access/sales-api';
 
 type Mode = 'view' | 'cancel';
@@ -21,7 +24,7 @@ type Mode = 'view' | 'cancel';
  */
 @Component({
   selector: 'app-sale-detail-modal',
-  imports: [ReactiveFormsModule, Modal, Button, Alert, Badge, FormField, InputDirective],
+  imports: [ReactiveFormsModule, Modal, Button, Alert, Badge, FormField, InputDirective, LucidePrinter],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sale-detail-modal.html',
 })
@@ -29,6 +32,7 @@ export class SaleDetailModal {
   private readonly api = inject(SalesApi);
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly notifications = inject(NotificationService);
+  private readonly printer = inject(PrintService);
 
   readonly open = model(false);
   readonly sale = input<Sale | null>(null);
@@ -71,6 +75,12 @@ export class SaleDetailModal {
         this.reasonForm.reset({ reason: '' });
       });
     });
+  }
+
+  /** Imprime la factura de venta (tiquete de 80 mm) de la venta abierta. */
+  protected printReceipt(): void {
+    const sale = this.sale();
+    if (sale) this.printer.print(buildSaleReceiptHtml(sale));
   }
 
   protected reasonError(): string | null {

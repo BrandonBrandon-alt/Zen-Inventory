@@ -10,6 +10,7 @@ import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
 import { NotificationService } from '@core/notifications/notification.service';
 import { chooseOption } from '@testing/select-helpers';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
+import { PrintService } from '@shared/print/print.service';
 import { SalesHistoryPage } from './sales-history-page';
 
 const sale = (id: number, status: string, extra: object = {}) => ({
@@ -49,8 +50,15 @@ function stub(sales: unknown[] = SALES) {
   server.use(http.get(URL_S, () => HttpResponse.json(sales)), http.get(`${TEST_API}/api/branches`, () => HttpResponse.json(BRANCHES)));
 }
 
+const printed: string[] = [];
 const renderPage = () =>
-  render(SalesHistoryPage, { providers: [provideHttpClient(withInterceptors([errorInterceptor])), { provide: API_BASE_URL, useValue: TEST_API }] });
+  render(SalesHistoryPage, {
+    providers: [
+      provideHttpClient(withInterceptors([errorInterceptor])),
+      { provide: API_BASE_URL, useValue: TEST_API },
+      { provide: PrintService, useValue: { print: (html: string) => printed.push(html) } },
+    ],
+  });
 
 const ids = () => screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0]?.textContent?.trim());
 
@@ -183,6 +191,22 @@ describe('SalesHistoryPage', () => {
       expect(column(rows[2])).toHaveTextContent('− $ 100');
       expect(column(rows[3])).toHaveTextContent('$ 4.900');
       for (const cell of rows.map(column)) expect(cell).toHaveClass('text-right');
+    });
+
+    it('imprime la factura de una venta completada, pero no la de una anulada', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      printed.length = 0;
+      await renderPage();
+      const dialog = await openDetail(1);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Imprimir factura' }));
+      expect(printed).toHaveLength(1);
+      expect(printed[0]).toContain('FACTURA DE VENTA N° 000001');
+      expect(printed[0]).toContain('Tornillo');
+      await userEvent.click(within(dialog).getAllByRole('button', { name: 'Cerrar' }).at(-1) as HTMLElement);
+      await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      const canceled = await openDetail(2);
+      expect(within(canceled).queryByRole('button', { name: 'Imprimir factura' })).not.toBeInTheDocument();
     });
 
     it('una venta anulada muestra el motivo y no ofrece anular otra vez', async () => {

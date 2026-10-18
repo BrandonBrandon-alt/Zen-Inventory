@@ -85,6 +85,12 @@
       @if (cancellable()) {
         <button appButton variant="ghost-danger" type="button" [disabled]="busy()" (click)="goto('cancel')">Anular venta</button>
       }
+      @if (sale()?.status === 'COMPLETED') {
+        <button appButton variant="ghost" type="button" (click)="printReceipt()">
+          <svg lucidePrinter [size]="16" aria-hidden="true"></svg>
+          Imprimir factura
+        </button>
+      }
       <button appButton [variant]="created() ? 'primary' : 'ghost'" type="button" (click)="open.set(false)">{{ created() ? 'Nueva venta' : 'Cerrar' }}</button>
     } @else {
       <button appButton variant="ghost" type="button" [disabled]="busy()" (click)="goto('view')">Volver</button>
