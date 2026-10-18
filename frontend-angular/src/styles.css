@@ -116,3 +116,14 @@
     font-weight: 400;
   }
 }
+
+/* Campos numéricos: sin las flechitas nativas (se ven distintas en cada navegador y se activan con un clic o la
+   rueda del ratón sin querer). `app-form-field` dibuja sus propios botones − y +. */
+input[type='number'] {
+  appearance: textfield;
+}
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
