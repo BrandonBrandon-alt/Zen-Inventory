@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, model, output, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { LucideArrowDownToLine, LucideArrowUpFromLine, LucideTriangleAlert } from '@lucide/angular';
+import { Router } from '@angular/router';
+import { LucideArrowDownToLine, LucideArrowRight, LucideArrowUpFromLine, LucideDynamicIcon, LucideTriangleAlert } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { NotificationService } from '@core/notifications/notification.service';
 import { formatQuantity } from '@shared/format/format';
@@ -14,7 +15,7 @@ import { Modal } from '@shared/ui/modal/modal';
 import { Select } from '@shared/ui/select/select';
 import { type TabItem, Tabs } from '@shared/ui/tabs/tabs';
 import { type InventoryItem, InventoryApi, type MovementReason, type MovementType } from '../../data-access/inventory-api';
-import { MANUAL_REASONS, MIN_JUSTIFICATION_LENGTH, SHRINKAGE_CATEGORIES, requiresJustification } from '../../data-access/inventory-labels';
+import { GUIDED_REASONS, MANUAL_REASONS, MIN_JUSTIFICATION_LENGTH, SHRINKAGE_CATEGORIES, requiresJustification } from '../../data-access/inventory-labels';
 
 const TYPE_TABS: readonly TabItem[] = [
   { id: 'INGRESO', label: 'Ingreso', icon: LucideArrowDownToLine.icon },
@@ -37,7 +38,7 @@ let nextId = 0;
 /** Ajuste manual de existencias de un producto: ingreso o retiro, con su motivo y la justificación que queda en el kardex. */
 @Component({
   selector: 'app-adjust-stock-modal',
-  imports: [ReactiveFormsModule, Modal, Button, Alert, FormField, InputDirective, Select, Tabs],
+  imports: [ReactiveFormsModule, Modal, Button, Alert, FormField, InputDirective, Select, Tabs, LucideArrowRight, LucideDynamicIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-modal
@@ -57,6 +58,19 @@ let nextId = 0;
           <app-select formControlName="reason" [options]="reasonOptions()" placeholder="Selecciona un motivo" />
         </app-form-field>
 
+        @if (guided(); as g) {
+          <section class="flex flex-col items-center gap-3 rounded-lg border border-line bg-surface p-5 text-center" aria-live="polite">
+            <span class="flex size-10 items-center justify-center rounded-full bg-brand/15 text-brand">
+              <svg [lucideIcon]="g.icon!" [size]="20" aria-hidden="true"></svg>
+            </span>
+            <h3 class="font-title text-base font-bold text-fg">Este movimiento se registra en otra pantalla</h3>
+            <p class="max-w-prose text-sm text-fg-muted">{{ g.explanation }}</p>
+            <button appButton type="button" (click)="goTo(g.path)">
+              {{ g.action }}
+              <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
+            </button>
+          </section>
+        } @else {
         @if (isShrinkage()) {
           <app-form-field label="Categoría de la merma" [error]="error('subReason')">
             <app-select formControlName="subReason" [options]="categories" [icon]="warningIcon" placeholder="Selecciona una categoría" />
@@ -81,10 +95,13 @@ let nextId = 0;
         <app-form-field [label]="justificationRequired() ? 'Justificación' : 'Observaciones (opcional)'" [error]="error('observations')">
           <textarea appInput rows="3" formControlName="observations" [attr.maxlength]="500"></textarea>
         </app-form-field>
+        }
       </form>
       <div data-slot="footer">
         <button appButton variant="ghost" type="button" [disabled]="saving()" (click)="open.set(false)">Cancelar</button>
-        <button appButton type="submit" [attr.form]="formId" [loading]="saving()">Registrar movimiento</button>
+        @if (!guided()) {
+          <button appButton type="submit" [attr.form]="formId" [loading]="saving()">Registrar movimiento</button>
+        }
       </div>
     </app-modal>
   `,
@@ -92,6 +109,7 @@ let nextId = 0;
 export class AdjustStockModal {
   private readonly api = inject(InventoryApi);
   private readonly notifications = inject(NotificationService);
+  private readonly router = inject(Router);
 
   readonly open = model(false);
   readonly product = input<InventoryItem | null>(null);
@@ -118,7 +136,9 @@ export class AdjustStockModal {
     observations: [''],
   });
 
-  protected readonly reasonOptions = computed(() => MANUAL_REASONS[this.type()]);
+  protected readonly reasonOptions = computed(() => [...MANUAL_REASONS[this.type()], ...GUIDED_REASONS[this.type()]]);
+  /** El motivo elegido se registra en otra pantalla: en vez del formulario se muestra a dónde ir. */
+  protected readonly guided = computed(() => GUIDED_REASONS[this.type()].find((g) => g.value === this.reasonValue()) ?? null);
   protected readonly isShrinkage = computed(() => this.reasonValue() === 'MERMA');
   protected readonly justificationRequired = computed(() => requiresJustification(this.reasonValue()));
   /** El costo solo se ofrece en ingresos por ajuste: una devolución de cliente no es una compra y no altera el costo promedio. */
@@ -148,6 +168,11 @@ export class AdjustStockModal {
     });
     this.form.controls.quantity.valueChanges.pipe(takeUntilDestroyed()).subscribe((quantity) => this.quantityValue.set(quantity));
     this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.serverError.set(null));
+  }
+
+  protected goTo(path: string): void {
+    this.open.set(false);
+    void this.router.navigateByUrl(path);
   }
 
   protected setType(id: string): void {
@@ -183,7 +208,7 @@ export class AdjustStockModal {
   protected submit(): void {
     this.form.markAllAsTouched();
     const product = this.product();
-    if (this.form.invalid || this.saving() || !product) return;
+    if (this.form.invalid || this.saving() || !product || this.guided()) return;
 
     const value = this.form.getRawValue();
     const type = this.type();

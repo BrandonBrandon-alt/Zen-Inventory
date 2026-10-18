@@ -1,4 +1,4 @@
-import { LucideClipboardCheck, LucideTriangleAlert, LucideUndo2 } from '@lucide/angular';
+import { LucideClipboardCheck, LucideReceipt, LucideShoppingCart, LucideTriangleAlert, LucideTruck, LucideUndo2 } from '@lucide/angular';
 import type { SelectOption } from '@shared/ui/select/select';
 import type { MovementReason, MovementType } from './inventory-api';
 
@@ -37,6 +37,62 @@ export const MANUAL_REASONS: Record<MovementType, readonly SelectOption<Movement
   RETIRO: [
     { value: 'MERMA', label: 'Merma / daño', description: 'Pérdida por daño, vencimiento o robo', icon: LucideTriangleAlert.icon },
     { value: 'AJUSTE_NEGATIVO', label: 'Ajuste de auditoría (−)', description: 'Corrección tras un conteo físico', icon: LucideClipboardCheck.icon },
+  ],
+};
+
+/** Un motivo que no se registra aquí: tiene su propia pantalla, que además genera el documento que respalda el movimiento. */
+export interface GuidedReason extends SelectOption<MovementReason> {
+  /** Pantalla donde se registra. */
+  readonly path: string;
+  /** Texto del botón que lleva allí. */
+  readonly action: string;
+  readonly explanation: string;
+}
+
+/**
+ * Motivos que aparecen en la lista para que se sepa dónde se hacen, pero que no se guardan desde el ajuste manual:
+ * al elegirlos, el diálogo explica por qué y lleva a la pantalla correspondiente.
+ */
+export const GUIDED_REASONS: Record<MovementType, readonly GuidedReason[]> = {
+  INGRESO: [
+    {
+      value: 'COMPRA',
+      label: 'Compra a proveedor',
+      description: 'Se registra en Compras',
+      icon: LucideShoppingCart.icon,
+      path: '/purchases',
+      action: 'Ir a Compras',
+      explanation: 'El ingreso por compra se registra con una orden de compra: así queda el documento, se actualiza el costo promedio y se controla lo que falta por recibir.',
+    },
+    {
+      value: 'TRASLADO',
+      label: 'Traslado recibido',
+      description: 'Se registra en Traslados',
+      icon: LucideTruck.icon,
+      path: '/transfers',
+      action: 'Ir a Traslados',
+      explanation: 'El movimiento entre sucursales se gestiona desde Traslados: así se descuenta del origen, se sigue en tránsito y se confirma lo recibido.',
+    },
+  ],
+  RETIRO: [
+    {
+      value: 'VENTA',
+      label: 'Venta a cliente',
+      description: 'Se registra en el punto de venta',
+      icon: LucideReceipt.icon,
+      path: '/sales/pos',
+      action: 'Ir al punto de venta',
+      explanation: 'Las salidas por venta se hacen en el punto de venta: así queda la factura y el stock se descuenta ligado a ella.',
+    },
+    {
+      value: 'TRASLADO',
+      label: 'Traslado enviado',
+      description: 'Se registra en Traslados',
+      icon: LucideTruck.icon,
+      path: '/transfers',
+      action: 'Ir a Traslados',
+      explanation: 'El movimiento entre sucursales se gestiona desde Traslados: así se descuenta del origen, se sigue en tránsito y se confirma lo recibido.',
+    },
   ],
 };
 

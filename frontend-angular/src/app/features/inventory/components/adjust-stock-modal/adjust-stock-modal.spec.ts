@@ -1,6 +1,7 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
-import { render, screen } from '@testing-library/angular';
+import { Router } from '@angular/router';
+import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -25,12 +26,14 @@ interface Props {
   onSaved: ReturnType<typeof vi.fn>;
 }
 
+const navigateByUrl = vi.fn(async () => true);
+
 async function setup(props: Partial<Props> = {}) {
   const componentProperties: Props = { open: true, product: PRODUCT, onSaved: vi.fn(), ...props };
   const result = await render(TEMPLATE, {
     imports: [AdjustStockModal],
     componentProperties,
-    providers: [provideHttpClient(withInterceptors([errorInterceptor])), { provide: API_BASE_URL, useValue: TEST_API }],
+    providers: [provideHttpClient(withInterceptors([errorInterceptor])), { provide: API_BASE_URL, useValue: TEST_API }, { provide: Router, useValue: { navigateByUrl } }],
   });
   const host = result.fixture.componentInstance as unknown as Props;
   const update = async (changes: Partial<Props>) => {
@@ -48,12 +51,68 @@ const submit = () => screen.getByRole('button', { name: 'Registrar movimiento' }
 
 describe('AdjustStockModal', () => {
   beforeEach(() => {
+    navigateByUrl.mockClear();
     localStorage.clear();
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token: 't', email: 'a@z.co', nombre: 'Ana', rol: 'MANAGER', id: 5, sucursalId: 3 }));
   });
   afterEach(() => {
     localStorage.clear();
     document.body.style.overflow = '';
+  });
+
+  describe('movimientos que se registran en otra pantalla', () => {
+    it('Compra y Traslado aparecen entre los motivos de un ingreso, y Venta y Traslado en un retiro', async () => {
+      await setup();
+      await userEvent.click(screen.getByRole('combobox', { name: 'Motivo' }));
+      expect(screen.getAllByRole('option').map((o) => o.textContent?.trim())).toEqual(
+        expect.arrayContaining([expect.stringContaining('Compra a proveedor'), expect.stringContaining('Traslado recibido')]),
+      );
+      await userEvent.keyboard('{Escape}');
+      await userEvent.click(screen.getByRole('tab', { name: 'Retiro' }));
+      await userEvent.click(screen.getByRole('combobox', { name: 'Motivo' }));
+      expect(screen.getAllByRole('option').map((o) => o.textContent?.trim())).toEqual(
+        expect.arrayContaining([expect.stringContaining('Venta a cliente'), expect.stringContaining('Traslado enviado')]),
+      );
+    });
+
+    it('al elegir Compra explica por qué y lleva a Compras; no se puede registrar el movimiento aquí', async () => {
+      let posted = false;
+      server.use(http.post(`${TEST_API}/api/v1/inventory/branches/3/products/7/add`, () => ((posted = true), HttpResponse.json({}))));
+      const { host } = await setup();
+      await chooseOption('Motivo', 'Compra a proveedor');
+      const dialog = screen.getByRole('dialog', { name: 'Ajustar stock' });
+      expect(within(dialog).getByText(/orden de compra/)).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Cantidad a/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Registrar movimiento' })).not.toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('button', { name: /Ir a Compras/ }));
+      expect(navigateByUrl).toHaveBeenCalledWith('/purchases');
+      expect(host.open).toBe(false);
+      expect(posted).toBe(false);
+    });
+
+    it('Traslado lleva a Traslados', async () => {
+      await setup();
+      await chooseOption('Motivo', 'Traslado recibido');
+      await userEvent.click(screen.getByRole('button', { name: /Ir a Traslados/ }));
+      expect(navigateByUrl).toHaveBeenLastCalledWith('/transfers');
+    });
+
+    it('Venta lleva al punto de venta', async () => {
+      await setup();
+      await userEvent.click(screen.getByRole('tab', { name: 'Retiro' }));
+      await chooseOption('Motivo', 'Venta a cliente');
+      await userEvent.click(screen.getByRole('button', { name: /Ir al punto de venta/ }));
+      expect(navigateByUrl).toHaveBeenLastCalledWith('/sales/pos');
+    });
+
+    it('volver a un motivo manual devuelve el formulario', async () => {
+      await setup();
+      await chooseOption('Motivo', 'Compra a proveedor');
+      expect(screen.queryByLabelText(/Cantidad a/)).not.toBeInTheDocument();
+      await chooseOption('Motivo', 'Ajuste de auditoría (+)');
+      expect(quantity()).toBeInTheDocument();
+      expect(submit()).toBeInTheDocument();
+    });
   });
 
   describe('modos y motivos', () => {
