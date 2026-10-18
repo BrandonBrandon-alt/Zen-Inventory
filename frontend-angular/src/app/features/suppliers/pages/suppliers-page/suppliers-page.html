@@ -1,0 +1,48 @@
+<header class="mb-6 flex animate-enter flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Proveedores</h1>
+    @if (!loading() && !error() && suppliers().length > 0) {
+      <p class="mt-1 text-sm text-fg-subtle">{{ summary() }}</p>
+    }
+  </div>
+  <button appButton type="button" (click)="openCreate()"><svg lucidePlus [size]="16" />Nuevo proveedor</button>
+</header>
+
+<app-data-table
+  exportName="proveedores"
+  persistKey="proveedores"
+  class="block animate-enter-delayed"
+  caption="Listado de proveedores"
+  [columns]="columns"
+  [rows]="suppliers()"
+  [rowKey]="rowKey"
+  [loading]="loading()"
+  [error]="error()"
+  [pageSize]="10"
+  emptyTitle="Todavía no hay proveedores"
+  emptyDescription="Registra el primero para poder asociarlo a los productos."
+  (retry)="load()"
+>
+  <ng-template appCell="acciones" let-supplier>
+    <div class="flex justify-end gap-1">
+      <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Editar ' + supplier.nombre" appTooltip="Editar proveedor" (click)="openEdit(supplier)">
+        <svg lucidePencil [size]="16" />
+      </button>
+      <button appButton variant="ghost-danger" size="sm" type="button" [attr.aria-label]="'Eliminar ' + supplier.nombre" appTooltip="Eliminar proveedor" (click)="askDelete(supplier)">
+        <svg lucideTrash2 [size]="16" />
+      </button>
+    </div>
+  </ng-template>
+</app-data-table>
+
+<app-supplier-form-modal [(open)]="formOpen" [supplier]="editing()" (saved)="load(true)" />
+
+<app-confirm-dialog
+  [(open)]="confirmOpen"
+  title="Eliminar proveedor"
+  [message]="'¿Eliminar al proveedor ' + (deleting()?.nombre ?? '') + '? Esta acción no se puede deshacer.'"
+  confirmLabel="Eliminar"
+  [busy]="deleteBusy()"
+  [error]="deleteError()"
+  (confirmed)="confirmDelete()"
+/>

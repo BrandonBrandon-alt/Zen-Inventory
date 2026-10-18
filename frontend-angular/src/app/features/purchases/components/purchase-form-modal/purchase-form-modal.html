@@ -1,0 +1,85 @@
+<app-modal
+  [(open)]="open"
+  title="Nueva orden de compra"
+  description="Pide mercancía a un proveedor."
+  size="xl"
+  [dismissible]="!saving()"
+>
+  <form [id]="formId" class="flex flex-col gap-4" [formGroup]="form" novalidate (ngSubmit)="submit()">
+    @if (serverError(); as message) {
+      <app-alert>{{ message }}</app-alert>
+    }
+    <div class="grid gap-4 sm:grid-cols-2 [&>*]:min-w-0">
+      <app-form-field label="Proveedor" [error]="error('supplierId')">
+        <app-select formControlName="supplierId" [options]="supplierOptions()" [icon]="truckIcon" searchable searchPlaceholder="Buscar proveedor…" placeholder="Selecciona un proveedor" />
+      </app-form-field>
+      @if (chooseBranch()) {
+        <app-form-field label="Sucursal que recibe" [error]="error('branchId')">
+          <app-select formControlName="branchId" [options]="branchOptions()" [icon]="storeIcon" searchable searchPlaceholder="Buscar sucursal…" placeholder="Selecciona una sucursal" />
+        </app-form-field>
+      }
+      <app-form-field label="Tiempo de entrega (días)" [error]="error('leadTimeDays')">
+        <input appInput type="number" min="1" step="1" inputmode="numeric" formControlName="leadTimeDays" />
+      </app-form-field>
+      <app-form-field label="Plazo de pago (días)" [error]="error('paymentDueDays')">
+        <input appInput type="number" min="0" step="1" inputmode="numeric" formControlName="paymentDueDays" />
+      </app-form-field>
+    </div>
+
+    <fieldset class="flex flex-col gap-3 border-t border-line pt-4" formArrayName="items">
+      <legend class="sr-only">Productos de la orden</legend>
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="font-title text-lg font-bold text-fg">Productos</h3>
+        <button appButton variant="ghost-brand" size="sm" type="button" (click)="addItem()">
+          <svg lucidePlus [size]="16" aria-hidden="true"></svg>
+          Agregar producto
+        </button>
+      </div>
+      @for (row of form.controls.items.controls; track row; let i = $index) {
+        <!-- Cada producto son dos líneas: arriba cuál es; abajo cuánto, a qué precio y cuánto suma. Los campos tienen el mismo ancho en todas las filas. -->
+        <div class="flex flex-col gap-3 rounded-lg border border-line-subtle p-3 [&_*]:min-w-0" [formGroupName]="i">
+          <div class="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3">
+            <app-form-field [label]="i === 0 ? 'Producto' : 'Producto ' + (i + 1)" [error]="itemError(row, 'productId')">
+              <app-select formControlName="productId" [options]="productOptions(row)" [icon]="productIcon" searchable searchPlaceholder="Buscar por nombre o SKU…" placeholder="Selecciona un producto" />
+            </app-form-field>
+            <button
+              appButton
+              variant="ghost-danger"
+              type="button"
+              class="mb-0.5"
+              appTooltip="Quitar producto"
+              [attr.aria-label]="'Quitar producto ' + (i + 1)"
+              [disabled]="form.controls.items.length === 1"
+              (click)="removeItem(i)"
+            >
+              <svg lucideTrash2 [size]="16" aria-hidden="true"></svg>
+            </button>
+          </div>
+          <div class="grid grid-cols-2 items-start gap-3 sm:grid-cols-[1fr_1.2fr_0.8fr_1.2fr]">
+            <app-form-field label="Cantidad" [error]="itemError(row, 'quantity')">
+              <input appInput type="number" min="0" step="any" inputmode="decimal" formControlName="quantity" />
+            </app-form-field>
+            <app-form-field label="Precio unitario" [error]="itemError(row, 'unitPrice')">
+              <input appInput type="number" min="0" step="0.01" inputmode="decimal" formControlName="unitPrice" />
+            </app-form-field>
+            <app-form-field label="Descuento %" [error]="itemError(row, 'discountPct')">
+              <input appInput type="number" min="0" max="100" step="0.5" inputmode="decimal" formControlName="discountPct" />
+            </app-form-field>
+            <div class="flex flex-col gap-1.5">
+              <span class="text-[13px] font-medium text-fg-muted">Subtotal</span>
+              <span class="flex h-[44px] items-center justify-end text-base font-semibold text-fg tabular-nums" [attr.aria-label]="'Subtotal de la fila ' + (i + 1)">{{ formatMoney(lineTotal(row)) }}</span>
+            </div>
+          </div>
+        </div>
+      }
+      <p class="flex items-baseline justify-end gap-3 border-t border-line pt-3 text-sm text-fg-muted">
+        Total de la orden
+        <strong class="font-title text-xl text-fg tabular-nums" aria-live="polite">{{ formatMoney(total()) }}</strong>
+      </p>
+    </fieldset>
+  </form>
+  <div data-slot="footer">
+    <button appButton variant="ghost" type="button" [disabled]="saving()" (click)="open.set(false)">Cancelar</button>
+    <button appButton type="submit" [attr.form]="formId" [loading]="saving()">Crear orden</button>
+  </div>
+</app-modal>

@@ -88,7 +88,7 @@ Representación de la **Arquitectura Hexagonal (Puertos y Adaptadores)** utiliza
 ```mermaid
 graph TB
     subgraph "Capa de Presentación (Frontend)"
-        FE[Next.js App]
+        FE[Angular App]
     end
 
     subgraph "Capa de Infraestructura (Adapters In)"

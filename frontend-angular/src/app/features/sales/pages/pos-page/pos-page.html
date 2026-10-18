@@ -1,0 +1,155 @@
+<header class="mb-6 flex animate-enter flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Punto de venta</h1>
+    <p class="mt-1 text-sm text-fg-subtle">Busca los productos, ajusta cantidades y registra la venta.</p>
+  </div>
+  @if (isAdmin() && branchOptions().length > 0) {
+    <div class="w-64">
+      <app-select [(value)]="chosenBranch" [options]="branchOptions()" [icon]="storeIcon" searchable searchPlaceholder="Buscar sucursal…" ariaLabel="Sucursal desde la que se vende" />
+    </div>
+  }
+</header>
+
+<div class="grid animate-enter-delayed items-start gap-6 lg:grid-cols-[minmax(0,1fr)_25rem]">
+  <!-- Productos -->
+  <section aria-label="Productos" class="min-w-0">
+    <div class="mb-3">
+      <app-form-field>
+        <input
+          appInput
+          type="search"
+          placeholder="Buscar por nombre o SKU… (Enter agrega el producto si es único)"
+          aria-label="Buscar producto"
+          autocomplete="off"
+          [value]="search()"
+          (input)="setSearch($event)"
+          (keydown.enter)="addFirst()"
+        />
+        <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
+      </app-form-field>
+    </div>
+
+    @if (loading()) {
+      <div class="flex justify-center py-12"><app-spinner /></div>
+    } @else if (loadError(); as message) {
+      <app-alert>{{ message }}</app-alert>
+    } @else if (results().length === 0) {
+      <app-empty-state [title]="search() ? 'Ningún producto coincide' : 'No hay productos para vender'" [description]="search() ? 'Prueba con otro nombre o SKU.' : 'Crea productos en el catálogo para poder venderlos.'" />
+    } @else {
+      <ul class="divide-y divide-line overflow-hidden rounded-lg border border-line bg-card">
+        @for (product of results(); track product.id) {
+          <li>
+            <button
+              type="button"
+              class="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-hover focus-visible:bg-hover focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+              [disabled]="product.stock <= 0"
+              [attr.aria-label]="'Agregar ' + product.name"
+              (click)="add(product)"
+            >
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-sm font-medium text-fg">{{ product.name }}</span>
+                <span class="block truncate text-xs text-fg-subtle">{{ product.sku }}@if (product.unit) { · {{ product.unit }} }</span>
+              </span>
+              <span class="shrink-0 text-xs" [class]="product.stock <= 0 ? 'font-semibold text-danger' : product.stock <= 5 ? 'text-warning' : 'text-fg-subtle'">
+                {{ product.stock <= 0 ? 'Sin stock' : formatQuantity(product.stock) + ' disp.' }}
+              </span>
+              <span class="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-fg">{{ formatMoney(product.price) }}</span>
+              <svg lucidePlus [size]="16" class="shrink-0 text-brand" aria-hidden="true"></svg>
+            </button>
+          </li>
+        }
+      </ul>
+      @if (truncated() > 0) {
+        <p class="mt-2 text-xs text-fg-subtle">Hay {{ truncated() }} productos más: afina la búsqueda para verlos.</p>
+      }
+    }
+  </section>
+
+  <!-- Venta actual -->
+  <app-card title="Venta actual" [description]="rows().length === 0 ? 'Aún no hay productos.' : units() + (units() === 1 ? ' unidad' : ' unidades')" class="lg:sticky lg:top-6">
+    @if (rows().length > 0) {
+      <button appButton data-slot="actions" variant="ghost" size="sm" type="button" (click)="clear()">Vaciar</button>
+    }
+
+    @if (rows().length === 0) {
+      <app-empty-state title="Agrega productos" description="Pulsa un producto de la lista para sumarlo a la venta." />
+    } @else {
+      <ul class="flex flex-col divide-y divide-line">
+        @for (row of rows(); track row.productId) {
+          <li class="flex flex-col gap-2 py-3 first:pt-0">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium text-fg">{{ row.product.name }}</p>
+                <p class="text-xs text-fg-subtle">{{ formatMoney(row.unitPrice) }} c/u</p>
+              </div>
+              <div class="flex items-center gap-1">
+                <span class="text-sm font-semibold tabular-nums text-fg">{{ formatMoney(row.subtotal) }}</span>
+                <button appButton variant="ghost-danger" size="sm" type="button" appTooltip="Quitar de la venta" [attr.aria-label]="'Quitar ' + row.product.name" (click)="remove(row.productId)">
+                  <svg lucideTrash2 [size]="15" aria-hidden="true"></svg>
+                </button>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <app-form-field label="Cantidad">
+                <input appInput type="number" min="1" [max]="row.product.stock" step="1" inputmode="numeric" [attr.aria-label]="'Cantidad de ' + row.product.name" [value]="row.quantity ?? ''" (input)="setQuantity(row.productId, $event)" />
+                <svg data-slot="prefix" lucideHash [size]="15" aria-hidden="true"></svg>
+              </app-form-field>
+              <app-form-field label="Descuento %">
+                <input appInput type="number" min="0" max="100" step="1" inputmode="decimal" [attr.aria-label]="'Descuento % de ' + row.product.name" placeholder="0" [value]="row.discount ?? ''" (input)="setDiscount(row.productId, $event)" />
+                <svg data-slot="prefix" lucidePercent [size]="15" aria-hidden="true"></svg>
+              </app-form-field>
+            </div>
+            @if (row.problem; as problem) {
+              <p role="alert" class="text-xs text-danger">{{ problem }}</p>
+            }
+          </li>
+        }
+      </ul>
+
+      <div class="mt-4 flex flex-col gap-3 border-t border-line pt-4">
+        <div class="grid grid-cols-2 gap-2">
+          <app-form-field label="Cliente (opcional)">
+            <input appInput type="text" autocomplete="off" [value]="customerName()" (input)="customerName.set($any($event.target).value)" />
+            <svg data-slot="prefix" lucideUserRound [size]="15" aria-hidden="true"></svg>
+          </app-form-field>
+          <app-form-field label="Documento (opcional)">
+            <input appInput type="text" autocomplete="off" [value]="customerDocument()" (input)="customerDocument.set($any($event.target).value)" />
+            <svg data-slot="prefix" lucideIdCard [size]="15" aria-hidden="true"></svg>
+          </app-form-field>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          @if (priceLists().length > 0) {
+            <app-form-field label="Lista de precios">
+              <app-select [value]="priceListId()" (valueChange)="choosePriceList($event)" [options]="priceListOptions()" [icon]="tagIcon" />
+            </app-form-field>
+          }
+          <app-form-field label="Descuento general %">
+            <input appInput type="number" min="0" max="100" step="1" inputmode="decimal" [value]="globalDiscount() ?? ''" (input)="setGlobalDiscount($event)" />
+            <svg data-slot="prefix" lucidePercent [size]="15" aria-hidden="true"></svg>
+          </app-form-field>
+        </div>
+      </div>
+
+      <dl class="mt-4 grid grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-1 border-t border-line pt-4 text-sm">
+        <dt class="text-fg-subtle">Subtotal</dt>
+        <dd class="text-right tabular-nums text-fg-muted">{{ formatMoney(subtotal()) }}</dd>
+        @if (globalDiscountAmount() > 0) {
+          <dt class="text-fg-subtle">Descuento general</dt>
+          <dd class="text-right tabular-nums text-fg-muted">− {{ formatMoney(globalDiscountAmount()) }}</dd>
+        }
+        <dt class="font-medium text-fg">Total</dt>
+        <dd class="text-right text-2xl font-bold tabular-nums text-fg" aria-live="polite">{{ formatMoney(total()) }}</dd>
+      </dl>
+
+      @if (saleError(); as message) {
+        <app-alert class="mt-4">{{ message }}</app-alert>
+      }
+      <button appButton type="button" class="mt-4 w-full" [fullWidth]="true" [disabled]="invalid()" [loading]="submitting()" (click)="submit()">
+        <svg lucideReceipt [size]="16" aria-hidden="true"></svg>
+        Registrar venta
+      </button>
+    }
+  </app-card>
+</div>
+
+<app-sale-detail-modal [(open)]="receiptOpen" [sale]="lastSale()" [created]="true" />

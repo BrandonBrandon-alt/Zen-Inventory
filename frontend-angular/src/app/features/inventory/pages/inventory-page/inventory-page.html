@@ -1,0 +1,98 @@
+<header class="mb-6 flex animate-enter flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Inventario</h1>
+    @if (!error() && items().length > 0) {
+      <p class="mt-1 text-sm text-fg-subtle">{{ summary() }}</p>
+    }
+  </div>
+  @if (isAdmin() && branchOptions().length > 0) {
+    <div class="w-64">
+      <app-select
+        [(value)]="branchId"
+        [options]="branchOptions()"
+        [icon]="storeIcon"
+        searchable
+        searchPlaceholder="Buscar sucursal…"
+        ariaLabel="Sucursal"
+        placeholder="Selecciona una sucursal"
+      />
+    </div>
+  }
+</header>
+
+@if (canSeeKardex()) {
+  <app-tabs class="mb-5 animate-enter-delayed" [tabs]="tabs()" [(active)]="activeTab" idPrefix="inventory" ariaLabel="Secciones del inventario" />
+}
+
+@if (activeTab() === 'stock') {
+  <div id="inventory-panel-stock" role="tabpanel" aria-labelledby="inventory-tab-stock" class="animate-enter-delayed">
+    <div class="mb-3 flex flex-wrap items-center gap-3">
+      <div class="w-72 max-w-full">
+        <app-form-field>
+          <input appInput type="search" placeholder="Buscar por producto o SKU…" aria-label="Buscar producto" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
+          <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
+        </app-form-field>
+      </div>
+      <div class="w-64"><app-select [(value)]="levelFilter" [options]="levelOptions" ariaLabel="Nivel de existencias" /></div>
+      <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
+        <app-form-field label="Existencias desde">
+          <input appInput type="number" step="any" inputmode="decimal" [value]="minStock() ?? ''" (input)="minStock.set(numberFromInput($event))" />
+        </app-form-field>
+        <app-form-field label="Existencias hasta">
+          <input appInput type="number" step="any" inputmode="decimal" [value]="maxStock() ?? ''" (input)="maxStock.set(numberFromInput($event))" />
+        </app-form-field>
+        <label class="flex min-h-11 items-center gap-2 text-sm text-fg-muted">
+          <input type="checkbox" class="size-4 accent-[var(--brand-500)]" [checked]="noMinimum()" (change)="noMinimum.set($any($event.target).checked)" />
+          Solo sin mínimo definido
+        </label>
+      </app-advanced-filters>
+    </div>
+    <app-active-filters class="mb-4" [filters]="activeFilters()" (removed)="removeFilter($event)" (cleared)="clearFilters()" />
+
+    <app-data-table
+  exportName="inventario"
+  persistKey="inventario"
+      caption="Existencias por producto"
+      [columns]="columns()"
+      [rows]="rows()"
+      [rowKey]="rowKey"
+      [loading]="loading()"
+      [error]="error()"
+      [pageSize]="15"
+      minWidth="52rem"
+      [emptyTitle]="activeFilters().length > 0 ? 'Ningún producto coincide' : 'No hay productos'"
+      [emptyDescription]="activeFilters().length > 0 ? 'Prueba quitando algún filtro.' : 'Los productos del catálogo aparecerán aquí con sus existencias.'"
+      (retry)="load()"
+    >
+      <ng-template appCell="stock" let-row>
+        <span class="inline-flex items-center justify-end gap-2">
+          @if (row.level === 'out') {
+            <app-badge variant="danger" dot>Agotado</app-badge>
+          } @else if (row.level === 'critical') {
+            <app-badge variant="warning" dot>Crítico</app-badge>
+          }
+          <span class="font-semibold tabular-nums">{{ formatQuantity(row.stock) }}</span>
+        </span>
+      </ng-template>
+      <ng-template appCell="acciones" let-row>
+        <div class="flex justify-end gap-1">
+          <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Ajustar stock de ' + row.nombre" appTooltip="Ajustar existencias: registrar un ingreso o un retiro" (click)="openAdjust(row)">
+            <svg lucideArrowUpDown [size]="16" aria-hidden="true"></svg>
+          </button>
+          <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Configurar stock mínimo de ' + row.nombre" appTooltip="Stock mínimo: con esta cantidad o menos el producto se marca como crítico" (click)="openMinimum(row)">
+            <svg lucideSlidersHorizontal [size]="16" aria-hidden="true"></svg>
+          </button>
+        </div>
+      </ng-template>
+    </app-data-table>
+  </div>
+} @else if (branchId() !== null) {
+  <div id="inventory-panel-kardex" role="tabpanel" aria-labelledby="inventory-tab-kardex" class="animate-enter-delayed">
+    <app-kardex-panel [branchId]="branchId()!" [products]="items()" />
+  </div>
+}
+
+@if (branchId() !== null) {
+  <app-adjust-stock-modal [(open)]="adjustOpen" [product]="adjusting()" [branchId]="branchId()!" (saved)="load(branchId(), true)" />
+  <app-minimum-stock-modal [(open)]="configOpen" [product]="configuring()" [branchId]="branchId()!" (saved)="load(branchId(), true)" />
+}

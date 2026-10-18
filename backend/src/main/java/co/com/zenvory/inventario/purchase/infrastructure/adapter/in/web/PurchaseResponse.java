@@ -31,7 +31,9 @@ public record PurchaseResponse(
             BigDecimal quantity,
             BigDecimal unitPrice,
             BigDecimal discountPct,
-            BigDecimal subtotal
+            BigDecimal subtotal,
+            /** Lo ya recibido de esta línea (en recepciones parciales); lo pendiente es {@code quantity - receivedQuantity}. */
+            BigDecimal receivedQuantity
     ) {}
 
     public static PurchaseResponse fromDomain(PurchaseOrder order) {
@@ -58,7 +60,8 @@ public record PurchaseResponse(
                         d.getQuantity(),
                         d.getUnitPrice(),
                         d.getDiscountPct(),
-                        d.computeSubtotal()
+                        d.computeSubtotal(),
+                        d.getReceivedQuantity()
                 )).toList()
         );
     }

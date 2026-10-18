@@ -1,0 +1,70 @@
+<app-modal
+  [(open)]="open"
+  title="Solicitar traslado"
+  description="Pide mercancía de otra sucursal para la tuya."
+  size="lg"
+  [dismissible]="!saving()"
+>
+  <form [id]="formId" class="flex flex-col gap-4" [formGroup]="form" novalidate (ngSubmit)="submit()">
+    @if (serverError(); as message) {
+      <app-alert>{{ message }}</app-alert>
+    }
+    <div class="grid gap-4 sm:grid-cols-2">
+      <app-form-field label="Sucursal que lo envía" [error]="branchError('originBranchId')">
+        <app-select formControlName="originBranchId" [options]="originOptions()" [icon]="storeIcon" searchable searchPlaceholder="Buscar sucursal…" placeholder="Selecciona el origen" />
+      </app-form-field>
+      <app-form-field label="Sucursal que lo recibe" [error]="branchError('destinationBranchId')">
+        <app-select formControlName="destinationBranchId" [options]="destinationOptions()" [icon]="storeIcon" searchable searchPlaceholder="Buscar sucursal…" placeholder="Selecciona el destino" />
+      </app-form-field>
+    </div>
+    @if (destinationLocked()) {
+      <p class="-mt-2 text-xs text-fg-subtle">Solo puedes pedir mercancía para tu propia sucursal.</p>
+    }
+    <div class="grid gap-4 sm:grid-cols-2">
+      <app-form-field label="Prioridad">
+        <app-select formControlName="priority" [options]="priorities" />
+      </app-form-field>
+      <app-form-field label="Llegada estimada (opcional)">
+        <app-date-picker formControlName="estimatedArrival" showTime [min]="now()" placeholder="Sin fecha estimada" />
+      </app-form-field>
+    </div>
+
+    <fieldset class="flex flex-col gap-3 border-t border-line pt-4" formArrayName="items">
+      <legend class="sr-only">Productos del traslado</legend>
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="font-title text-lg font-bold text-fg">Productos</h3>
+        <button appButton variant="ghost-brand" size="sm" type="button" (click)="addItem()">
+          <svg lucidePlus [size]="16" aria-hidden="true"></svg>
+          Agregar producto
+        </button>
+      </div>
+      @for (row of form.controls.items.controls; track row; let i = $index) {
+        <div class="grid items-start gap-3 sm:grid-cols-[3fr_1fr_auto]" [formGroupName]="i">
+          <app-form-field [label]="i === 0 ? 'Producto' : 'Producto ' + (i + 1)" [error]="itemError(row, 'productId')">
+            <app-select formControlName="productId" [options]="productOptions(row)" [icon]="productIcon" searchable searchPlaceholder="Buscar por nombre o SKU…" placeholder="Selecciona un producto" />
+          </app-form-field>
+          <app-form-field label="Cantidad" [error]="itemError(row, 'quantity')">
+            <input appInput type="number" min="1" step="1" inputmode="numeric" formControlName="quantity" />
+          </app-form-field>
+          <button
+            appButton
+            variant="ghost-danger"
+            size="sm"
+            type="button"
+            class="sm:mt-7"
+            appTooltip="Quitar producto"
+            [attr.aria-label]="'Quitar producto ' + (i + 1)"
+            [disabled]="form.controls.items.length === 1"
+            (click)="removeItem(i)"
+          >
+            <svg lucideTrash2 [size]="16" aria-hidden="true"></svg>
+          </button>
+        </div>
+      }
+    </fieldset>
+  </form>
+  <div data-slot="footer">
+    <button appButton variant="ghost" type="button" [disabled]="saving()" (click)="open.set(false)">Cancelar</button>
+    <button appButton type="submit" [attr.form]="formId" [loading]="saving()">Solicitar traslado</button>
+  </div>
+</app-modal>

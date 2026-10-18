@@ -1,0 +1,103 @@
+<app-modal
+  [(open)]="open"
+  [title]="request() ? 'Devolución #' + request()!.id : 'Devolución'"
+  [description]="request() && mode() === 'view' ? info[request()!.status].next : ''"
+  size="lg"
+  [dismissible]="!busy()"
+>
+  @if (request(); as r) {
+    @if (error(); as message) {
+      <app-alert class="mb-4">{{ message }}</app-alert>
+    }
+
+    @switch (mode()) {
+      @case ('view') {
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <app-badge [variant]="info[r.status].variant" dot>{{ info[r.status].label }}</app-badge>
+          <p class="text-sm text-fg-muted">Venta #{{ r.saleId }}@if (branchName()) { · {{ branchName() }} }</p>
+        </div>
+
+        <div class="mt-5 overflow-x-auto rounded-lg border border-line">
+          <table class="w-full border-collapse text-sm">
+            <caption class="sr-only">Productos de la devolución</caption>
+            <thead class="bg-surface text-xs text-fg-subtle">
+              <tr>
+                <th scope="col" class="px-3 py-2 text-left font-medium">Producto</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Cantidad</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Precio pagado</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (line of r.lines; track line.id) {
+                <tr class="border-t border-line-subtle">
+                  <th scope="row" class="px-3 py-2 text-left font-medium text-fg">
+                    {{ productName(line.productId) }}
+                    @if (line.reason) {
+                      <span class="block text-xs font-normal text-fg-subtle">{{ line.reason }}</span>
+                    }
+                  </th>
+                  <td class="px-3 py-2 text-right tabular-nums text-fg-muted">{{ formatQuantity(line.quantity) }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums text-fg-muted">{{ formatMoney(line.unitPrice) }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums text-fg">{{ formatMoney(line.quantity * line.unitPrice) }}</td>
+                </tr>
+              }
+            </tbody>
+            <tfoot class="border-t border-line">
+              <tr>
+                <th scope="row" colspan="3" class="px-3 py-2.5 text-right align-baseline text-sm font-medium text-fg">Total a devolver al cliente</th>
+                <td class="px-3 py-2.5 text-right align-baseline text-lg font-bold tabular-nums text-fg">{{ formatMoney(r.total) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <dl class="mt-5 grid gap-x-6 gap-y-2 border-t border-line pt-4 text-sm">
+          <div class="flex gap-2"><dt class="text-fg-subtle">Motivo</dt><dd class="text-fg">{{ r.reason || '—' }}</dd></div>
+          @if (r.requestDate) {
+            <div class="flex gap-2"><dt class="text-fg-subtle">Solicitada</dt><dd class="text-fg">{{ formatDateTime(r.requestDate) }}@if (r.requesterId !== null) { · {{ person(r.requesterId) }} }</dd></div>
+          }
+          @if (r.processedDate) {
+            <div class="flex gap-2"><dt class="text-fg-subtle">Decidida</dt><dd class="text-fg">{{ formatDateTime(r.processedDate) }}@if (r.approverId !== null) { · {{ person(r.approverId) }} }</dd></div>
+          }
+          @if (r.approverComment) {
+            <div class="flex gap-2"><dt class="text-fg-subtle">{{ r.status === 'RECHAZADA' ? 'Motivo del rechazo' : 'Comentario' }}</dt><dd class="text-fg">{{ r.approverComment }}</dd></div>
+          }
+        </dl>
+      }
+
+      @case ('approve') {
+        <form id="return-decision-form" class="flex flex-col gap-4" [formGroup]="approveForm" novalidate (ngSubmit)="submit()">
+          <p class="text-sm text-fg-muted">Las unidades vuelven al stock de la sucursal. No se puede deshacer.</p>
+          <app-form-field label="Comentario (opcional)">
+            <textarea appInput rows="3" formControlName="comment"></textarea>
+          </app-form-field>
+        </form>
+      }
+
+      @case ('reject') {
+        <form id="return-decision-form" class="flex flex-col gap-4" [formGroup]="rejectForm" novalidate (ngSubmit)="submit()">
+          <p class="text-sm text-fg-muted">No se mueve stock y la solicitud queda cerrada.</p>
+          <app-form-field label="Motivo del rechazo" [error]="reasonError()">
+            <textarea appInput rows="3" formControlName="reason"></textarea>
+          </app-form-field>
+        </form>
+      }
+    }
+  }
+
+  <div data-slot="footer">
+    @if (mode() === 'view') {
+      @if (decidable()) {
+        <button appButton variant="ghost-danger" type="button" [disabled]="busy()" (click)="goto('reject')">Rechazar</button>
+        <button appButton type="button" [disabled]="busy()" (click)="goto('approve')">Aprobar</button>
+      }
+      <button appButton variant="ghost" type="button" (click)="open.set(false)">Cerrar</button>
+    } @else {
+      <button appButton variant="ghost" type="button" [disabled]="busy()" (click)="goto('view')">Volver</button>
+      <button appButton type="submit" form="return-decision-form" [variant]="mode() === 'reject' ? 'danger' : 'primary'" [loading]="busy()">
+        {{ mode() === 'approve' ? 'Aprobar devolución' : 'Rechazar devolución' }}
+      </button>
+    }
+  </div>
+</app-modal>

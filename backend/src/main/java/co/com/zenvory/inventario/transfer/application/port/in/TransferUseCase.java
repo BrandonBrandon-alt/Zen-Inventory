@@ -17,6 +17,11 @@ public interface TransferUseCase {
     Transfer getTransferById(Long transferId);
     List<Transfer> getAllTransfers();
     List<Transfer> getTransfersByBranch(Long branchId);
-    co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.TransferFulfillmentReport getFulfillmentReport();
-    co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.LogisticsAnalyticsResponse getLogisticsAnalytics();
+    /** Traslado visible para el usuario actual: solo si es ADMIN o su sucursal es el origen o el destino. */
+    Transfer getTransferForCurrentUser(Long id);
+
+    /** @param branchId limita el informe a los traslados de esa sucursal; {@code null} = todas (ADMIN). */
+    co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.TransferFulfillmentReport getFulfillmentReport(Long branchId);
+    /** @param branchId limita el análisis a los traslados de esa sucursal; {@code null} = todas (ADMIN). */
+    co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.LogisticsAnalyticsResponse getLogisticsAnalytics(Long branchId);
 }

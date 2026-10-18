@@ -55,7 +55,8 @@ public class AuthController {
             result.user().getNombre(),
             result.user().getRole().getNombre(),
             result.user().getSucursalId(),
-            result.user().getId()
+            result.user().getId(),
+            result.user().getAvatarUpdatedAt()
         ));
     }
 }

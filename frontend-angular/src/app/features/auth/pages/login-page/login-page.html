@@ -1,0 +1,84 @@
+<div class="relative flex min-h-dvh bg-base">
+  <app-theme-toggle class="absolute top-4 right-4 z-10" />
+
+  <section
+    class="hidden flex-1 flex-col items-center justify-center gap-6 border-r border-line bg-surface p-12 text-center md:flex"
+  >
+    <div class="flex flex-col items-center gap-6 animate-fade-in-up motion-reduce:animate-none">
+      <app-logo [size]="120" />
+      <!-- El título se anima letra por letra; el nombre accesible es el texto completo. -->
+      <h1
+        aria-label="Zen Inventory"
+        class="flex flex-wrap justify-center gap-[0.15em] font-title text-[clamp(48px,5.5vw,76px)] leading-[1.05] font-bold tracking-[-0.04em] text-fg"
+      >
+        @for (letter of titleLetters; track $index) {
+          <span
+            aria-hidden="true"
+            class="inline-block animate-letter-reveal motion-reduce:animate-none"
+            [class.whitespace-pre]="letter.char === ' '"
+            [style.animation-delay.s]="letter.delay"
+            >{{ letter.char }}</span
+          >
+        }
+      </h1>
+      <p class="font-serif text-2xl font-medium text-brand-soft italic">
+        Gestiona tu inventario con inteligencia.
+      </p>
+    </div>
+    <p class="text-[13px] text-fg-subtle">© {{ year }} Zen Inventory Logic</p>
+  </section>
+
+  <section class="flex flex-1 items-center justify-center p-6">
+    <div class="w-full max-w-[380px] animate-form-in motion-reduce:animate-none">
+      <div class="mb-8 flex items-center gap-3 md:hidden">
+        <app-logo [size]="32" />
+        <span class="font-serif text-xl font-bold text-fg">Zen Inventory</span>
+      </div>
+
+      <h2 class="mb-2 font-title text-[28px] leading-tight font-bold tracking-tight text-fg">
+        Bienvenido de vuelta
+      </h2>
+      <p class="mb-8 text-sm text-fg-subtle">Ingresa tus credenciales para continuar</p>
+
+      <form
+        [formGroup]="form"
+        (ngSubmit)="submit()"
+        (animationend)="onShakeEnd($event)"
+        novalidate
+        class="flex flex-col gap-[18px]"
+        [class.animate-shake]="shaking()"
+      >
+        @if (serverError(); as message) {
+          <app-alert class="animate-alert-in">{{ message }}</app-alert>
+        }
+
+        <app-form-field label="Correo electrónico" [error]="emailError()">
+          <svg data-slot="prefix" lucideMail [size]="15" />
+          <input
+            appInput
+            formControlName="email"
+            type="email"
+            autocomplete="email"
+            placeholder="admin@zeninventory.co"
+          />
+        </app-form-field>
+
+        <app-form-field label="Contraseña" [error]="passwordError()">
+          <svg data-slot="prefix" lucideLock [size]="15" />
+          <input
+            appInput
+            formControlName="password"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            [type]="showPassword() ? 'text' : 'password'"
+          />
+          <app-password-toggle data-slot="suffix" [(visible)]="showPassword" />
+        </app-form-field>
+
+        <button appButton type="submit" size="lg" fullWidth class="mt-1.5" [loading]="submitting()">
+          {{ submitting() ? 'Verificando…' : 'Ingresar al sistema' }}
+        </button>
+      </form>
+    </div>
+  </section>
+</div>

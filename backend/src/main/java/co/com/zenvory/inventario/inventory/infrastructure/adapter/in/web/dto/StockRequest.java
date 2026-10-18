@@ -26,7 +26,7 @@ public class StockRequest {
     private MovementReason reason;
 
     /** Identificador del usuario que reporta la novedad. */
-    @NotNull(message = "El ID de usuario es obligatorio (autoría)")
+    /** Se ignora: la autoría es siempre la del usuario de la sesión. Se acepta por compatibilidad con clientes antiguos. */
     private Long userId;
 
     /** ID del documento o entidad externa relacionada. */

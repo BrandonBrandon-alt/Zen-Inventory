@@ -44,16 +44,17 @@ public class ReturnRequestService implements ReturnRequestUseCase {
     @Override
     @Transactional
     public ReturnRequest createRequest(CreateReturnRequestCommand command) {
-        // 1. Obtener la venta original
-        Sale sale = saleManagementUseCase.getSaleById(command.saleId());
-        
-        // 2. Mapear detalles originales para validación rápida
-        Map<Long, SaleDetail> originalDetails = sale.getDetails().stream()
-                .collect(Collectors.toMap(SaleDetail::getProductId, d -> d));
+        // 1. Obtener la venta original con su fila bloqueada: así no puede anularse ni recibir otra solicitud a la vez
+        Sale sale = saleManagementUseCase.getSaleForUpdate(command.saleId());
+        requireNotCanceled(sale);
+        if (!sale.getBranchId().equals(command.branchId())) {
+            // El stock devuelto vuelve a la sucursal de la solicitud: tiene que ser la de la venta.
+            throw new InvalidReturnOperationException("La venta no pertenece a la sucursal indicada.");
+        }
 
-        // 3. Obtener todas las solicitudes previas (Aprobadas y Pendientes)
+        // 2. Obtener todas las solicitudes previas (Aprobadas y Pendientes)
         List<ReturnRequest> existingRequests = repositoryPort.findBySaleId(command.saleId());
-        
+
         // Calcular cuánto se ha devuelto o está en proceso de devolución por producto
         Map<Long, Integer> alreadyReturnedOrPending = existingRequests.stream()
                 .filter(r -> r.getStatus() != ReturnRequestStatus.RECHAZADA)
@@ -63,28 +64,38 @@ public class ReturnRequestService implements ReturnRequestUseCase {
                         Collectors.summingInt(ReturnRequestDetail::getQuantity)
                 ));
 
-        // 4. Validar cada ítem solicitado
-        List<ReturnRequestDetail> requestDetails = command.items().stream()
-                .map(item -> {
-                    SaleDetail original = originalDetails.get(item.productId());
-                    if (original == null) {
-                        throw new InvalidReturnOperationException("El producto ID " + item.productId() + " no pertenece a la venta original.");
+        // 3. Unir las líneas repetidas de la petición: validar cada una por separado dejaría pasar, por ejemplo,
+        //    dos líneas de 5 unidades sobre una venta de 5.
+        Map<Long, List<CreateReturnRequestCommand.Detail>> requestedByProduct = command.items().stream()
+                .collect(Collectors.groupingBy(CreateReturnRequestCommand.Detail::productId, java.util.LinkedHashMap::new, Collectors.toList()));
+
+        // 4. Validar cada producto contra lo vendido (sumando sus líneas) y lo ya devuelto o pendiente
+        List<ReturnRequestDetail> requestDetails = requestedByProduct.entrySet().stream()
+                .map(entry -> {
+                    Long productId = entry.getKey();
+                    int sold = sale.soldUnits(productId);
+                    if (sold == 0) {
+                        throw new InvalidReturnOperationException("El producto ID " + productId + " no pertenece a la venta original.");
                     }
+                    int requestedNow = entry.getValue().stream().mapToInt(CreateReturnRequestCommand.Detail::quantity).sum();
+                    int previouslyProcessed = alreadyReturnedOrPending.getOrDefault(productId, 0);
 
-                    int previouslyProcessed = alreadyReturnedOrPending.getOrDefault(item.productId(), 0);
-                    int totalAfterThis = previouslyProcessed + item.quantity();
-
-                    if (totalAfterThis > original.getQuantity()) {
+                    if (previouslyProcessed + requestedNow > sold) {
+                        String name = sale.getDetails().stream().filter(d -> d.getProductId().equals(productId))
+                                .findFirst().map(SaleDetail::getProductName).orElse("#" + productId);
                         throw new InvalidReturnOperationException(
                             String.format("Cantidad inválida para %s. Comprado: %d, Ya procesado/pendiente: %d, Solicitado ahora: %d",
-                                original.getProductName(), original.getQuantity(), previouslyProcessed, item.quantity()));
+                                name, sold, previouslyProcessed, requestedNow));
                     }
 
+                    String reason = entry.getValue().stream().map(CreateReturnRequestCommand.Detail::reasonSpecific)
+                            .filter(r -> r != null && !r.isBlank()).distinct().collect(Collectors.joining("; "));
                     return ReturnRequestDetail.create(
-                            item.productId(),
-                            item.quantity(),
-                            item.reasonSpecific(),
-                            original.getUnitPriceApplied()
+                            productId,
+                            requestedNow,
+                            reason.isEmpty() ? null : reason,
+                            // Lo realmente pagado (con descuentos de línea y global), no el precio de lista
+                            sale.effectiveUnitPaid(productId)
                     );
                 }).toList();
 
@@ -108,6 +119,8 @@ public class ReturnRequestService implements ReturnRequestUseCase {
     @Transactional
     public void approveRequest(Long requestId, Long managerId, String comment) {
         ReturnRequest request = getRequestById(requestId);
+        // Una venta anulada ya repuso su stock: aprobar la devolución lo repondría dos veces.
+        requireNotCanceled(saleManagementUseCase.getSaleForUpdate(request.getSaleId()));
         
         // 1. Transición de estado en el dominio
         request.approve(managerId, comment);
@@ -126,7 +139,8 @@ public class ReturnRequestService implements ReturnRequestUseCase {
                 managerId,
                 request.getSaleId(), // Referenciamos a la venta original para trazabilidad
                 "DEVOLUCION",
-                detail.getUnitPricePaid(),
+                // Sin costo: reponer unidades devueltas no es una compra y no debe alterar el costo promedio.
+                null,
                 "Devolución Aprobada Solicitud #" + requestId + ": " + detail.getReasonSpecific(),
                 null
             );
@@ -134,6 +148,12 @@ public class ReturnRequestService implements ReturnRequestUseCase {
 
         // 4. Marcar la venta original como 'RETURNED' para bloquear futuros flujos (Anulación/Nuevas Solicitudes)
         saleManagementUseCase.updateSaleStatus(request.getSaleId(), SaleStatus.RETURNED);
+    }
+
+    private void requireNotCanceled(Sale sale) {
+        if (sale.getStatus() == SaleStatus.CANCELED) {
+            throw new InvalidReturnOperationException("No se pueden gestionar devoluciones de una venta anulada.");
+        }
     }
 
     @Override

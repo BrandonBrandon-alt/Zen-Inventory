@@ -5,8 +5,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ -f \"$CLAUDE_PROJECT_DIR/graphify-out/graph.json\" ] && echo \"Recordatorio: para preguntas sobre el código usa graphify query/path/explain antes de grep o Read (ver CLAUDE.md).\" || true",
+            "command": "[ -f \"$CLAUDE_PROJECT_DIR/graphify-out/graph.json\" ] && echo \"Recordatorio graphify: ANTES de modificar código, consulta el grafo del área afectada (graphify query / explain / path) para ver qué depende de ella; no empieces con grep o lecturas masivas. Ver CLAUDE.md.\" || true",
             "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v graphify >/dev/null 2>&1 && [ -f \"$CLAUDE_PROJECT_DIR/graphify-out/graph.json\" ] && (cd \"$CLAUDE_PROJECT_DIR\" && graphify update . >/dev/null 2>&1) || true",
+            "timeout": 60
           }
         ]
       }

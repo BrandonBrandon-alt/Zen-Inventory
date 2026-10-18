@@ -9,12 +9,18 @@ import co.com.zenvory.inventario.transfer.application.port.in.RequestTransferCom
 import co.com.zenvory.inventario.transfer.application.port.in.TransferUseCase;
 import co.com.zenvory.inventario.transfer.application.port.out.TransferRepositoryPort;
 import co.com.zenvory.inventario.transfer.domain.model.Transfer;
+import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException;
+import co.com.zenvory.inventario.shared.infrastructure.security.CurrentUser;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Set;
+import java.util.HashSet;
 import co.com.zenvory.inventario.transfer.domain.model.TransferDetail;
 import co.com.zenvory.inventario.transfer.domain.model.TransferStatus;
 import co.com.zenvory.inventario.transfer.application.port.in.UpdateQuantityCommand;
-import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
-import org.springframework.context.annotation.Lazy;
+import co.com.zenvory.inventario.branch.application.port.in.BranchUseCase;
+import co.com.zenvory.inventario.transfer.domain.event.TransferPreparedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,19 +36,50 @@ public class TransferService implements TransferUseCase {
     private final TransferRepositoryPort transferRepositoryPort;
     private final InventoryUseCase inventoryUseCase;
     private final ProductUseCase productUseCase;
-    private final AlertUseCase alertUseCase;
+    private final BranchUseCase branchUseCase;
+    private final ApplicationEventPublisher eventPublisher;
     private final UserRepositoryPort userRepositoryPort;
 
     public TransferService(TransferRepositoryPort transferRepositoryPort, 
                            InventoryUseCase inventoryUseCase, 
                            ProductUseCase productUseCase,
-                           @Lazy AlertUseCase alertUseCase,
-                           UserRepositoryPort userRepositoryPort) {
+                           BranchUseCase branchUseCase,
+                           UserRepositoryPort userRepositoryPort,
+                           ApplicationEventPublisher eventPublisher) {
         this.transferRepositoryPort = transferRepositoryPort;
         this.inventoryUseCase = inventoryUseCase;
         this.productUseCase = productUseCase;
-        this.alertUseCase = alertUseCase;
+        this.branchUseCase = branchUseCase;
+        this.eventPublisher = eventPublisher;
         this.userRepositoryPort = userRepositoryPort;
+    }
+
+    private void requireActiveBranch(Long branchId) {
+        if (Boolean.FALSE.equals(branchUseCase.getBranchById(branchId).getActive())) {
+            throw new IllegalArgumentException("La sucursal " + branchId + " está inactiva.");
+        }
+    }
+
+    /** Quién puede ejecutar cada paso de un traslado: la sucursal que da el stock, la que lo recibe, o cualquiera de las dos. */
+    private enum Side { ORIGIN, DESTINATION, EITHER }
+
+    /** El ADMIN actúa sobre cualquier traslado; el resto solo si su sucursal es la que corresponde al paso. */
+    private void requireSide(Transfer transfer, User user, Side side) {
+        CurrentUser current = new CurrentUser(user);
+        if (current.isAdmin()) {
+            return;
+        }
+        Long branch = user.getSucursalId();
+        boolean isOrigin = branch != null && branch.equals(transfer.getOriginBranchId());
+        boolean isDestination = branch != null && branch.equals(transfer.getDestinationBranchId());
+        boolean allowed = switch (side) {
+            case ORIGIN -> isOrigin;
+            case DESTINATION -> isDestination;
+            case EITHER -> isOrigin || isDestination;
+        };
+        if (!allowed) {
+            throw new UnauthorizedActionException("Su sucursal no participa en este paso del traslado.");
+        }
     }
 
     private User getCurrentUser() {
@@ -57,6 +94,15 @@ public class TransferService implements TransferUseCase {
     @Override
     @Transactional
     public Transfer requestTransfer(RequestTransferCommand command) {
+        // El origen y el destino deben existir y estar activos; una reserva sobre una sucursal inexistente o cerrada
+        // no tendría a quién despachar, y repetir un producto bloquearía más stock del que se pide.
+        requireActiveBranch(command.originBranchId());
+        requireActiveBranch(command.destinationBranchId());
+        long distinctProducts = command.items().stream().map(RequestTransferCommand.Detail::productId).distinct().count();
+        if (distinctProducts != command.items().size()) {
+            throw new IllegalArgumentException("Hay productos repetidos en la solicitud de traslado.");
+        }
+
         List<TransferDetail> details = command.items().stream()
                 .map(item -> {
                     String productName = productUseCase.getProductById(item.productId()).getName();
@@ -65,6 +111,10 @@ public class TransferService implements TransferUseCase {
                 .toList();
 
         User user = getCurrentUser();
+        // Quien solicita pide para su propia sucursal (destino); el stock se reserva en la sucursal de origen.
+        if (!new CurrentUser(user).isAdmin() && !command.destinationBranchId().equals(user.getSucursalId())) {
+            throw new UnauthorizedActionException("Solo puede solicitar traslados hacia su propia sucursal.");
+        }
 
         Transfer transfer = Transfer.create(
                 command.originBranchId(),
@@ -102,11 +152,24 @@ public class TransferService implements TransferUseCase {
         return savedTransfer;
     }
 
+    /** Las cantidades deben cubrir exactamente todas las líneas de la transferencia, sin repetir ninguna. */
+    private void requireEveryLine(Transfer transfer, List<Long> providedIds) {
+        Set<Long> provided = new HashSet<>(providedIds);
+        if (provided.size() != providedIds.size()) {
+            throw new IllegalArgumentException("Hay productos repetidos en la solicitud.");
+        }
+        Set<Long> expected = transfer.getDetails().stream().map(TransferDetail::getId).collect(Collectors.toSet());
+        if (!provided.equals(expected)) {
+            throw new IllegalArgumentException("Debe indicar la cantidad de todos los productos de la transferencia.");
+        }
+    }
+
     @Override
     @Transactional
     public Transfer approveDestination(Long id) {
         Transfer transfer = getTransferById(id);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.DESTINATION);
                 
         transfer.approveDestination(user.getId(), user.getNombre());
         return transferRepositoryPort.save(transfer);
@@ -117,6 +180,7 @@ public class TransferService implements TransferUseCase {
     public Transfer dispatchTransfer(Long transferId, DispatchTransferCommand command) {
         Transfer transfer = getTransferById(transferId);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.ORIGIN);
         
         // El agregado valida su estado internamente
         transfer.dispatch(
@@ -127,6 +191,13 @@ public class TransferService implements TransferUseCase {
                 user.getId(),
                 user.getNombre()
         ); 
+
+        // Cada producto debe traer su cantidad enviada: una línea omitida dejaría su reserva bloqueada para siempre.
+        requireEveryLine(transfer, command.items().stream().map(DispatchTransferCommand.DispatchDetail::detailId).toList());
+        if (command.items().stream().mapToInt(DispatchTransferCommand.DispatchDetail::sentQuantity).sum() == 0) {
+            // Todo en cero dejaría el traslado "en tránsito" sin carga y terminaría entregado sin novedad.
+            throw new IllegalArgumentException("Debe despachar al menos una unidad.");
+        }
 
         // Operamos contra el Inventario de la sucursal origen
         for (DispatchTransferCommand.DispatchDetail dDetail : command.items()) {
@@ -147,19 +218,21 @@ public class TransferService implements TransferUseCase {
                     BigDecimal.valueOf(detail.getRequestedQuantity())
             );
 
-            inventoryUseCase.withdrawStock(
-                    transfer.getOriginBranchId(),
-                    detail.getProductId(),
-                    productName,
-                    BigDecimal.valueOf(detail.getSentQuantity()),
-                    null,
-                    MovementReason.TRASLADO,
-                    user.getId(),
-                    transfer.getId(),
-                    "TRANSFERENCIA_OUT",
-                    null,
-                    null
-            );
+            if (detail.getSentQuantity() > 0) {
+                inventoryUseCase.withdrawStock(
+                        transfer.getOriginBranchId(),
+                        detail.getProductId(),
+                        productName,
+                        BigDecimal.valueOf(detail.getSentQuantity()),
+                        null,
+                        MovementReason.TRASLADO,
+                        user.getId(),
+                        transfer.getId(),
+                        "TRANSFERENCIA_OUT",
+                        null,
+                        null
+                );
+            }
         }
 
         return transferRepositoryPort.save(transfer);
@@ -170,22 +243,17 @@ public class TransferService implements TransferUseCase {
     public Transfer prepareTransfer(Long transferId, List<UpdateQuantityCommand> items) {
         Transfer transfer = getTransferById(transferId);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.ORIGIN);
 
         transfer.prepare(user.getId(), user.getNombre());
 
-        // Al autorizar la salida (preparar), buscamos si había una alerta de solicitud para cerrarla
-        try {
-            List<co.com.zenvory.inventario.alert.domain.model.StockAlert> originAlerts = alertUseCase.getActiveAlerts(transfer.getOriginBranchId());
-            for (var alert : originAlerts) {
-                if (alert.getMessage().contains("Solicitud de Traslado") && alert.getProductId().equals(transfer.getDetails().get(0).getProductId())) {
-                    alertUseCase.dismissAlert(alert.getId(), "Transferencia autorizada por el gerente");
-                }
-            }
-        } catch (Exception e) {
-            // No bloqueamos el flujo principal si falla la limpieza de alertas
-        }
-        
-        return transferRepositoryPort.save(transfer);
+        Transfer saved = transferRepositoryPort.save(transfer);
+
+        // Al autorizar la salida se cierran las alertas de solicitud de esos productos. Se hace por evento y tras el
+        // commit (en otra transacción): si limpiar alertas falla, la preparación no se deshace.
+        eventPublisher.publishEvent(new TransferPreparedEvent(saved.getId(), saved.getOriginBranchId(),
+                saved.getDetails().stream().map(TransferDetail::getProductId).collect(Collectors.toSet())));
+        return saved;
     }
 
     @Override
@@ -193,8 +261,12 @@ public class TransferService implements TransferUseCase {
     public Transfer receiveTransfer(Long transferId, ReceiveTransferCommand command) {
         Transfer transfer = getTransferById(transferId);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.DESTINATION);
         
         boolean hasIssues = false;
+
+        // Una línea sin cantidad recibida quedaría como "recibida 0" sin faltante reportado.
+        requireEveryLine(transfer, command.items().stream().map(ReceiveTransferCommand.ReceivedDetail::detailId).toList());
 
         // Procesar detalles primero para calcular si hay novedades
         for (ReceiveTransferCommand.ReceivedDetail rDetail : command.items()) {
@@ -237,6 +309,7 @@ public class TransferService implements TransferUseCase {
     public void cancelTransfer(Long id, String reason) {
         Transfer transfer = getTransferById(id);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.EITHER);
 
         TransferStatus previousStatus = transfer.getStatus();
         
@@ -280,6 +353,7 @@ public class TransferService implements TransferUseCase {
     public void rejectTransfer(Long id, String reason) {
         Transfer transfer = getTransferById(id);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.EITHER);
 
         TransferStatus previousStatus = transfer.getStatus();
         
@@ -323,6 +397,7 @@ public class TransferService implements TransferUseCase {
     public void resolveAsShrinkage(Long id) {
         Transfer transfer = getTransferById(id);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.EITHER);
                 
         transfer.resolveAsShrinkage(user.getId(), user.getNombre());
         transferRepositoryPort.save(transfer);
@@ -333,6 +408,7 @@ public class TransferService implements TransferUseCase {
     public void resolveAsResend(Long id) {
         Transfer transfer = getTransferById(id);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.EITHER);
         
         // Crear nuevo traslado para los faltantes
         List<TransferDetail> relativeDetails = transfer.getDetails().stream()
@@ -342,7 +418,12 @@ public class TransferService implements TransferUseCase {
         
         if (!relativeDetails.isEmpty()) {
             Transfer resend = Transfer.resend(transfer, relativeDetails);
-            // El reenvío automático se registra como solicitado por el sistema o por el usuario que resuelve 
+            // Como en cualquier solicitud, el reenvío reserva el stock en el origen: sin la reserva, despacharlo o
+            // cancelarlo liberaría reservas que pertenecen a otros traslados.
+            for (TransferDetail detail : relativeDetails) {
+                inventoryUseCase.reserveStock(transfer.getOriginBranchId(), detail.getProductId(),
+                        BigDecimal.valueOf(detail.getRequestedQuantity()));
+            }
             transferRepositoryPort.save(resend);
         }
         
@@ -355,8 +436,16 @@ public class TransferService implements TransferUseCase {
     public void resolveAsClaim(Long id) {
         Transfer transfer = getTransferById(id);
         User user = getCurrentUser();
+        requireSide(transfer, user, Side.EITHER);
         transfer.resolveAsClaim(user.getId(), user.getNombre());
         transferRepositoryPort.save(transfer);
+    }
+
+    @Override
+    public Transfer getTransferForCurrentUser(Long id) {
+        Transfer transfer = getTransferById(id);
+        requireSide(transfer, getCurrentUser(), Side.EITHER);
+        return transfer;
     }
 
     @Override
@@ -376,8 +465,8 @@ public class TransferService implements TransferUseCase {
     }
 
     @Override
-    public co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.TransferFulfillmentReport getFulfillmentReport() {
-        List<Transfer> transfers = transferRepositoryPort.findAll();
+    public co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.TransferFulfillmentReport getFulfillmentReport(Long branchId) {
+        List<Transfer> transfers = branchId == null ? transferRepositoryPort.findAll() : transferRepositoryPort.findByBranch(branchId);
         
         long totalTransfers = transfers.size();
         
@@ -413,8 +502,8 @@ public class TransferService implements TransferUseCase {
     }
 
     @Override
-    public co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.LogisticsAnalyticsResponse getLogisticsAnalytics() {
-        List<Transfer> transfers = transferRepositoryPort.findAll();
+    public co.com.zenvory.inventario.transfer.infrastructure.adapter.in.web.LogisticsAnalyticsResponse getLogisticsAnalytics(Long branchId) {
+        List<Transfer> transfers = branchId == null ? transferRepositoryPort.findAll() : transferRepositoryPort.findByBranch(branchId);
         
         long totalTransfers = transfers.size();
         

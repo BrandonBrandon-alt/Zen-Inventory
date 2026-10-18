@@ -12,7 +12,8 @@ import co.com.zenvory.inventario.sale.application.port.out.SaleRepositoryPort;
 import co.com.zenvory.inventario.sale.domain.model.Sale;
 import co.com.zenvory.inventario.sale.domain.model.SaleDetail;
 import co.com.zenvory.inventario.branch.application.port.in.BranchUseCase;
-import co.com.zenvory.inventario.auth.application.port.in.UserUseCase;
+import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
+import co.com.zenvory.inventario.auth.domain.exception.UserNotFoundException;
 import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
 import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException;
 import co.com.zenvory.inventario.sale.domain.exception.SaleNotFoundException;
@@ -29,17 +30,17 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
     private final ProductUseCase productUseCase;
     private final InventoryUseCase inventoryUseCase;
     private final BranchUseCase branchUseCase;
-    private final UserUseCase userUseCase;
+    private final UserRepositoryPort userRepositoryPort;
     private final PriceListUseCase priceListUseCase;
     private final AlertUseCase alertUseCase;
 
     public SaleService(SaleRepositoryPort saleRepositoryPort, ProductUseCase productUseCase, InventoryUseCase inventoryUseCase,
-                       BranchUseCase branchUseCase, UserUseCase userUseCase, PriceListUseCase priceListUseCase, AlertUseCase alertUseCase) {
+                       BranchUseCase branchUseCase, UserRepositoryPort userRepositoryPort, PriceListUseCase priceListUseCase, AlertUseCase alertUseCase) {
         this.saleRepositoryPort = saleRepositoryPort;
         this.productUseCase = productUseCase;
         this.inventoryUseCase = inventoryUseCase;
         this.branchUseCase = branchUseCase;
-        this.userUseCase = userUseCase;
+        this.userRepositoryPort = userRepositoryPort;
         this.priceListUseCase = priceListUseCase;
         this.alertUseCase = alertUseCase;
     }
@@ -51,6 +52,9 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
         List<SaleDetail> details = command.items().stream()
                 .map(item -> {
                     Product product = productUseCase.getProductById(item.productId());
+                    if (Boolean.FALSE.equals(product.getActive())) {
+                        throw new IllegalArgumentException("El producto \"" + product.getName() + "\" está desactivado y no se puede vender.");
+                    }
 
                     // Jerarquía de Precios: Detalle -> Global -> Base
                     Long effectiveListId = (item.priceListId() != null) ? item.priceListId() : command.priceListId();
@@ -58,6 +62,10 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
                     BigDecimal price = (effectiveListId != null) 
                             ? priceListUseCase.getPriceForProduct(effectiveListId, item.productId()).orElse(product.getSalePrice())
                             : product.getSalePrice();
+
+                    if (price == null) {
+                        throw new IllegalArgumentException("El producto \"" + product.getName() + "\" no tiene precio de venta.");
+                    }
 
                     return SaleDetail.create(
                             item.productId(),
@@ -84,7 +92,8 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
 
         // 2. Obtener nombres de sucursal y vendedor para el snapshot
         String branchName = branchUseCase.getBranchById(command.branchId()).getName();
-        String userName = userUseCase.getUserById(command.userId()).getNombre();
+        String userName = userRepositoryPort.findById(command.userId())
+                .orElseThrow(() -> new UserNotFoundException(command.userId())).getNombre();
 
         // 3. Crear el agregado (con información de cliente)
         Sale sale = Sale.create(
@@ -138,10 +147,16 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
     }
 
     @Override
+    public Sale getSaleForUpdate(Long id) {
+        return saleRepositoryPort.findByIdForUpdate(id)
+                .orElseThrow(() -> new SaleNotFoundException(id));
+    }
+
+    @Override
     @Transactional
-    public void cancelSale(Long id, String reason, Long restrictedBranchId) {
-        // 1. Obtener la venta
-        Sale sale = getSaleById(id);
+    public void cancelSale(Long id, String reason, Long restrictedBranchId, Long actorUserId) {
+        // 1. Obtener la venta con su fila bloqueada: dos anulaciones (o una anulación y una devolución) se serializan
+        Sale sale = getSaleForUpdate(id);
 
         // 2. Seguridad: Validar que si hay restricción, la venta pertenezca a la sucursal
         if (restrictedBranchId != null && !sale.getBranchId().equals(restrictedBranchId)) {
@@ -164,10 +179,11 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
                     BigDecimal.valueOf(detail.getQuantity()),
                     null,
                     MovementReason.DEVOLUCION,
-                    sale.getUserId(), 
+                    actorUserId, 
                     sale.getId(),
                     "ANULACION_VENTA",
-                    detail.getUnitPriceApplied(),
+                    // Sin costo: reponer unidades no es una compra, y el precio de venta no debe entrar al costo promedio.
+                    null,
                     "Anulación #" + id + ": " + reason,
                     null
             );
@@ -176,12 +192,13 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
     @Override
     @Transactional
     public void updateSaleStatus(Long id, co.com.zenvory.inventario.sale.domain.model.SaleStatus status) {
-        if (status == co.com.zenvory.inventario.sale.domain.model.SaleStatus.RETURNED) {
-            Sale sale = getSaleById(id);
-            sale.markAsReturned();
-            saleRepositoryPort.save(sale);
-        } else {
-            saleRepositoryPort.updateStatus(id, status);
+        // La única transición externa permitida es marcar la venta como devuelta; anular pasa por cancelSale
+        // (con su motivo y su reposición de stock) y no hay forma de "des-anular".
+        if (status != co.com.zenvory.inventario.sale.domain.model.SaleStatus.RETURNED) {
+            throw new IllegalArgumentException("Solo se puede marcar una venta como RETURNED; para anularla use la anulación.");
         }
+        Sale sale = getSaleForUpdate(id);
+        sale.markAsReturned();
+        saleRepositoryPort.save(sale);
     }
 }

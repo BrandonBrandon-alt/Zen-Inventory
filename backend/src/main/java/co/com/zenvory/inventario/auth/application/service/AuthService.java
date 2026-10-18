@@ -10,6 +10,9 @@ import co.com.zenvory.inventario.shared.infrastructure.security.JwtService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Locale;
+import java.util.Optional;
+
 /**
  * Servicio de aplicación que implementa la orquestación del inicio de sesión.
  * 
@@ -28,6 +31,9 @@ public class AuthService implements AuthUseCase {
     private final UserRepositoryPort userRepositoryPort;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private final LoginAttemptLimiter loginAttemptLimiter;
+    /** Hash de relleno para igualar el tiempo de respuesta cuando el correo no existe. */
+    private final String dummyHash;
 
     /**
      * Constructor para la inyección de dependencias.
@@ -35,14 +41,18 @@ public class AuthService implements AuthUseCase {
      * @param userRepositoryPort Puerto de salida para acceso a datos de usuario.
      * @param jwtService Servicio para la gestión de tokens JWT.
      * @param passwordEncoder Componente de validación de hashes de contraseña.
+     * @param loginAttemptLimiter Límite de intentos fallidos por correo.
      */
     public AuthService(
             UserRepositoryPort userRepositoryPort,
             JwtService jwtService,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            LoginAttemptLimiter loginAttemptLimiter) {
         this.userRepositoryPort = userRepositoryPort;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
+        this.loginAttemptLimiter = loginAttemptLimiter;
+        this.dummyHash = passwordEncoder.encode("relleno-contra-enumeracion");
     }
 
     /**
@@ -54,22 +64,26 @@ public class AuthService implements AuthUseCase {
      */
     @Override
     public LoginResult login(String email, String password) {
-        User user = userRepositoryPort.findByEmail(email)
-                .orElseThrow(InvalidCredentialsException::new);
+        String key = email.trim().toLowerCase(Locale.ROOT);
+        loginAttemptLimiter.checkAllowed(key);
 
-        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+        Optional<User> found = userRepositoryPort.findByEmail(key);
+        // Se compara siempre contra un hash (el real o uno de relleno): así un correo inexistente tarda lo mismo
+        // que uno existente con contraseña errónea y no se puede averiguar qué cuentas existen midiendo tiempos.
+        String hash = found.map(User::getPasswordHash).orElse(dummyHash);
+        boolean passwordMatches = passwordEncoder.matches(password, hash);
+        if (found.isEmpty() || !passwordMatches) {
+            loginAttemptLimiter.recordFailure(key);
             throw new InvalidCredentialsException();
         }
+        User user = found.get();
+        loginAttemptLimiter.reset(key);
 
         if (user.getActive() != null && !user.getActive()) {
             throw new AccountDisabledException();
         }
 
-        String token = jwtService.generateToken(
-                user.getEmail(),
-                user.getRole().getNombre(),
-                user.getSucursalId()
-        );
+        String token = jwtService.generateToken(user.getId(), user.getEmail());
 
         return LoginResult.builder()
                 .token(token)

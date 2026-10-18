@@ -88,5 +88,79 @@ class InventoryControllerTest {
         mockMvc.perform(get("/api/v1/inventory/movements"))
                 .andExpect(status().isOk());
     }
-}
 
+    private void actAsManagerOfBranch(Long branchId) {
+        co.com.zenvory.inventario.auth.domain.model.User manager = co.com.zenvory.inventario.auth.domain.model.User.builder()
+                .id(5L).email("test@example.com").nombre("Gerente").sucursalId(branchId)
+                .role(co.com.zenvory.inventario.auth.domain.model.Role.builder().nombre("MANAGER").build()).build();
+        org.mockito.Mockito.when(userRepositoryPort.findByEmail("test@example.com")).thenReturn(java.util.Optional.of(manager));
+    }
+
+    @Test
+    @DisplayName("retirar o ingresar stock en otra sucursal es 403 y no toca el inventario")
+    void stockMovementsOtherBranch_return403() throws Exception {
+        actAsManagerOfBranch(1L);
+        String body = "{\"quantity\": 1, \"reason\": \"MERMA\", \"userId\": 99}";
+        mockMvc.perform(post("/api/v1/inventory/branches/2/products/3/withdraw").contentType("application/json").content(body))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/inventory/branches/2/products/3/add").contentType("application/json").content(body))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/v1/inventory/branches/2/products/3/config?minimumStock=5")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/inventory/branches/2/products/3/kardex")).andExpect(status().isForbidden());
+        org.mockito.Mockito.verifyNoInteractions(inventoryUseCase);
+    }
+
+    @Test
+    @DisplayName("el movimiento queda a nombre del usuario de la sesión, no del userId del cuerpo")
+    void movementAuthorIsSessionUser() throws Exception {
+        actAsManagerOfBranch(1L);
+        String body = "{\"quantity\": 1, \"reason\": \"MERMA\", \"userId\": 99}";
+        when(productUseCase.getProductById(3L)).thenReturn(co.com.zenvory.inventario.catalog.domain.model.Product.builder().name("P").build());
+        mockMvc.perform(post("/api/v1/inventory/branches/1/products/3/withdraw").contentType("application/json").content(body))
+                .andExpect(status().isNoContent());
+        org.mockito.Mockito.verify(inventoryUseCase).withdrawStock(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(3L),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(5L), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("el listado enriquecido (con costo y precio) de otra sucursal es 403, pero el stock de UN producto en otra sucursal se puede consultar (traslados)")
+    void listIsOwnBranchOnlyButSingleProductReadIsOpen() throws Exception {
+        actAsManagerOfBranch(1L);
+        mockMvc.perform(get("/api/v1/inventory/branches/2")).andExpect(status().isForbidden());
+        org.mockito.Mockito.verify(inventoryUseCase, org.mockito.Mockito.never()).getEnrichedInventoryByBranch(org.mockito.ArgumentMatchers.any());
+
+        when(inventoryUseCase.getInventory(2L, 3L)).thenReturn(
+                co.com.zenvory.inventario.inventory.domain.model.LocalInventory.builder().branchId(2L).productId(3L)
+                        .currentQuantity(java.math.BigDecimal.TEN).build());
+        mockMvc.perform(get("/api/v1/inventory/branches/2/products/3")).andExpect(status().isOk());
+        when(inventoryUseCase.getEnrichedInventoryByBranch(1L)).thenReturn(java.util.List.of());
+        mockMvc.perform(get("/api/v1/inventory/branches/1")).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("un stock mínimo negativo por la API es 400")
+    void negativeMinimumIs400() throws Exception {
+        actAsManagerOfBranch(1L);
+        mockMvc.perform(put("/api/v1/inventory/branches/1/products/3/config?minimumStock=-2")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("los movimientos de un MANAGER sin sucursal asignada son 403, no una consulta con null")
+    void movementsWithoutBranchIs403() throws Exception {
+        actAsManagerOfBranch(null);
+        mockMvc.perform(get("/api/v1/inventory/movements")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("el stock de un producto en cualquier sucursal es solo para quien gestiona traslados, no para el vendedor")
+    void singleProductStockIsNotForSellers() throws Exception {
+        var rule = InventoryController.class
+                .getMethod("getInventory", Long.class, Long.class)
+                .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class)
+                .value();
+        org.junit.jupiter.api.Assertions.assertFalse(rule.contains("SELLER"), rule);
+        org.junit.jupiter.api.Assertions.assertTrue(rule.contains("OPERADOR_INVENTARIO") && rule.contains("MANAGER") && rule.contains("ADMIN"), rule);
+    }
+}

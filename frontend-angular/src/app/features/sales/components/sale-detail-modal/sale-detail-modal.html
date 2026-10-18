@@ -1,0 +1,100 @@
+<app-modal
+  [(open)]="open"
+  [title]="title()"
+  [description]="sale()?.date ? formatDateTime(sale()!.date) : ''"
+  size="lg"
+  [dismissible]="!busy()"
+>
+  @if (sale(); as s) {
+    @if (error(); as message) {
+      <app-alert class="mb-4">{{ message }}</app-alert>
+    }
+
+    @if (mode() === 'view') {
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <app-badge [variant]="info[s.status].variant" dot>{{ info[s.status].label }}</app-badge>
+        <p class="text-sm text-fg-muted">
+          <span class="font-medium text-fg">{{ customerLabel(s.customerName) }}</span>
+          @if (s.customerDocument) {
+            · {{ s.customerDocument }}
+          }
+        </p>
+        @if (s.seller || s.branchName) {
+          <p class="text-sm text-fg-subtle">{{ s.seller }}@if (s.seller && s.branchName) { · }{{ s.branchName }}</p>
+        }
+      </div>
+
+      <div class="mt-5 overflow-x-auto rounded-lg border border-line">
+        <table class="w-full border-collapse text-sm">
+          <caption class="sr-only">Productos de la venta</caption>
+          <thead class="bg-surface text-xs text-fg-subtle">
+            <tr>
+              <th scope="col" class="px-3 py-2 text-left font-medium">Producto</th>
+              <th scope="col" class="px-3 py-2 text-right font-medium">Cantidad</th>
+              <th scope="col" class="px-3 py-2 text-right font-medium">Precio</th>
+              <th scope="col" class="px-3 py-2 text-right font-medium">Desc.</th>
+              <th scope="col" class="px-3 py-2 text-right font-medium">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of s.lines; track line.id) {
+              <tr class="border-t border-line-subtle">
+                <th scope="row" class="px-3 py-2 text-left font-medium text-fg">{{ line.productName }}</th>
+                <td class="px-3 py-2 text-right tabular-nums text-fg-muted">{{ formatQuantity(line.quantity) }}</td>
+                <td class="px-3 py-2 text-right tabular-nums text-fg-muted">{{ formatMoney(line.unitPrice) }}</td>
+                <td class="px-3 py-2 text-right tabular-nums text-fg-subtle">{{ line.discountPct ? line.discountPct + ' %' : '—' }}</td>
+                <td class="px-3 py-2 text-right tabular-nums text-fg">{{ formatMoney(line.subtotal) }}</td>
+              </tr>
+            }
+          </tbody>
+          <!-- Los totales van en la misma tabla: así sus cifras caen justo bajo la columna Subtotal. -->
+          <tfoot class="border-t border-line">
+            <tr>
+              <th scope="row" colspan="4" class="px-3 pt-2 pb-1 text-right text-sm font-normal text-fg-subtle">Subtotal</th>
+              <td class="px-3 pt-2 pb-1 text-right tabular-nums text-fg-muted">{{ formatMoney(s.subtotal) }}</td>
+            </tr>
+            @if (s.discount > 0) {
+              <tr>
+                <th scope="row" colspan="4" class="px-3 py-1 text-right text-sm font-normal text-fg-subtle">Descuento{{ s.globalDiscountPct ? ' (' + s.globalDiscountPct + ' % general)' : '' }}</th>
+                <td class="px-3 py-1 text-right tabular-nums text-fg-muted">− {{ formatMoney(s.discount) }}</td>
+              </tr>
+            }
+            <tr>
+              <th scope="row" colspan="4" class="px-3 pt-1 pb-2.5 text-right align-baseline text-sm font-medium text-fg">Total</th>
+              <td class="px-3 pt-1 pb-2.5 text-right align-baseline text-lg font-bold tabular-nums text-fg">{{ formatMoney(s.total) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      @if (s.cancellationReason) {
+        <p class="mt-4 text-sm text-fg-muted"><span class="text-fg-subtle">Motivo de la anulación:</span> {{ s.cancellationReason }}</p>
+      }
+    } @else {
+      <form id="sale-cancel-form" class="flex flex-col gap-4" [formGroup]="reasonForm" novalidate (ngSubmit)="submitCancel()">
+        <p class="text-sm text-fg-muted">La venta queda anulada y los productos vuelven al stock de la sucursal. No se puede deshacer.</p>
+        <app-form-field label="Motivo de la anulación" [error]="reasonError()">
+          <textarea appInput rows="3" formControlName="reason"></textarea>
+        </app-form-field>
+      </form>
+    }
+  }
+
+  <div data-slot="footer">
+    @if (mode() === 'view') {
+      @if (cancellable()) {
+        <button appButton variant="ghost-danger" type="button" [disabled]="busy()" (click)="goto('cancel')">Anular venta</button>
+      }
+      @if (sale()?.status === 'COMPLETED') {
+        <button appButton variant="ghost" type="button" (click)="printReceipt()">
+          <svg lucidePrinter [size]="16" aria-hidden="true"></svg>
+          Imprimir factura
+        </button>
+      }
+      <button appButton [variant]="created() ? 'primary' : 'ghost'" type="button" (click)="open.set(false)">{{ created() ? 'Nueva venta' : 'Cerrar' }}</button>
+    } @else {
+      <button appButton variant="ghost" type="button" [disabled]="busy()" (click)="goto('view')">Volver</button>
+      <button appButton variant="danger" type="submit" form="sale-cancel-form" [loading]="busy()">Anular venta</button>
+    }
+  </div>
+</app-modal>

@@ -29,7 +29,8 @@ public record ProductRequest(
         @Size(max = 150, message = "El nombre no puede superar los 150 caracteres")
         String nombre,
 
-        @NotNull(message = "El costo promedio es obligatorio")
+        // Obligatorio al crear (lo valida el controlador). Al editar puede omitirse: el costo promedio lo calcula el sistema
+        // con cada compra y una petición vieja no debe pisarlo.
         @DecimalMin(value = "0.0", inclusive = true, message = "El costo promedio no puede ser negativo")
         @Digits(integer = 10, fraction = 2, message = "El costo promedio debe tener máximo 10 enteros y 2 decimales")
         BigDecimal costoPromedio,

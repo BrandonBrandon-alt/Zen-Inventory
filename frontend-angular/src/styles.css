@@ -1,0 +1,129 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource/lora/400.css';
+@import '@fontsource/lora/600.css';
+@import './styles/theme.css';
+
+/* Junicode (OFL) para los títulos. Solo WOFF: es lo único que necesitan los navegadores actuales. */
+@font-face {
+  font-family: 'Junicode';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../node_modules/@typopro/web-junicode/TypoPRO-Junicode-Regular.woff') format('woff');
+}
+@font-face {
+  font-family: 'Junicode';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../node_modules/@typopro/web-junicode/TypoPRO-Junicode-Bold.woff') format('woff');
+}
+@font-face {
+  font-family: 'Junicode';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../node_modules/@typopro/web-junicode/TypoPRO-Junicode-Italic.woff') format('woff');
+}
+
+@layer base {
+  /* Scroll estético y consistente en toda la app: barra fina del color neutral del tema, sin pista visible.
+     Va en `*` porque `scrollbar-width` no se hereda: cada área con scroll necesita la propiedad. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--neutral-600) transparent;
+  }
+
+  /* Navegadores que aún no soportan scrollbar-width/scrollbar-color. */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--neutral-600);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--neutral-500);
+  }
+
+  body {
+    min-height: 100vh;
+    background: var(--neutral-100);
+    color: var(--neutral-100);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    /* Sin `transition` de color/fondo: el cambio de tema lo anima la View Transition (ver más abajo) y una
+       transición en el body haría que la captura de la pantalla nueva saliera con los colores a medio camino. */
+  }
+}
+
+/* Cambio de tema claro/oscuro: el tema nuevo se revela como un círculo que crece desde el botón pulsado
+   (--theme-x / --theme-y los pone ThemeService). Solo activo mientras dura el cambio (html[data-theme-switching]). */
+:root[data-theme-switching]::view-transition-old(root),
+:root[data-theme-switching]::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+:root[data-theme-switching]::view-transition-new(root) {
+  animation: theme-reveal 650ms var(--ease-out-expo) both;
+}
+
+@keyframes theme-reveal {
+  from {
+    clip-path: circle(0 at var(--theme-x, 50%) var(--theme-y, 50%));
+  }
+  to {
+    clip-path: circle(150vmax at var(--theme-x, 50%) var(--theme-y, 50%));
+  }
+}
+
+/* Accesibilidad: quien pide menos movimiento no ve animaciones ni transiciones (el estado final se conserva). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+
+/* Énfasis dentro de un título: `<h1>Hola <span class="italic">mundo</span></h1>`. Usa la cara itálica real de Junicode
+   (por eso no se sintetiza otra) y sin alternativas "swash". */
+@layer components {
+  :is(h1, h2) .italic {
+    font-family: var(--font-title);
+    font-feature-settings: 'swsh' 0;
+    font-style: italic;
+    font-weight: 400;
+  }
+}
+
+/* Campos numéricos: sin las flechitas nativas (se ven distintas en cada navegador y se activan con un clic o la
+   rueda del ratón sin querer). `app-form-field` dibuja sus propios botones − y +. */
+input[type='number'] {
+  appearance: textfield;
+}
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}

@@ -1,10 +1,36 @@
 
+# Límites de recursos y registros para que el entorno de desarrollo no se coma el equipo: cada servicio tiene su tope de
+# memoria (`mem_limit`) y de CPU (`cpus`), y los registros rotan (sin esto crecen sin límite en disco).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # 1. Base de Datos
   db:
     image: postgres:16-alpine
     container_name: ${DB_CONTEINER_NAME}
-    restart: always
+    restart: unless-stopped
+    # Ajuste para desarrollo: pocas conexiones y memoria compartida pequeña (la API usa un pool de 5).
+    command: >
+      postgres
+      -c shared_buffers=64MB
+      -c effective_cache_size=192MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=32MB
+      -c max_connections=30
+      -c synchronous_commit=off
+    mem_limit: 256m
+    cpus: 1.0
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
@@ -20,14 +46,21 @@ services:
   pgadmin:
     image: dpage/pgadmin4
     container_name: zenvory-pgadmin
-    restart: always
+    restart: unless-stopped
+    # Herramienta opcional (775 MB de imagen, ~150 MB de RAM): no arranca con `docker compose up`.
+    # Para usarla: `docker compose --profile tools up -d pgadmin`.
+    profiles: ["tools"]
+    mem_limit: 384m
+    cpus: 0.5
+    logging: *default-logging
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
     ports:
       - "5050:80"
     depends_on:
-      - db
+      db:
+        condition: service_started
     networks:
       - zenvory-network
 
@@ -38,29 +71,77 @@ services:
       dockerfile: Dockerfile
     container_name: zenvory-backend
     restart: on-failure
+    init: true
+    # La JVM respeta el tope del contenedor: el heap usa hasta el 65 % (el resto es memoria fuera del heap y pilas).
+    # SerialGC es el recolector más liviano para un heap chico; TieredStopAtLevel=1 arranca antes y gasta menos
+    # CPU (suficiente para desarrollo; en producción quítalo con JAVA_TOOL_OPTIONS).
+    mem_limit: 640m
+    cpus: 1.5
+    logging: *default-logging
+    # `docker compose watch`: vigila estos archivos y reconstruye solo este servicio cuando cambian.
+    develop:
+      watch:
+        - action: rebuild
+          path: ./backend/src
+        - action: rebuild
+          path: ./backend/pom.xml
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${DB_NAME}
       - SPRING_DATASOURCE_USERNAME=${DB_USER}
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
       - SECURITY_JWT_SECRET=${JWT_SECRET}
+      # Datos de la empresa para la factura de venta (todos opcionales; ver app.company en application.yml).
+      - COMPANY_NAME=${COMPANY_NAME:-Zen Inventory}
+      - COMPANY_TAX_ID=${COMPANY_TAX_ID:-}
+      - COMPANY_ADDRESS=${COMPANY_ADDRESS:-}
+      - COMPANY_PHONE=${COMPANY_PHONE:-}
+      - COMPANY_INVOICE_PREFIX=${COMPANY_INVOICE_PREFIX:-FV}
+      - COMPANY_INVOICE_FOOTER=${COMPANY_INVOICE_FOOTER:-Documento equivalente a factura de venta.}
+      # Perfil de la API: "dev" abre Swagger, permite CORS desde localhost y registra SQL. En producción: SPRING_PROFILES_ACTIVE=prod
+      # y CORS_ALLOWED_ORIGINS=https://tu-dominio (sin definirla, no se permite ningún origen cruzado).
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
+      - JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=65 -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -Xss512k -XX:+ExitOnOutOfMemoryError}
+      # Pool de conexiones y hilos de Tomcat acordes a un entorno de desarrollo (los valores por defecto son 10 y 200).
+      - SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE=${HIKARI_MAX_POOL:-5}
+      - SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE=1
+      - SERVER_TOMCAT_THREADS_MAX=${TOMCAT_MAX_THREADS:-40}
     ports:
       - "${SPRING_LOCAL_PORT}:8080"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - zenvory-network
 
-  # 4. Frontend (Next.js)
-  frontend:
+  # 4. Frontend (Angular)
+  frontend-angular:
     build:
-      context: ./frontend
+      context: ./frontend-angular
       dockerfile: Dockerfile
-    container_name: zenvory-frontend
+    container_name: zenvory-frontend-angular
     restart: on-failure
+    init: true
+    mem_limit: 64m
+    cpus: 0.5
+    logging: *default-logging
+    # `docker compose watch`: vigila estos archivos y reconstruye solo este servicio cuando cambian.
+    develop:
+      watch:
+        - action: rebuild
+          path: ./frontend-angular/src
+        - action: rebuild
+          path: ./frontend-angular/nginx
+        - action: rebuild
+          path: ./frontend-angular/package.json
+        - action: rebuild
+          path: ./frontend-angular/package-lock.json
+        - action: rebuild
+          path: ./frontend-angular/angular.json
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      # nginx reenvía /api/* a esta dirección (red interna de Docker)
+      - BACKEND_URL=http://backend:8080
     ports:
-      - "${NEXT_PORT}:3000"
+      - "${ANGULAR_PORT:-4200}:8080"
     depends_on:
       - backend
     networks:

@@ -29,6 +29,15 @@ public interface ProductUseCase {
     Product getProductById(Long id);
 
     /**
+     * Producto con su fila bloqueada hasta el fin de la transacción, para recalcular su costo promedio sin que otro
+     * ingreso simultáneo lo pise.
+     */
+    Product getProductForCostUpdate(Long id);
+
+    /** Actualiza únicamente el costo promedio del producto. */
+    void updateAverageCost(Long id, java.math.BigDecimal averageCost);
+
+    /**
      * Registra un nuevo producto en el catálogo persistente.
      * 
      * @param product Modelo de dominio con los datos iniciales.

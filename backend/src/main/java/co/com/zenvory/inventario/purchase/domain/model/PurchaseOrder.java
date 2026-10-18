@@ -112,6 +112,10 @@ public class PurchaseOrder {
             throw new InvalidPurchaseStateException(
                     "Solo se pueden aprobar excepciones en órdenes con estado PENDING.");
         }
+        if (this.exceptionApproved) {
+            // No se pisa quién aprobó primero ni cuándo: es el rastro de auditoría.
+            throw new InvalidPurchaseStateException("La excepción de esta orden ya fue aprobada.");
+        }
         this.exceptionApproved = true;
         this.resolvedById = userId;
         this.resolutionDate = LocalDateTime.now();
@@ -131,13 +135,25 @@ public class PurchaseOrder {
      * @param userId       ID del usuario que recibe físicamente el pedido.
      * @param totalsAreMet Si todas las cantidades cuadran al 100%.
      */
-    public void receive(Long userId, boolean totalsAreMet) {
+    /**
+     * Valida que la orden pueda recibir mercancía (antes de mover stock). Se admite desde PENDING (aprobada) y
+     * IN_TRANSIT, y también desde RECEIVED_PARTIAL para el resto; no desde AWAITING_APPROVAL, RECEIVED_TOTAL
+     * ni CANCELLED.
+     */
+    public void requireReceivable() {
         if (this.receptionStatus == ReceptionStatus.RECEIVED_TOTAL) {
             throw new InvalidPurchaseStateException("La orden ya ha sido recibida completamente.");
         }
         if (this.receptionStatus == ReceptionStatus.CANCELLED) {
             throw new InvalidPurchaseStateException("No se puede recibir una orden cancelada.");
         }
+        if (this.receptionStatus == ReceptionStatus.AWAITING_APPROVAL) {
+            throw new InvalidPurchaseStateException("La orden aún no ha sido aprobada, no se puede recibir.");
+        }
+    }
+
+    public void receive(Long userId, boolean totalsAreMet) {
+        requireReceivable();
 
         this.receptionStatus = totalsAreMet ? ReceptionStatus.RECEIVED_TOTAL : ReceptionStatus.RECEIVED_PARTIAL;
         this.receivingUserId = userId;

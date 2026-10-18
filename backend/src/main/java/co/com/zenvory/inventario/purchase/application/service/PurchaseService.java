@@ -11,17 +11,15 @@ import co.com.zenvory.inventario.purchase.application.port.out.PurchaseRepositor
 import co.com.zenvory.inventario.purchase.domain.model.PurchaseOrder;
 import co.com.zenvory.inventario.purchase.domain.model.PurchaseOrderDetail;
 import co.com.zenvory.inventario.purchase.domain.model.ReceptionStatus;
-import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
-import co.com.zenvory.inventario.alert.domain.model.StockAlert;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Set;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Servicio de aplicación que implementa la lógica de negocio para la gestión de compras.
@@ -43,8 +41,6 @@ public class PurchaseService implements PurchaseUseCase {
     /** Puerto para consulta de información técnica de productos. */
     private final ProductUseCase productUseCase;
     
-    /** Puerto para la gestión de notificaciones y umbrales de stock. */
-    private final AlertUseCase alertUseCase;
 
     /**
      * Constructor con inyección de dependencias.
@@ -52,16 +48,13 @@ public class PurchaseService implements PurchaseUseCase {
      * @param repository       Repositorio de órdenes.
      * @param inventoryUseCase Servicio de inventarios.
      * @param productUseCase   Servicio de catálogo.
-     * @param alertUseCase     Servicio de alertas (con {@link Lazy} para evitar dependencias circulares).
      */
     public PurchaseService(PurchaseRepositoryPort repository, 
                            InventoryUseCase inventoryUseCase,
-                           ProductUseCase productUseCase,
-                           @Lazy AlertUseCase alertUseCase) {
+                           ProductUseCase productUseCase) {
         this.repository = repository;
         this.inventoryUseCase = inventoryUseCase;
         this.productUseCase = productUseCase;
-        this.alertUseCase = alertUseCase;
     }
 
 
@@ -114,13 +107,27 @@ public class PurchaseService implements PurchaseUseCase {
     public PurchaseReceiptResult receiveOrder(Long orderId, Long userId, Map<Long, PurchaseUseCase.ItemReceiptInfo> items) {
         PurchaseOrder order = getOrderById(orderId);
         List<PurchaseReceiptResult.CppImpact> impacts = new ArrayList<>();
+
+        // Se valida todo antes de mover stock: ni aprobada pendiente, ni líneas ajenas, ni sobrerrecepción.
+        order.requireReceivable();
+        requireValidReceipt(items);
+        Set<Long> orderDetailIds = order.getDetails().stream().map(PurchaseOrderDetail::getId).collect(Collectors.toSet());
+        if (!orderDetailIds.containsAll(items.keySet())) {
+            throw new IllegalArgumentException("La recepción incluye líneas que no pertenecen a la orden.");
+        }
+        for (PurchaseOrderDetail detail : order.getDetails()) {
+            BigDecimal incoming = items.getOrDefault(detail.getId(), new PurchaseUseCase.ItemReceiptInfo(BigDecimal.ZERO, null)).quantity();
+            if (incoming.compareTo(detail.pendingQuantity()) > 0) {
+                throw new IllegalArgumentException("No se puede recibir más de lo pendiente en el producto " + detail.getProductId() + ".");
+            }
+        }
         
-        boolean allMet = true;
         for (PurchaseOrderDetail detail : order.getDetails()) {
             PurchaseUseCase.ItemReceiptInfo receiptInfo = items.getOrDefault(detail.getId(), new PurchaseUseCase.ItemReceiptInfo(BigDecimal.ZERO, null));
             BigDecimal qtyNow = receiptInfo.quantity();
             
             if (qtyNow.compareTo(BigDecimal.ZERO) > 0) {
+                detail.registerReceipt(qtyNow);
                 // Capturar CPP anterior para auditoría de impacto
                 Product productBefore = productUseCase.getProductById(detail.getProductId());
                 BigDecimal oldCpp = productBefore.getAverageCost();
@@ -130,12 +137,12 @@ public class PurchaseService implements PurchaseUseCase {
                         order.getBranchId(),
                         detail.getProductId(),
                         qtyNow,
-                        receiptInfo.unitId(),
+                        null,
                         MovementReason.COMPRA,
                         userId,
                         order.getId(),
                         "ORDEN_COMPRA",
-                        detail.getUnitPrice(),
+                        detail.effectiveUnitPrice(),
                         null,
                         null
                 );
@@ -152,17 +159,35 @@ public class PurchaseService implements PurchaseUseCase {
                         qtyNow
                 ));
             }
-
-            // Verificación simplificada de cumplimiento de línea
-            if (qtyNow.compareTo(detail.getQuantity()) < 0) {
-                allMet = false;
-            }
         }
 
+        // El cumplimiento se mide sobre lo acumulado de todas las recepciones, no solo sobre esta entrega.
+        boolean allMet = order.getDetails().stream().allMatch(PurchaseOrderDetail::isFullyReceived);
         order.receive(userId, allMet);
         PurchaseOrder savedOrder = repository.save(order);
         
         return new PurchaseReceiptResult(savedOrder, impacts);
+    }
+
+    /**
+     * Una recepción tiene que traer algo: sin cantidades negativas, al menos una línea con cantidad y sin unidad
+     * alterna (la cantidad pedida y recibida van en la unidad base; convertir cajas/paquetes aquí descuadraría el
+     * estado de la orden, el stock y el costo).
+     */
+    private void requireValidReceipt(Map<Long, PurchaseUseCase.ItemReceiptInfo> items) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (PurchaseUseCase.ItemReceiptInfo info : items.values()) {
+            if (info.quantity() == null || info.quantity().signum() < 0) {
+                throw new IllegalArgumentException("Las cantidades recibidas no pueden ser negativas.");
+            }
+            if (info.unitId() != null) {
+                throw new IllegalArgumentException("La recepción de compras se registra en la unidad base del producto.");
+            }
+            total = total.add(info.quantity());
+        }
+        if (total.signum() == 0) {
+            throw new IllegalArgumentException("Debe indicar al menos una cantidad recibida.");
+        }
     }
 
     @Override
@@ -198,5 +223,10 @@ public class PurchaseService implements PurchaseUseCase {
     @Override
     public List<PurchaseOrder> getAllOrders() {
         return repository.findAll();
+    }
+
+    @Override
+    public List<PurchaseOrder> getOrdersByBranch(Long branchId) {
+        return repository.findByBranchId(branchId);
     }
 }

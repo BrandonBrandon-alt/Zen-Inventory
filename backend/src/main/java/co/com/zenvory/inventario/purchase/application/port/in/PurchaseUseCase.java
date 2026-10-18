@@ -106,5 +106,8 @@ public interface PurchaseUseCase {
      * @return Lista de órdenes de compra.
      */
     List<PurchaseOrder> getAllOrders();
+
+    /** Órdenes de una sucursal. */
+    List<PurchaseOrder> getOrdersByBranch(Long branchId);
 }
 

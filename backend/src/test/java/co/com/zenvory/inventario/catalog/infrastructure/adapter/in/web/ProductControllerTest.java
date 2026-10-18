@@ -97,6 +97,30 @@ class ProductControllerTest {
     }
 
     @Test
+    @DisplayName("POST /api/catalog/products sin costo inicial es 400 y no crea nada")
+    void create_withoutCost_returns400() throws Exception {
+        String body = "{\"sku\":\"SKU-001\",\"nombre\":\"Producto Test\",\"precioVenta\":150.00,\"unitId\":1,\"activo\":true}";
+
+        mockMvc.perform(post("/api/catalog/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verify(productUseCase, org.mockito.Mockito.never()).createProduct(any(Product.class));
+    }
+
+    @Test
+    @DisplayName("PUT /api/catalog/products/{id} sin costo promedio es válido: el costo lo calculan las compras")
+    void update_withoutCost_returns200() throws Exception {
+        String body = "{\"sku\":\"SKU-001\",\"nombre\":\"Updated Name\",\"precioVenta\":150.00,\"unitId\":1,\"activo\":true}";
+        when(productUseCase.updateProduct(eq(1L), any(Product.class))).thenReturn(sampleProduct);
+
+        mockMvc.perform(put("/api/catalog/products/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     @DisplayName("PUT /api/catalog/products/{id}: returns 200 with updated product")
     void update_returns200() throws Exception {
         ProductRequest request = new ProductRequest("SKU-001", "Updated Name", new BigDecimal("100.00"), new BigDecimal("150.00"), 1L, List.of(), true);

@@ -1,7 +1,10 @@
 package co.com.zenvory.inventario.inventory.infrastructure.adapter.out.persistence;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -27,12 +30,30 @@ public interface JpaLocalInventoryRepository extends JpaRepository<LocalInventor
     Optional<LocalInventoryEntity> findByBranchIdAndProductId(Long branchId, Long productId);
 
     /**
+     * Igual que {@link #findByBranchIdAndProductId} pero bloquea la fila hasta el fin de la transacción
+     * ({@code SELECT ... FOR UPDATE}). Toda lectura-modificación-escritura del saldo debe usarla: sin el bloqueo,
+     * dos operaciones simultáneas leen el mismo saldo y la segunda pisa a la primera.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM LocalInventoryEntity i WHERE i.branchId = :branchId AND i.productId = :productId")
+    Optional<LocalInventoryEntity> findByBranchIdAndProductIdForUpdate(@Param("branchId") Long branchId, @Param("productId") Long productId);
+
+    /**
+     * Crea la fila (con ceros) si no existe, sin error si otra transacción la crea a la vez. Se usa antes de bloquear:
+     * sin fila no hay nada que bloquear y dos primeras operaciones simultáneas intentarían insertar las dos.
+     */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query(value = "INSERT INTO inventario_local (sucursal_id, producto_id, cantidad_actual, stock_minimo, stock_comprometido, last_updated) "
+            + "VALUES (:branchId, :productId, 0, 0, 0, now()) ON CONFLICT (sucursal_id, producto_id) DO NOTHING", nativeQuery = true)
+    void insertIfAbsent(@Param("branchId") Long branchId, @Param("productId") Long productId);
+
+    /**
      * Busca registros donde la existencia actual es inferior o igual al stock mínimo de seguridad.
      * Solo considera productos que tengan configurado un stock mínimo mayor a cero.
      * 
      * @return Lista de inventarios en estado de alerta.
      */
-    @Query("SELECT i FROM LocalInventoryEntity i WHERE i.currentQuantity <= i.minimumStock AND i.minimumStock > 0")
+    @Query("SELECT i FROM LocalInventoryEntity i WHERE (i.currentQuantity - COALESCE(i.committedQuantity, 0)) <= i.minimumStock AND i.minimumStock > 0")
     List<LocalInventoryEntity> findLowStock();
 
     /**

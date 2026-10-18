@@ -1,8 +1,10 @@
 package co.com.zenvory.inventario.purchase.infrastructure.adapter.in.web;
 
+import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
 import co.com.zenvory.inventario.purchase.application.port.in.CreatePurchaseCommand;
 import co.com.zenvory.inventario.purchase.application.port.in.PurchaseUseCase;
 import co.com.zenvory.inventario.purchase.domain.model.PurchaseOrder;
+import co.com.zenvory.inventario.shared.infrastructure.security.CurrentUser;
 import co.com.zenvory.inventario.shared.infrastructure.web.ResolutionRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -17,8 +19,21 @@ public class PurchaseController {
 
     private final PurchaseUseCase purchaseUseCase;
 
-    public PurchaseController(PurchaseUseCase purchaseUseCase) {
+    private final UserRepositoryPort userRepositoryPort;
+
+    public PurchaseController(PurchaseUseCase purchaseUseCase, UserRepositoryPort userRepositoryPort) {
         this.purchaseUseCase = purchaseUseCase;
+        this.userRepositoryPort = userRepositoryPort;
+    }
+
+    /**
+     * Orden de la propia sucursal (el ADMIN accede a todas). El usuario que actúa siempre es el de la sesión:
+     * los {@code userId} que llegan en la petición se ignoran porque cualquiera podría falsificarlos.
+     */
+    private CurrentUser requireOrderAccess(Long orderId) {
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
+        current.requireBranch(purchaseUseCase.getOrderById(orderId).getBranchId());
+        return current;
     }
 
     @PostMapping
@@ -29,10 +44,11 @@ public class PurchaseController {
         
         boolean isManager = httpRequest.isUserInRole("ADMIN") || httpRequest.isUserInRole("MANAGER");
         
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
         CreatePurchaseCommand command = new CreatePurchaseCommand(
                 request.supplierId(),
-                request.userId(),
-                request.branchId(),
+                current.id(),
+                current.resolveBranch(request.branchId()),
                 request.leadTimeDays(),
                 request.paymentDueDays(),
                 request.items().stream()
@@ -47,24 +63,23 @@ public class PurchaseController {
     @PostMapping("/{id}/approve")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<PurchaseResponse> approveOrder(
-            @PathVariable Long id,
-            @RequestParam Long userId) {
-        PurchaseOrder order = purchaseUseCase.approveOrder(id, userId);
+            @PathVariable Long id) {
+        PurchaseOrder order = purchaseUseCase.approveOrder(id, requireOrderAccess(id).id());
         return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
     }
 
     @PostMapping("/{id}/approve-exception")
     @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<PurchaseResponse> approveException(
-            @PathVariable Long id,
-            @RequestParam Long userId) {
-        PurchaseOrder order = purchaseUseCase.approveException(id, userId);
+            @PathVariable Long id) {
+        PurchaseOrder order = purchaseUseCase.approveException(id, requireOrderAccess(id).id());
         return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
     }
 
     @PostMapping("/{id}/dispatch")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<PurchaseResponse> markAsInTransit(@PathVariable Long id) {
+        requireOrderAccess(id);
         PurchaseOrder order = purchaseUseCase.markAsInTransit(id);
         return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
     }
@@ -75,12 +90,18 @@ public class PurchaseController {
             @PathVariable Long id,
             @Valid @RequestBody ReceiveOrderRequest request) {
         
+        CurrentUser current = requireOrderAccess(id);
         java.util.Map<Long, co.com.zenvory.inventario.purchase.application.port.in.PurchaseUseCase.ItemReceiptInfo> itemsInMap = new java.util.HashMap<>();
-        request.items().forEach(item -> itemsInMap.put(item.detailId(), 
-                new co.com.zenvory.inventario.purchase.application.port.in.PurchaseUseCase.ItemReceiptInfo(item.quantityReceived(), item.unitId())));
+        request.items().forEach(item -> {
+            var previous = itemsInMap.put(item.detailId(),
+                    new co.com.zenvory.inventario.purchase.application.port.in.PurchaseUseCase.ItemReceiptInfo(item.quantityReceived(), item.unitId()));
+            if (previous != null) {
+                throw new IllegalArgumentException("La línea " + item.detailId() + " aparece repetida en la recepción.");
+            }
+        });
 
         co.com.zenvory.inventario.purchase.application.port.in.PurchaseReceiptResult result = 
-                purchaseUseCase.receiveOrder(id, request.userId(), itemsInMap);
+                purchaseUseCase.receiveOrder(id, current.id(), itemsInMap);
         
         List<PurchaseReceiptResponse.CppImpact> impacts = result.impacts().stream()
                 .map(i -> new PurchaseReceiptResponse.CppImpact(
@@ -101,15 +122,15 @@ public class PurchaseController {
     @PostMapping("/{id}/close-shortfall")
     @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<PurchaseResponse> closeShortfall(
-            @PathVariable Long id,
-            @RequestParam Long userId) {
-        PurchaseOrder order = purchaseUseCase.closeShortfall(id, userId);
+            @PathVariable Long id) {
+        PurchaseOrder order = purchaseUseCase.closeShortfall(id, requireOrderAccess(id).id());
         return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
     }
 
     @PostMapping("/{id}/pay")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<PurchaseResponse> registerPayment(@PathVariable Long id) {
+        requireOrderAccess(id);
         PurchaseOrder order = purchaseUseCase.registerPayment(id);
         return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
     }
@@ -119,7 +140,7 @@ public class PurchaseController {
     public ResponseEntity<Void> cancelPurchase(
             @PathVariable Long id,
             @Valid @RequestBody ResolutionRequest request) {
-        purchaseUseCase.cancelPurchase(id, request.reason(), request.userId());
+        purchaseUseCase.cancelPurchase(id, request.reason(), requireOrderAccess(id).id());
         return ResponseEntity.noContent().build();
     }
 
@@ -127,6 +148,7 @@ public class PurchaseController {
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<PurchaseResponse> getOrder(@PathVariable Long id) {
         PurchaseOrder order = purchaseUseCase.getOrderById(id);
+        CurrentUser.resolve(userRepositoryPort).requireBranch(order.getBranchId());
         return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
     }
 
@@ -136,10 +158,13 @@ public class PurchaseController {
             @RequestParam(required = false) Long supplierId,
             @RequestParam(required = false) Long productId) {
         
-        List<PurchaseOrder> allOrders = purchaseUseCase.getAllOrders();
-        
-        // Filtrado básico (por ahora en memoria, se puede optimizar en repository)
-        List<PurchaseResponse> filtered = allOrders.stream()
+        // Solo el ADMIN ve las órdenes de todas las sucursales; el resto, las de la suya (filtrado en base de datos).
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
+        List<PurchaseOrder> scoped = current.isAdmin()
+                ? purchaseUseCase.getAllOrders()
+                : purchaseUseCase.getOrdersByBranch(current.resolveBranch(null));
+
+        List<PurchaseResponse> filtered = scoped.stream()
                 .filter(o -> supplierId == null || o.getSupplierId().equals(supplierId))
                 .filter(o -> productId == null || o.getDetails().stream().anyMatch(d -> d.getProductId().equals(productId)))
                 .map(PurchaseResponse::fromDomain)

@@ -4,6 +4,7 @@ import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
 import co.com.zenvory.inventario.auth.domain.model.User;
 import org.springframework.http.ResponseEntity;
+import co.com.zenvory.inventario.shared.infrastructure.security.CurrentUser;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -31,10 +32,23 @@ public class AlertController {
     public record MessageResponse(String message) {}
 
     /** Requerimientos de datos para resolver una alerta mediante traslado. */
-    public record TransferResolutionRequest(Long originBranchId, Integer quantity, Long userId, String priority) {}
+    public record TransferResolutionRequest(
+            @jakarta.validation.constraints.NotNull(message = "La sucursal de origen es obligatoria.") Long originBranchId,
+            @jakarta.validation.constraints.NotNull(message = "La cantidad es obligatoria.")
+            @jakarta.validation.constraints.Positive(message = "La cantidad debe ser mayor a cero.") Integer quantity,
+            /** Se ignora: quien resuelve es el usuario de la sesión. */
+            Long userId,
+            String priority) {}
     
     /** Requerimientos de datos para resolver una alerta mediante compra. */
-    public record PurchaseResolutionRequest(Integer leadTimeDays, java.math.BigDecimal quantity, Long userId, Long supplierId) {}
+    public record PurchaseResolutionRequest(
+            @jakarta.validation.constraints.NotNull(message = "El tiempo de entrega es obligatorio.")
+            @jakarta.validation.constraints.Positive(message = "El tiempo de entrega debe ser mayor a cero.") Integer leadTimeDays,
+            @jakarta.validation.constraints.NotNull(message = "La cantidad es obligatoria.")
+            @jakarta.validation.constraints.Positive(message = "La cantidad debe ser mayor a cero.") java.math.BigDecimal quantity,
+            /** Se ignora: quien resuelve es el usuario de la sesión. */
+            Long userId,
+            @jakarta.validation.constraints.NotNull(message = "El proveedor es obligatorio.") Long supplierId) {}
     
     /** Requerimientos para descartar una alerta sin acción. */
     public record DismissResolutionRequest(String reason) {}
@@ -52,23 +66,11 @@ public class AlertController {
         this.userRepositoryPort = userRepositoryPort;
     }
 
-    /**
-     * Resuelve el alcance de la consulta basado en el rol del usuario autenticado.
-     * 
-     * <p>Regla de Seguridad:
-     * - ADMIN: Acceso global (puede ver cualquier sucursal).
-     * - MANAGER / OPERADOR_INVENTARIO: Restringido a su sucursalId propia.
-     * </p>
-     */
-    private Long resolveBranchScope() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        User user = userRepositoryPort.findByEmail(auth.getName()).orElseThrow();
-        String roleName = user.getRole().getNombre();
-        
-        if ("ADMIN".equals(roleName)) {
-            return null; // Acceso global
-        }
-        return user.getSucursalId(); // Restricción obligatoria por sede
+    /** Solo se actúa sobre alertas de la propia sucursal (el ADMIN, sobre cualquiera). */
+    private CurrentUser requireAlertBranch(Long alertId) {
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
+        current.requireBranch(alertUseCase.getAlertById(alertId).getBranchId());
+        return current;
     }
 
     /**
@@ -93,7 +95,9 @@ public class AlertController {
      */
     @GetMapping
     public ResponseEntity<List<StockAlertResponse>> getActiveAlerts(@RequestParam(required = false) Long branchId) {
-        Long restrictedBranchId = resolveBranchScope();
+        // ADMIN: global (puede filtrar por sucursal). El resto: siempre su sucursal; sin sucursal asignada, 403.
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
+        Long restrictedBranchId = current.isAdmin() ? null : current.resolveBranch(null);
         
         // Si el usuario tiene restricción (Gerente/Operador), usamos su sucursal ignorando el parámetro
         Long finalBranchId = (restrictedBranchId != null) ? restrictedBranchId : branchId;
@@ -120,6 +124,7 @@ public class AlertController {
     @PatchMapping("/{id}/resolve")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<MessageResponse> resolveAlert(@PathVariable Long id) {
+        requireAlertBranch(id);
         alertUseCase.resolveAlert(id);
         return ResponseEntity.ok(new MessageResponse("Alerta #" + id + " marcada como resuelta."));
     }
@@ -134,8 +139,10 @@ public class AlertController {
     @PostMapping("/{id}/resolve/transfer")
     public ResponseEntity<MessageResponse> resolveViaTransfer(
             @PathVariable Long id, 
-            @RequestBody TransferResolutionRequest request) {
-        alertUseCase.resolveViaTransfer(id, request.originBranchId(), request.quantity(), request.userId(), request.priority());
+            @jakarta.validation.Valid @RequestBody TransferResolutionRequest request) {
+        // Quien resuelve es el usuario de la sesión (request.userId() se ignora: era falsificable).
+        CurrentUser current = requireAlertBranch(id);
+        alertUseCase.resolveViaTransfer(id, request.originBranchId(), request.quantity(), current.id(), request.priority());
         return ResponseEntity.ok(new MessageResponse("Alerta resuelta mediante solicitud de transferencia interna."));
     }
 
@@ -152,13 +159,15 @@ public class AlertController {
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<MessageResponse> resolveViaPurchase(
             @PathVariable Long id, 
-            @RequestBody PurchaseResolutionRequest request,
+            @jakarta.validation.Valid @RequestBody PurchaseResolutionRequest request,
             jakarta.servlet.http.HttpServletRequest httpRequest) {
         
-        // Verificamos si el usuario tiene 권한 de aprobación inmediata (isManager)
+        // Verificamos si el usuario tiene permiso de aprobación inmediata (isManager)
         boolean isManager = httpRequest.isUserInRole("ADMIN") || httpRequest.isUserInRole("MANAGER");
-        
-        alertUseCase.resolveViaPurchaseOrder(id, request.leadTimeDays(), request.quantity(), request.userId(), isManager, request.supplierId());
+
+        // El creador de la orden es el usuario de la sesión (request.userId() se ignora: era falsificable).
+        CurrentUser current = requireAlertBranch(id);
+        alertUseCase.resolveViaPurchaseOrder(id, request.leadTimeDays(), request.quantity(), current.id(), isManager, request.supplierId());
         return ResponseEntity.ok(new MessageResponse("Alerta resuelta mediante generación de orden de compra."));
     }
 
@@ -174,6 +183,7 @@ public class AlertController {
     public ResponseEntity<MessageResponse> dismissAlert(
             @PathVariable Long id, 
             @RequestBody DismissResolutionRequest request) {
+        requireAlertBranch(id);
         alertUseCase.dismissAlert(id, request.reason());
         return ResponseEntity.ok(new MessageResponse("Alerta descartada exitosamente."));
     }

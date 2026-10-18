@@ -42,6 +42,28 @@ public class AlertPersistenceAdapter implements AlertRepositoryPort {
     }
 
     @Override
+    public List<StockAlert> findUnresolvedByBranchProductAndType(Long branchId, Long productId, StockAlert.AlertType type) {
+        return repository.findByBranchIdAndProductIdAndTypeAndResolvedFalse(branchId, productId, type)
+                .stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public List<StockAlert> findAllUnresolvedByType(StockAlert.AlertType type) {
+        return repository.findByTypeAndResolvedFalse(type).stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public Optional<StockAlert> findByIdForUpdate(Long id) {
+        return repository.findByIdForUpdate(id).map(this::toDomain);
+    }
+
+    @Override
+    public void lockForCreation(Long branchId, Long productId) {
+        // Clave estable por par (sucursal, producto) para el candado de la transacción.
+        repository.advisoryLock(branchId * 1_000_003L + productId);
+    }
+
+    @Override
     public List<StockAlert> findUnresolvedByBranchAndProduct(Long branchId, Long productId) {
         return repository.findByBranchIdAndProductIdAndResolvedFalse(branchId, productId)
                 .stream().map(this::toDomain).toList();

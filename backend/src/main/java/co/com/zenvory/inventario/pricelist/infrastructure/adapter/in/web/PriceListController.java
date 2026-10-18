@@ -2,6 +2,7 @@ package co.com.zenvory.inventario.pricelist.infrastructure.adapter.in.web;
 
 import co.com.zenvory.inventario.pricelist.application.port.in.PriceListUseCase;
 import co.com.zenvory.inventario.pricelist.domain.model.ProductPrice;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.http.ResponseEntity;
@@ -99,7 +100,7 @@ public class PriceListController {
     public ResponseEntity<ProductPriceResponse> upsertProductPrice(
             @PathVariable Long listaId,
             @PathVariable Long productoId,
-            @RequestBody UpsertPriceRequest request) {
+            @Valid @RequestBody UpsertPriceRequest request) {
         ProductPrice saved = priceListUseCase.upsertProductPrice(listaId, productoId, request.precio());
         return ResponseEntity.ok(new ProductPriceResponse(saved.getId(), saved.getListaId(), saved.getProductoId(), saved.getPrecio()));
     }

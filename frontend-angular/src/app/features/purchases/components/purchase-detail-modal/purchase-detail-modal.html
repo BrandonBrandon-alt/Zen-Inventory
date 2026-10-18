@@ -1,0 +1,173 @@
+<app-modal
+  [(open)]="open"
+  [title]="title()"
+  [description]="purchase() && mode() === 'view' ? receptionInfo[purchase()!.reception].next : ''"
+  size="lg"
+  [dismissible]="!busy()"
+>
+  @if (purchase(); as p) {
+    @if (error(); as message) {
+      <app-alert class="mb-4">{{ message }}</app-alert>
+    }
+
+    @switch (mode()) {
+      @case ('view') {
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <app-badge [variant]="receptionInfo[p.reception].variant" dot>{{ receptionInfo[p.reception].label }}</app-badge>
+          <app-badge [variant]="paymentInfo[p.payment].variant">{{ paymentInfo[p.payment].label }}</app-badge>
+          <p class="text-sm text-fg-muted">
+            <span class="font-medium text-fg">{{ supplierName() }}</span>
+            @if (branchName()) {
+              · recibe {{ branchName() }}
+            }
+          </p>
+        </div>
+
+        <div class="mt-5 overflow-x-auto rounded-lg border border-line">
+          <table class="w-full border-collapse text-sm">
+            <caption class="sr-only">Productos de la orden</caption>
+            <thead class="bg-surface text-xs text-fg-subtle">
+              <tr>
+                <th scope="col" class="px-3 py-2 text-left font-medium">Producto</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Cantidad</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Recibido</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Precio</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Desc.</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (line of p.lines; track line.id) {
+                <tr class="border-t border-line-subtle">
+                  <th scope="row" class="px-3 py-2 text-left font-medium text-fg">{{ productName(line.productId) }}</th>
+                  <td class="px-3 py-2 text-right tabular-nums text-fg-muted">{{ formatQuantity(line.quantity) }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums text-fg-muted">{{ formatQuantity(line.received) }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums text-fg-muted">{{ formatMoney(line.unitPrice) }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums text-fg-subtle">{{ line.discountPct ? line.discountPct + ' %' : '—' }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums text-fg">{{ formatMoney(line.subtotal) }}</td>
+                </tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr class="border-t border-line">
+                <th scope="row" colspan="5" class="px-3 py-2 text-right text-sm font-medium text-fg-muted">Total</th>
+                <td class="px-3 py-2 text-right text-base font-bold tabular-nums text-fg">{{ formatMoney(p.total) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <dl class="mt-5 grid gap-x-6 gap-y-2 border-t border-line pt-4 text-sm sm:grid-cols-2">
+          @if (p.requestDate) {
+            <div class="flex gap-2"><dt class="text-fg-subtle">Solicitada</dt><dd class="text-fg">{{ formatDateTime(p.requestDate) }}</dd></div>
+          }
+          @if (p.estimatedArrival && !p.actualArrival) {
+            <div class="flex gap-2"><dt class="text-fg-subtle">Llegada estimada</dt><dd class="text-fg">{{ formatDateTime(p.estimatedArrival) }}</dd></div>
+          }
+          @if (p.actualArrival) {
+            <div class="flex gap-2"><dt class="text-fg-subtle">Recibida</dt><dd class="text-fg">{{ formatDateTime(p.actualArrival) }}</dd></div>
+          }
+          @if (p.paymentDueDate) {
+            <div class="flex gap-2"><dt class="text-fg-subtle">Pago vence</dt><dd class="text-fg">{{ formatDateTime(p.paymentDueDate) }}</dd></div>
+          }
+        </dl>
+        @if (p.reason) {
+          <p class="mt-3 text-sm text-fg-muted"><span class="text-fg-subtle">Motivo:</span> {{ p.reason }}</p>
+        }
+      }
+
+      @case ('receive') {
+        <form id="purchase-action-form" class="flex flex-col gap-4" [formGroup]="receiveForm" novalidate (ngSubmit)="submit()">
+          <fieldset class="flex flex-col gap-3" formArrayName="received">
+            <legend class="font-title text-lg font-bold text-fg">Cantidades recibidas</legend>
+            <p class="-mt-2 text-xs text-fg-subtle">
+              En la unidad base de cada producto. Si llega menos de lo pedido, la orden queda recibida parcialmente y se puede seguir recibiendo. El costo promedio de cada producto se actualiza al registrar.
+            </p>
+            @for (line of p.lines; track line.id; let i = $index) {
+              <app-form-field [label]="productName(line.productId) + ' (faltan ' + formatQuantity(pending(line)) + ' de ' + formatQuantity(line.quantity) + ')'" [error]="lineError(i)">
+                <input appInput type="number" min="0" [max]="pending(line)" step="any" inputmode="decimal" [formControlName]="i" />
+              </app-form-field>
+            }
+          </fieldset>
+        </form>
+      }
+
+      @case ('cancel') {
+        <form id="purchase-action-form" class="flex flex-col gap-4" [formGroup]="reasonForm" novalidate (ngSubmit)="submit()">
+          <p class="text-sm text-fg-muted">La orden se cierra y no se podrá recibir.</p>
+          <app-form-field label="Motivo de la cancelación" [error]="reasonError()">
+            <textarea appInput rows="3" formControlName="reason"></textarea>
+          </app-form-field>
+        </form>
+      }
+
+      @case ('receipt') {
+        @if (receipt(); as r) {
+          <p class="text-sm text-fg-muted">
+            Recepción registrada. La orden quedó <strong class="text-fg">{{ receptionInfo[r.reception].label.toLowerCase() }}</strong>.
+          </p>
+          <div class="mt-4 overflow-x-auto rounded-lg border border-line">
+            <table class="w-full border-collapse text-sm">
+              <caption class="sr-only">Cambio del costo promedio por producto</caption>
+              <thead class="bg-surface text-xs text-fg-subtle">
+                <tr>
+                  <th scope="col" class="px-3 py-2 text-left font-medium">Producto</th>
+                  <th scope="col" class="px-3 py-2 text-right font-medium">Recibido</th>
+                  <th scope="col" class="px-3 py-2 text-right font-medium">Costo antes</th>
+                  <th scope="col" class="px-3 py-2 text-right font-medium">Costo ahora</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (impact of r.impacts; track impact.productId) {
+                  <tr class="border-t border-line-subtle">
+                    <th scope="row" class="px-3 py-2 text-left font-medium text-fg">{{ impact.productName }}</th>
+                    <td class="px-3 py-2 text-right tabular-nums text-fg-muted">{{ formatQuantity(impact.received) }}</td>
+                    <td class="px-3 py-2 text-right tabular-nums text-fg-muted">{{ formatMoney(impact.oldCost) }}</td>
+                    <td class="px-3 py-2 text-right tabular-nums font-semibold" [class]="impact.newCost > impact.oldCost ? 'text-warning' : impact.newCost < impact.oldCost ? 'text-success' : 'text-fg'">{{ formatMoney(impact.newCost) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+    }
+  }
+
+  <div data-slot="footer">
+    @if (purchase(); as p) {
+      @switch (mode()) {
+        @case ('view') {
+          @if (actions(); as a) {
+            @if (a.cancel) {
+              <button appButton variant="ghost-danger" type="button" [disabled]="busy()" (click)="goto('cancel')">Cancelar orden</button>
+            }
+            @if (a.closeShortfall) {
+              <button appButton variant="ghost" type="button" [loading]="busy()" (click)="closeShortfall()">Cerrar con faltante</button>
+            }
+            @if (a.pay) {
+              <button appButton variant="ghost" type="button" [loading]="busy()" (click)="pay()">Marcar como pagada</button>
+            }
+            @if (a.dispatch) {
+              <button appButton variant="ghost" type="button" [loading]="busy()" (click)="dispatch()">Marcar como enviada</button>
+            }
+            @if (a.approve) {
+              <button appButton type="button" [loading]="busy()" (click)="approve()">Aprobar</button>
+            }
+            @if (a.receive) {
+              <button appButton type="button" [disabled]="busy()" (click)="goto('receive')">Recibir mercancía</button>
+            }
+          }
+          <button appButton variant="ghost" type="button" [disabled]="busy()" (click)="open.set(false)">Cerrar</button>
+        }
+        @case ('receipt') {
+          <button appButton type="button" (click)="open.set(false)">Listo</button>
+        }
+        @default {
+          <button appButton variant="ghost" type="button" [disabled]="busy()" (click)="goto('view')">Volver</button>
+          <button appButton type="submit" form="purchase-action-form" [variant]="mode() === 'cancel' ? 'danger' : 'primary'" [loading]="busy()">{{ submitLabel() }}</button>
+        }
+      }
+    }
+  </div>
+</app-modal>

@@ -77,8 +77,49 @@ class ReturnRequestControllerTest {
     @Test
     @DisplayName("POST /api/v1/returns/{id}/approve: returns 204")
     void approve_returns204() throws Exception {
+        ReturnRequest req = mock(ReturnRequest.class);
+        when(req.getBranchId()).thenReturn(3L);
+        when(returnRequestUseCase.getRequestById(1L)).thenReturn(req);
         mockMvc.perform(post("/api/v1/returns/1/approve?comment=OK"))
                 .andExpect(status().isNoContent());
     }
-}
 
+    private void actAsManagerOfBranch(Long branchId) {
+        User manager = User.builder().id(5L).email("test@example.com").nombre("Gerente").sucursalId(branchId)
+                .role(co.com.zenvory.inventario.auth.domain.model.Role.builder().nombre("MANAGER").build()).build();
+        when(userRepositoryPort.findByEmail("test@example.com")).thenReturn(Optional.of(manager));
+    }
+
+    @Test
+    @DisplayName("un MANAGER no puede aprobar devoluciones de otra sucursal (403)")
+    void approve_otherBranch_returns403() throws Exception {
+        actAsManagerOfBranch(1L);
+        ReturnRequest req = mock(ReturnRequest.class);
+        when(req.getBranchId()).thenReturn(2L);
+        when(returnRequestUseCase.getRequestById(1L)).thenReturn(req);
+
+        mockMvc.perform(post("/api/v1/returns/1/approve?comment=OK"))
+                .andExpect(status().isForbidden());
+        org.mockito.Mockito.verify(returnRequestUseCase, org.mockito.Mockito.never()).approveRequest(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("un MANAGER no puede listar las devoluciones de otra sucursal (403)")
+    void listOtherBranch_returns403() throws Exception {
+        actAsManagerOfBranch(1L);
+        mockMvc.perform(get("/api/v1/returns/branch/2")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/returns/pending?branchId=2")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("quien aprueba es el usuario de la sesión, no uno indicado en la petición")
+    void approve_usesSessionUser() throws Exception {
+        actAsManagerOfBranch(1L);
+        ReturnRequest req = mock(ReturnRequest.class);
+        when(req.getBranchId()).thenReturn(1L);
+        when(returnRequestUseCase.getRequestById(1L)).thenReturn(req);
+
+        mockMvc.perform(post("/api/v1/returns/1/approve?comment=OK")).andExpect(status().isNoContent());
+        org.mockito.Mockito.verify(returnRequestUseCase).approveRequest(1L, 5L, "OK");
+    }
+}

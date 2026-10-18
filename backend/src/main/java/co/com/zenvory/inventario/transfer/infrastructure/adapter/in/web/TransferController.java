@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import co.com.zenvory.inventario.shared.infrastructure.security.CurrentUser;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
@@ -45,6 +46,7 @@ public class TransferController {
     }
 
     @PostMapping("/{id}/approve-destination")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<TransferResponse> approveDestination(@PathVariable Long id) {
         Transfer transfer = transferUseCase.approveDestination(id);
         return ResponseEntity.ok(TransferResponse.fromDomain(transfer));
@@ -70,7 +72,7 @@ public class TransferController {
     }
 
     @PostMapping("/{id}/prepare")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<TransferResponse> prepareTransfer(
             @PathVariable Long id,
             @Valid @RequestBody TransferPrepareRequest request) {
@@ -140,20 +142,19 @@ public class TransferController {
 
     @GetMapping("/{id}")
     public ResponseEntity<TransferResponse> getTransfer(@PathVariable Long id) {
-        Transfer transfer = transferUseCase.getTransferById(id);
+        Transfer transfer = transferUseCase.getTransferForCurrentUser(id);
         return ResponseEntity.ok(TransferResponse.fromDomain(transfer));
     }
 
     @GetMapping
     public ResponseEntity<java.util.List<TransferResponse>> getAllTransfers() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        User user = userRepositoryPort.findByEmail(auth.getName()).orElseThrow();
-        
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
+
         java.util.List<Transfer> transfers;
-        if ("ADMIN".equals(user.getRole().getNombre())) {
+        if (current.isAdmin()) {
             transfers = transferUseCase.getAllTransfers();
         } else {
-            transfers = transferUseCase.getTransfersByBranch(user.getSucursalId());
+            transfers = transferUseCase.getTransfersByBranch(current.resolveBranch(null));
         }
         
         return ResponseEntity.ok(transfers.stream()
@@ -164,12 +165,18 @@ public class TransferController {
     @GetMapping("/fulfillment-report")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<TransferFulfillmentReport> getFulfillmentReport() {
-        return ResponseEntity.ok(transferUseCase.getFulfillmentReport());
+        return ResponseEntity.ok(transferUseCase.getFulfillmentReport(reportScope()));
     }
 
     @GetMapping("/analytics/logistics")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<LogisticsAnalyticsResponse> getLogisticsAnalytics() {
-        return ResponseEntity.ok(transferUseCase.getLogisticsAnalytics());
+        return ResponseEntity.ok(transferUseCase.getLogisticsAnalytics(reportScope()));
+    }
+
+    /** Los informes cubren todas las sucursales solo para el ADMIN; el resto ve únicamente la suya. */
+    private Long reportScope() {
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
+        return current.isAdmin() ? null : current.resolveBranch(null);
     }
 }

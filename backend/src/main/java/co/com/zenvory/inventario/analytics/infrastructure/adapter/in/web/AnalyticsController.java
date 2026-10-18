@@ -1,14 +1,12 @@
-    package co.com.zenvory.inventario.analytics.infrastructure.adapter.in.web;
+package co.com.zenvory.inventario.analytics.infrastructure.adapter.in.web;
 
 import co.com.zenvory.inventario.analytics.application.port.in.AnalyticsUseCase;
 import co.com.zenvory.inventario.analytics.domain.model.*;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
-import co.com.zenvory.inventario.auth.domain.model.User;
+import co.com.zenvory.inventario.shared.infrastructure.security.CurrentUser;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -55,14 +53,12 @@ public class AnalyticsController {
      * @return El ID de la sucursal a filtrar o null si tiene acceso global.
      */
     private Long resolveBranchScope() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        User user = userRepositoryPort.findByEmail(auth.getName()).orElseThrow();
-        String roleName = user.getRole().getNombre();
-        
-        if ("MANAGER".equals(roleName) || "OPERADOR_INVENTARIO".equals(roleName)) {
-            return user.getSucursalId();
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
+        if (current.isAdmin()) {
+            return null; // ADMIN ve todo el sistema
         }
-        return null; // ADMIN ve todo el sistema
+        // Quien no es ADMIN ve solo su sucursal; sin una asignada es 403, nunca "todas" (null significaría global).
+        return current.resolveBranch(null);
     }
 
     /**

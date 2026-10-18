@@ -21,6 +21,8 @@ public interface JpaPurchaseRepository extends JpaRepository<PurchaseOrderEntity
      * @return Lista de entidades de orden de compra.
      */
     List<PurchaseOrderEntity> findBySupplierId(Long supplierId);
+
+    List<PurchaseOrderEntity> findByBranchId(Long branchId);
     
     /**
      * Localiza órdenes de compra que incluyan un producto determinado en sus líneas de detalle.

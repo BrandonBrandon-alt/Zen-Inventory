@@ -1,5 +1,6 @@
 package co.com.zenvory.inventario.sale.domain.model;
 
+import co.com.zenvory.inventario.sale.domain.exception.InvalidSaleStateException;
 import co.com.zenvory.inventario.sale.domain.exception.EmptySaleException;
 
 import java.math.BigDecimal;
@@ -59,7 +60,11 @@ public class Sale {
 
     public void cancel(String reason) {
         if (this.status == SaleStatus.CANCELED) {
-            throw new IllegalStateException("Esta venta ya se encuentra anulada.");
+            throw new InvalidSaleStateException("Esta venta ya se encuentra anulada.");
+        }
+        if (this.status == SaleStatus.RETURNED) {
+            // Ya se repuso stock por la devolución aprobada: anularla repondría de nuevo las mismas unidades.
+            throw new InvalidSaleStateException("Esta venta tiene devoluciones aprobadas y ya no puede anularse.");
         }
         if (reason == null || reason.trim().isEmpty()) {
             throw new IllegalArgumentException("El motivo de la anulación es obligatorio.");
@@ -70,9 +75,30 @@ public class Sale {
 
     public void markAsReturned() {
         if (this.status == SaleStatus.CANCELED) {
-            throw new IllegalStateException("No se puede marcar como devolución una venta ya anulada.");
+            throw new InvalidSaleStateException("No se puede marcar como devolución una venta ya anulada.");
         }
         this.status = SaleStatus.RETURNED;
+    }
+
+    /**
+     * Precio unitario realmente pagado de un producto: total de sus líneas con el descuento de línea y el global,
+     * dividido entre las unidades. Es el valor que debe usarse al devolver (el precio de lista lo sobrestimaría).
+     * Si el producto aparece en varias líneas (p. ej. con distinto descuento) devuelve el promedio ponderado.
+     */
+    public BigDecimal effectiveUnitPaid(Long productId) {
+        List<SaleDetail> lines = this.details.stream().filter(d -> d.getProductId().equals(productId)).toList();
+        int units = lines.stream().mapToInt(SaleDetail::getQuantity).sum();
+        if (units == 0) {
+            throw new IllegalArgumentException("El producto " + productId + " no pertenece a la venta.");
+        }
+        BigDecimal linesTotal = lines.stream().map(SaleDetail::getSubtotalLine).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal globalFactor = BigDecimal.ONE.subtract(this.globalDiscountPercentage.divide(new BigDecimal("100")));
+        return linesTotal.multiply(globalFactor).divide(BigDecimal.valueOf(units), 4, java.math.RoundingMode.HALF_UP);
+    }
+
+    /** Unidades vendidas de un producto sumando todas sus líneas. */
+    public int soldUnits(Long productId) {
+        return this.details.stream().filter(d -> d.getProductId().equals(productId)).mapToInt(SaleDetail::getQuantity).sum();
     }
 
     private void calculateFinancials() {

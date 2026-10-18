@@ -93,15 +93,18 @@ public class Transfer {
 
     public static Transfer create(Long originBranchId, Long destinationBranchId, LocalDateTime estimatedArrival, 
                                  List<TransferDetail> details, TransferPriority priority, Long userId, String userName) {
+        if (originBranchId != null && originBranchId.equals(destinationBranchId)) {
+            throw new IllegalArgumentException("La sucursal de origen y la de destino deben ser distintas.");
+        }
         return new Transfer(null, TransferStatus.PENDING, LocalDateTime.now(), estimatedArrival, null, 
-                originBranchId, destinationBranchId, null, null, details, null, priority, null, null, null, null, null, 0,
+                originBranchId, destinationBranchId, null, null, details, null, priority, null, null, null, null, null, null,
                 userId, userName, null, null, null, null, null, null, null, null);
     }
 
     public static Transfer resend(Transfer parent, List<TransferDetail> relativeDetails) {
         return new Transfer(null, TransferStatus.PENDING, LocalDateTime.now(), LocalDateTime.now().plusDays(2), null, 
                 parent.getOriginBranchId(), parent.getDestinationBranchId(), null, "REENVÍO AUTOMÁTICO - REF #" + parent.getId(), 
-                relativeDetails, parent.getId(), parent.getPriority(), null, null, null, null, null, 0,
+                relativeDetails, parent.getId(), parent.getPriority(), null, null, null, null, null, null,
                 null, "SISTEMA", null, null, null, null, null, null, null, null);
     }
 

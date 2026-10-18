@@ -30,6 +30,9 @@ public class TransferDetail {
         if (sent == null || sent < 0) {
             throw new IllegalArgumentException("La cantidad enviada no puede ser nula ni negativa.");
         }
+        if (sent > this.requestedQuantity) {
+            throw new IllegalArgumentException("No se puede enviar más de lo solicitado (" + this.requestedQuantity + ").");
+        }
         this.sentQuantity = sent;
     }
 
@@ -37,8 +40,17 @@ public class TransferDetail {
         if (received == null || received < 0) {
             throw new IllegalArgumentException("La cantidad recibida no puede ser nula ni negativa.");
         }
+        if (received > this.sentQuantity) {
+            // Recibir más de lo enviado crearía stock de la nada en el destino.
+            throw new IllegalArgumentException("No se puede recibir más de lo enviado (" + this.sentQuantity + ").");
+        }
         this.receivedQuantity = received;
         this.missingQuantity = Math.max(0, this.sentQuantity - this.receivedQuantity);
+    }
+
+    /** Lo pedido que no se envió (0 antes del despacho o si se envió todo): permite señalar el faltante de origen. */
+    public Integer getUnsentQuantity() {
+        return this.sentQuantity > 0 ? Math.max(0, this.requestedQuantity - this.sentQuantity) : 0;
     }
 
     public Long getId() { return id; }

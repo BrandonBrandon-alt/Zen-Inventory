@@ -1,0 +1,48 @@
+<header class="mb-6 flex animate-enter flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Unidades de medida</h1>
+    @if (!loading() && !error() && units().length > 0) {
+      <p class="mt-1 text-sm text-fg-subtle">{{ summary() }}</p>
+    }
+  </div>
+  <button appButton type="button" (click)="openCreate()"><svg lucidePlus [size]="16" />Nueva unidad</button>
+</header>
+
+<app-data-table
+  exportName="unidades"
+  persistKey="unidades"
+  class="block animate-enter-delayed"
+  caption="Listado de unidades de medida"
+  [columns]="columns"
+  [rows]="units()"
+  [rowKey]="rowKey"
+  [loading]="loading()"
+  [error]="error()"
+  [pageSize]="10"
+  emptyTitle="Todavía no hay unidades de medida"
+  emptyDescription="Crea la primera para poder asignarla a los productos."
+  (retry)="load()"
+>
+  <ng-template appCell="acciones" let-unit>
+    <div class="flex justify-end gap-1">
+      <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Editar ' + unit.nombre" appTooltip="Editar unidad" (click)="openEdit(unit)">
+        <svg lucidePencil [size]="16" />
+      </button>
+      <button appButton variant="ghost-danger" size="sm" type="button" [attr.aria-label]="'Eliminar ' + unit.nombre" appTooltip="Eliminar unidad" (click)="askDelete(unit)">
+        <svg lucideTrash2 [size]="16" />
+      </button>
+    </div>
+  </ng-template>
+</app-data-table>
+
+<app-unit-form-modal [(open)]="formOpen" [unit]="editing()" (saved)="load(true)" />
+
+<app-confirm-dialog
+  [(open)]="confirmOpen"
+  title="Eliminar unidad"
+  [message]="'¿Eliminar la unidad ' + (deleting()?.nombre ?? '') + '? Esta acción no se puede deshacer.'"
+  confirmLabel="Eliminar"
+  [busy]="deleteBusy()"
+  [error]="deleteError()"
+  (confirmed)="confirmDelete()"
+/>

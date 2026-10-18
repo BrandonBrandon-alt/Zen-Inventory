@@ -13,6 +13,8 @@ public record CreateReturnRequestCommand(
     String generalReason,
     List<Detail> items
 ) {
+    // Nombre propio en el OpenAPI: «Detail» chocaba con otros registros anidados y un esquema pisaba al otro.
+    @io.swagger.v3.oas.annotations.media.Schema(name = "ReturnItemRequest")
     public record Detail(
         Long productId,
         Integer quantity,

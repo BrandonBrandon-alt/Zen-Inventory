@@ -52,4 +52,16 @@ public interface AlertRepositoryPort {
      * @return Lista global de alertas activas.
      */
     List<StockAlert> getGlobalActiveAlerts();
+
+    /** Alertas sin resolver de un tipo concreto para una sucursal y producto. */
+    List<StockAlert> findUnresolvedByBranchProductAndType(Long branchId, Long productId, StockAlert.AlertType type);
+
+    /** Todas las alertas sin resolver de un tipo (una sola consulta para el escaneo periódico). */
+    List<StockAlert> findAllUnresolvedByType(StockAlert.AlertType type);
+
+    /** Como {@link #findById} pero bloquea la fila hasta el fin de la transacción. */
+    Optional<StockAlert> findByIdForUpdate(Long id);
+
+    /** Candado de la transacción para (sucursal, producto): la comprobación y creación de una alerta no se intercalan. */
+    void lockForCreation(Long branchId, Long productId);
 }

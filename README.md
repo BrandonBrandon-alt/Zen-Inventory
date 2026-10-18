@@ -45,9 +45,9 @@ El backend está construido bajo el patrón de **Arquitectura Hexagonal (Puertos
 flowchart TB
     subgraph ClientLayer ["Capa de Cliente (Frontend)"]
         direction TB
-        UI["Interfaz de Usuario\n(Next.js + React)"]
-        Components["Componentes Reutilizables\n(Shadcn UI + Tailwind)"]
-        Services["Servicios de Consumo API\n(Axios)"]
+        UI["Interfaz de Usuario\n(Angular)"]
+        Components["Componentes Reutilizables\n(Tailwind)"]
+        Services["Servicios de Consumo API\n(HttpClient)"]
         UI --> Components
         Components --> Services
     end
@@ -164,7 +164,7 @@ flowchart TD
 | Componente            | Tecnología                                              |
 | :-------------------- | :------------------------------------------------------ |
 | **Backend**           | Java 21, Spring Boot 3.5, Spring Security, JWT          |
-| **Frontend**          | Next.js 14 (App Router), React, Tailwind CSS, Shadcn UI |
+| **Frontend**          | Angular 22 (zoneless, signals), Tailwind CSS 4, Vitest  |
 | **Base de Datos**     | PostgreSQL 16                                           |
 | **Persistencia**      | Spring Data JPA, Hibernate                              |
 | **Migraciones**       | Flyway                                                  |
@@ -196,9 +196,27 @@ Para levantar todo el ecosistema (DB, Backend, Frontend, pgAdmin):
 docker-compose up --build -d
 ```
 
-- **Frontend:** `http://localhost:3000`
+- **Frontend:** `http://localhost:4200`
 - **Backend API:** `http://localhost:8080/api`
 - **pgAdmin:** `http://localhost:5050`
+
+**Aplicar cambios sin indicar servicios.** `docker compose up -d --build` reconstruye solo lo que cambió (caché de capas, y de dependencias Maven/npm) y recrea únicamente los contenedores afectados.
+
+**Servicios opcionales (no arrancan por defecto, para ahorrar memoria).** pgAdmin está en un perfil:
+
+```bash
+docker compose --profile tools up -d pgadmin     # pgAdmin en http://localhost:5050
+```
+
+Cada servicio tiene su tope de memoria y CPU en `docker-compose.yml` (la API usa ~250 MB, la base de datos ~20 MB) y los registros rotan solos.
+
+**Reconstrucción automática mientras desarrollas:**
+
+```bash
+docker compose watch
+```
+
+Vigila `backend/src`, `backend/pom.xml` y `frontend-angular/` (código, `nginx/`, `package*.json`, `angular.json`); al guardar un cambio reconstruye y reemplaza solo ese servicio. Requiere que los contenedores ya existan (`docker compose up -d` una vez antes) y se detiene con `Ctrl+C` (los contenedores siguen corriendo).
 
 ### 3. Ejecución en Modo Desarrollo (Local)
 

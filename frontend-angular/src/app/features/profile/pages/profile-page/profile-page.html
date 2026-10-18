@@ -1,0 +1,84 @@
+@if (session(); as current) {
+  <header class="mb-8 animate-enter">
+    <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Mi perfil</h1>
+    <p class="mt-1 text-sm text-fg-subtle">Tu foto, tu nombre y tu contraseña.</p>
+  </header>
+
+  <div class="grid animate-enter-delayed items-start gap-6 lg:grid-cols-[20rem_1fr]">
+    <app-card title="Foto">
+      <div class="flex flex-col items-center gap-4">
+        <app-user-avatar [userId]="current.id" [name]="current.nombre" [version]="current.avatarVersion" size="xl" />
+        <p class="text-center text-xs text-fg-subtle">JPG, PNG o GIF de hasta 5 MB. Se recorta en cuadrado.</p>
+        @if (photoError(); as message) {
+          <app-alert class="w-full">{{ message }}</app-alert>
+        }
+        <div class="flex flex-wrap justify-center gap-3">
+          <button appButton type="button" [loading]="photoBusy()" (click)="photoInput.click()">
+            <svg lucideImagePlus [size]="16" aria-hidden="true"></svg>
+            {{ hasPhoto() ? 'Cambiar foto' : 'Subir foto' }}
+          </button>
+          @if (hasPhoto()) {
+            <button appButton variant="ghost-danger" type="button" [disabled]="photoBusy()" (click)="removePhoto()">
+              <svg lucideTrash2 [size]="16" aria-hidden="true"></svg>
+              Quitar
+            </button>
+          }
+        </div>
+        <input #photoInput type="file" class="sr-only" tabindex="-1" aria-label="Archivo de la foto de perfil" [accept]="acceptedTypes" (change)="chooseFile($event)" />
+      </div>
+    </app-card>
+
+    <div class="grid gap-6">
+      <app-card title="Datos personales">
+        <form class="flex flex-col gap-4" [formGroup]="nameForm" novalidate (ngSubmit)="saveName()">
+          @if (nameError(); as message) {
+            <app-alert>{{ message }}</app-alert>
+          }
+          <app-form-field label="Nombre completo" [error]="nameFieldError()">
+            <input appInput type="text" formControlName="nombre" autocomplete="name" />
+          </app-form-field>
+          <div class="flex justify-end">
+            <button appButton type="submit" [loading]="nameSaving()" [disabled]="nameForm.pristine">Guardar nombre</button>
+          </div>
+        </form>
+        <dl class="mt-5 grid gap-4 border-t border-line pt-5 text-sm sm:grid-cols-3">
+          <div class="min-w-0">
+            <dt class="text-fg-subtle">Correo</dt>
+            <dd class="mt-1 truncate text-fg">{{ current.email }}</dd>
+          </div>
+          <div>
+            <dt class="text-fg-subtle">Rol</dt>
+            <dd class="mt-1"><app-badge variant="info">{{ current.rol }}</app-badge></dd>
+          </div>
+          <div class="min-w-0">
+            <dt class="text-fg-subtle">Sucursal</dt>
+            <dd class="mt-1 truncate text-fg">{{ branchLabel() }}</dd>
+          </div>
+        </dl>
+        <p class="mt-4 text-xs text-fg-subtle">El correo, el rol y la sucursal los cambia un administrador.</p>
+      </app-card>
+
+      <app-card title="Contraseña" description="Para cambiarla necesitas la actual.">
+        <form class="flex flex-col gap-4" [formGroup]="passwordForm" novalidate (ngSubmit)="savePassword()">
+          @if (passwordError(); as message) {
+            <app-alert>{{ message }}</app-alert>
+          }
+          <app-form-field label="Contraseña actual" [error]="passwordFieldError('actual')">
+            <input appInput [type]="showCurrent() ? 'text' : 'password'" formControlName="actual" autocomplete="current-password" />
+            <app-password-toggle data-slot="suffix" [(visible)]="showCurrent" />
+          </app-form-field>
+          <app-form-field label="Contraseña nueva" [error]="passwordFieldError('nueva')">
+            <input appInput [type]="showNew() ? 'text' : 'password'" formControlName="nueva" autocomplete="new-password" />
+            <app-password-toggle data-slot="suffix" [(visible)]="showNew" />
+          </app-form-field>
+          <app-form-field label="Repite la contraseña nueva" [error]="passwordFieldError('confirmar')">
+            <input appInput [type]="showNew() ? 'text' : 'password'" formControlName="confirmar" autocomplete="new-password" />
+          </app-form-field>
+          <div class="flex justify-end">
+            <button appButton type="submit" [loading]="passwordSaving()">Cambiar contraseña</button>
+          </div>
+        </form>
+      </app-card>
+    </div>
+  </div>
+}

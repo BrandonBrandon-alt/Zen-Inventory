@@ -74,26 +74,40 @@ public class InventoryService implements InventoryUseCase {
     @Override
     public LocalInventory getInventory(Long branchId, Long productId) {
         return localInventoryRepository.findByBranchAndProduct(branchId, productId)
-                .orElseGet(() -> LocalInventory.builder()
-                        .branchId(branchId)
-                        .productId(productId)
-                        .currentQuantity(BigDecimal.ZERO)
-                        .minimumStock(BigDecimal.ZERO)
-                        .committedQuantity(BigDecimal.ZERO)
-                        .build());
+                .orElseGet(() -> emptyInventory(branchId, productId));
+    }
+
+    /** Saldo para modificarlo: la fila queda bloqueada hasta el fin de la transacción (evita pérdidas de actualización). */
+    private LocalInventory lockedInventory(Long branchId, Long productId) {
+        // Se garantiza que la fila exista ANTES de bloquearla: sin fila no hay nada que bloquear, y dos primeras
+        // operaciones simultáneas sobre el mismo (sucursal, producto) intentarían insertarla las dos.
+        localInventoryRepository.ensureExists(branchId, productId);
+        return localInventoryRepository.findByBranchAndProductForUpdate(branchId, productId)
+                .orElseGet(() -> emptyInventory(branchId, productId));
+    }
+
+    private LocalInventory emptyInventory(Long branchId, Long productId) {
+        return LocalInventory.builder()
+                .branchId(branchId)
+                .productId(productId)
+                .currentQuantity(BigDecimal.ZERO)
+                .minimumStock(BigDecimal.ZERO)
+                .committedQuantity(BigDecimal.ZERO)
+                .build();
     }
 
     @Override
     @Transactional
     public void withdrawStock(Long branchId, Long productId, String productName, BigDecimal quantity, Long unitId, MovementReason reason, Long userId, Long referenceId, String referenceType, String observations, String subReason) {
         BigDecimal finalQuantity = quantity;
+        requireProduct(productId);
 
         // Lógica de Conversión de Unidades
         if (unitId != null) {
             finalQuantity = applyConversion(productId, unitId, quantity, null).quantity();
         }
 
-        LocalInventory inventory = getInventory(branchId, productId);
+        LocalInventory inventory = lockedInventory(branchId, productId);
         
         if (!inventory.hasSufficientStock(finalQuantity)) {
             throw new InsufficientStockException(productName, finalQuantity, inventory.getCurrentQuantity());
@@ -119,8 +133,11 @@ public class InventoryService implements InventoryUseCase {
                 .build();
         inventoryMovementRepository.save(movement);
         
-        // Disparar evento de auditoría/alerta si el stock bajó
-        eventPublisher.publishEvent(new StockLevelDroppedEvent(this, branchId, productId));
+        // Solo se avisa si el producto tiene mínimo definido y lo disponible está en o bajo él: con mínimo 0 no hay
+        // alertas, y avisar en cada venta/traslado cargaría el camino más usado para nada.
+        if (isBelowMinimum(inventory)) {
+            eventPublisher.publishEvent(new StockLevelDroppedEvent(this, branchId, productId));
+        }
     }
 
     @Override
@@ -128,6 +145,7 @@ public class InventoryService implements InventoryUseCase {
     public void addStock(Long branchId, Long productId, BigDecimal quantity, Long unitId, MovementReason reason, Long userId, Long referenceId, String referenceType, BigDecimal unitCost, String observations, String subReason) {
         BigDecimal finalQuantity = quantity;
         BigDecimal finalUnitCost = unitCost;
+        requireProduct(productId);
 
         // Lógica de Conversión de Unidades
         if (unitId != null) {
@@ -136,13 +154,7 @@ public class InventoryService implements InventoryUseCase {
             finalUnitCost = result.unitCost();
         }
 
-        LocalInventory inventory = localInventoryRepository.findByBranchAndProduct(branchId, productId)
-                .orElseGet(() -> LocalInventory.builder()
-                        .branchId(branchId)
-                        .productId(productId)
-                        .currentQuantity(BigDecimal.ZERO)
-                        .minimumStock(BigDecimal.ZERO)
-                        .build());
+        LocalInventory inventory = lockedInventory(branchId, productId);
 
         // Recalcular Costo Promedio si se proporciona un costo unitario
         if (finalUnitCost != null && finalUnitCost.compareTo(BigDecimal.ZERO) > 0) {
@@ -169,8 +181,8 @@ public class InventoryService implements InventoryUseCase {
                 .build();
         inventoryMovementRepository.save(movement);
 
-        // Si el stock se ha incrementado, avisamos al sistema por si debe retirar alertas críticas
-        if (inventory.getCurrentQuantity().compareTo(inventory.getMinimumStock()) > 0) {
+        // Si lo disponible (lo que hay menos lo comprometido en traslados) superó el mínimo, se retiran las alertas
+        if (inventory.getMinimumStock().signum() > 0 && !isBelowMinimum(inventory)) {
             eventPublisher.publishEvent(new StockLevelRestoredEvent(this, branchId, productId));
         }
     }
@@ -190,14 +202,19 @@ public class InventoryService implements InventoryUseCase {
      * @return Resultado con cantidad y costo normalizados a la unidad base.
      */
     private ConversionResult applyConversion(Long productId, Long unitId, BigDecimal quantity, BigDecimal unitCost) {
+        // Reportar en la unidad base del producto no requiere conversión.
+        if (unitId.equals(productUseCase.getProductById(productId).getUnitId())) {
+            return new ConversionResult(quantity, unitCost);
+        }
         List<ProductUnit> units = unitOfMeasureUseCase.getUnitsByProduct(productId);
         ProductUnit targetUnit = units.stream()
                 .filter(u -> u.getUnitId().equals(unitId))
                 .findFirst()
                 .orElse(null);
 
-        if (targetUnit == null || targetUnit.getConversionFactor() == null) {
-            return new ConversionResult(quantity, unitCost);
+        // Una unidad desconocida o sin factor no se puede "adivinar" como base: 5 cajas de 12 quedarían como 5 unidades.
+        if (targetUnit == null || targetUnit.getConversionFactor() == null || targetUnit.getConversionFactor().signum() <= 0) {
+            throw new IllegalArgumentException("La unidad indicada no está configurada con un factor de conversión para este producto.");
         }
 
         BigDecimal factor = targetUnit.getConversionFactor();
@@ -212,7 +229,8 @@ public class InventoryService implements InventoryUseCase {
     @Override
     @Transactional
     public void reserveStock(Long branchId, Long productId, BigDecimal quantity) {
-        LocalInventory inventory = getInventory(branchId, productId);
+        requireProduct(productId);
+        LocalInventory inventory = lockedInventory(branchId, productId);
         
         if (!inventory.hasSufficientStock(quantity)) {
             Product product = productUseCase.getProductById(productId);
@@ -229,7 +247,7 @@ public class InventoryService implements InventoryUseCase {
     @Override
     @Transactional
     public void releaseStock(Long branchId, Long productId, BigDecimal quantity) {
-        LocalInventory inventory = getInventory(branchId, productId);
+        LocalInventory inventory = lockedInventory(branchId, productId);
         BigDecimal currentCommitted = inventory.getCommittedQuantity() != null ? inventory.getCommittedQuantity() : BigDecimal.ZERO;
         
         BigDecimal newCommitted = currentCommitted.subtract(quantity);
@@ -252,7 +270,9 @@ public class InventoryService implements InventoryUseCase {
      * @param unitCost Costo unitario de la nueva entrada (normalizado).
      */
     private void updateProductAverageCost(Long productId, BigDecimal newQuantity, BigDecimal unitCost) {
-        Product product = productUseCase.getProductById(productId);
+        // La fila del producto se bloquea mientras se recalcula: dos ingresos simultáneos (de la misma o de distintas
+        // sucursales) leerían el mismo costo anterior y el último en escribir borraría el aporte del otro.
+        Product product = productUseCase.getProductForCostUpdate(productId);
         
         // Obtener stock total actual en todas las sucursales
         BigDecimal currentTotalStock = localInventoryRepository.sumQuantityByProductId(productId);
@@ -272,7 +292,18 @@ public class InventoryService implements InventoryUseCase {
             product.setAverageCost(newAverageCost);
         }
         
-        productUseCase.updateProduct(productId, product);
+        // Solo el costo: reescribir el producto entero podía pisar ediciones simultáneas de precio o nombre.
+        productUseCase.updateAverageCost(productId, product.getAverageCost());
+    }
+
+    private void requireProduct(Long productId) {
+        productUseCase.getProductById(productId);
+    }
+
+    /** Lo disponible está en o bajo el mínimo definido (con mínimo 0 no hay alertas de stock). */
+    private static boolean isBelowMinimum(LocalInventory inventory) {
+        BigDecimal minimum = inventory.getMinimumStock() != null ? inventory.getMinimumStock() : BigDecimal.ZERO;
+        return minimum.signum() > 0 && inventory.availableQuantity().compareTo(minimum) <= 0;
     }
 
     @Override
@@ -283,9 +314,14 @@ public class InventoryService implements InventoryUseCase {
     @Override
     public List<co.com.zenvory.inventario.inventory.domain.model.LocalInventoryEnriched> getEnrichedInventoryByBranch(Long branchId) {
         List<LocalInventory> inventoryList = localInventoryRepository.findByBranchId(branchId);
+        // Una sola consulta de productos (antes una por fila); un producto que ya no existe se omite en vez de
+        // hacer fallar todo el listado.
+        java.util.Map<Long, Product> productsById = productUseCase.getAllProducts().stream()
+                .collect(java.util.stream.Collectors.toMap(Product::getId, p -> p, (a, b) -> a));
         return inventoryList.stream()
+                .filter(inv -> productsById.containsKey(inv.getProductId()))
                 .map(inv -> {
-                    Product product = productUseCase.getProductById(inv.getProductId());
+                    Product product = productsById.get(inv.getProductId());
                     return co.com.zenvory.inventario.inventory.domain.model.LocalInventoryEnriched.builder()
                             .id(inv.getId())
                             .productId(inv.getProductId())
@@ -306,20 +342,18 @@ public class InventoryService implements InventoryUseCase {
     @Override
     @Transactional
     public LocalInventory updateMinimumStock(Long branchId, Long productId, BigDecimal minimumStock) {
-        LocalInventory inventory = localInventoryRepository.findByBranchAndProduct(branchId, productId)
-                .orElseGet(() -> LocalInventory.builder()
-                        .branchId(branchId)
-                        .productId(productId)
-                        .currentQuantity(BigDecimal.ZERO) // Empieza en 0
-                        .committedQuantity(BigDecimal.ZERO)
-                        .build());
+        if (minimumStock == null || minimumStock.signum() < 0) {
+            throw new IllegalArgumentException("El stock mínimo no puede ser negativo.");
+        }
+        requireProduct(productId);
+        LocalInventory inventory = lockedInventory(branchId, productId);
 
         inventory.setMinimumStock(minimumStock);
         inventory.setLastUpdated(LocalDateTime.now());
         LocalInventory saved = localInventoryRepository.save(inventory);
 
         // Si el nuevo mínimo pone al producto en estado crítico, avisar
-        if (saved.getCurrentQuantity().compareTo(minimumStock) <= 0) {
+        if (isBelowMinimum(saved)) {
             eventPublisher.publishEvent(new StockLevelDroppedEvent(this, branchId, productId));
         }
         

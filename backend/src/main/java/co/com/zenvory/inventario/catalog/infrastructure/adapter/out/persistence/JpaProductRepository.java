@@ -23,6 +23,14 @@ public interface JpaProductRepository extends JpaRepository<ProductEntity, Long>
      */
     boolean existsBySku(String sku);
 
+    /** Bloquea la fila del producto hasta el fin de la transacción (no se pueden bloquear los JOIN FETCH externos). */
+    @org.springframework.data.jpa.repository.Query(value = "SELECT id FROM producto WHERE id = :id FOR UPDATE", nativeQuery = true)
+    java.util.List<Long> lockById(@org.springframework.data.repository.query.Param("id") Long id);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @org.springframework.data.jpa.repository.Query("UPDATE ProductEntity p SET p.averageCost = :cost WHERE p.id = :id")
+    void updateAverageCost(@org.springframework.data.repository.query.Param("id") Long id, @org.springframework.data.repository.query.Param("cost") java.math.BigDecimal cost);
+
     /** 
      * Recupera todos los productos enriquecidos con su unidad de medida y proveedores.
      * 

@@ -63,7 +63,41 @@ public class PurchaseOrderDetail {
      * @return Nueva instancia de {@link PurchaseOrderDetail}.
      */
     public static PurchaseOrderDetail create(Long productId, BigDecimal quantity, BigDecimal unitPrice, BigDecimal discountPct) {
+        if (discountPct != null && (discountPct.signum() < 0 || discountPct.compareTo(new BigDecimal("100")) > 0)) {
+            throw new IllegalArgumentException("El descuento debe estar entre 0 y 100.");
+        }
         return new PurchaseOrderDetail(null, productId, quantity, unitPrice, discountPct, BigDecimal.ZERO);
+    }
+
+    /**
+     * Precio unitario real de compra: el pactado menos el descuento de la línea. Es el costo que debe entrar al
+     * costo promedio ponderado (con el precio de lista se sobrestimaría cuando hay descuento).
+     */
+    public BigDecimal effectiveUnitPrice() {
+        BigDecimal factor = BigDecimal.ONE.subtract(this.discountPct.divide(new BigDecimal("100")));
+        return this.unitPrice.multiply(factor).setScale(4, java.math.RoundingMode.HALF_UP);
+    }
+
+    /** Lo que aún falta por recibir de esta línea. */
+    public BigDecimal pendingQuantity() {
+        return this.quantity.subtract(this.receivedQuantity);
+    }
+
+    /**
+     * Acumula una recepción física. No se puede recibir más de lo pendiente.
+     *
+     * @throws IllegalArgumentException si la cantidad supera lo que falta por recibir.
+     */
+    public void registerReceipt(BigDecimal received) {
+        if (received.compareTo(pendingQuantity()) > 0) {
+            throw new IllegalArgumentException("No se puede recibir más de lo pendiente (" + pendingQuantity().stripTrailingZeros().toPlainString() + ").");
+        }
+        this.receivedQuantity = this.receivedQuantity.add(received);
+    }
+
+    /** @return {@code true} si ya se recibió todo lo pedido. */
+    public boolean isFullyReceived() {
+        return this.receivedQuantity.compareTo(this.quantity) >= 0;
     }
 
     /**

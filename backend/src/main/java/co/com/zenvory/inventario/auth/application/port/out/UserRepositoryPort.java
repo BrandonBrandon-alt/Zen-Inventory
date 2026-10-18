@@ -36,6 +36,14 @@ public interface UserRepositoryPort {
     List<User> findAll();
 
     /**
+     * Usuarios de una sucursal.
+     *
+     * @param sucursalId Identificador de la sucursal.
+     * @return Lista de usuarios de esa sucursal.
+     */
+    List<User> findBySucursalId(Long sucursalId);
+
+    /**
      * Guarda o actualiza un usuario en el almacén de datos.
      * 
      * @param user Modelo de dominio del usuario a persistir.

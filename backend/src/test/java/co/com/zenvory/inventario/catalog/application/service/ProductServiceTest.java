@@ -122,4 +122,27 @@ class ProductServiceTest {
         assertThatThrownBy(() -> productService.updateProduct(99L, Product.builder().build()))
                 .isInstanceOf(ProductNotFoundException.class);
     }
+
+    @Test
+    @DisplayName("updateProduct: si la petición no trae costo promedio, se conserva el calculado por las compras")
+    void updateProduct_keepsAverageCostWhenOmitted() {
+        when(productRepositoryPort.findById(1L)).thenReturn(java.util.Optional.of(existingProduct));
+        when(productRepositoryPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        Product changes = Product.builder().sku("SKU-001").name("Nuevo nombre").salePrice(new BigDecimal("25.00")).unitId(1L).build();
+
+        Product result = productService.updateProduct(1L, changes);
+
+        assertThat(result.getName()).isEqualTo("Nuevo nombre");
+        assertThat(result.getAverageCost()).isEqualByComparingTo("10.00");
+    }
+
+    @Test
+    @DisplayName("updateProduct: un costo promedio enviado explícitamente sí se aplica (corrección manual)")
+    void updateProduct_appliesExplicitAverageCost() {
+        when(productRepositoryPort.findById(1L)).thenReturn(java.util.Optional.of(existingProduct));
+        when(productRepositoryPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        Product changes = Product.builder().sku("SKU-001").name("X").averageCost(new BigDecimal("12.50")).salePrice(new BigDecimal("25.00")).unitId(1L).build();
+
+        assertThat(productService.updateProduct(1L, changes).getAverageCost()).isEqualByComparingTo("12.50");
+    }
 }

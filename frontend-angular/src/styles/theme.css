@@ -1,0 +1,288 @@
+/* Tokens de diseño — Zen Inventory. Oscuro por defecto, claro con [data-theme='light']. */
+:root {
+  --bg-base: #242421;
+  --bg-surface: #1f1f1c;
+  --bg-card: #2a2a26;
+  --bg-hover: #32322d;
+
+  --brand-400: #e87c6a;
+  --brand-500: #d9634f;
+  --brand-600: #c0503c;
+  --brand-glow: rgba(217, 99, 79, 0.22);
+
+  --btn-primary-bg: #d1cfc0;
+  --btn-primary-text: #1f1f1f;
+  --btn-primary-hover-bg: #f5f4f0;
+
+  --neutral-50: #f2f0e3;
+  --neutral-100: #f2f0e3;
+  --neutral-200: #cbc8bf;
+  --neutral-300: #a8a49a;
+  --neutral-400: #7c7971;
+  --neutral-500: #5a574f;
+  --neutral-600: #3d3b35;
+  --neutral-700: #2e2c27;
+  --neutral-800: #232220;
+  --neutral-900: #191917;
+
+  --border-default: rgba(255, 255, 255, 0.07);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+
+  --state-danger: #e07070;
+  --state-success: #6fbf8a;
+  --state-warning: #f59e0b;
+  --state-info: #60a5fa;
+
+  --page-padding: 40px;
+}
+
+:root[data-theme='light'] {
+  --bg-base: #f2f0e3;
+  --bg-surface: #eeebe4;
+  --bg-card: #f2f0e3;
+  --bg-hover: #e8e4db;
+
+  --brand-400: #c94f3a;
+  --brand-500: #b83c28;
+  --brand-600: #9e2f1e;
+  --brand-glow: rgba(185, 60, 40, 0.18);
+
+  --btn-primary-bg: #2e2e2e;
+  --btn-primary-text: #f5f4f0;
+  --btn-primary-hover-bg: #2c2a25;
+
+  --neutral-50: #1a1917;
+  --neutral-100: #2c2a25;
+  --neutral-200: #3d3b35;
+  --neutral-300: #5a574f;
+  --neutral-400: #7c7971;
+  --neutral-500: #a8a49a;
+  --neutral-600: #cbc8bf;
+  --neutral-700: #dedbd3;
+  --neutral-800: #eceae3;
+  --neutral-900: #f5f3ee;
+
+  --border-default: rgba(0, 0, 0, 0.1);
+  --border-subtle: rgba(0, 0, 0, 0.06);
+
+  --state-danger: #cc4444;
+  --state-success: #2d8a52;
+  --state-warning: #c07c00;
+  --state-info: #1d72d4;
+}
+
+@media (max-width: 1024px) {
+  :root {
+    --page-padding: 24px;
+  }
+}
+@media (max-width: 768px) {
+  :root {
+    --page-padding: 16px;
+  }
+}
+
+/* Expone los tokens como utilidades de Tailwind (bg-base, text-fg, border-line…). */
+@theme inline {
+  --color-base: var(--bg-base);
+  --color-surface: var(--bg-surface);
+  --color-card: var(--bg-card);
+  --color-hover: var(--bg-hover);
+  --color-fg: var(--neutral-100);
+  --color-fg-muted: var(--neutral-300);
+  --color-fg-subtle: var(--neutral-400);
+  --color-line: var(--border-default);
+  --color-line-subtle: var(--border-subtle);
+  --color-brand: var(--brand-500);
+  --color-brand-soft: var(--brand-400);
+  --color-brand-strong: var(--brand-600);
+  --color-primary: var(--btn-primary-bg);
+  --color-primary-fg: var(--btn-primary-text);
+  --color-primary-hover: var(--btn-primary-hover-bg);
+  --color-danger: var(--state-danger);
+  --color-success: var(--state-success);
+  --color-warning: var(--state-warning);
+  --color-info: var(--state-info);
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --font-sans: 'Inter Variable', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Lora', Georgia, serif;
+  /* Títulos (h1/h2): clase `font-title`. */
+  --font-title: 'Junicode', Georgia, serif;
+}
+
+/* Animaciones de marca (utilidades animate-*). Los keyframes solo se emiten si la utilidad se usa. */
+@theme {
+  --animate-letter-reveal: letterReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-fade-in-up: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+
+  /* Entrada de las pantallas (la misma del Next): el encabezado sube y aparece; el contenido lo sigue unos ms después.
+     `backwards` (no `both`): al terminar no queda ningún `transform`, que crearía un contenedor para hijos con position fixed. */
+  --animate-enter: fadeInUp 0.4s ease backwards;
+  --animate-enter-delayed: fadeInUp 0.4s ease 0.07s backwards;
+
+  /* La línea de una gráfica de área se dibuja una vez al entrar (pathLength=1) y el relleno aparece después. */
+  --animate-draw-line: drawLine 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.25s backwards;
+  --animate-area-in: areaIn 0.9s ease 0.55s backwards;
+
+  /* Los enlaces del menú oculto entran en cascada cuando el menú se abre (el retraso lo da --i, su posición). */
+  --animate-nav-in: navIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--i, 0) * 22ms + 60ms) backwards;
+
+  /* Barra fina de "actualizando" sobre una tabla que ya tenía datos. */
+  --animate-progress: progressSlide 1.1s ease-in-out infinite;
+
+  @keyframes progressSlide {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
+  }
+
+  @keyframes navIn {
+    from {
+      opacity: 0;
+      transform: translateX(-10px);
+    }
+  }
+
+  @keyframes drawLine {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes areaIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* Movimiento de interfaz: entradas rápidas y salidas aún más rápidas (la salida no debe hacer esperar). */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-form-in: fadeInUp 0.6s var(--ease-out-expo) 0.1s both;
+  --animate-alert-in: alertIn 0.28s var(--ease-out-expo) both;
+  --animate-error-in: errorIn 0.2s ease-out both;
+  --animate-toast-in: toastIn 0.35s var(--ease-out-expo) both;
+  --animate-toast-out: toastOut 0.2s ease-in both;
+  --animate-shake: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  --animate-modal-in: modalIn 0.22s var(--ease-out-expo) both;
+  --animate-backdrop-in: backdropIn 0.2s ease-out both;
+
+  @keyframes letterReveal {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.9);
+      filter: blur(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes alertIn {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes errorIn {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes toastIn {
+    from {
+      opacity: 0;
+      transform: translateX(24px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+  }
+
+  @keyframes toastOut {
+    from {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateX(24px) scale(0.96);
+    }
+  }
+
+  @keyframes modalIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes backdropIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes shake {
+    10%,
+    90% {
+      transform: translateX(-1px);
+    }
+    20%,
+    80% {
+      transform: translateX(2px);
+    }
+    30%,
+    50%,
+    70% {
+      transform: translateX(-4px);
+    }
+    40%,
+    60% {
+      transform: translateX(4px);
+    }
+  }
+}

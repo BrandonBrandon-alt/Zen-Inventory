@@ -13,6 +13,7 @@ package co.com.zenvory.inventario.auth.infrastructure.adapter.in.web.dto;
  * @param rol Nombre del rol asignado.
  * @param sucursalId ID de la sucursal de trabajo (puede ser null para administradores).
  * @param id Identificador único del usuario.
+ * @param avatarActualizadoEn Cuándo cambió la foto de perfil (null si no tiene).
  */
 public record LoginResponse(
         String token,
@@ -21,10 +22,12 @@ public record LoginResponse(
         String nombre,
         String rol,
         Long sucursalId,
-        Long id) {
+        Long id,
+        java.time.LocalDateTime avatarActualizadoEn) {
 
     /** Constructor de conveniencia: tipo siempre es "Bearer". */
-    public LoginResponse(String token, String email, String nombre, String rol, Long sucursalId, Long id) {
-        this(token, "Bearer", email, nombre, rol, sucursalId, id);
+    public LoginResponse(String token, String email, String nombre, String rol, Long sucursalId, Long id,
+                         java.time.LocalDateTime avatarActualizadoEn) {
+        this(token, "Bearer", email, nombre, rol, sucursalId, id, avatarActualizadoEn);
     }
 }

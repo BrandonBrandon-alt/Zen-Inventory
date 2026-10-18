@@ -73,6 +73,10 @@ public class UserEntity {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    /** Cuándo se cambió la foto de perfil (null si no tiene). */
+    @Column(name = "avatar_actualizado_en")
+    private LocalDateTime avatarUpdatedAt;
+
     /**
      * Mapea esta entidad JPA a un objeto de dominio puro.
      * 
@@ -88,6 +92,7 @@ public class UserEntity {
                 .sucursalId(this.sucursalId)
                 .active(this.activa)
                 .createdAt(this.createdAt)
+                .avatarUpdatedAt(this.avatarUpdatedAt)
                 .build();
     }
 
@@ -107,6 +112,7 @@ public class UserEntity {
                 .sucursalId(user.getSucursalId())
                 .activa(user.getActive())
                 .createdAt(user.getCreatedAt())
+                .avatarUpdatedAt(user.getAvatarUpdatedAt())
                 .build();
     }
 }

@@ -46,5 +46,8 @@ public class User {
     
     /** Timestamp de creación del registro. */
     private LocalDateTime createdAt;
+
+    /** Última vez que cambió la foto de perfil; null si no tiene foto. Sirve también como versión para el caché. */
+    private LocalDateTime avatarUpdatedAt;
 }
 

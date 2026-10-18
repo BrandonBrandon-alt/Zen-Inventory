@@ -8,6 +8,7 @@ import co.com.zenvory.inventario.inventory.infrastructure.adapter.in.web.dto.Sto
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import co.com.zenvory.inventario.shared.infrastructure.security.CurrentUser;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
@@ -58,8 +59,10 @@ public class InventoryController {
      * @param productId ID del producto.
      * @return {@link LocalInventory} con saldos y configuraciones.
      */
+    // Lectura entre sucursales a propósito: quien gestiona traslados necesita ver el stock del origen antes de pedir.
+    // Por eso es solo para esos roles; el vendedor consulta únicamente el stock de su sucursal (listado por sucursal).
     @GetMapping("/branches/{branchId}/products/{productId}")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER', 'OPERADOR_INVENTARIO')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<LocalInventory> getInventory(
             @PathVariable Long branchId, 
             @PathVariable Long productId) {
@@ -77,6 +80,9 @@ public class InventoryController {
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<List<co.com.zenvory.inventario.inventory.infrastructure.adapter.in.web.dto.InventoryProductResponse>> getInventoryByBranch(
             @PathVariable Long branchId) {
+        // Este listado incluye precio de venta y costo promedio (datos de margen): solo de la propia sucursal.
+        // (El stock de UN producto en otra sucursal sí se puede consultar: lo necesita quien pide un traslado.)
+        CurrentUser.resolve(userRepositoryPort).requireBranch(branchId);
         return ResponseEntity.ok(inventoryUseCase.getEnrichedInventoryByBranch(branchId).stream()
                 .map(inv -> co.com.zenvory.inventario.inventory.infrastructure.adapter.in.web.dto.InventoryProductResponse.builder()
                         .id(inv.getId())
@@ -107,7 +113,8 @@ public class InventoryController {
     public ResponseEntity<LocalInventory> updateConfig(
             @PathVariable Long branchId,
             @PathVariable Long productId,
-            @RequestParam BigDecimal minimumStock) {
+            @RequestParam @jakarta.validation.constraints.DecimalMin(value = "0", message = "El stock mínimo no puede ser negativo.") BigDecimal minimumStock) {
+        CurrentUser.resolve(userRepositoryPort).requireBranch(branchId);
         return ResponseEntity.ok(inventoryUseCase.updateMinimumStock(branchId, productId, minimumStock));
     }
 
@@ -123,6 +130,7 @@ public class InventoryController {
     public ResponseEntity<List<InventoryMovement>> getKardex(
             @PathVariable Long branchId, 
             @PathVariable Long productId) {
+        CurrentUser.resolve(userRepositoryPort).requireBranch(branchId);
         List<InventoryMovement> kardex = inventoryUseCase.getKardex(branchId, productId);
         return ResponseEntity.ok(kardex);
     }
@@ -142,6 +150,9 @@ public class InventoryController {
             @PathVariable Long productId,
             @Valid @RequestBody StockRequest request) {
         
+        // Solo se mueve el stock de la propia sucursal y el movimiento queda a nombre de quien lo hace.
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
+        current.requireBranch(branchId);
         String productName = productUseCase.getProductById(productId).getName();
         
         inventoryUseCase.withdrawStock(
@@ -151,7 +162,7 @@ public class InventoryController {
                 request.getQuantity(), 
                 request.getUnitId(),
                 request.getReason(), 
-                request.getUserId(), 
+                current.id(), 
                 request.getReferenceId(), 
                 request.getReferenceType(),
                 request.getObservations(),
@@ -175,13 +186,15 @@ public class InventoryController {
             @PathVariable Long productId,
             @Valid @RequestBody StockRequest request) {
         
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
+        current.requireBranch(branchId);
         inventoryUseCase.addStock(
                 branchId, 
                 productId, 
                 request.getQuantity(), 
                 request.getUnitId(),
                 request.getReason(), 
-                request.getUserId(), 
+                current.id(), 
                 request.getReferenceId(), 
                 request.getReferenceType(),
                 request.getUnitCost(),
@@ -200,16 +213,13 @@ public class InventoryController {
     @GetMapping("/movements")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<List<InventoryMovement>> getAllMovements() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        User user = userRepositoryPort.findByEmail(auth.getName()).orElseThrow();
-        
-        List<InventoryMovement> movements;
-        if ("MANAGER".equals(user.getRole().getNombre()) || "OPERADOR_INVENTARIO".equals(user.getRole().getNombre())) {
-            movements = inventoryUseCase.getMovementsByBranch(user.getSucursalId());
-        } else {
-            movements = inventoryUseCase.getAllMovements();
-        }
-        
+        CurrentUser current = CurrentUser.resolve(userRepositoryPort);
+
+        // El ADMIN ve los movimientos de todas las sucursales; el resto, solo los de la suya.
+        List<InventoryMovement> movements = current.isAdmin()
+                ? inventoryUseCase.getAllMovements()
+                : inventoryUseCase.getMovementsByBranch(current.resolveBranch(null));
+
         return ResponseEntity.ok(movements);
     }
 }

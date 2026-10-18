@@ -12,19 +12,19 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
  * Adaptador de entrada (Primary Adapter) para la administración de usuarios.
  * 
- * <p>Proporciona endpoints para el CRUD de usuarios del sistema. Por seguridad,
- * todas las operaciones en este controlador están restringidas exclusivamente 
- * a usuarios con el rol 'ADMIN'.</p>
+ * <p>Proporciona endpoints para el CRUD de usuarios. Acceso para 'ADMIN' (todos los usuarios) y 'MANAGER'
+ * (solo los de su sucursal y con roles inferiores); el servicio aplica el alcance según quien ejecuta.</p>
  */
 @RestController
 @RequestMapping("/api/users")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
 public class UserController {
 
     private final UserUseCase userUseCase;
@@ -43,8 +43,8 @@ public class UserController {
      * @return Lista de usuarios en formato {@link UserResponse}.
      */
     @GetMapping
-    public ResponseEntity<List<UserResponse>> getAll() {
-        List<UserResponse> response = userUseCase.getAllUsers().stream()
+    public ResponseEntity<List<UserResponse>> getAll(Principal principal) {
+        List<UserResponse> response = userUseCase.getAllUsers(principal.getName()).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(response);
@@ -57,8 +57,8 @@ public class UserController {
      * @return Datos del usuario encontrado.
      */
     @GetMapping("/{id}")
-    public ResponseEntity<UserResponse> getById(@PathVariable Long id) {
-        return ResponseEntity.ok(mapToResponse(userUseCase.getUserById(id)));
+    public ResponseEntity<UserResponse> getById(@PathVariable Long id, Principal principal) {
+        return ResponseEntity.ok(mapToResponse(userUseCase.getUserById(id, principal.getName())));
     }
 
     /**
@@ -68,7 +68,7 @@ public class UserController {
      * @return El usuario creado con su ID asignado.
      */
     @PostMapping
-    public ResponseEntity<UserResponse> create(@Valid @RequestBody UserRequest request) {
+    public ResponseEntity<UserResponse> create(@Valid @RequestBody UserRequest request, Principal principal) {
         User userToCreate = User.builder()
                 .nombre(request.nombre())
                 .email(request.email())
@@ -76,7 +76,7 @@ public class UserController {
                 .sucursalId(request.sucursalId())
                 .build();
 
-        User saved = userUseCase.createUser(userToCreate, request.password());
+        User saved = userUseCase.createUser(userToCreate, request.password(), principal.getName());
         return ResponseEntity.status(HttpStatus.CREATED).body(mapToResponse(saved));
     }
 
@@ -89,7 +89,7 @@ public class UserController {
      * @return El usuario con los cambios aplicados.
      */
     @PutMapping("/{id}")
-    public ResponseEntity<UserResponse> update(@PathVariable Long id, @Valid @RequestBody UserRequest request) {
+    public ResponseEntity<UserResponse> update(@PathVariable Long id, @Valid @RequestBody UserRequest request, Principal principal) {
         User userData = User.builder()
                 .nombre(request.nombre())
                 .email(request.email())
@@ -98,7 +98,7 @@ public class UserController {
                 .active(request.activo())
                 .build();
 
-        User updated = userUseCase.updateUser(id, userData, request.password());
+        User updated = userUseCase.updateUser(id, userData, request.password(), principal.getName());
         return ResponseEntity.ok(mapToResponse(updated));
     }
 
@@ -109,27 +109,12 @@ public class UserController {
      * @return Respuesta sin contenido confirmando la operación.
      */
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deactivate(@PathVariable Long id) {
-        userUseCase.deactivateUser(id);
+    public ResponseEntity<Void> deactivate(@PathVariable Long id, Principal principal) {
+        userUseCase.deactivateUser(id, principal.getName());
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Método auxiliar de mapeo entre modelo de dominio y DTO de respuesta.
-     */
     private UserResponse mapToResponse(User user) {
-        return UserResponse.builder()
-                .id(user.getId())
-                .nombre(user.getNombre())
-                .email(user.getEmail())
-                .role(RoleResponse.builder()
-                        .id(user.getRole().getId())
-                        .nombre(user.getRole().getNombre())
-                        .build())
-                .sucursalId(user.getSucursalId())
-                .activo(user.getActive())
-                .createdAt(user.getCreatedAt())
-                .build();
+        return UserResponse.from(user);
     }
 }
-

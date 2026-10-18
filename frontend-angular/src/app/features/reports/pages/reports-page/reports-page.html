@@ -1,0 +1,70 @@
+<header class="mb-6 animate-enter">
+  <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Reportes</h1>
+  <p class="mt-1 text-sm text-fg-subtle">Cierre de caja y ventas por vendedor, para imprimir o guardar como PDF.</p>
+</header>
+
+<div class="mb-5 flex animate-enter-delayed flex-wrap items-end gap-3">
+  <div class="w-44"><app-date-picker [(value)]="from" [max]="to()" [clearable]="false" placeholder="Desde" ariaLabel="Desde" /></div>
+  <div class="w-44"><app-date-picker [(value)]="to" [min]="from()" [clearable]="false" placeholder="Hasta" ariaLabel="Hasta" /></div>
+  <button appButton [variant]="isToday() ? 'primary' : 'ghost'" size="sm" type="button" (click)="useToday()">Hoy</button>
+  <button appButton [variant]="isMonth() ? 'primary' : 'ghost'" size="sm" type="button" (click)="useMonth()">Este mes</button>
+  @if (isAdmin()) {
+    <div class="w-56"><app-select [value]="branchFilter()" (valueChange)="setBranch($event)" [options]="branchOptions()" [icon]="storeIcon" ariaLabel="Sucursal" /></div>
+  }
+  <div class="ml-auto">
+    <button appButton type="button" [disabled]="!report() || loading() || !!error()" [loading]="printing()" (click)="download()">
+      <svg lucideFileDown [size]="16" aria-hidden="true"></svg>
+      Descargar PDF
+    </button>
+  </div>
+</div>
+
+@if (error(); as message) {
+  <div class="rounded-lg border border-line p-5" role="alert">
+    <p class="text-sm text-fg">{{ message }}</p>
+    <button appButton class="mt-3" variant="ghost" size="sm" type="button" (click)="load()">Reintentar</button>
+  </div>
+} @else if (loading()) {
+  <p class="text-sm text-fg-subtle" role="status">Cargando ventas…</p>
+} @else if (report(); as r) {
+  <app-card [title]="title()" [description]="branchLabel()" class="animate-enter-delayed">
+    <dl class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div><dt class="text-xs text-fg-subtle">Total vendido</dt><dd class="text-xl font-bold tabular-nums text-fg">{{ formatMoney(r.total) }}</dd></div>
+      <div><dt class="text-xs text-fg-subtle">Ventas</dt><dd class="text-xl font-bold tabular-nums text-fg">{{ r.sales }}</dd></div>
+      <div><dt class="text-xs text-fg-subtle">Ticket promedio</dt><dd class="text-xl font-bold tabular-nums text-fg">{{ formatMoney(r.average) }}</dd></div>
+      <div><dt class="text-xs text-fg-subtle">Unidades</dt><dd class="text-xl font-bold tabular-nums text-fg">{{ formatQuantity(r.units) }}</dd></div>
+    </dl>
+    <p class="mt-4 text-sm text-fg-muted">
+      Subtotal {{ formatMoney(r.subtotal) }} · descuentos − {{ formatMoney(r.discount) }}
+      @if (r.canceledCount > 0) {
+        · {{ r.canceledCount === 1 ? '1 venta anulada' : r.canceledCount + ' ventas anuladas' }} ({{ formatMoney(r.canceledTotal) }}, no suman)
+      }
+    </p>
+  </app-card>
+
+  <div class="mt-5 grid animate-enter-delayed gap-5 2xl:grid-cols-2">
+    <app-data-table
+      caption="Ventas por vendedor"
+      [columns]="sellerColumns"
+      [rows]="r.bySeller"
+      [rowKey]="sellerKey"
+      exportName="ventas-por-vendedor"
+      persistKey="ventas-por-vendedor"
+      emptyTitle="No hubo ventas en este periodo"
+      emptyDescription="Prueba con otro rango de fechas."
+      minWidth="30rem"
+    />
+    <app-data-table
+      caption="Productos más vendidos"
+      [columns]="productColumns"
+      [rows]="r.topProducts"
+      [rowKey]="productKey"
+      exportName="productos-mas-vendidos"
+      emptyTitle="No hubo ventas en este periodo"
+      emptyDescription="Prueba con otro rango de fechas."
+      minWidth="24rem"
+    />
+  </div>
+} @else {
+  <p class="text-sm text-fg-muted">Elige las fechas del reporte.</p>
+}
