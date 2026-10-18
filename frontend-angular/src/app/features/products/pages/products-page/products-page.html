@@ -31,7 +31,7 @@
 >
   <ng-template appCell="suppliers" let-product>
     @if (mainSupplier(product); as main) {
-      <span class="inline-flex items-center gap-2">
+      <span class="inline-flex items-center gap-2 whitespace-nowrap">
         <span>{{ main.nombre }}</span>
         @if (otherCount(product) > 0) {
           <span
@@ -44,7 +44,7 @@
         }
       </span>
     } @else {
-      <span class="text-fg-subtle">Sin proveedores</span>
+      <span class="whitespace-nowrap text-fg-subtle">Sin proveedores</span>
     }
   </ng-template>
   <ng-template appCell="activo" let-product>

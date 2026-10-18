@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { LucidePencil, LucidePlus, LucideTrash2 } from '@lucide/angular';
+import { LucideEllipsis, LucidePencil, LucidePlus, LucideRuler, LucideTrash2, LucideType } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { NotificationService } from '@core/notifications/notification.service';
 import { Button } from '@shared/ui/button/button';
@@ -11,9 +11,9 @@ import { UnitFormModal } from '../../components/unit-form-modal/unit-form-modal'
 import { type Unit, UnitsApi } from '../../data-access/units-api';
 
 const COLUMNS: readonly TableColumn<Unit>[] = [
-  { key: 'nombre', header: 'Nombre', sortable: true, primary: true },
-  { key: 'abreviatura', header: 'Abreviatura', sortable: true },
-  { key: 'acciones', header: 'Acciones', align: 'end' },
+  { key: 'nombre', header: 'Nombre', icon: LucideRuler.icon, sortable: true, primary: true },
+  { key: 'abreviatura', header: 'Abreviatura', icon: LucideType.icon, sortable: true },
+  { key: 'acciones', header: 'Acciones', icon: LucideEllipsis.icon, align: 'end' },
 ];
 
 const rowKey = (unit: Unit): number => unit.id;

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { forkJoin, firstValueFrom, catchError, of } from 'rxjs';
-import { LucideBan, LucidePencil, LucidePlus, LucideRuler, LucideSearch } from '@lucide/angular';
+import { LucideBan, LucideBarcode, LucideCircleCheck, LucideCoins, LucideEllipsis, LucidePackage, LucidePencil, LucidePlus, LucideRuler, LucideSearch, LucideTag, LucideTruck } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { CatalogOptionsApi, type SupplierOption, type UnitOption } from '@core/catalog/catalog-options-api';
 import { NotificationService } from '@core/notifications/notification.service';
@@ -16,14 +16,14 @@ import { ProductUnitsModal } from '../../components/product-units-modal/product-
 import { type Product, ProductsApi, type ProductSupplier } from '../../data-access/products-api';
 
 const COLUMNS: readonly TableColumn<Product>[] = [
-  { key: 'sku', header: 'SKU', sortable: true },
-  { key: 'nombre', header: 'Producto', sortable: true, primary: true },
-  { key: 'unitAbbreviation', header: 'Unidad' },
-  { key: 'cost', header: 'Costo prom.', sortable: true, align: 'end', display: (p) => formatMoney(p.cost) },
-  { key: 'price', header: 'Precio venta', sortable: true, align: 'end', display: (p) => formatMoney(p.price) },
-  { key: 'suppliers', header: 'Proveedores' },
-  { key: 'activo', header: 'Estado', sortable: true },
-  { key: 'acciones', header: 'Acciones', align: 'end' },
+  { key: 'sku', header: 'SKU', icon: LucideBarcode.icon, sortable: true },
+  { key: 'nombre', header: 'Producto', icon: LucidePackage.icon, sortable: true, primary: true },
+  { key: 'unitAbbreviation', header: 'Unidad', icon: LucideRuler.icon },
+  { key: 'cost', header: 'Costo prom.', icon: LucideCoins.icon, sortable: true, align: 'end', display: (p) => formatMoney(p.cost) },
+  { key: 'price', header: 'Precio venta', icon: LucideTag.icon, sortable: true, align: 'end', display: (p) => formatMoney(p.price) },
+  { key: 'suppliers', header: 'Proveedores', icon: LucideTruck.icon },
+  { key: 'activo', header: 'Estado', icon: LucideCircleCheck.icon, sortable: true },
+  { key: 'acciones', header: 'Acciones', icon: LucideEllipsis.icon, align: 'end' },
 ];
 
 const rowKey = (product: Product): number => product.id;

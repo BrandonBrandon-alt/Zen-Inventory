@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { LucidePencil, LucidePlus, LucideTrash2 } from '@lucide/angular';
+import { LucideClock, LucideContact, LucideEllipsis, LucidePencil, LucidePlus, LucideTrash2, LucideTruck } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { NotificationService } from '@core/notifications/notification.service';
 import { Button } from '@shared/ui/button/button';
@@ -11,16 +11,17 @@ import { SupplierFormModal } from '../../components/supplier-form-modal/supplier
 import { type Supplier, SuppliersApi } from '../../data-access/suppliers-api';
 
 const COLUMNS: readonly TableColumn<Supplier>[] = [
-  { key: 'nombre', header: 'Nombre', sortable: true, primary: true },
-  { key: 'contacto', header: 'Contacto', sortable: true },
+  { key: 'nombre', header: 'Nombre', icon: LucideTruck.icon, sortable: true, primary: true },
+  { key: 'contacto', header: 'Contacto', icon: LucideContact.icon, sortable: true },
   {
     key: 'tiempoEntregaDias',
     header: 'Entrega',
+    icon: LucideClock.icon,
     sortable: true,
     align: 'end',
     display: (s) => (s.tiempoEntregaDias === null ? '—' : s.tiempoEntregaDias === 1 ? '1 día' : `${s.tiempoEntregaDias} días`),
   },
-  { key: 'acciones', header: 'Acciones', align: 'end' },
+  { key: 'acciones', header: 'Acciones', icon: LucideEllipsis.icon, align: 'end' },
 ];
 
 const rowKey = (supplier: Supplier): number => supplier.id;

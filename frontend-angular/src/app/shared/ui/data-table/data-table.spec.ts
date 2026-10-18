@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Badge } from '../badge/badge';
+import { LucideStore } from '@lucide/angular';
 import { Button } from '../button/button';
 import { DataTable, DataTableCell, type TableColumn } from './data-table';
 
@@ -94,6 +95,23 @@ describe('DataTable — contenido', () => {
     await setup();
     expect(screen.getAllByRole('columnheader').map((h) => h.textContent?.trim())).toEqual(['Nombre', 'Ventas', 'Activa']);
     expect(firstColumn()).toEqual(['Norte', 'Álvaro Sur', 'Alberto Este', 'Zona Ñandú']);
+  });
+
+  it('una columna con icono lo dibuja junto al encabezado, decorativo y sin cambiar su nombre accesible', async () => {
+    await setup({
+      columns: [
+        { key: 'nombre', header: 'Nombre', icon: LucideStore.icon, sortable: true, primary: true },
+        { key: 'ventas', header: 'Ventas', icon: LucideStore.icon },
+        { key: 'activa', header: 'Activa' },
+      ],
+    });
+    const sortable = screen.getByRole('columnheader', { name: 'Nombre' });
+    const plain = screen.getByRole('columnheader', { name: 'Ventas' });
+    // Con orden, el icono de la columna convive con el de la dirección (que solo aparece al pasar el cursor).
+    expect(sortable.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument();
+    expect(plain.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Activa' }).querySelector('svg')).toBeNull();
+    expect(plain.textContent?.trim()).toBe('Ventas');
   });
 
   it('un valor ausente se muestra como guion y los booleanos como Sí/No', async () => {

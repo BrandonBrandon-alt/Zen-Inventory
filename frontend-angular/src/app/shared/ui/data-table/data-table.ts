@@ -14,7 +14,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { LucideArrowDown, LucideArrowUp, LucideArrowUpDown, LucideInbox, LucideTriangleAlert } from '@lucide/angular';
+import { LucideArrowDown, LucideArrowUp, LucideArrowUpDown, LucideDynamicIcon, type LucideIconData, LucideInbox, LucideTriangleAlert } from '@lucide/angular';
 import { Button } from '../button/button';
 import { EmptyState } from '../empty-state/empty-state';
 import { Pagination } from '../pagination/pagination';
@@ -25,6 +25,8 @@ export interface TableColumn<T> {
   /** Identificador de la columna; también la propiedad de la fila que se muestra si no hay `value`. */
   readonly key: string;
   readonly header: string;
+  /** Icono que acompaña al encabezado y da una pista visual de qué contiene la columna. */
+  readonly icon?: LucideIconData;
   /** Valor de la celda: es lo que se muestra (salvo `display`) y lo que se ordena. */
   readonly value?: (row: T) => CellValue;
   /** Texto a mostrar cuando difiere del valor ordenable (p. ej. un precio con símbolo de moneda). */
@@ -72,7 +74,7 @@ function compareValues(a: CellValue, b: CellValue): number {
  */
 @Component({
   selector: 'app-data-table',
-  imports: [NgTemplateOutlet, Button, EmptyState, Pagination, LucideArrowUp, LucideArrowDown, LucideArrowUpDown, LucideInbox, LucideTriangleAlert],
+  imports: [NgTemplateOutlet, Button, EmptyState, Pagination, LucideDynamicIcon, LucideArrowUp, LucideArrowDown, LucideArrowUpDown, LucideInbox, LucideTriangleAlert],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block' },
   templateUrl: './data-table.html',

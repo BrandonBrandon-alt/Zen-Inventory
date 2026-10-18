@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { LucideBan, LucidePencil, LucidePlus } from '@lucide/angular';
+import { LucideBan, LucideCircleCheck, LucideEllipsis, LucideMail, LucidePencil, LucidePlus, LucideShield, LucideStore, LucideUser } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { AuthStore } from '@core/auth/session/auth-store';
@@ -20,12 +20,12 @@ interface UserRow extends AppUser {
 }
 
 const COLUMNS: readonly TableColumn<UserRow>[] = [
-  { key: 'nombre', header: 'Nombre', sortable: true, primary: true },
-  { key: 'email', header: 'Correo', sortable: true },
-  { key: 'rol', header: 'Rol', sortable: true },
-  { key: 'sucursal', header: 'Sucursal', sortable: true },
-  { key: 'activo', header: 'Estado', sortable: true },
-  { key: 'acciones', header: 'Acciones', align: 'end' },
+  { key: 'nombre', header: 'Nombre', icon: LucideUser.icon, sortable: true, primary: true },
+  { key: 'email', header: 'Correo', icon: LucideMail.icon, sortable: true },
+  { key: 'rol', header: 'Rol', icon: LucideShield.icon, sortable: true },
+  { key: 'sucursal', header: 'Sucursal', icon: LucideStore.icon, sortable: true },
+  { key: 'activo', header: 'Estado', icon: LucideCircleCheck.icon, sortable: true },
+  { key: 'acciones', header: 'Acciones', icon: LucideEllipsis.icon, align: 'end' },
 ];
 
 const ROLE_VARIANTS: Record<string, BadgeVariant> = { ADMIN: 'danger', MANAGER: 'info' };

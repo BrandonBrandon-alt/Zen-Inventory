@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
-import { LucideArrowUpDown, LucideSearch, LucideSlidersHorizontal, LucideStore } from '@lucide/angular';
+import { LucideArrowDownToLine, LucideArrowUpDown, LucideBarcode, LucideCoins, LucideEllipsis, LucideLayers, LucidePackage, LucideRuler, LucideSearch, LucideSlidersHorizontal, LucideStore, LucideTag } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { AuthStore } from '@core/auth/session/auth-store';
@@ -22,17 +22,17 @@ interface InventoryRow extends InventoryItem {
 }
 
 const BASE_COLUMNS: readonly TableColumn<InventoryRow>[] = [
-  { key: 'sku', header: 'SKU', sortable: true },
-  { key: 'nombre', header: 'Producto', sortable: true, primary: true },
-  { key: 'unit', header: 'Unidad' },
-  { key: 'stock', header: 'Existencias', sortable: true, align: 'end' },
-  { key: 'minimum', header: 'Mínimo', sortable: true, align: 'end', display: (r) => formatQuantity(r.minimum) },
+  { key: 'sku', header: 'SKU', icon: LucideBarcode.icon, sortable: true },
+  { key: 'nombre', header: 'Producto', icon: LucidePackage.icon, sortable: true, primary: true },
+  { key: 'unit', header: 'Unidad', icon: LucideRuler.icon },
+  { key: 'stock', header: 'Existencias', icon: LucideLayers.icon, sortable: true, align: 'end' },
+  { key: 'minimum', header: 'Mínimo', icon: LucideArrowDownToLine.icon, sortable: true, align: 'end', display: (r) => formatQuantity(r.minimum) },
 ];
 const COST_COLUMNS: readonly TableColumn<InventoryRow>[] = [
-  { key: 'cost', header: 'Costo prom.', sortable: true, align: 'end', display: (r) => formatMoney(r.cost) },
-  { key: 'price', header: 'Precio venta', sortable: true, align: 'end', display: (r) => formatMoney(r.price) },
+  { key: 'cost', header: 'Costo prom.', icon: LucideCoins.icon, sortable: true, align: 'end', display: (r) => formatMoney(r.cost) },
+  { key: 'price', header: 'Precio venta', icon: LucideTag.icon, sortable: true, align: 'end', display: (r) => formatMoney(r.price) },
 ];
-const ACTIONS_COLUMN: TableColumn<InventoryRow> = { key: 'acciones', header: 'Acciones', align: 'end' };
+const ACTIONS_COLUMN: TableColumn<InventoryRow> = { key: 'acciones', header: 'Acciones', icon: LucideEllipsis.icon, align: 'end' };
 
 const TABS: readonly TabItem[] = [
   { id: 'stock', label: 'Existencias' },

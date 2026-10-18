@@ -1,3 +1,14 @@
+<ng-template #headerLabel let-column>
+  @if (column.icon) {
+    <span class="inline-flex items-center gap-1.5">
+      <svg [lucideIcon]="column.icon" [size]="14" class="shrink-0" aria-hidden="true" />
+      {{ column.header }}
+    </span>
+  } @else {
+    {{ column.header }}
+  }
+</ng-template>
+
 <div class="overflow-hidden rounded-lg border border-line bg-card">
   @if (loading()) {
     <p role="status" class="sr-only">Cargando datos…</p>
@@ -25,7 +36,7 @@
                   class="group inline-flex cursor-pointer items-center gap-1.5 rounded-sm transition-colors hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
                   (click)="toggleSort(column)"
                 >
-                  {{ column.header }}
+                  <ng-container *ngTemplateOutlet="headerLabel; context: { $implicit: column }" />
                   @switch (direction(column)) {
                     @case ('asc') {
                       <svg lucideArrowUp [size]="13" class="text-brand" aria-hidden="true" />
@@ -44,7 +55,7 @@
                   }
                 </button>
               } @else {
-                {{ column.header }}
+                <ng-container *ngTemplateOutlet="headerLabel; context: { $implicit: column }" />
               }
             </th>
           }

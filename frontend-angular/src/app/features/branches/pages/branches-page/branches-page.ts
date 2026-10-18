@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { firstValueFrom } from 'rxjs';
 import { NotificationService } from '@core/notifications/notification.service';
 import { toApiError } from '@core/api/api-error';
-import { LucideBan, LucidePencil, LucidePlus } from '@lucide/angular';
+import { LucideBan, LucideCircleCheck, LucideEllipsis, LucideMapPin, LucidePencil, LucidePhone, LucidePlus, LucideStore } from '@lucide/angular';
 import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog/confirm-dialog';
@@ -12,11 +12,11 @@ import { type Branch, BranchesApi } from '../../data-access/branches-api';
 import { BranchFormModal } from '../../components/branch-form-modal/branch-form-modal';
 
 const COLUMNS: readonly TableColumn<Branch>[] = [
-  { key: 'nombre', header: 'Nombre', sortable: true, primary: true },
-  { key: 'direccion', header: 'Dirección', sortable: true },
-  { key: 'telefono', header: 'Teléfono' },
-  { key: 'activa', header: 'Estado', sortable: true },
-  { key: 'acciones', header: 'Acciones', align: 'end' },
+  { key: 'nombre', header: 'Nombre', icon: LucideStore.icon, sortable: true, primary: true },
+  { key: 'direccion', header: 'Dirección', icon: LucideMapPin.icon, sortable: true },
+  { key: 'telefono', header: 'Teléfono', icon: LucidePhone.icon },
+  { key: 'activa', header: 'Estado', icon: LucideCircleCheck.icon, sortable: true },
+  { key: 'acciones', header: 'Acciones', icon: LucideEllipsis.icon, align: 'end' },
 ];
 
 const rowKey = (branch: Branch): number => branch.id;

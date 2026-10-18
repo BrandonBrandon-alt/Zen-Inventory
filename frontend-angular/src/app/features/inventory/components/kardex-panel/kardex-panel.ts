@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
-import { LucidePackage } from '@lucide/angular';
+import { LucideArrowUpDown, LucideCalendar, LucideHash, LucideInfo, LucideMessageSquareText, LucidePackage, LucideScale } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { formatDateTime, formatQuantity } from '@shared/format/format';
 import { Badge } from '@shared/ui/badge/badge';
@@ -17,13 +17,13 @@ interface MovementRow extends Movement {
 const signed = (row: Movement): number => (row.type === 'INGRESO' ? row.quantity : -row.quantity);
 
 const COLUMNS: readonly TableColumn<MovementRow>[] = [
-  { key: 'date', header: 'Fecha', sortable: true, width: '11.5rem', value: (r) => r.date, display: (r) => formatDateTime(r.date) },
-  { key: 'productName', header: 'Producto', sortable: true, primary: true },
-  { key: 'type', header: 'Tipo', sortable: true },
-  { key: 'reason', header: 'Motivo', sortable: true, value: (r) => REASON_LABELS[r.reason] },
-  { key: 'quantity', header: 'Cantidad', sortable: true, align: 'end', value: signed },
-  { key: 'balance', header: 'Saldo', align: 'end', display: (r) => formatQuantity(r.balance) },
-  { key: 'observations', header: 'Observaciones' },
+  { key: 'date', header: 'Fecha', icon: LucideCalendar.icon, sortable: true, width: '11.5rem', value: (r) => r.date, display: (r) => formatDateTime(r.date) },
+  { key: 'productName', header: 'Producto', icon: LucidePackage.icon, sortable: true, primary: true },
+  { key: 'type', header: 'Tipo', icon: LucideArrowUpDown.icon, sortable: true },
+  { key: 'reason', header: 'Motivo', icon: LucideInfo.icon, sortable: true, value: (r) => REASON_LABELS[r.reason] },
+  { key: 'quantity', header: 'Cantidad', icon: LucideHash.icon, sortable: true, align: 'end', value: signed },
+  { key: 'balance', header: 'Saldo', icon: LucideScale.icon, align: 'end', display: (r) => formatQuantity(r.balance) },
+  { key: 'observations', header: 'Observaciones', icon: LucideMessageSquareText.icon },
 ];
 
 const rowKey = (row: MovementRow): number => row.id;
