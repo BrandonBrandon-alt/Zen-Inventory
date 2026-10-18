@@ -1,0 +1,61 @@
+<header class="mb-6 flex animate-enter flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Devoluciones</h1>
+    @if (!loading() && !error()) {
+      <p class="mt-1 text-sm text-fg-subtle">{{ summary() }}</p>
+    }
+  </div>
+  <button appButton type="button" (click)="formOpen.set(true)"><svg lucidePlus [size]="16" />Solicitar devolución</button>
+</header>
+
+<div class="mb-4 flex animate-enter-delayed flex-wrap items-center gap-3">
+  <div class="w-56">
+    <app-select [(value)]="statusFilter" [options]="statusOptions" [icon]="filterIcon" ariaLabel="Estado de la devolución" />
+  </div>
+</div>
+
+<app-data-table
+  exportName="devoluciones"
+  class="block animate-enter-delayed"
+  caption="Solicitudes de devolución"
+  [columns]="columns()"
+  [rows]="rows()"
+  [rowKey]="rowKey"
+  [loading]="loading()"
+  [error]="error()"
+  [pageSize]="10"
+  [clickableRows]="true"
+  [emptyTitle]="statusFilter() === 'PENDIENTE' ? 'No hay devoluciones pendientes' : 'Ninguna devolución coincide'"
+  [emptyDescription]="statusFilter() === 'PENDIENTE' ? 'Cuando un cliente devuelva algo, solicítala aquí para que un gerente la decida.' : 'Prueba con otro estado.'"
+  minWidth="52rem"
+  (rowClick)="openDetail($event)"
+  (retry)="load()"
+>
+  <ng-template appCell="statusLabel" let-r>
+    <span class="inline-flex items-center gap-2">
+      <app-badge [variant]="statusVariant(r)" dot>{{ r.statusLabel }}</app-badge>
+      @if (r.needsMe) {
+        <span class="rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-semibold text-brand">Te toca</span>
+      }
+    </span>
+  </ng-template>
+  <ng-template appCell="acciones" let-r>
+    <div class="flex justify-end">
+      <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Ver devolución ' + r.id" appTooltip="Ver detalle" (click)="openDetail(r)">
+        <svg lucideEye [size]="16" />
+      </button>
+    </div>
+  </ng-template>
+</app-data-table>
+
+<app-return-form-modal [(open)]="formOpen" [sales]="sales()" [existing]="requests()" (saved)="refresh()" />
+
+<app-return-detail-modal
+  [(open)]="detailOpen"
+  [request]="selected()"
+  [canDecide]="canDecide()"
+  [productNames]="productNames()"
+  [userNames]="userNames()"
+  [branchName]="selectedBranch()"
+  (changed)="refresh()"
+/>

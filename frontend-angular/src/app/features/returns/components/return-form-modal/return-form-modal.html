@@ -1,0 +1,45 @@
+<app-modal [(open)]="open" title="Solicitar devolución" description="Elige la venta y las unidades que el cliente devuelve." size="lg" [dismissible]="!saving()">
+  <form id="return-form" class="flex flex-col gap-4" [formGroup]="form" novalidate (ngSubmit)="submit()">
+    @if (serverError(); as message) {
+      <app-alert>{{ message }}</app-alert>
+    }
+
+    <app-form-field label="Venta" [error]="error('saleId')">
+      <app-select formControlName="saleId" [options]="saleOptions()" [icon]="receiptIcon" searchable searchPlaceholder="Buscar por n.º o cliente…" placeholder="Selecciona la venta" />
+    </app-form-field>
+
+    @if (sale(); as s) {
+      @if (nothingToReturn()) {
+        <app-alert variant="warning">Esta venta ya no tiene unidades por devolver: todo lo vendido se devolvió o espera una decisión.</app-alert>
+      } @else {
+        <fieldset class="flex flex-col gap-3 border-t border-line pt-4">
+          <legend class="font-title text-lg font-bold text-fg">Productos a devolver</legend>
+          <p class="-mt-2 text-xs text-fg-subtle">Deja en 0 lo que el cliente se queda. La devolución es por el precio que pagó.</p>
+          @for (line of lines(); track line.productId; let i = $index) {
+            <div class="grid items-start gap-3 rounded-lg border border-line-subtle p-3 sm:grid-cols-[1fr_8rem_1fr]">
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium text-fg">{{ line.name }}</p>
+                <p class="text-xs text-fg-subtle">
+                  Vendidas {{ formatQuantity(line.sold) }}@if (line.processed > 0) { · ya devueltas o pendientes {{ formatQuantity(line.processed) }} } · {{ formatMoney(line.unitPrice) }} c/u
+                </p>
+              </div>
+              <app-form-field label="Devuelve" [error]="quantityError(i)">
+                <input appInput type="number" min="0" [max]="line.available" step="1" inputmode="numeric" [attr.aria-label]="'Unidades a devolver de ' + line.name" [formControl]="form.controls.quantities.at(i)" />
+              </app-form-field>
+              <app-form-field label="Motivo (opcional)">
+                <input appInput type="text" autocomplete="off" [attr.aria-label]="'Motivo de la devolución de ' + line.name" [formControl]="form.controls.reasons.at(i)" />
+              </app-form-field>
+            </div>
+          }
+        </fieldset>
+        <app-form-field label="Motivo general" [error]="error('reason')">
+          <textarea appInput rows="3" formControlName="reason" placeholder="Por ejemplo: producto defectuoso, no era lo que pidió…"></textarea>
+        </app-form-field>
+      }
+    }
+  </form>
+  <div data-slot="footer">
+    <button appButton variant="ghost" type="button" [disabled]="saving()" (click)="open.set(false)">Cancelar</button>
+    <button appButton type="submit" form="return-form" [loading]="saving()" [disabled]="!sale() || nothingToReturn()">Solicitar devolución</button>
+  </div>
+</app-modal>

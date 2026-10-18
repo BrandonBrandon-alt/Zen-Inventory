@@ -42,7 +42,7 @@ e2e/         tests de Playwright
 utilidades de un solo archivo quedan planos junto a su spec.
 
 **Menú y rutas:** `layout/nav-items.ts` es la fuente única. Para una pantalla nueva, agrégala a `NAV_SECTIONS`
-con sus roles y cambia su `loadComponent` en `app.routes.ts` (mientras tanto muestra `NotMigratedPage`).
+con sus roles y cambia su `loadComponent` en `app.routes.ts` (el ítem debe tener su pantalla en `SCREENS`: `app.routes.spec.ts` lo comprueba).
 
 ## Reglas
 

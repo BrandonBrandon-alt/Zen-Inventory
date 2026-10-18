@@ -7,11 +7,8 @@ import { NAV_SECTIONS } from './layout/nav-items';
 
 const APP_TITLE = 'Zen Inventory';
 
-const loadNotMigrated = () =>
-  import('./features/not-migrated/pages/not-migrated-page/not-migrated-page').then((m) => m.NotMigratedPage);
-
-/** Pantallas ya migradas, por ruta del menú. Las demás muestran `NotMigratedPage`. */
-const IMPLEMENTED: Readonly<Record<string, () => Promise<Type<unknown>>>> = {
+/** La pantalla de cada ítem del menú, por su ruta. Un ítem sin pantalla aquí no pasa las pruebas (ver `app.routes.spec.ts`). */
+export const SCREENS: Readonly<Record<string, () => Promise<Type<unknown>>>> = {
   '/branches': () =>
     import('./features/branches/pages/branches-page/branches-page').then((m) => m.BranchesPage),
   '/dashboard': () => import('./features/dashboard/pages/dashboard-page/dashboard-page').then((m) => m.DashboardPage),
@@ -24,17 +21,18 @@ const IMPLEMENTED: Readonly<Record<string, () => Promise<Type<unknown>>>> = {
   '/sales/pos': () => import('./features/sales/pages/pos-page/pos-page').then((m) => m.PosPage),
   '/sales/history': () => import('./features/sales/pages/sales-history-page/sales-history-page').then((m) => m.SalesHistoryPage),
   '/audit': () => import('./features/audit/pages/audit-page/audit-page').then((m) => m.AuditPage),
+  '/returns': () => import('./features/returns/pages/returns-page/returns-page').then((m) => m.ReturnsPage),
   '/inventory': () => import('./features/inventory/pages/inventory-page/inventory-page').then((m) => m.InventoryPage),
   '/users': () => import('./features/users/pages/users-page/users-page').then((m) => m.UsersPage),
 };
 
-/** Una ruta por ítem del menú, con su guarda de roles. Al migrar una pantalla se cambia su `loadComponent`. */
+/** Una ruta por ítem del menú, con su guarda de roles. */
 const menuRoutes: Routes = NAV_SECTIONS.flatMap((section) => section.items).map((item) => ({
   path: item.path.replace(/^\//, ''),
   title: `${item.label} | ${APP_TITLE}`,
   data: { title: item.label },
   canActivate: [roleGuard(...item.roles)],
-  loadComponent: IMPLEMENTED[item.path] ?? loadNotMigrated,
+  loadComponent: SCREENS[item.path],
 }));
 
 export const routes: Routes = [

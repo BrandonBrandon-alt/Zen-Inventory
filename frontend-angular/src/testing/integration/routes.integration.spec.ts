@@ -48,12 +48,6 @@ describe('rutas (guardas + shell + login)', () => {
     expect(screen.getByRole('heading', { level: 1, name: /^Buen(os|as) (días|tardes|noches)/ })).toBeInTheDocument();
   });
 
-  it('una pantalla aún no migrada muestra el aviso en lugar de la vista', async () => {
-    const { harness } = await setup('ADMIN');
-    await harness.navigateByUrl('/returns');
-    expect(await screen.findByText(/todavía no está disponible/)).toBeInTheDocument();
-  });
-
   it('el enlace de la pantalla actual queda marcado como página actual', async () => {
     const { harness } = await setup('ADMIN');
     await harness.navigateByUrl('/inventory');
@@ -155,13 +149,6 @@ describe('rutas (guardas + shell + login)', () => {
     expect(router.url).toBe('/branches');
     expect(await screen.findByRole('table', { name: 'Listado de sucursales' })).toBeInTheDocument();
     expect(await screen.findByText('Av. 15')).toBeInTheDocument();
-    expect(screen.queryByText(/todavía no está disponible/)).not.toBeInTheDocument();
-  });
-
-  it('las pantallas sin migrar siguen mostrando el marcador', async () => {
-    const { harness } = await setup('ADMIN');
-    await harness.navigateByUrl('/returns');
-    expect(await screen.findByText(/todavía no está disponible/)).toBeInTheDocument();
   });
 
   it('Usuarios ya está migrada y un MANAGER entra (el backend le limita el alcance)', async () => {
