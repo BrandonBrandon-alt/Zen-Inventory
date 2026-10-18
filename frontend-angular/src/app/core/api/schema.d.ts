@@ -1241,7 +1241,7 @@ export interface components {
         ProductRequest: {
             sku: string;
             nombre: string;
-            costoPromedio: number;
+            costoPromedio?: number;
             precioVenta: number;
             /** Format: int64 */
             unitId?: number;
@@ -1529,6 +1529,7 @@ export interface components {
             unitPrice?: number;
             discountPct?: number;
             subtotal?: number;
+            receivedQuantity?: number;
         };
         PurchaseResponse: {
             /** Format: int64 */

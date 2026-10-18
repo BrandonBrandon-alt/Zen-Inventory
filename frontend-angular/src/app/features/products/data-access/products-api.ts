@@ -35,7 +35,8 @@ export interface Product {
 export interface ProductInput {
   readonly sku: string;
   readonly nombre: string;
-  readonly cost: number;
+  /** Costo inicial: solo al crear. Al editar no se envía, para no pisar el costo promedio que calculan las compras. */
+  readonly cost?: number;
   readonly price: number;
   readonly unitId: number;
   readonly suppliers: readonly Omit<ProductSupplier, 'nombre'>[];
@@ -81,7 +82,7 @@ function toRequest(input: ProductInput): components['schemas']['ProductRequest']
   return {
     sku: input.sku.trim(),
     nombre: input.nombre.trim(),
-    costoPromedio: input.cost,
+    ...(input.cost !== undefined ? { costoPromedio: input.cost } : {}),
     precioVenta: input.price,
     unitId: input.unitId,
     suppliers: input.suppliers.map((s) => ({

@@ -12,10 +12,11 @@ import { chooseOption } from '@testing/select-helpers';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
 import { PurchasesPage } from './purchases-page';
 
-const detail = (id: number, productId: number, quantity: number, unitPrice: number, discountPct = 0) => ({
+const detail = (id: number, productId: number, quantity: number, unitPrice: number, discountPct = 0, receivedQuantity = 0) => ({
   id,
   productId,
   quantity,
+  receivedQuantity,
   unitPrice,
   discountPct,
   subtotal: quantity * unitPrice * (1 - discountPct / 100),
@@ -38,7 +39,7 @@ const ORDERS = [
   order(1, 'AWAITING_APPROVAL', { supplierId: 101 }),
   order(2, 'PENDING'),
   order(3, 'IN_TRANSIT'),
-  order(4, 'RECEIVED_PARTIAL', { details: [detail(41, 1, 10, 100), detail(42, 2, 4, 50)], total: 1200 }),
+  order(4, 'RECEIVED_PARTIAL', { details: [detail(41, 1, 10, 100, 0, 6), detail(42, 2, 4, 50)], total: 1200 }),
   order(5, 'RECEIVED_TOTAL'),
   order(6, 'CANCELLED', { reasonResolution: 'Ya no se necesita' }),
 ];
@@ -295,17 +296,35 @@ describe('PurchasesPage', () => {
       await renderPage();
       const dialog = await openDetail(4);
       await userEvent.click(within(dialog).getByRole('button', { name: 'Recibir mercancía' }));
-      const tornillo = within(dialog).getByLabelText('Tornillo (pedido: 10)');
-      expect(tornillo).toHaveValue(10);
+      // Ya llegaron 6 de 10: el formulario propone y limita a lo que falta, no a lo pedido.
+      const tornillo = within(dialog).getByLabelText('Tornillo (faltan 4 de 10)');
+      expect(tornillo).toHaveValue(4);
       await userEvent.clear(tornillo);
-      await userEvent.type(tornillo, '4');
+      await userEvent.type(tornillo, '3');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar recepción' }));
-      await vi.waitFor(() => expect(body).toEqual({ items: [{ detailId: 41, quantityReceived: 4 }, { detailId: 42, quantityReceived: 4 }] }));
+      await vi.waitFor(() => expect(body).toEqual({ items: [{ detailId: 41, quantityReceived: 3 }, { detailId: 42, quantityReceived: 4 }] }));
       expect(await within(dialog).findByText(/Recepción registrada/)).toBeInTheDocument();
       expect(within(dialog).getByRole('row', { name: /Tornillo/ })).toHaveTextContent('Tornillo4$ 100$ 90');
       await vi.waitFor(() => expect(lists).toBe(2)); // la lista se actualiza aunque el diálogo siga abierto
       await userEvent.click(within(dialog).getByRole('button', { name: 'Listo' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('en una orden parcial no deja recibir más de lo que falta aunque no pase de lo pedido', async () => {
+      useSession('OPERADOR_INVENTARIO', 10);
+      stub();
+      let called = false;
+      server.use(http.post(`${URL_P}/4/receive`, () => ((called = true), HttpResponse.json({}))));
+      await renderPage();
+      const dialog = await openDetail(4);
+      expect(within(dialog).getByRole('row', { name: /Tornillo/ })).toHaveTextContent('Tornillo106'); // pedido 10, recibido 6
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Recibir mercancía' }));
+      const qty = within(dialog).getByLabelText('Tornillo (faltan 4 de 10)');
+      await userEvent.clear(qty);
+      await userEvent.type(qty, '5');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar recepción' }));
+      expect(await within(dialog).findByText('Es más de lo que falta por recibir.')).toBeInTheDocument();
+      expect(called).toBe(false);
     });
 
     it('no deja recibir más de lo pedido ni todo en cero', async () => {
@@ -316,11 +335,11 @@ describe('PurchasesPage', () => {
       await renderPage();
       const dialog = await openDetail(3);
       await userEvent.click(within(dialog).getByRole('button', { name: 'Recibir mercancía' }));
-      const qty = within(dialog).getByLabelText('Tornillo (pedido: 10)');
+      const qty = within(dialog).getByLabelText('Tornillo (faltan 10 de 10)');
       await userEvent.clear(qty);
       await userEvent.type(qty, '11');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar recepción' }));
-      expect(await within(dialog).findByText('Es más de lo pedido.')).toBeInTheDocument();
+      expect(await within(dialog).findByText('Es más de lo que falta por recibir.')).toBeInTheDocument();
       await userEvent.clear(qty);
       await userEvent.type(qty, '0');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar recepción' }));

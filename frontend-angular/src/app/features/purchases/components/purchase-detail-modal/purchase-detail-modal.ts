@@ -13,11 +13,14 @@ import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Modal } from '@shared/ui/modal/modal';
 import { PAYMENT_INFO, RECEPTION_INFO } from '../../data-access/purchase-labels';
 import { purchaseActions } from '../../data-access/purchase-permissions';
-import { type Purchase, PurchasesApi, type Receipt } from '../../data-access/purchases-api';
+import { type Purchase, type PurchaseLine, PurchasesApi, type Receipt } from '../../data-access/purchases-api';
 
 type Mode = 'view' | 'receive' | 'cancel' | 'receipt';
 
-const QUANTITY = { required: 'Escribe la cantidad.', min: 'No puede ser negativa.', max: 'Es más de lo pedido.' };
+/** Lo que falta por recibir de una línea (una orden parcialmente recibida ya trae parte). */
+export const pendingOf = (line: PurchaseLine): number => Math.max(0, line.quantity - line.received);
+
+const QUANTITY = { required: 'Escribe la cantidad.', min: 'No puede ser negativa.', max: 'Es más de lo que falta por recibir.' };
 const REASON = { required: 'Cuéntanos el motivo.' };
 
 /**
@@ -53,6 +56,7 @@ export class PurchaseDetailModal {
   protected readonly formatDateTime = formatDateTime;
   protected readonly formatMoney = formatMoney;
   protected readonly formatQuantity = formatQuantity;
+  protected readonly pending = pendingOf;
   protected readonly receptionInfo = RECEPTION_INFO;
   protected readonly paymentInfo = PAYMENT_INFO;
 
@@ -184,7 +188,8 @@ export class PurchaseDetailModal {
     const received = this.receiveForm.controls.received;
     received.clear({ emitEvent: false });
     for (const line of purchase.lines) {
-      received.push(new FormControl<number | null>(line.quantity, [Validators.required, Validators.min(0), Validators.max(line.quantity)]), { emitEvent: false });
+      const pending = pendingOf(line);
+      received.push(new FormControl<number | null>(pending, [Validators.required, Validators.min(0), Validators.max(pending)]), { emitEvent: false });
     }
     this.reasonForm.reset({ reason: '' }, { emitEvent: false });
   }

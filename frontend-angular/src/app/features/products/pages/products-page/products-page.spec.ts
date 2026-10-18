@@ -244,7 +244,7 @@ describe('ProductsPage', () => {
   });
 
   describe('editar', () => {
-    it('precarga el producto, muestra el costo sin poder editarlo y lo reenvía tal cual', async () => {
+    it('precarga el producto, muestra el costo sin poder editarlo y no lo envía (no pisa el costo calculado por las compras)', async () => {
       stub();
       let body: Record<string, unknown> = {};
       let putId = '';
@@ -265,7 +265,8 @@ describe('ProductsPage', () => {
       expect(screen.getAllByRole('combobox', { name: 'Proveedor' })).toHaveLength(2);
       await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
       await vi.waitFor(() => expect(putId).toBe('1'));
-      expect(body).toMatchObject({ costoPromedio: 2000, activo: true, unitId: 10 });
+      expect(body).toMatchObject({ activo: true, unitId: 10 });
+      expect(body).not.toHaveProperty('costoPromedio');
       expect(body['suppliers']).toEqual([
         { supplierId: 100, negotiatedPrice: 1800, deliveryDays: 3, preferred: false },
         { supplierId: 101, negotiatedPrice: 1700, deliveryDays: 1, preferred: true },

@@ -30,6 +30,7 @@
               <tr>
                 <th scope="col" class="px-3 py-2 text-left font-medium">Producto</th>
                 <th scope="col" class="px-3 py-2 text-right font-medium">Cantidad</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Recibido</th>
                 <th scope="col" class="px-3 py-2 text-right font-medium">Precio</th>
                 <th scope="col" class="px-3 py-2 text-right font-medium">Desc.</th>
                 <th scope="col" class="px-3 py-2 text-right font-medium">Subtotal</th>
@@ -40,6 +41,7 @@
                 <tr class="border-t border-line-subtle">
                   <th scope="row" class="px-3 py-2 text-left font-medium text-fg">{{ productName(line.productId) }}</th>
                   <td class="px-3 py-2 text-right tabular-nums text-fg-muted">{{ formatQuantity(line.quantity) }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums text-fg-muted">{{ formatQuantity(line.received) }}</td>
                   <td class="px-3 py-2 text-right tabular-nums text-fg-muted">{{ formatMoney(line.unitPrice) }}</td>
                   <td class="px-3 py-2 text-right tabular-nums text-fg-subtle">{{ line.discountPct ? line.discountPct + ' %' : '—' }}</td>
                   <td class="px-3 py-2 text-right tabular-nums text-fg">{{ formatMoney(line.subtotal) }}</td>
@@ -48,7 +50,7 @@
             </tbody>
             <tfoot>
               <tr class="border-t border-line">
-                <th scope="row" colspan="4" class="px-3 py-2 text-right text-sm font-medium text-fg-muted">Total</th>
+                <th scope="row" colspan="5" class="px-3 py-2 text-right text-sm font-medium text-fg-muted">Total</th>
                 <td class="px-3 py-2 text-right text-base font-bold tabular-nums text-fg">{{ formatMoney(p.total) }}</td>
               </tr>
             </tfoot>
@@ -82,8 +84,8 @@
               En la unidad base de cada producto. Si llega menos de lo pedido, la orden queda recibida parcialmente y se puede seguir recibiendo. El costo promedio de cada producto se actualiza al registrar.
             </p>
             @for (line of p.lines; track line.id; let i = $index) {
-              <app-form-field [label]="productName(line.productId) + ' (pedido: ' + formatQuantity(line.quantity) + ')'" [error]="lineError(i)">
-                <input appInput type="number" min="0" [max]="line.quantity" step="any" inputmode="decimal" [formControlName]="i" />
+              <app-form-field [label]="productName(line.productId) + ' (faltan ' + formatQuantity(pending(line)) + ' de ' + formatQuantity(line.quantity) + ')'" [error]="lineError(i)">
+                <input appInput type="number" min="0" [max]="pending(line)" step="any" inputmode="decimal" [formControlName]="i" />
               </app-form-field>
             }
           </fieldset>

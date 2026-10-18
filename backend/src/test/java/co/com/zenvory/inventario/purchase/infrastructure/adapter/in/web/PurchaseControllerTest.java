@@ -141,6 +141,22 @@ class PurchaseControllerTest {
     }
 
     @Test
+    @DisplayName("el detalle de una orden con recepción parcial expone lo ya recibido")
+    void detailExposesReceivedQuantity() throws Exception {
+        PurchaseOrder order = mock(PurchaseOrder.class);
+        when(order.getReceptionStatus()).thenReturn(co.com.zenvory.inventario.purchase.domain.model.ReceptionStatus.PENDING);
+        when(order.getPaymentStatus()).thenReturn(co.com.zenvory.inventario.purchase.domain.model.PaymentStatus.POR_PAGAR);
+        when(order.getBranchId()).thenReturn(3L);
+        when(order.getDetails()).thenReturn(List.of(new co.com.zenvory.inventario.purchase.domain.model.PurchaseOrderDetail(
+                7L, 1L, new java.math.BigDecimal("10"), new java.math.BigDecimal("5"), java.math.BigDecimal.ZERO, new java.math.BigDecimal("4"))));
+        when(purchaseUseCase.getOrderById(1L)).thenReturn(order);
+
+        mockMvc.perform(get("/api/v1/purchases/1")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.details[0].quantity").value(10))
+                .andExpect(jsonPath("$.details[0].receivedQuantity").value(4));
+    }
+
+    @Test
     @DisplayName("una recepción con una línea repetida se rechaza (no se descarta una en silencio)")
     void receiveWithRepeatedLineRejected() throws Exception {
         PurchaseOrder order = mock(PurchaseOrder.class);

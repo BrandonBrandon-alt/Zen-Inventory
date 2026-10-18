@@ -20,6 +20,8 @@ export interface PurchaseLine {
   readonly id: number;
   readonly productId: number;
   readonly quantity: number;
+  /** Lo ya recibido en recepciones anteriores; lo que falta es `quantity - received`. */
+  readonly received: number;
   readonly unitPrice: number;
   readonly discountPct: number;
   readonly subtotal: number;
@@ -89,7 +91,7 @@ function toPurchase(raw: PurchaseResponse): Purchase | null {
     reason: raw.reasonResolution?.trim() ?? '',
     lines: (raw.details ?? []).flatMap((d) =>
       typeof d.id === 'number' && typeof d.productId === 'number'
-        ? [{ id: d.id, productId: d.productId, quantity: d.quantity ?? 0, unitPrice: d.unitPrice ?? 0, discountPct: d.discountPct ?? 0, subtotal: d.subtotal ?? 0 }]
+        ? [{ id: d.id, productId: d.productId, quantity: d.quantity ?? 0, received: d.receivedQuantity ?? 0, unitPrice: d.unitPrice ?? 0, discountPct: d.discountPct ?? 0, subtotal: d.subtotal ?? 0 }]
         : [],
     ),
   };

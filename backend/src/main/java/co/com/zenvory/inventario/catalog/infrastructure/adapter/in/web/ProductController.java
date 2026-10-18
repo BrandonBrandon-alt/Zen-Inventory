@@ -72,6 +72,9 @@ public class ProductController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
+        if (request.costoPromedio() == null) {
+            throw new IllegalArgumentException("El costo inicial es obligatorio al crear un producto.");
+        }
         Product created = productUseCase.createProduct(mapToDomain(request));
         return ResponseEntity.status(HttpStatus.CREATED).body(mapToResponse(created));
     }

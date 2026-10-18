@@ -190,7 +190,8 @@ export class ProductFormModal {
     const input = {
       sku: value.sku,
       nombre: value.nombre,
-      cost: value.cost as number,
+      // Al editar no se envía: el costo promedio ya no es el que mostraba el formulario si hubo compras entre tanto.
+      cost: current ? undefined : (value.cost as number),
       price: value.price as number,
       unitId: value.unitId as number,
       suppliers: value.suppliers.map((s) => ({
