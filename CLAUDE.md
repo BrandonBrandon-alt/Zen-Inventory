@@ -1,7 +1,7 @@
 # CLAUDE.md — optiplant-prueba-tecnica
 
-Monorepo: `backend/` (Spring Boot, Maven) y `frontend/` (Next.js, en proceso de
-migración a Angular con fines de aprendizaje).
+Monorepo: `backend/` (Spring Boot, Maven) y `frontend-angular/` (Angular). El frontend anterior de
+Next.js (`frontend/`) se retiró: su historia sigue en git.
 
 ## graphify — grafo de conocimiento del código
 
@@ -19,7 +19,7 @@ Reglas:
   `graphify query "<qué voy a cambiar>"` y, según el caso, `graphify explain "<símbolo>"` (qué lo rodea) o
   `graphify path "<A>" "<B>"` (qué depende de qué: p. ej. de un endpoint del backend a su pantalla Angular).
   Sirve para encontrar los archivos correctos y el impacto del cambio sin leer de más. Un único grafo en la
-  raíz cubre `backend/` y `frontend-angular/` (y `frontend/`), así que las relaciones entre ambos se ven.
+  raíz cubre `backend/` y `frontend-angular/`, así que las relaciones entre ambos se ven.
 - Para preguntas sobre el código, si existe `graphify-out/graph.json`, correr primero
   `graphify query "<pregunta>"`. Para relaciones, `graphify path "<A>" "<B>"`; para un
   concepto puntual, `graphify explain "<concepto>"`. Devuelven un subgrafo acotado,
@@ -34,10 +34,10 @@ Automatización en `.claude/settings.json`: un hook `UserPromptSubmit` recuerda 
 grafo antes de modificar código (si existe `graphify-out/graph.json`) y un hook `Stop` corre
 `graphify update .` al terminar cada respuesta para mantenerlo al día.
 
-## frontend-angular — migración a Angular
+## frontend-angular
 
-Proyecto nuevo en `frontend-angular/` que reemplaza a `frontend/` (Next.js) pantalla por pantalla.
-Spec y plan en `docs/superpowers/specs/` y `docs/superpowers/plans/`. Convenciones, estructura y
+Único frontend del proyecto (reemplazó al de Next.js pantalla por pantalla).
+Spec y plan de la migración en `docs/superpowers/specs/` y `docs/superpowers/plans/`. Convenciones, estructura y
 comandos: `frontend-angular/README.md`.
 
 **Regla operativa:** al implementar o modificar algo, agregar o actualizar los tests y correr la

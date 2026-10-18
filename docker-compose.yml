@@ -113,30 +113,7 @@ services:
     networks:
       - zenvory-network
 
-  # 4. Frontend (Next.js)
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: zenvory-frontend
-    restart: on-failure
-    # Frontend anterior (Next.js), en retirada por la migración a Angular: no arranca con `docker compose up`.
-    # Para usarlo: `docker compose --profile legacy up -d frontend`.
-    profiles: ["legacy"]
-    init: true
-    mem_limit: 256m
-    cpus: 0.5
-    logging: *default-logging
-    environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-    ports:
-      - "${NEXT_PORT}:3000"
-    depends_on:
-      - backend
-    networks:
-      - zenvory-network
-
-  # 5. Frontend (Angular) — convive con el de Next.js mientras dura la migración
+  # 4. Frontend (Angular)
   frontend-angular:
     build:
       context: ./frontend-angular

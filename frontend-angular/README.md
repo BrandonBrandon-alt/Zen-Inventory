@@ -1,7 +1,7 @@
 # Zen Inventory — frontend Angular
 
-Migración incremental del frontend de Next.js (`../frontend`) a Angular. Diseño y plan:
-`../docs/superpowers/specs/` y `../docs/superpowers/plans/`.
+Único frontend del proyecto: reemplazó al de Next.js, que se retiró (su historia sigue en git). Diseño y plan de la
+migración: `../docs/superpowers/specs/` y `../docs/superpowers/plans/`.
 
 ## Requisitos
 
@@ -74,7 +74,7 @@ con sus roles y cambia su `loadComponent` en `app.routes.ts` (el ítem debe tene
 
 ## Docker
 
-El servicio `frontend-angular` del `docker-compose.yml` (raíz del monorepo) convive con el de Next.js:
+El servicio `frontend-angular` del `docker-compose.yml` (raíz del monorepo):
 
 ```bash
 docker compose up --build frontend-angular   # levanta también db y backend por depends_on

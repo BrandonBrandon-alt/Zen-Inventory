@@ -57,35 +57,10 @@ backend/target/
 *.log.*
 
 # =========================================================================
-# FRONTEND — Next.js / Node.js
+# FRONTEND — Node.js (la configuración propia está en frontend-angular/.gitignore)
 # =========================================================================
 # Dependencias — nunca subir node_modules (se reinstalan con npm install)
-frontend/node_modules/
-
-# Archivos de build y caché de Next.js
-frontend/.next/
-frontend/out/
-frontend/build/
-
-# Configuracion de despliegue en Vercel (entorno local)
-frontend/.vercel/
-
-# Archivos generados por TypeScript y Next.js
-frontend/*.tsbuildinfo
-frontend/**/*.tsbuildinfo
-frontend/next-env.d.ts
-
-# Archivos de Yarn (si se usa Yarn en lugar de npm)
-frontend/.pnp
-frontend/.pnp.*
-frontend/.yarn/*
-!frontend/.yarn/patches
-!frontend/.yarn/plugins
-!frontend/.yarn/releases
-!frontend/.yarn/versions
-
-# Cobertura de tests del frontend
-frontend/coverage/
+node_modules/
 
 # Logs de gestores de paquetes
 npm-debug.log*

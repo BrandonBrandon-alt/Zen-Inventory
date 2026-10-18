@@ -1,6 +1,4 @@
 # Archivos generados: no aportan estructura al grafo
-frontend/src/api/schema.d.ts
-frontend/package-lock.json
 package-lock.json
 frontend-angular/src/app/core/api/schema.d.ts
 frontend-angular/package-lock.json
