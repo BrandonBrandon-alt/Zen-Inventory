@@ -52,6 +52,14 @@ logging:
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  # Datos de la empresa que salen en la factura de venta. Vacíos = no se imprimen (el nombre y el prefijo sí tienen valor).
+  company:
+    name: ${COMPANY_NAME:Zen Inventory}
+    tax-id: ${COMPANY_TAX_ID:}
+    address: ${COMPANY_ADDRESS:}
+    phone: ${COMPANY_PHONE:}
+    invoice-prefix: ${COMPANY_INVOICE_PREFIX:FV}
+    footer: ${COMPANY_INVOICE_FOOTER:Documento equivalente a factura de venta.}
   docs:
     # Swagger / OpenAPI abiertos sin autenticación: solo en "dev".
     public: ${APP_DOCS_PUBLIC:false}

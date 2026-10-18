@@ -964,6 +964,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/company": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analytics/valuations": {
         parameters: {
             query?: never;
@@ -1195,7 +1211,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["get_1"];
+        get: operations["get_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1833,6 +1849,14 @@ export interface components {
             activo?: boolean;
             /** Format: date-time */
             lastUpdated?: string;
+        };
+        CompanyResponse: {
+            name?: string;
+            taxId?: string;
+            address?: string;
+            phone?: string;
+            invoicePrefix?: string;
+            invoiceFooter?: string;
         };
         BranchValuation: {
             /** Format: int64 */
@@ -3861,6 +3885,26 @@ export interface operations {
             };
         };
     };
+    get_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CompanyResponse"];
+                };
+            };
+        };
+    };
     getBranchValuations: {
         parameters: {
             query?: never;
@@ -4163,7 +4207,7 @@ export interface operations {
             };
         };
     };
-    get_1: {
+    get_2: {
         parameters: {
             query?: never;
             header?: never;

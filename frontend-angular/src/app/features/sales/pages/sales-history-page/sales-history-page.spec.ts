@@ -10,6 +10,7 @@ import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
 import { NotificationService } from '@core/notifications/notification.service';
 import { chooseOption } from '@testing/select-helpers';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
+import { CompanyInfo, DEFAULT_COMPANY } from '@core/company/company-info';
 import { PrintService } from '@shared/print/print.service';
 import { SalesHistoryPage } from './sales-history-page';
 
@@ -57,6 +58,7 @@ const renderPage = () =>
       provideHttpClient(withInterceptors([errorInterceptor])),
       { provide: API_BASE_URL, useValue: TEST_API },
       { provide: PrintService, useValue: { print: (html: string) => printed.push(html) } },
+      { provide: CompanyInfo, useValue: { load: async () => DEFAULT_COMPANY } },
     ],
   });
 
@@ -226,7 +228,7 @@ describe('SalesHistoryPage', () => {
       const dialog = await openDetail(1);
       await userEvent.click(within(dialog).getByRole('button', { name: 'Imprimir factura' }));
       expect(printed).toHaveLength(1);
-      expect(printed[0]).toContain('FACTURA DE VENTA N° 000001');
+      expect(printed[0]).toContain('FACTURA DE VENTA N° FV-000001');
       expect(printed[0]).toContain('Tornillo');
       await userEvent.click(within(dialog).getAllByRole('button', { name: 'Cerrar' }).at(-1) as HTMLElement);
       await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());

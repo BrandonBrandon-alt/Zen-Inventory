@@ -117,3 +117,21 @@ como un componente con su plantilla completa repetida (~3 kB por icono, 85 en us
 reducirlo. Si el arranque llega a importar, la salida es cambiar a una librería con los datos del icono sueltos
 (p. ej. `lucide`) y pintarlos con un único componente: unos 60 archivos, baja a ~390 kB. Para medirlo:
 `ng build --source-map` y sumar los bytes generados por paquete a partir del `.map` del chunk grande.
+
+## Factura de venta: datos de la empresa
+
+La factura impresa (80 mm, botón "Imprimir factura" al registrar una venta y en el detalle del historial) toma los
+datos de la empresa del backend (`GET /api/v1/company`). Se configuran con variables de entorno del backend, por ejemplo
+en el `.env` de la raíz:
+
+```
+COMPANY_NAME=Ferretería Zen S.A.S.
+COMPANY_TAX_ID=900.123.456-1
+COMPANY_ADDRESS=Cra 7 # 12-34, Medellín
+COMPANY_PHONE=604 444 0000
+COMPANY_INVOICE_PREFIX=FV          # número impreso: FV-000055 (el consecutivo es el id de la venta)
+COMPANY_INVOICE_FOOTER=Gracias por su compra
+```
+
+Todas son opcionales: lo que quede vacío no se imprime. Es un comprobante interno, no una factura electrónica
+(DIAN): para eso hace falta un proveedor tecnológico autorizado.

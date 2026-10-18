@@ -3,6 +3,7 @@ import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angula
 import { LucidePrinter } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { toApiError } from '@core/api/api-error';
+import { CompanyInfo } from '@core/company/company-info';
 import { NotificationService } from '@core/notifications/notification.service';
 import { PrintService } from '@shared/print/print.service';
 import { formatDateTime, formatMoney, formatQuantity } from '@shared/format/format';
@@ -33,6 +34,7 @@ export class SaleDetailModal {
   private readonly fb = inject(NonNullableFormBuilder);
   private readonly notifications = inject(NotificationService);
   private readonly printer = inject(PrintService);
+  private readonly company = inject(CompanyInfo);
 
   readonly open = model(false);
   readonly sale = input<Sale | null>(null);
@@ -78,9 +80,9 @@ export class SaleDetailModal {
   }
 
   /** Imprime la factura de venta (tiquete de 80 mm) de la venta abierta. */
-  protected printReceipt(): void {
+  protected async printReceipt(): Promise<void> {
     const sale = this.sale();
-    if (sale) this.printer.print(buildSaleReceiptHtml(sale));
+    if (sale) this.printer.print(buildSaleReceiptHtml(sale, await this.company.load()));
   }
 
   protected reasonError(): string | null {

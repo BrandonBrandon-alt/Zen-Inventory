@@ -8,6 +8,7 @@ import { errorInterceptor } from '@core/api/error.interceptor';
 import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
 import { chooseOption } from '@testing/select-helpers';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
+import { CompanyInfo, DEFAULT_COMPANY } from '@core/company/company-info';
 import { PrintService } from '@shared/print/print.service';
 import { PosPage } from './pos-page';
 
@@ -64,6 +65,7 @@ const renderPage = () =>
       provideHttpClient(withInterceptors([errorInterceptor])),
       { provide: API_BASE_URL, useValue: TEST_API },
       { provide: PrintService, useValue: { print: (html: string) => printed.push(html) } },
+      { provide: CompanyInfo, useValue: { load: async () => DEFAULT_COMPANY } },
     ],
   });
 
@@ -281,7 +283,7 @@ describe('PosPage', () => {
       printed.length = 0;
       await userEvent.click(within(receipt).getByRole('button', { name: 'Imprimir factura' }));
       expect(printed).toHaveLength(1);
-      expect(printed[0]).toContain('FACTURA DE VENTA N° 000055');
+      expect(printed[0]).toContain('FACTURA DE VENTA N° FV-000055');
       await userEvent.click(within(receipt).getByRole('button', { name: 'Nueva venta' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });

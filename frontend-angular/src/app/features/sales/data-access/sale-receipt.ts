@@ -1,3 +1,4 @@
+import { type Company, DEFAULT_COMPANY } from '@core/company/company-info';
 import { formatDateTime, formatMoney, formatQuantity } from '@shared/format/format';
 import { customerLabel } from './sale-labels';
 import type { Sale } from './sales-api';
@@ -31,8 +32,9 @@ const STYLES = `
  * Factura de venta en formato de tiquete de 80 mm, lista para imprimir. Todo texto que viene del servidor
  * (productos, cliente, vendedor) se escapa: el documento se escribe como HTML.
  */
-export function buildSaleReceiptHtml(sale: Sale): string {
-  const number = String(sale.id).padStart(6, '0');
+export function buildSaleReceiptHtml(sale: Sale, company: Company = DEFAULT_COMPANY): string {
+  const number = `${company.invoicePrefix ? company.invoicePrefix + '-' : ''}${String(sale.id).padStart(6, '0')}`;
+  const contact = [company.taxId ? `NIT ${company.taxId}` : '', company.address, company.phone ? `Tel. ${company.phone}` : ''].filter(Boolean);
   const lines = sale.lines
     .map(
       (l) => `<tr>
@@ -46,12 +48,13 @@ export function buildSaleReceiptHtml(sale: Sale): string {
   const status = sale.status === 'COMPLETED' ? '' : `<div class="void">${sale.status === 'CANCELED' ? 'ANULADA' : 'DEVUELTA'}</div>`;
 
   return `<!doctype html>
-<html lang="es"><head><meta charset="utf-8"><title>Factura de venta ${number}</title><style>${STYLES}</style></head>
+<html lang="es"><head><meta charset="utf-8"><title>Factura de venta ${escapeHtml(number)}</title><style>${STYLES}</style></head>
 <body>
   <div class="center">
-    <div class="brand">ZEN INVENTORY</div>
+    <div class="brand">${escapeHtml(company.name.toUpperCase())}</div>
+    ${contact.map((line) => `<div class="muted">${escapeHtml(line)}</div>`).join('')}
     ${sale.branchName ? `<div class="muted">${escapeHtml(sale.branchName)}</div>` : ''}
-    <div class="doc">FACTURA DE VENTA N° ${number}</div>
+    <div class="doc">FACTURA DE VENTA N° ${escapeHtml(number)}</div>
   </div>
   ${status}
   <div class="rule"></div>
@@ -72,6 +75,6 @@ export function buildSaleReceiptHtml(sale: Sale): string {
   </div>
   <div class="rule"></div>
   <div class="center strong" style="letter-spacing:2px">GRACIAS POR SU COMPRA</div>
-  <div class="center muted" style="margin-top:6px">Documento equivalente a factura de venta.<br>Favor verificar su mercancía.</div>
+  ${company.invoiceFooter ? `<div class="center muted" style="margin-top:6px">${escapeHtml(company.invoiceFooter)}</div>` : ''}
 </body></html>`;
 }

@@ -90,6 +90,13 @@ services:
       - SPRING_DATASOURCE_USERNAME=${DB_USER}
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
       - SECURITY_JWT_SECRET=${JWT_SECRET}
+      # Datos de la empresa para la factura de venta (todos opcionales; ver app.company en application.yml).
+      - COMPANY_NAME=${COMPANY_NAME:-Zen Inventory}
+      - COMPANY_TAX_ID=${COMPANY_TAX_ID:-}
+      - COMPANY_ADDRESS=${COMPANY_ADDRESS:-}
+      - COMPANY_PHONE=${COMPANY_PHONE:-}
+      - COMPANY_INVOICE_PREFIX=${COMPANY_INVOICE_PREFIX:-FV}
+      - COMPANY_INVOICE_FOOTER=${COMPANY_INVOICE_FOOTER:-Documento equivalente a factura de venta.}
       # Perfil de la API: "dev" abre Swagger, permite CORS desde localhost y registra SQL. En producción: SPRING_PROFILES_ACTIVE=prod
       # y CORS_ALLOWED_ORIGINS=https://tu-dominio (sin definirla, no se permite ningún origen cruzado).
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-dev}
