@@ -159,6 +159,102 @@ describe('TransfersPage', () => {
     });
   });
 
+  describe('filtros', () => {
+    const STORE = 'zen:filters:1:transfers';
+    const ids = () => screen.queryAllByRole('row').slice(1).map((r) => /#(\d+)/.exec(r.textContent ?? '')?.[1]);
+    const openAdvanced = async () => userEvent.click(await screen.findByRole('button', { name: /Más filtros/ }));
+
+    it('busca por número, sede o producto', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await screen.findByText('#5');
+      await userEvent.type(screen.getByLabelText('Buscar traslado'), 'tuerca');
+      expect(ids().sort()).toEqual(['3', '5']);
+    });
+
+    it('filtra por prioridad', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await screen.findByText('#5');
+      await chooseOption('Prioridad', 'Alta');
+      expect(ids()).toEqual(['5']);
+      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro Prioridad: Alta' }));
+      expect(ids().length).toBe(5); // en curso: todos menos el entregado
+    });
+
+    it('filtra por sede de origen y de destino y por producto desde «Más filtros»', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await screen.findByText('#5');
+      await chooseOption('Estado del traslado', 'Todos los estados');
+      await openAdvanced();
+      await chooseOption('Sede de origen', 'Sucursal Norte');
+      expect(ids()).toEqual(['9']);
+      await chooseOption('Sede de origen', 'Todas las sucursales');
+      await chooseOption('Sede de destino', 'Sucursal Sur');
+      expect(ids()).toEqual(['9']);
+      await chooseOption('Sede de destino', 'Todas las sucursales');
+      await chooseOption('Producto', 'Tuerca');
+      expect(ids().sort()).toEqual(['3', '5']);
+      expect(screen.getByLabelText('1 filtro activo')).toBeInTheDocument();
+    });
+
+    it('«solo los que esperan mi acción» deja lo que le toca a quien mira', async () => {
+      useSession('MANAGER', 20);
+      stub();
+      await renderPage();
+      await screen.findByText('#5');
+      await openAdvanced();
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Solo los que esperan mi acción' }));
+      const mine = ids();
+      expect(mine.length).toBeGreaterThan(0);
+      expect(mine.length).toBeLessThan(5);
+      expect(screen.getByRole('group', { name: 'Filtros aplicados' })).toHaveTextContent('esperan mi acción');
+    });
+
+    it('recuerda los filtros la próxima vez que se entra, pero no la búsqueda', async () => {
+      useSession('ADMIN');
+      stub();
+      const first = await renderPage();
+      await screen.findByText('#5');
+      await chooseOption('Prioridad', 'Alta');
+      await openAdvanced();
+      await chooseOption('Producto', 'Tornillo');
+      await userEvent.type(screen.getByLabelText('Buscar traslado'), '5');
+      await vi.waitFor(() => expect(JSON.parse(localStorage.getItem(STORE) ?? '{}')).toMatchObject({ priority: 'HIGH', product: 'Tornillo', advancedOpen: true }));
+      first.fixture.destroy();
+      TestBed.resetTestingModule(); // otra visita
+
+      await renderPage();
+      await screen.findByText('#5');
+      expect(screen.getByRole('combobox', { name: 'Prioridad' })).toHaveTextContent('Alta');
+      expect(screen.getByRole('combobox', { name: 'Producto' })).toHaveTextContent('Tornillo');
+      expect(screen.getByLabelText('Buscar traslado')).toHaveValue('');
+      expect(ids()).toEqual(['5']);
+    });
+
+    it('un valor guardado dañado se ignora', async () => {
+      useSession('ADMIN');
+      localStorage.setItem(STORE, JSON.stringify({ status: 'INVENTADO', priority: 3, direction: 'sideways', origin: 'x' }));
+      stub();
+      await renderPage();
+      expect(await screen.findByText('#5')).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
+    });
+
+    it('el panel abierto no tiene problemas de accesibilidad detectables', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await screen.findByText('#5');
+      await openAdvanced();
+      await expectAccessible();
+    });
+  });
+
   describe('detalle', () => {
     it('muestra el estado, qué sigue, la ruta y los productos con sus cantidades', async () => {
       useSession('ADMIN');

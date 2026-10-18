@@ -10,14 +10,33 @@
   <button appButton type="button" (click)="requestOpen.set(true)"><svg lucidePlus [size]="16" />Solicitar traslado</button>
 </header>
 
-<div class="mb-4 flex animate-enter-delayed flex-wrap items-center gap-3">
+<div class="mb-3 flex animate-enter-delayed flex-wrap items-center gap-3">
+  <div class="w-64 max-w-full">
+    <app-form-field>
+      <input appInput type="search" placeholder="Buscar por n.º, sede o producto…" aria-label="Buscar traslado" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
+      <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
+    </app-form-field>
+  </div>
   @if (!isAdmin()) {
     <app-segmented [options]="directionOptions" [(value)]="direction" ariaLabel="Dirección del traslado" />
   }
   <div class="w-56">
     <app-select [(value)]="statusFilter" [options]="statusOptions" [icon]="filterIcon" ariaLabel="Estado del traslado" />
   </div>
+  <div class="w-52"><app-select [(value)]="priorityFilter" [options]="priorityOptions" [icon]="priorityIcon" ariaLabel="Prioridad" /></div>
+  <div class="w-44"><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
+  <div class="w-44"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
+  <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
+    <app-select [(value)]="originFilter" [options]="branchOptions()" ariaLabel="Sede de origen" />
+    <app-select [(value)]="destinationFilter" [options]="branchOptions()" ariaLabel="Sede de destino" />
+    <app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" />
+    <label class="flex items-center gap-2 text-sm text-fg-muted">
+      <input type="checkbox" class="size-4 accent-[var(--brand-500)]" [checked]="onlyMine()" (change)="onlyMine.set($any($event.target).checked)" />
+      Solo los que esperan mi acción
+    </label>
+  </app-advanced-filters>
 </div>
+<app-active-filters class="mb-4 animate-enter-delayed" [filters]="activeFilters()" (removed)="removeFilter($event)" (cleared)="clearFilters()" />
 
 <app-data-table
   exportName="traslados"
@@ -30,8 +49,8 @@
   [error]="error()"
   [pageSize]="10"
   [clickableRows]="true"
-  [emptyTitle]="statusFilter() === 'open' ? 'No hay traslados en curso' : 'Ningún traslado coincide'"
-  [emptyDescription]="statusFilter() === 'open' ? 'Solicita uno para pedir mercancía a otra sucursal.' : 'Prueba con otro estado o dirección.'"
+  [emptyTitle]="activeFilters().length === 0 ? 'No hay traslados en curso' : 'Ningún traslado coincide'"
+  [emptyDescription]="activeFilters().length === 0 ? 'Solicita uno para pedir mercancía a otra sucursal.' : 'Prueba quitando algún filtro.'"
   minWidth="52rem"
   (rowClick)="openDetail($event)"
   (retry)="load()"
