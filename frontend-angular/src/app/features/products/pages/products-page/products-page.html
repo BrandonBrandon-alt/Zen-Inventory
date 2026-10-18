@@ -18,14 +18,14 @@
   <div class="w-52"><app-select [(value)]="statusFilter" [options]="statusOptions" ariaLabel="Estado del producto" /></div>
   <div class="w-56"><app-select [(value)]="unitFilter" [options]="unitOptions()" ariaLabel="Unidad de medida" /></div>
   <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
-    <app-select [(value)]="supplierFilter" [options]="supplierOptions()" ariaLabel="Proveedor" searchable searchPlaceholder="Buscar proveedor…" />
+    <app-form-field label="Proveedor"><app-select [(value)]="supplierFilter" [options]="supplierOptions()" ariaLabel="Proveedor" searchable searchPlaceholder="Buscar proveedor…" /></app-form-field>
     <app-form-field label="Precio desde">
       <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="minPrice() ?? ''" (input)="minPrice.set(numberFromInput($event))" />
     </app-form-field>
     <app-form-field label="Precio hasta">
       <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="maxPrice() ?? ''" (input)="maxPrice.set(numberFromInput($event))" />
     </app-form-field>
-    <label class="flex items-center gap-2 text-sm text-fg-muted">
+    <label class="flex min-h-11 items-center gap-2 text-sm text-fg-muted">
       <input type="checkbox" class="size-4 accent-[var(--brand-500)]" [checked]="noSuppliers()" (change)="noSuppliers.set($any($event.target).checked)" />
       Solo sin proveedores
     </label>

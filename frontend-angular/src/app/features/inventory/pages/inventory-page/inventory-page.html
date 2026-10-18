@@ -41,7 +41,7 @@
         <app-form-field label="Existencias hasta">
           <input appInput type="number" step="any" inputmode="decimal" [value]="maxStock() ?? ''" (input)="maxStock.set(numberFromInput($event))" />
         </app-form-field>
-        <label class="flex items-center gap-2 text-sm text-fg-muted">
+        <label class="flex min-h-11 items-center gap-2 text-sm text-fg-muted">
           <input type="checkbox" class="size-4 accent-[var(--brand-500)]" [checked]="noMinimum()" (change)="noMinimum.set($any($event.target).checked)" />
           Solo sin mínimo definido
         </label>

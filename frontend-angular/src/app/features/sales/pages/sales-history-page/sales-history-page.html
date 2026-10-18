@@ -23,8 +23,8 @@
   <div class="w-44"><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
   <div class="w-44"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
   <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
-    <app-select [(value)]="sellerFilter" [options]="sellerOptions()" ariaLabel="Vendedor" />
-    <app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" />
+    <app-form-field label="Vendedor"><app-select [(value)]="sellerFilter" [options]="sellerOptions()" ariaLabel="Vendedor" /></app-form-field>
+    <app-form-field label="Producto"><app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" /></app-form-field>
     <app-form-field label="Total desde">
       <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="minTotal() ?? ''" (input)="minTotal.set(numberFromInput($event))" />
     </app-form-field>

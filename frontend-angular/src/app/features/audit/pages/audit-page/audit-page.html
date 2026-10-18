@@ -20,15 +20,15 @@
   <div><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
   <div><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
   <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="col-span-full">
-    <app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" />
-    <app-select [(value)]="responsibleFilter" [options]="responsibleOptions()" ariaLabel="Responsable" searchable searchPlaceholder="Buscar persona…" />
+    <app-form-field label="Producto"><app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" /></app-form-field>
+    <app-form-field label="Responsable"><app-select [(value)]="responsibleFilter" [options]="responsibleOptions()" ariaLabel="Responsable" searchable searchPlaceholder="Buscar persona…" /></app-form-field>
     <app-form-field label="Cantidad desde">
       <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="minQuantity() ?? ''" (input)="minQuantity.set(numberFromInput($event))" />
     </app-form-field>
     <app-form-field label="Cantidad hasta">
       <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="maxQuantity() ?? ''" (input)="maxQuantity.set(numberFromInput($event))" />
     </app-form-field>
-    <label class="flex items-center gap-2 text-sm text-fg-muted">
+    <label class="flex min-h-11 items-center gap-2 text-sm text-fg-muted">
       <input type="checkbox" class="size-4 accent-[var(--brand-500)]" [checked]="onlyObserved()" (change)="onlyObserved.set($any($event.target).checked)" />
       Solo con observaciones
     </label>

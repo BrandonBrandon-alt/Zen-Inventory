@@ -27,10 +27,10 @@
   <div class="w-44"><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
   <div class="w-44"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
   <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
-    <app-select [(value)]="originFilter" [options]="branchOptions()" ariaLabel="Sede de origen" />
-    <app-select [(value)]="destinationFilter" [options]="branchOptions()" ariaLabel="Sede de destino" />
-    <app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" />
-    <label class="flex items-center gap-2 text-sm text-fg-muted">
+    <app-form-field label="Sede de origen"><app-select [(value)]="originFilter" [options]="branchOptions()" ariaLabel="Sede de origen" /></app-form-field>
+    <app-form-field label="Sede de destino"><app-select [(value)]="destinationFilter" [options]="branchOptions()" ariaLabel="Sede de destino" /></app-form-field>
+    <app-form-field label="Producto"><app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" /></app-form-field>
+    <label class="flex min-h-11 items-center gap-2 text-sm text-fg-muted">
       <input type="checkbox" class="size-4 accent-[var(--brand-500)]" [checked]="onlyMine()" (change)="onlyMine.set($any($event.target).checked)" />
       Solo los que esperan mi acción
     </label>

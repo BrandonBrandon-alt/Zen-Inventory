@@ -21,10 +21,10 @@
   <div class="w-44"><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
   <div class="w-44"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
   <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
-    <app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" />
-    <app-select [(value)]="requesterFilter" [options]="requesterOptions()" ariaLabel="Solicitó" searchable searchPlaceholder="Buscar persona…" />
+    <app-form-field label="Producto"><app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" /></app-form-field>
+    <app-form-field label="Solicitó"><app-select [(value)]="requesterFilter" [options]="requesterOptions()" ariaLabel="Solicitó" searchable searchPlaceholder="Buscar persona…" /></app-form-field>
     @if (isAdmin()) {
-      <app-select [(value)]="branchFilter" [options]="branchOptions()" ariaLabel="Sucursal" />
+      <app-form-field label="Sucursal"><app-select [(value)]="branchFilter" [options]="branchOptions()" ariaLabel="Sucursal" /></app-form-field>
     }
     <app-form-field label="Valor desde">
       <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="minTotal() ?? ''" (input)="minTotal.set(numberFromInput($event))" />

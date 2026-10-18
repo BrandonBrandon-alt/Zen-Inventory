@@ -24,18 +24,18 @@
   <div class="w-44"><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
   <div class="w-44"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
   <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
-    <app-select [(value)]="supplierFilter" [options]="supplierOptions()" ariaLabel="Proveedor" searchable searchPlaceholder="Buscar proveedor…" />
+    <app-form-field label="Proveedor"><app-select [(value)]="supplierFilter" [options]="supplierOptions()" ariaLabel="Proveedor" searchable searchPlaceholder="Buscar proveedor…" /></app-form-field>
     @if (isAdmin()) {
-      <app-select [(value)]="branchFilter" [options]="branchOptions()" ariaLabel="Sucursal" />
+      <app-form-field label="Sucursal"><app-select [(value)]="branchFilter" [options]="branchOptions()" ariaLabel="Sucursal" /></app-form-field>
     }
-    <app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" />
+    <app-form-field label="Producto"><app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" /></app-form-field>
     <app-form-field label="Total desde">
       <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="minTotal() ?? ''" (input)="minTotal.set(numberFromInput($event))" />
     </app-form-field>
     <app-form-field label="Total hasta">
       <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="maxTotal() ?? ''" (input)="maxTotal.set(numberFromInput($event))" />
     </app-form-field>
-    <label class="flex items-center gap-2 text-sm text-fg-muted">
+    <label class="flex min-h-11 items-center gap-2 text-sm text-fg-muted">
       <input type="checkbox" class="size-4 accent-[var(--brand-500)]" [checked]="onlyMine()" (change)="onlyMine.set($any($event.target).checked)" />
       Solo las que esperan mi acción
     </label>
