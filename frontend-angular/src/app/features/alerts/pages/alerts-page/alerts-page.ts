@@ -9,6 +9,7 @@ import {
   LucidePackage,
   LucideReceiptText,
   LucideScanSearch,
+  LucideSearch,
   LucideShoppingBag,
   LucideShuffle,
   LucideStore,
@@ -23,9 +24,15 @@ import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { CatalogOptionsApi } from '@core/catalog/catalog-options-api';
 import { NotificationService } from '@core/notifications/notification.service';
-import { formatDateTime } from '@shared/format/format';
+import { formatDateTime, normalizeText } from '@shared/format/format';
+import { inDateRange, optionsFrom } from '@shared/filters/filter-helpers';
+import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
+import { DatePicker } from '@shared/ui/date-picker/date-picker';
+import { ActiveFilters, type ActiveFilter } from '@shared/ui/filters/active-filters';
+import { AdvancedFilters } from '@shared/ui/filters/advanced-filters';
+import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
@@ -56,9 +63,11 @@ interface AlertRow extends StockAlert {
 
 const rowKey = (row: AlertRow): number => row.id;
 
+const DAY = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' });
+
 @Component({
   selector: 'app-alerts-page',
-  imports: [DataTable, DataTableCell, Badge, Button, Select, Tooltip, AlertResolutionModal, LucideCircleCheck, LucideScanSearch],
+  imports: [DataTable, DataTableCell, Badge, Button, DatePicker, ActiveFilters, AdvancedFilters, FormField, InputDirective, Select, Tooltip, AlertResolutionModal, LucideCircleCheck, LucideScanSearch, LucideSearch],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './alerts-page.html',
@@ -87,8 +96,15 @@ export class AlertsPage {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
-  protected readonly branchFilter = signal<number | null>(null);
-  protected readonly typeFilter = signal<AlertType | null>(null);
+  // Los filtros se recuerdan por persona (la búsqueda de texto no: se escribe cada vez).
+  private static readonly SCREEN = 'alerts';
+  protected readonly search = signal('');
+  protected readonly branchFilter = persistedFilter(AlertsPage.SCREEN, 'branch', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly typeFilter = persistedFilter(AlertsPage.SCREEN, 'type', null as AlertType | null, codecs.nullable(codecs.oneOf(ALERT_TYPES)));
+  protected readonly from = persistedFilter(AlertsPage.SCREEN, 'from', null as Date | null, codecs.nullable(codecs.date()));
+  protected readonly to = persistedFilter(AlertsPage.SCREEN, 'to', null as Date | null, codecs.nullable(codecs.date()));
+  protected readonly productFilter = persistedFilter(AlertsPage.SCREEN, 'product', null as string | null, codecs.nullable(codecs.text()));
+  protected readonly advancedOpen = persistedFilter(AlertsPage.SCREEN, 'advancedOpen', false, codecs.bool());
 
   protected readonly scanning = signal(false);
 
@@ -107,14 +123,37 @@ export class AlertsPage {
   protected readonly rows = computed<AlertRow[]>(() => {
     const branches = new Map(this.branches().map((b) => [b.id, b.nombre]));
     const type = this.typeFilter();
+    const { from, to, product } = { from: this.from(), to: this.to(), product: this.productFilter() };
+    const needle = normalizeText(this.search().trim());
     return this.alerts()
-      .filter((a) => type === null || a.type === type)
       .map((a) => ({
         ...a,
         product: this.productNames().get(a.productId) ?? `Producto ${a.productId}`,
         branch: branches.get(a.branchId) ?? `Sede ${a.branchId}`,
         typeLabel: TYPES[a.type].label,
-      }));
+      }))
+      .filter((a) => type === null || a.type === type)
+      .filter((a) => inDateRange(a.date, from, to))
+      .filter((a) => product === null || a.product === product)
+      .filter((a) => !needle || normalizeText(`${a.product} ${a.message} ${a.typeLabel}`).includes(needle));
+  });
+
+  protected readonly productOptions = computed(() => optionsFrom(this.alerts().map((a) => this.productNames().get(a.productId) ?? `Producto ${a.productId}`), this.productFilter(), 'Todos los productos'));
+
+  /** Los filtros del panel «Más filtros» que están aplicados (el botón muestra cuántos). */
+  protected readonly advancedCount = computed(() => (this.productFilter() !== null ? 1 : 0));
+
+  /** Todos los filtros aplicados, para mostrarlos como etiquetas que se quitan. */
+  protected readonly activeFilters = computed<ActiveFilter[]>(() => {
+    const list: ActiveFilter[] = [];
+    const branch = this.branchFilter();
+    if (this.isAdmin() && branch !== null) list.push({ id: 'branch', label: 'Sucursal', text: this.branches().find((b) => b.id === branch)?.nombre ?? `Sede ${branch}` });
+    if (this.typeFilter() !== null) list.push({ id: 'type', label: 'Tipo', text: TYPES[this.typeFilter()!].label });
+    if (this.from() !== null) list.push({ id: 'from', label: 'Desde', text: DAY.format(this.from()!) });
+    if (this.to() !== null) list.push({ id: 'to', label: 'Hasta', text: DAY.format(this.to()!) });
+    if (this.productFilter() !== null) list.push({ id: 'product', label: 'Producto', text: this.productFilter()! });
+    if (this.search().trim()) list.push({ id: 'search', label: 'Búsqueda', text: this.search().trim() });
+    return list;
   });
 
   protected readonly summary = computed(() => {
@@ -171,6 +210,25 @@ export class AlertsPage {
     } finally {
       if (id === this.loadId) this.loading.set(false);
     }
+  }
+
+  protected onSearch(event: Event): void {
+    this.search.set((event.target as HTMLInputElement).value);
+  }
+
+  protected removeFilter(id: string): void {
+    switch (id) {
+      case 'branch': this.setBranch(null); break;
+      case 'type': this.typeFilter.set(null); break;
+      case 'from': this.from.set(null); break;
+      case 'to': this.to.set(null); break;
+      case 'product': this.productFilter.set(null); break;
+      case 'search': this.search.set(''); break;
+    }
+  }
+
+  protected clearFilters(): void {
+    for (const filter of this.activeFilters()) this.removeFilter(filter.id);
   }
 
   protected setBranch(branchId: number | null): void {

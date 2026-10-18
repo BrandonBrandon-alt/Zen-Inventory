@@ -20,18 +20,30 @@
   }
 </header>
 
-<div class="mb-4 flex animate-enter-delayed flex-wrap gap-3">
+<div class="mb-3 flex animate-enter-delayed flex-wrap items-center gap-3">
+  <div class="w-64 max-w-full">
+    <app-form-field>
+      <input appInput type="search" placeholder="Buscar producto o detalle…" aria-label="Buscar alerta" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
+      <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
+    </app-form-field>
+  </div>
   @if (isAdmin() && branches().length > 0) {
     <div class="w-64">
       <app-select [value]="branchFilter()" (valueChange)="setBranch($event)" [options]="branchOptions()" [icon]="storeIcon" ariaLabel="Sucursal" />
     </div>
   }
-  @if (alerts().length > 0) {
+  @if (alerts().length > 0 || typeFilter()) {
     <div class="w-56">
       <app-select [(value)]="typeFilter" [options]="typeOptions()" [icon]="tagIcon" ariaLabel="Tipo de alerta" />
     </div>
   }
+  <div class="w-44"><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
+  <div class="w-44"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
+  <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
+    <app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" />
+  </app-advanced-filters>
 </div>
+<app-active-filters class="mb-4 animate-enter-delayed" [filters]="activeFilters()" (removed)="removeFilter($event)" (cleared)="clearFilters()" />
 
 <app-data-table
   exportName="alertas"
@@ -43,8 +55,8 @@
   [loading]="loading()"
   [error]="error()"
   [pageSize]="10"
-  [emptyTitle]="typeFilter() ? 'Ninguna alerta de este tipo' : 'No hay alertas activas'"
-  [emptyDescription]="typeFilter() ? 'Prueba con otro tipo.' : 'Todo está en orden: ningún producto necesita atención.'"
+  [emptyTitle]="activeFilters().length > 0 ? 'Ninguna alerta coincide' : 'No hay alertas activas'"
+  [emptyDescription]="activeFilters().length > 0 ? 'Prueba quitando algún filtro.' : 'Todo está en orden: ningún producto necesita atención.'"
   minWidth="52rem"
   (retry)="load()"
 >

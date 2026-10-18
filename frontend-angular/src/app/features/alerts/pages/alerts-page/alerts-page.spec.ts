@@ -210,6 +210,106 @@ describe('AlertsPage', () => {
     });
   });
 
+  describe('filtros', () => {
+    const STORE = 'zen:filters:1:alerts';
+    const openAdvanced = async () => userEvent.click(await screen.findByRole('button', { name: /Más filtros/ }));
+
+    it('busca por producto o por detalle', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await screen.findByText('Venta anulada');
+      await userEvent.type(screen.getByLabelText('Buscar alerta'), 'sugerida');
+      expect(products()).toEqual(['Tuerca']); // «Compra sugerida»
+      await userEvent.clear(screen.getByLabelText('Buscar alerta'));
+      await userEvent.type(screen.getByLabelText('Buscar alerta'), 'tornillo');
+      expect(products()).toEqual(['Tornillo']);
+    });
+
+    it('filtra por producto desde «Más filtros» y por rango de fechas recordado', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await screen.findByText('Venta anulada');
+      await openAdvanced();
+      await chooseOption('Producto', 'Tuerca');
+      expect(products()).toEqual(['Tuerca', 'Tuerca']);
+      expect(screen.getByLabelText('1 filtro activo')).toBeInTheDocument();
+    });
+
+    it('un rango de fechas guardado se aplica y se ve como etiqueta', async () => {
+      useSession('ADMIN');
+      localStorage.setItem(STORE, JSON.stringify({ from: new Date(2026, 9, 15).toISOString(), to: new Date(2026, 9, 16).toISOString() }));
+      stub();
+      await renderPage();
+      await screen.findByText('Venta anulada');
+      expect(products().sort()).toEqual(['Tornillo', 'Tuerca']); // 15 y 16 de octubre; la del 14 queda fuera
+      expect(screen.getByRole('group', { name: 'Filtros aplicados' })).toHaveTextContent('Desde:');
+    });
+
+    it('las etiquetas se quitan una a una y todas juntas', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await screen.findByText('Venta anulada');
+      await chooseOption('Tipo de alerta', 'Stock bajo');
+      expect(products()).toEqual(['Tornillo']);
+      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro Tipo: Stock bajo' }));
+      expect(products()).toHaveLength(3);
+      await chooseOption('Tipo de alerta', 'Stock bajo');
+      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+      expect(products()).toHaveLength(3);
+    });
+
+    it('la sucursal recordada se pide al servidor desde la primera carga', async () => {
+      useSession('ADMIN');
+      localStorage.setItem(STORE, JSON.stringify({ branch: 20 }));
+      const requested: (string | null)[] = [];
+      stub();
+      server.use(http.get(ALERTS_URL, ({ request }) => (requested.push(new URL(request.url).searchParams.get('branchId')), HttpResponse.json(ALERTS))));
+      await renderPage();
+      await screen.findByText('Venta anulada');
+      expect(requested[0]).toBe('20');
+    });
+
+    it('recuerda los filtros la próxima vez que se entra, pero no la búsqueda', async () => {
+      useSession('ADMIN');
+      stub();
+      const first = await renderPage();
+      await screen.findByText('Venta anulada');
+      await chooseOption('Tipo de alerta', 'Compra sugerida');
+      await openAdvanced();
+      await chooseOption('Producto', 'Tuerca');
+      await userEvent.type(screen.getByLabelText('Buscar alerta'), 'x');
+      await vi.waitFor(() => expect(JSON.parse(localStorage.getItem(STORE) ?? '{}')).toMatchObject({ type: 'PURCHASE_REQUEST', product: 'Tuerca', advancedOpen: true }));
+      first.fixture.destroy();
+      TestBed.resetTestingModule(); // otra visita
+
+      await renderPage();
+      await vi.waitFor(() => expect(products()).toEqual(['Tuerca']));
+      expect(screen.getByLabelText('Buscar alerta')).toHaveValue('');
+      expect(products()).toEqual(['Tuerca']);
+    });
+
+    it('un valor guardado dañado se ignora', async () => {
+      useSession('ADMIN');
+      localStorage.setItem(STORE, JSON.stringify({ type: 'INVENTADO', from: 'nada', branch: 'x' }));
+      stub();
+      await renderPage();
+      expect(await screen.findByText('Venta anulada')).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
+    });
+
+    it('el panel abierto no tiene problemas de accesibilidad detectables', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await screen.findByText('Venta anulada');
+      await openAdvanced();
+      await expectAccessible();
+    });
+  });
+
   describe('permisos del botón Resolver', () => {
     it('el gerente puede resolver cualquier alerta', async () => {
       useSession('MANAGER');
