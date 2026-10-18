@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { errorInterceptor } from '@core/api/error.interceptor';
 import { NotificationService } from '@core/notifications/notification.service';
+import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
 import { chooseOption } from '@testing/select-helpers';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
 import { expectAccessible } from '@testing/a11y';
@@ -86,6 +87,86 @@ describe('AuditPage', () => {
       expect(within(sale).getByText('Sofía Díaz')).toBeInTheDocument();
       expect(within(sale).getByText('−3')).toBeInTheDocument();
       expect(within(sale).getByText('Retiro')).toBeInTheDocument();
+    });
+
+    describe('filtros avanzados', () => {
+      const STORE = 'zen:filters:1:audit';
+      const login = () => localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token: 't', email: 'e@z.co', nombre: 'Yo', rol: 'ADMIN', id: 1 }));
+      const openAdvanced = async () => userEvent.click(await screen.findByRole('button', { name: /Más filtros/ }));
+
+      it('filtra por producto, por responsable, por rango de cantidad y por observaciones', async () => {
+        stub();
+        await renderPage();
+        await screen.findAllByRole('row', { name: /Tuerca/ });
+        await openAdvanced();
+        await chooseOption('Producto', 'Tuerca');
+        expect(products()).toEqual(['Tuerca', 'Tuerca']);
+        await chooseOption('Producto', 'Todos los productos');
+        await chooseOption('Responsable', 'Sofía Díaz');
+        expect(products()).toEqual(['Tuerca']);
+        await chooseOption('Responsable', 'Todos los responsables');
+        await userEvent.type(screen.getByLabelText('Cantidad desde'), '4');
+        await userEvent.type(screen.getByLabelText('Cantidad hasta'), '6');
+        expect(products()).toEqual(['Tornillo']); // solo el ajuste de 5
+        await userEvent.clear(screen.getByLabelText('Cantidad desde'));
+        await userEvent.clear(screen.getByLabelText('Cantidad hasta'));
+        await userEvent.click(screen.getByRole('checkbox', { name: 'Solo con observaciones' }));
+        expect(screen.getAllByRole('row').slice(1)).toHaveLength(1);
+        expect(screen.getByRole('row', { name: /Merma/ })).toBeInTheDocument();
+        expect(screen.getByLabelText('1 filtro activo')).toBeInTheDocument();
+      });
+
+      it('las etiquetas de filtros aplicados se quitan una a una y todas juntas', async () => {
+        stub();
+        await renderPage();
+        await screen.findAllByRole('row', { name: /Tuerca/ });
+        await chooseOption('Tipo de movimiento', 'Solo retiros');
+        await chooseOption('Motivo', 'Merma');
+        expect(products()).toEqual(['Tuerca']);
+        await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro Motivo: Merma' }));
+        expect(products()).toEqual(['Tuerca', 'Tuerca']);
+        await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+        expect(products()).toHaveLength(4);
+        expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
+      });
+
+      it('recuerda los filtros la próxima vez que se entra, también los del panel abierto', async () => {
+        login();
+        stub();
+        const first = await renderPage();
+        await screen.findAllByRole('row', { name: /Tuerca/ });
+        await chooseOption('Sucursal', 'Sucursal Norte');
+        await openAdvanced();
+        await chooseOption('Producto', 'Tuerca');
+        await vi.waitFor(() => expect(JSON.parse(localStorage.getItem(STORE) ?? '{}')).toMatchObject({ branch: 20, product: 'Tuerca', advancedOpen: true }));
+        first.fixture.destroy();
+        TestBed.resetTestingModule(); // otra visita
+
+        await renderPage();
+        // Los nombres de las opciones llegan con las sucursales y los movimientos: se espera a que estén.
+        await vi.waitFor(() => expect(screen.getByRole('combobox', { name: 'Sucursal' })).toHaveTextContent('Sucursal Norte'));
+        await vi.waitFor(() => expect(screen.getByRole('combobox', { name: 'Producto' })).toHaveTextContent('Tuerca'));
+        await vi.waitFor(() => expect(products()).toEqual(['Tuerca']));
+      });
+
+      it('un filtro de producto recordado que ya no existe se ve como etiqueta y se quita', async () => {
+        login();
+        localStorage.setItem(STORE, JSON.stringify({ product: 'Producto descontinuado' }));
+        stub();
+        await renderPage();
+        expect(await screen.findByText('Ningún movimiento coincide')).toBeInTheDocument();
+        await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro Producto: Producto descontinuado' }));
+        await vi.waitFor(() => expect(products()).toHaveLength(4));
+        expect(localStorage.getItem(STORE)).toBeNull();
+      });
+
+      it('el panel abierto no tiene problemas de accesibilidad detectables', async () => {
+        stub();
+        await renderPage();
+        await screen.findAllByRole('row', { name: /Tuerca/ });
+        await openAdvanced();
+        await expectAccessible();
+      });
     });
 
     it('descarta un movimiento con un motivo que la app no conoce (no lo muestra con un rótulo roto)', async () => {

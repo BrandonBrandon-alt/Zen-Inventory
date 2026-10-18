@@ -19,10 +19,14 @@ import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-optio
 import { CatalogOptionsApi, type ProductOption } from '@core/catalog/catalog-options-api';
 import { type UserName, UserOptionsApi } from '@core/users/user-options-api';
 import { formatDateTime, formatQuantity, normalizeText } from '@shared/format/format';
+import { inDateRange, inNumberRange, numberFromInput, optionsFrom } from '@shared/filters/filter-helpers';
+import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
 import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
 import { DatePicker } from '@shared/ui/date-picker/date-picker';
+import { ActiveFilters, type ActiveFilter } from '@shared/ui/filters/active-filters';
+import { AdvancedFilters } from '@shared/ui/filters/advanced-filters';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
@@ -31,11 +35,11 @@ import { MOVEMENT_REASONS, type AuditMovement, AuditApi, type MovementReason, ty
 import { REASON_INFO, documentLabel, subReasonText } from '../../data-access/audit-labels';
 
 const rowKey = (row: AuditRow): number => row.id;
-const endOfDay = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+const DAY = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' });
 
 @Component({
   selector: 'app-audit-page',
-  imports: [DataTable, DataTableCell, Badge, Button, DatePicker, FormField, InputDirective, Select, Tooltip, AuditDetailModal, LucideEye, LucideSearch],
+  imports: [DataTable, DataTableCell, Badge, Button, DatePicker, ActiveFilters, AdvancedFilters, FormField, InputDirective, Select, Tooltip, AuditDetailModal, LucideEye, LucideSearch],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './audit-page.html',
@@ -60,12 +64,21 @@ export class AuditPage {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
+  // Los filtros se recuerdan por persona (la búsqueda de texto no: se escribe cada vez).
+  private static readonly SCREEN = 'audit';
   protected readonly search = signal('');
-  protected readonly branchFilter = signal<number | null>(null);
-  protected readonly typeFilter = signal<MovementType | null>(null);
-  protected readonly reasonFilter = signal<MovementReason | null>(null);
-  protected readonly from = signal<Date | null>(null);
-  protected readonly to = signal<Date | null>(null);
+  protected readonly branchFilter = persistedFilter(AuditPage.SCREEN, 'branch', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly typeFilter = persistedFilter(AuditPage.SCREEN, 'type', null as MovementType | null, codecs.nullable(codecs.oneOf(['INGRESO', 'RETIRO'] as const)));
+  protected readonly reasonFilter = persistedFilter(AuditPage.SCREEN, 'reason', null as MovementReason | null, codecs.nullable(codecs.oneOf(MOVEMENT_REASONS)));
+  protected readonly from = persistedFilter(AuditPage.SCREEN, 'from', null as Date | null, codecs.nullable(codecs.date()));
+  protected readonly to = persistedFilter(AuditPage.SCREEN, 'to', null as Date | null, codecs.nullable(codecs.date()));
+  protected readonly productFilter = persistedFilter(AuditPage.SCREEN, 'product', null as string | null, codecs.nullable(codecs.text()));
+  protected readonly responsibleFilter = persistedFilter(AuditPage.SCREEN, 'responsible', null as string | null, codecs.nullable(codecs.text()));
+  protected readonly minQuantity = persistedFilter(AuditPage.SCREEN, 'minQuantity', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly maxQuantity = persistedFilter(AuditPage.SCREEN, 'maxQuantity', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly onlyObserved = persistedFilter(AuditPage.SCREEN, 'onlyObserved', false, codecs.bool());
+  protected readonly advancedOpen = persistedFilter(AuditPage.SCREEN, 'advancedOpen', false, codecs.bool());
+  protected readonly numberFromInput = numberFromInput;
 
   protected readonly detailOpen = signal(false);
   protected readonly selectedId = signal<number | null>(null);
@@ -140,17 +153,51 @@ export class AuditPage {
     const reason = this.reasonFilter();
     const from = this.from();
     const to = this.to();
+    const product = this.productFilter();
+    const responsible = this.responsibleFilter();
+    const minQuantity = this.minQuantity();
+    const maxQuantity = this.maxQuantity();
+    const onlyObserved = this.onlyObserved();
     return this.all().filter((r) => {
       if (branch !== null && r.branchId !== branch) return false;
       if (type !== null && r.type !== type) return false;
       if (reason !== null && r.reason !== reason) return false;
-      if (from !== null && r.date < from) return false;
-      if (to !== null && r.date > endOfDay(to)) return false;
+      if (!inDateRange(r.date, from, to)) return false;
+      if (product !== null && r.product !== product) return false;
+      if (responsible !== null && r.responsible !== responsible) return false;
+      if (!inNumberRange(r.quantity, minQuantity, maxQuantity)) return false;
+      if (onlyObserved && !r.observations) return false;
       return !needle || normalizeText(`${r.product} ${r.responsible} ${r.document} ${r.reasonLabel} ${r.observations} ${r.id}`).includes(needle);
     });
   });
 
-  protected readonly filtered = computed(() => this.rows().length !== this.all().length);
+  protected readonly productOptions = computed(() => optionsFrom(this.all().map((r) => r.product), this.productFilter(), 'Todos los productos'));
+  protected readonly responsibleOptions = computed(() => optionsFrom(this.all().map((r) => r.responsible), this.responsibleFilter(), 'Todos los responsables'));
+
+  /** Los filtros del panel «Más filtros» que están aplicados (el botón muestra cuántos). */
+  protected readonly advancedCount = computed(
+    () => [this.productFilter() !== null, this.responsibleFilter() !== null, this.minQuantity() !== null, this.maxQuantity() !== null, this.onlyObserved()].filter(Boolean).length,
+  );
+
+  /** Todos los filtros aplicados, para mostrarlos como etiquetas que se quitan. */
+  protected readonly activeFilters = computed<ActiveFilter[]>(() => {
+    const list: ActiveFilter[] = [];
+    const branch = this.branchFilter();
+    if (branch !== null) list.push({ id: 'branch', label: 'Sucursal', text: this.branchNames().get(branch) ?? `Sede ${branch}` });
+    if (this.typeFilter() !== null) list.push({ id: 'type', label: 'Tipo', text: this.typeFilter() === 'INGRESO' ? 'Ingresos' : 'Retiros' });
+    if (this.reasonFilter() !== null) list.push({ id: 'reason', label: 'Motivo', text: REASON_INFO[this.reasonFilter()!].label });
+    if (this.from() !== null) list.push({ id: 'from', label: 'Desde', text: DAY.format(this.from()!) });
+    if (this.to() !== null) list.push({ id: 'to', label: 'Hasta', text: DAY.format(this.to()!) });
+    if (this.productFilter() !== null) list.push({ id: 'product', label: 'Producto', text: this.productFilter()! });
+    if (this.responsibleFilter() !== null) list.push({ id: 'responsible', label: 'Responsable', text: this.responsibleFilter()! });
+    if (this.minQuantity() !== null) list.push({ id: 'minQuantity', label: 'Cantidad desde', text: formatQuantity(this.minQuantity()) });
+    if (this.maxQuantity() !== null) list.push({ id: 'maxQuantity', label: 'Cantidad hasta', text: formatQuantity(this.maxQuantity()) });
+    if (this.onlyObserved()) list.push({ id: 'onlyObserved', label: 'Con', text: 'observaciones' });
+    if (this.search().trim()) list.push({ id: 'search', label: 'Búsqueda', text: this.search().trim() });
+    return list;
+  });
+
+  protected readonly filtered = computed(() => this.activeFilters().length > 0);
 
   protected readonly summary = computed(() => {
     const rows = this.rows();
@@ -192,13 +239,24 @@ export class AuditPage {
     this.search.set((event.target as HTMLInputElement).value);
   }
 
+  protected removeFilter(id: string): void {
+    switch (id) {
+      case 'branch': this.branchFilter.set(null); break;
+      case 'type': this.typeFilter.set(null); break;
+      case 'reason': this.reasonFilter.set(null); break;
+      case 'from': this.from.set(null); break;
+      case 'to': this.to.set(null); break;
+      case 'product': this.productFilter.set(null); break;
+      case 'responsible': this.responsibleFilter.set(null); break;
+      case 'minQuantity': this.minQuantity.set(null); break;
+      case 'maxQuantity': this.maxQuantity.set(null); break;
+      case 'onlyObserved': this.onlyObserved.set(false); break;
+      case 'search': this.search.set(''); break;
+    }
+  }
+
   protected clearFilters(): void {
-    this.search.set('');
-    this.branchFilter.set(null);
-    this.typeFilter.set(null);
-    this.reasonFilter.set(null);
-    this.from.set(null);
-    this.to.set(null);
+    for (const filter of this.activeFilters()) this.removeFilter(filter.id);
   }
 
   protected openDetail(row: AuditRow): void {
