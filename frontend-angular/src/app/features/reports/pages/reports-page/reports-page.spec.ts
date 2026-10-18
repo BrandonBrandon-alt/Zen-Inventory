@@ -132,6 +132,19 @@ describe('ReportsPage', () => {
     expect(await screen.findByText('Sucursal Norte', { selector: 'p' })).toBeInTheDocument();
   });
 
+  it('el ADMIN vuelve a la sucursal que dejó, y las fechas arrancan siempre en hoy', async () => {
+    useSession('ADMIN');
+    localStorage.setItem('zen:filters:1:reports', JSON.stringify({ branch: 20, from: new Date(2020, 0, 1).toISOString() }));
+    const asked: (string | null)[] = [];
+    server.use(
+      http.get(URL_S, ({ request }) => (asked.push(new URL(request.url).searchParams.get('branchId')), HttpResponse.json(SALES))),
+      http.get(`${TEST_API}/api/branches`, () => HttpResponse.json(BRANCHES)),
+    );
+    await renderPage();
+    await screen.findByRole('region', { name: 'Cierre de caja' }); // hoy, no el 2020 guardado
+    expect(asked[0]).toBe('20');
+  });
+
   it('sin ventas en el periodo lo dice en las dos tablas', async () => {
     useSession('MANAGER', 10);
     stub([]);

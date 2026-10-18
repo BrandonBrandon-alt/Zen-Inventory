@@ -6,6 +6,7 @@ import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { CompanyInfo } from '@core/company/company-info';
 import { formatMoney, formatQuantity } from '@shared/format/format';
+import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
 import { PrintService } from '@shared/print/print.service';
 import { Button } from '@shared/ui/button/button';
 import { Card } from '@shared/ui/card/card';
@@ -53,7 +54,8 @@ export class ReportsPage {
 
   protected readonly from = signal<Date | null>(today());
   protected readonly to = signal<Date | null>(today());
-  protected readonly branchFilter = signal<number | null>(null);
+  // Solo la sucursal se recuerda: las fechas arrancan siempre en hoy, que es lo que se espera de un cierre de caja.
+  protected readonly branchFilter = persistedFilter('reports', 'branch', null as number | null, codecs.nullable(codecs.number()));
 
   protected readonly branchOptions = computed<SelectOption<number | null>[]>(() => [
     { value: null, label: 'Todas las sucursales' },

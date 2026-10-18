@@ -17,6 +17,8 @@ import {
 import { LucideArrowDown, LucideArrowUp, LucideArrowUpDown, LucideDownload, LucideDynamicIcon, type LucideIconData, LucideInbox, LucideTriangleAlert } from '@lucide/angular';
 import { downloadCsv, toCsv } from '@shared/export/csv';
 import { formatDateTime } from '@shared/format/format';
+import { type FilterCodec, loadStored, saveStored } from '@shared/filters/persisted-filter';
+import { AuthStore } from '@core/auth/session/auth-store';
 import { Button } from '../button/button';
 import { EmptyState } from '../empty-state/empty-state';
 import { Pagination } from '../pagination/pagination';
@@ -111,6 +113,8 @@ export class DataTable<T> {
    * Exporta todas las filas recibidas (no solo la página que se ve), en el orden elegido; la columna de acciones no sale.
    */
   readonly exportName = input<string | null>(null);
+  /** Si se indica, el orden de la tabla se recuerda por persona (p. ej. `ventas`): vuelve como se dejó la última vez. */
+  readonly persistKey = input<string | null>(null);
   /** Columnas del CSV cuando difieren de las de la pantalla (p. ej. para agregar observaciones largas). */
   readonly exportColumns = input<readonly TableColumn<T>[] | null>(null);
 
@@ -166,7 +170,31 @@ export class DataTable<T> {
 
   protected readonly currentPage = computed(() => Math.min(this.page(), this.pageCount()));
 
+  private readonly userId = inject(AuthStore).session()?.id;
+
   constructor() {
+    // El orden recordado se lee una vez, cuando la pantalla dice cómo se llama (y solo si esa columna existe y se puede ordenar).
+    let hydrated = false;
+    effect(() => {
+      const key = this.persistKey();
+      const columns = this.columns();
+      if (!key || hydrated) return;
+      hydrated = true;
+      const codec: FilterCodec<{ key: string; direction: Direction }> = {
+        parse: (raw) => {
+          const value = raw as { key?: unknown; direction?: unknown } | null;
+          const column = columns.find((c) => c.key === value?.key);
+          return column?.sortable && (value?.direction === 'asc' || value?.direction === 'desc') ? { key: column.key, direction: value.direction } : undefined;
+        },
+      };
+      const saved = loadStored(this.userId, `table:${key}`, 'sort', codec);
+      if (saved) untracked(() => this.sort.set(saved));
+    });
+    effect(() => {
+      const key = this.persistKey();
+      const sort = this.sort();
+      if (key && hydrated) saveStored(this.userId, `table:${key}`, 'sort', sort, null);
+    });
     // Si cambian los datos o el orden, se vuelve a la primera página.
     effect(() => {
       this.rows();

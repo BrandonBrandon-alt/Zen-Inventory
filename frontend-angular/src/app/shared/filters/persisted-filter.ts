@@ -42,6 +42,25 @@ function writeAll(key: string, all: Record<string, unknown>): void {
   }
 }
 
+const keyFor = (userId: number | undefined, screen: string): string | null => (userId === undefined ? null : `${PREFIX}:${userId}:${screen}`);
+
+/** Lee un valor guardado de una pantalla (para quien no es un filtro de la pantalla, como el orden de una tabla). */
+export function loadStored<T>(userId: number | undefined, screen: string, name: string, codec: FilterCodec<T>): T | undefined {
+  const key = keyFor(userId, screen);
+  return key === null ? undefined : codec.parse(readAll(key)[name]);
+}
+
+/** Guarda un valor de una pantalla; si es igual al inicial, borra lo guardado. */
+export function saveStored(userId: number | undefined, screen: string, name: string, value: unknown, initial: unknown): void {
+  const key = keyFor(userId, screen);
+  if (key === null) return;
+  const json = JSON.stringify(value);
+  const all = readAll(key);
+  if (json === JSON.stringify(initial)) delete all[name];
+  else all[name] = JSON.parse(json) as unknown;
+  writeAll(key, all);
+}
+
 /**
  * Un filtro que se recuerda entre visitas. Cada persona tiene los suyos por pantalla (`zen:filters:<usuario>:<pantalla>`),
  * así que en un equipo compartido no se mezclan. Solo se guarda lo que difiere del valor inicial; un valor guardado que
@@ -50,19 +69,8 @@ function writeAll(key: string, all: Record<string, unknown>): void {
  */
 export function persistedFilter<T>(screen: string, name: string, initial: T, codec: FilterCodec<T>): WritableSignal<T> {
   const userId = inject(AuthStore).session()?.id;
-  const key = userId === undefined ? null : `${PREFIX}:${userId}:${screen}`;
-  const stored = key === null ? undefined : codec.parse(readAll(key)[name]);
+  const stored = loadStored(userId, screen, name, codec);
   const state = signal<T>(stored === undefined ? initial : stored);
-
-  if (key !== null) {
-    const initialJson = JSON.stringify(initial);
-    effect(() => {
-      const json = JSON.stringify(state());
-      const all = readAll(key);
-      if (json === initialJson) delete all[name];
-      else all[name] = JSON.parse(json) as unknown;
-      writeAll(key, all);
-    });
-  }
+  if (userId !== undefined) effect(() => saveStored(userId, screen, name, state(), initial));
   return state;
 }

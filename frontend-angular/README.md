@@ -143,3 +143,21 @@ vendedor y productos más vendidos. "Descargar PDF" abre el reporte en formato A
 navegador: ahí se imprime o se elige "Guardar como PDF" (el nombre sugerido es `cierre-de-caja-AAAA-MM-DD`). No usa
 ninguna librería de PDF. Las tablas también se pueden bajar en CSV. Se calcula en el navegador con las ventas que el
 servidor deja ver a cada rol (el gerente, solo las de su sucursal); una venta anulada no suma a lo vendido.
+
+## Filtros que se recuerdan
+
+Las pantallas con lista (Ventas, Auditoría, Compras, Traslados, Devoluciones, Alertas, Productos, Inventario) recuerdan
+sus filtros **por persona y por pantalla** en el navegador (`zen:filters:<usuario>:<pantalla>`): al volver, la lista
+sigue como se dejó. El texto de la búsqueda no se guarda. El orden de las tablas también, con `persistKey` en
+`app-data-table`.
+
+- `shared/filters/persisted-filter.ts`: `persistedFilter(pantalla, nombre, inicial, codec)` es una señal que se guarda
+  sola. Solo guarda lo que difiere del valor inicial y descarta lo guardado que ya no sirve (opción que no existe, tipo
+  equivocado, texto alterado). Sin sesión o sin almacenamiento, funciona pero no recuerda.
+- `app-advanced-filters`: panel plegable «Más filtros» (el botón cuenta cuántos hay aplicados; el panel recuerda si
+  estaba abierto). `app-active-filters`: etiquetas de lo aplicado, que se quitan una a una o todas, para que ningún
+  filtro recordado quede activo sin verse.
+- `shared/filters/filter-helpers.ts`: rangos de fechas (el «Hasta» incluye el día completo) y de números, opciones de
+  selector armadas con los datos y lectura de campos numéricos.
+- Para sumar un filtro a una pantalla: una señal `persistedFilter`, su condición en `rows`, su entrada en
+  `activeFilters`/`removeFilter`, el campo en la barra o en el panel, y una prueba (los demás filtros sirven de modelo).

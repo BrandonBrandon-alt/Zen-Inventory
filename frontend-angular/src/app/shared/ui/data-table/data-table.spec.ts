@@ -1,3 +1,4 @@
+import { TestBed } from '@angular/core/testing';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -497,5 +498,61 @@ describe('DataTable — exportar a CSV', () => {
   it('sin filas, cargando o con error no se ofrece exportar', async () => {
     await setupExport('exportName="s"', { rows: [] });
     expect(screen.queryByRole('button', { name: /Exportar CSV/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('DataTable · orden recordado (persistKey)', () => {
+  const STORE = 'zen:filters:7:table:sucursales';
+  const TABLE = (extra: string) => `<app-data-table caption="Sucursales" [columns]="columns" [rows]="rows" [rowKey]="rowKey" ${extra}></app-data-table>`;
+  const setup = (extra: string, columns = COLUMNS) =>
+    render(TABLE(extra), { imports, componentProperties: { columns, rows: BRANCHES, rowKey: (r: Branch) => r.id } });
+  const names = () => screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0].textContent?.trim());
+  const login = () => localStorage.setItem('zen_inventory_session', JSON.stringify({ token: 't', email: 'e', nombre: 'Ana', rol: 'ADMIN', id: 7 }));
+
+  beforeEach(() => localStorage.clear());
+  afterEach(() => localStorage.clear());
+
+  it('guarda el orden elegido y la próxima vez la tabla ya viene ordenada así', async () => {
+    login();
+    const first = await setup('persistKey="sucursales"');
+    await userEvent.click(within(screen.getByRole('columnheader', { name: /Ventas/ })).getByRole('button'));
+    await userEvent.click(within(screen.getByRole('columnheader', { name: /Ventas/ })).getByRole('button'));
+    await vi.waitFor(() => expect(JSON.parse(localStorage.getItem(STORE) ?? 'null')).toEqual({ sort: { key: 'ventas', direction: 'desc' } }));
+    first.fixture.destroy();
+    TestBed.resetTestingModule();
+
+    await setup('persistKey="sucursales"');
+    expect(screen.getByRole('columnheader', { name: /Ventas/ })).toHaveAttribute('aria-sort', 'descending');
+    expect(names()).toEqual(['Zona Ñandú', 'Norte', 'Álvaro Sur', 'Alberto Este']); // mayor a menor; sin dato al final
+  });
+
+  it('sin persistKey no guarda ni recuerda nada', async () => {
+    login();
+    await setup('');
+    await userEvent.click(within(screen.getByRole('columnheader', { name: /Nombre/ })).getByRole('button'));
+    expect(localStorage.getItem(STORE)).toBeNull();
+  });
+
+  it('un orden guardado de una columna que no existe o no se ordena se ignora', async () => {
+    login();
+    localStorage.setItem(STORE, JSON.stringify({ sort: { key: 'activa', direction: 'asc' } })); // existe, pero no es ordenable
+    await setup('persistKey="sucursales"');
+    expect(screen.getByRole('columnheader', { name: /Nombre/ })).toHaveAttribute('aria-sort', 'none');
+    expect(names()[0]).toBe('Norte'); // en el orden en que llegaron
+
+    TestBed.resetTestingModule();
+    localStorage.setItem(STORE, JSON.stringify({ sort: { key: 'inexistente', direction: 'asc' } }));
+    await setup('persistKey="sucursales"');
+    expect(names()[0]).toBe('Norte');
+  });
+
+  it('volver al orden original borra lo guardado', async () => {
+    login();
+    localStorage.setItem(STORE, JSON.stringify({ sort: { key: 'nombre', direction: 'asc' } }));
+    await setup('persistKey="sucursales"');
+    expect(screen.getByRole('columnheader', { name: /Nombre/ })).toHaveAttribute('aria-sort', 'ascending');
+    await userEvent.click(within(screen.getByRole('columnheader', { name: /Nombre/ })).getByRole('button')); // desc
+    await userEvent.click(within(screen.getByRole('columnheader', { name: /Nombre/ })).getByRole('button')); // sin orden
+    await vi.waitFor(() => expect(localStorage.getItem(STORE)).toBeNull());
   });
 });
