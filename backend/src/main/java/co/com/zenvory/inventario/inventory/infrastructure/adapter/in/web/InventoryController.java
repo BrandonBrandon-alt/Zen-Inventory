@@ -59,8 +59,10 @@ public class InventoryController {
      * @param productId ID del producto.
      * @return {@link LocalInventory} con saldos y configuraciones.
      */
+    // Lectura entre sucursales a propósito: quien gestiona traslados necesita ver el stock del origen antes de pedir.
+    // Por eso es solo para esos roles; el vendedor consulta únicamente el stock de su sucursal (listado por sucursal).
     @GetMapping("/branches/{branchId}/products/{productId}")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER', 'OPERADOR_INVENTARIO')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
     public ResponseEntity<LocalInventory> getInventory(
             @PathVariable Long branchId, 
             @PathVariable Long productId) {

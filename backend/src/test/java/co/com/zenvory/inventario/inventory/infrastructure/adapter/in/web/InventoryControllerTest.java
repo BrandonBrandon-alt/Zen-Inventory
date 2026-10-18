@@ -152,4 +152,15 @@ class InventoryControllerTest {
         actAsManagerOfBranch(null);
         mockMvc.perform(get("/api/v1/inventory/movements")).andExpect(status().isForbidden());
     }
+
+    @Test
+    @DisplayName("el stock de un producto en cualquier sucursal es solo para quien gestiona traslados, no para el vendedor")
+    void singleProductStockIsNotForSellers() throws Exception {
+        var rule = InventoryController.class
+                .getMethod("getInventory", Long.class, Long.class)
+                .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class)
+                .value();
+        org.junit.jupiter.api.Assertions.assertFalse(rule.contains("SELLER"), rule);
+        org.junit.jupiter.api.Assertions.assertTrue(rule.contains("OPERADOR_INVENTARIO") && rule.contains("MANAGER") && rule.contains("ADMIN"), rule);
+    }
 }

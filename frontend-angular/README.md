@@ -108,3 +108,12 @@ En el frontend:
 
 `npm test` usa dos procesos de Vitest (ver `vitest-base.config.mts`): ocupa ~2 GB de RAM y deja el equipo usable (sin
 límite, usaba todos los núcleos y más de 4 GB). En una máquina holgada se puede subir con `VITEST_MAX_WORKERS=4 npm test`.
+
+## Tamaño del arranque (presupuesto de bundle)
+
+El bundle inicial pesa ~634 kB sin comprimir (~103 kB descargados), por eso el presupuesto de `angular.json` es 650 kB
+(aviso) y 800 kB (error), no los 500 kB por defecto. Casi la mitad (~270 kB) es `@lucide/angular`: cada icono viene
+como un componente con su plantilla completa repetida (~3 kB por icono, 85 en uso) y el empaquetador no puede
+reducirlo. Si el arranque llega a importar, la salida es cambiar a una librería con los datos del icono sueltos
+(p. ej. `lucide`) y pintarlos con un único componente: unos 60 archivos, baja a ~390 kB. Para medirlo:
+`ng build --source-map` y sumar los bytes generados por paquete a partir del `.map` del chunk grande.
