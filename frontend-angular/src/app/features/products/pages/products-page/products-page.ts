@@ -4,7 +4,7 @@ import { LucideBan, LucideBarcode, LucideCircleCheck, LucideCoins, LucideEllipsi
 import { toApiError } from '@core/api/api-error';
 import { CatalogOptionsApi, type SupplierOption, type UnitOption } from '@core/catalog/catalog-options-api';
 import { NotificationService } from '@core/notifications/notification.service';
-import { formatMoney } from '@shared/format/format';
+import { formatMoney, normalizeText } from '@shared/format/format';
 import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog/confirm-dialog';
@@ -29,7 +29,6 @@ const COLUMNS: readonly TableColumn<Product>[] = [
 const rowKey = (product: Product): number => product.id;
 
 /** Minúsculas y sin acentos: "tuerca" encuentra "Tuérca". */
-const normalize = (text: string): string => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 @Component({
   selector: 'app-products-page',
@@ -81,9 +80,9 @@ export class ProductsPage {
   protected readonly deactivateError = signal<string | null>(null);
 
   protected readonly rows = computed(() => {
-    const term = normalize(this.search().trim());
+    const term = normalizeText(this.search().trim());
     if (!term) return this.products();
-    return this.products().filter((p) => normalize(p.nombre).includes(term) || normalize(p.sku).includes(term));
+    return this.products().filter((p) => normalizeText(p.nombre).includes(term) || normalizeText(p.sku).includes(term));
   });
 
   protected readonly summary = computed(() => {

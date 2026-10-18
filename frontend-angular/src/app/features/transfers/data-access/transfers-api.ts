@@ -4,7 +4,7 @@ import { type Observable, map } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { SKIP_ERROR_NOTIFICATION } from '@core/api/error.interceptor';
 import type { components } from '@core/api/schema';
-import { toLocalIso } from '@shared/format/format';
+import { parseDate, toLocalIso } from '@shared/format/format';
 
 type TransferResponse = components['schemas']['TransferResponse'];
 
@@ -72,12 +72,6 @@ export interface ReceiveInput {
   readonly items: readonly { detailId: number; received: number }[];
 }
 
-const date = (value: string | undefined): Date | null => {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
 function toTransfer(raw: TransferResponse): Transfer | null {
   if (typeof raw.id !== 'number' || !isStatus(raw.status)) return null;
   if (typeof raw.originBranchId !== 'number' || typeof raw.destinationBranchId !== 'number') return null;
@@ -87,10 +81,10 @@ function toTransfer(raw: TransferResponse): Transfer | null {
     priority: toPriority(raw.priority),
     originBranchId: raw.originBranchId,
     destinationBranchId: raw.destinationBranchId,
-    requestDate: date(raw.requestDate),
-    estimatedArrival: date(raw.estimatedArrivalDate),
-    actualArrival: date(raw.actualArrivalDate),
-    dispatchDate: date(raw.dispatchDate),
+    requestDate: parseDate(raw.requestDate),
+    estimatedArrival: parseDate(raw.estimatedArrivalDate),
+    actualArrival: parseDate(raw.actualArrivalDate),
+    dispatchDate: parseDate(raw.dispatchDate),
     carrier: raw.carrier?.trim() ?? '',
     trackingNumber: raw.trackingNumber?.trim() ?? '',
     shippingCost: raw.shippingCost ?? null,

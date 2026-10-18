@@ -3,7 +3,7 @@ import { LucideArrowDownToLine, LucideArrowUpDown, LucideBarcode, LucideCoins, L
 import { toApiError } from '@core/api/api-error';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { AuthStore } from '@core/auth/session/auth-store';
-import { formatMoney, formatQuantity } from '@shared/format/format';
+import { formatMoney, formatQuantity, normalizeText } from '@shared/format/format';
 import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
@@ -42,7 +42,6 @@ const TABS: readonly TabItem[] = [
 const rowKey = (row: InventoryRow): number => row.productId;
 
 /** Minúsculas y sin acentos: "tuerca" encuentra "Tuérca". */
-const normalize = (text: string): string => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 @Component({
   selector: 'app-inventory-page',
@@ -107,9 +106,9 @@ export class InventoryPage {
 
   private readonly allRows = computed<InventoryRow[]>(() => this.items().map((item) => ({ ...item, level: stockLevel(item) })));
   protected readonly rows = computed<InventoryRow[]>(() => {
-    const needle = normalize(this.search().trim());
+    const needle = normalizeText(this.search().trim());
     if (needle === '') return this.allRows();
-    return this.allRows().filter((row) => normalize(`${row.nombre} ${row.sku}`).includes(needle));
+    return this.allRows().filter((row) => normalizeText(`${row.nombre} ${row.sku}`).includes(needle));
   });
 
   protected readonly summary = computed(() => {

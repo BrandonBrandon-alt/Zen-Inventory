@@ -4,6 +4,7 @@ import { type Observable, map } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { SKIP_ERROR_NOTIFICATION } from '@core/api/error.interceptor';
 import type { components } from '@core/api/schema';
+import { parseDate } from '@shared/format/format';
 
 type PurchaseResponse = components['schemas']['PurchaseResponse'];
 type PurchaseReceiptResponse = components['schemas']['PurchaseReceiptResponse'];
@@ -67,12 +68,6 @@ export interface Receipt {
   readonly impacts: readonly CostImpact[];
 }
 
-const date = (value: string | undefined): Date | null => {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
 function toPurchase(raw: PurchaseResponse): Purchase | null {
   if (typeof raw.id !== 'number' || typeof raw.supplierId !== 'number' || typeof raw.branchId !== 'number') return null;
   if (!isReception(raw.receptionStatus)) return null;
@@ -82,11 +77,11 @@ function toPurchase(raw: PurchaseResponse): Purchase | null {
     payment: isPayment(raw.paymentStatus) ? raw.paymentStatus : 'POR_PAGAR',
     supplierId: raw.supplierId,
     branchId: raw.branchId,
-    requestDate: date(raw.requestDate),
-    estimatedArrival: date(raw.estimatedArrivalDate),
-    actualArrival: date(raw.actualArrivalDate),
+    requestDate: parseDate(raw.requestDate),
+    estimatedArrival: parseDate(raw.estimatedArrivalDate),
+    actualArrival: parseDate(raw.actualArrivalDate),
     paymentDueDays: raw.paymentDueDays ?? 0,
-    paymentDueDate: date(raw.paymentDueDate),
+    paymentDueDate: parseDate(raw.paymentDueDate),
     total: raw.total ?? 0,
     reason: raw.reasonResolution?.trim() ?? '',
     lines: (raw.details ?? []).flatMap((d) =>

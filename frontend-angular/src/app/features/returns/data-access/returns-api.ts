@@ -4,6 +4,7 @@ import { type Observable, map } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { SKIP_ERROR_NOTIFICATION } from '@core/api/error.interceptor';
 import type { components } from '@core/api/schema';
+import { parseDate } from '@shared/format/format';
 
 /**
  * Respuesta real del servidor. El OpenAPI describe mal los renglones (`items`): dos registros del backend se llaman
@@ -55,7 +56,8 @@ export interface ReturnableSale {
   readonly branchId: number;
   readonly customerName: string;
   readonly total: number;
-  readonly lines: readonly { productId: number; productName: string; quantity: number; unitPrice: number }[];
+  /** `paid` es lo cobrado por la línea, ya con su descuento y el descuento general de la venta. */
+  readonly lines: readonly { productId: number; productName: string; quantity: number; paid: number }[];
 }
 
 export interface ReturnInput {
@@ -66,12 +68,6 @@ export interface ReturnInput {
   readonly reason: string;
   readonly items: readonly { productId: number; quantity: number; reason: string; unitPrice: number }[];
 }
-
-const date = (value: string | undefined): Date | null => {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
 
 function toReturn(raw: ReturnResponse): ReturnRequest | null {
   if (typeof raw.id !== 'number' || typeof raw.saleId !== 'number' || typeof raw.sucursalId !== 'number' || !isStatus(raw.estado)) return null;
@@ -87,8 +83,8 @@ function toReturn(raw: ReturnResponse): ReturnRequest | null {
     requesterId: raw.solicitanteId ?? null,
     approverId: raw.aprobadorId ?? null,
     status: raw.estado,
-    requestDate: date(raw.fechaSolicitud),
-    processedDate: date(raw.fechaProcesamiento),
+    requestDate: parseDate(raw.fechaSolicitud),
+    processedDate: parseDate(raw.fechaProcesamiento),
     reason: raw.motivoGeneral?.trim() ?? '',
     approverComment: raw.comentarioAprobador?.trim() ?? '',
     lines,
@@ -136,12 +132,22 @@ export class ReturnsApi {
             return [
               {
                 id: s.id,
-                date: date(s.date),
+                date: parseDate(s.date),
                 branchId: s.branchId,
                 customerName: s.customerName?.trim() ?? '',
                 total: s.totalFinal ?? 0,
                 lines: (s.details ?? []).flatMap((d) =>
-                  typeof d.productId === 'number' ? [{ productId: d.productId, productName: d.productName?.trim() || `Producto ${d.productId}`, quantity: d.quantity ?? 0, unitPrice: d.unitPriceApplied ?? 0 }] : [],
+                  typeof d.productId === 'number'
+                    ? [
+                        {
+                          productId: d.productId,
+                          productName: d.productName?.trim() || `Producto ${d.productId}`,
+                          quantity: d.quantity ?? 0,
+                          // El subtotal de la línea ya trae su descuento; falta el descuento general de la venta.
+                          paid: (d.subtotalLine ?? (d.unitPriceApplied ?? 0) * (d.quantity ?? 0)) * (1 - (s.globalDiscountPercentage ?? 0) / 100),
+                        },
+                      ]
+                    : [],
                 ),
               },
             ];

@@ -42,3 +42,15 @@ export function toLocalIso(date: Date): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}T${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
 }
+
+/** Minúsculas y sin acentos: "Panamá" coincide con "panama" al buscar. */
+export function normalizeText(text: string): string {
+  return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+}
+
+/** Fecha que manda el servidor como texto: `null` si falta o no es una fecha válida. */
+export function parseDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}

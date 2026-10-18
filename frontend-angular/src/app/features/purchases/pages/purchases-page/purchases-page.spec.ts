@@ -389,6 +389,34 @@ describe('PurchasesPage', () => {
       expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ message: 'Orden #9 creada.' });
     });
 
+    it('al cambiar de producto se propone el precio del nuevo mientras nadie haya escrito el precio', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      await renderPage();
+      await screen.findByText('#1');
+      await userEvent.click(screen.getByRole('button', { name: /Nueva orden de compra/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Nueva orden de compra' });
+      await chooseOption('Proveedor', 'Ferretería Central');
+      await chooseOption('Producto', 'Tornillo');
+      expect(within(dialog).getByLabelText('Precio unitario')).toHaveValue(80);
+      await chooseOption('Producto', 'Tuerca'); // sin precio pactado con este proveedor: no queda el del tornillo
+      expect(within(dialog).getByLabelText('Precio unitario')).toHaveValue(null);
+    });
+
+    it('si la persona escribió el precio, cambiar de producto no lo pisa', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      await renderPage();
+      await screen.findByText('#1');
+      await userEvent.click(screen.getByRole('button', { name: /Nueva orden de compra/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Nueva orden de compra' });
+      await chooseOption('Proveedor', 'Ferretería Central');
+      await chooseOption('Producto', 'Tuerca');
+      await userEvent.type(within(dialog).getByLabelText('Precio unitario'), '55');
+      await chooseOption('Producto', 'Tornillo');
+      expect(within(dialog).getByLabelText('Precio unitario')).toHaveValue(55);
+    });
+
     it('un operador crea una orden que queda esperando aprobación y el aviso lo dice', async () => {
       useSession('OPERADOR_INVENTARIO', 10);
       stub();

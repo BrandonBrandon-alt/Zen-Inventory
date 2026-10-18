@@ -4,7 +4,7 @@ import { LucideHash, LucideIdCard, LucidePackage, LucidePercent, LucidePlus, Luc
 import { toApiError } from '@core/api/api-error';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
-import { formatMoney, formatQuantity } from '@shared/format/format';
+import { formatMoney, formatQuantity, normalizeText } from '@shared/format/format';
 import { Alert } from '@shared/ui/alert/alert';
 import { Button } from '@shared/ui/button/button';
 import { Card } from '@shared/ui/card/card';
@@ -34,7 +34,6 @@ interface CartRow extends CartLine {
 const MAX_RESULTS = 40;
 const round = (value: number): number => Math.round(value * 100) / 100;
 /** Minúsculas y sin acentos: "tuerca" encuentra "Tuérca". */
-const normalize = (text: string): string => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 @Component({
   selector: 'app-pos-page',
@@ -109,14 +108,14 @@ export class PosPage {
   ]);
 
   protected readonly results = computed(() => {
-    const needle = normalize(this.search().trim());
+    const needle = normalizeText(this.search().trim());
     const all = this.products();
-    const matches = needle ? all.filter((p) => normalize(p.name).includes(needle) || normalize(p.sku).includes(needle)) : all;
+    const matches = needle ? all.filter((p) => normalizeText(p.name).includes(needle) || normalizeText(p.sku).includes(needle)) : all;
     return matches.slice(0, MAX_RESULTS);
   });
   protected readonly truncated = computed(() => {
-    const needle = normalize(this.search().trim());
-    const total = needle ? this.products().filter((p) => normalize(p.name).includes(needle) || normalize(p.sku).includes(needle)).length : this.products().length;
+    const needle = normalizeText(this.search().trim());
+    const total = needle ? this.products().filter((p) => normalizeText(p.name).includes(needle) || normalizeText(p.sku).includes(needle)).length : this.products().length;
     return total > MAX_RESULTS ? total - MAX_RESULTS : 0;
   });
 
@@ -179,10 +178,10 @@ export class PosPage {
 
   /** Enter en el buscador: agrega el producto si la búsqueda lo identifica (un solo resultado o un SKU exacto, como un lector de códigos). */
   protected addFirst(): void {
-    const needle = normalize(this.search().trim());
+    const needle = normalizeText(this.search().trim());
     if (!needle) return;
     const results = this.results();
-    const exact = results.find((p) => normalize(p.sku) === needle);
+    const exact = results.find((p) => normalizeText(p.sku) === needle);
     const pick = exact ?? (results.length === 1 ? results[0] : null);
     if (pick && pick.stock > 0) {
       this.add(pick);

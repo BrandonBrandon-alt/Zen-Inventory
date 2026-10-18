@@ -143,7 +143,9 @@ export class PurchaseFormModal {
     // Al elegir el producto se propone el precio pactado con el proveedor de la orden.
     row.controls.productId.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((productId) => {
       const agreement = this.products().find((p) => p.id === productId)?.suppliers.find((s) => s.supplierId === this.form.controls.supplierId.value);
-      if (agreement && agreement.price > 0 && row.controls.unitPrice.value === null) row.controls.unitPrice.setValue(agreement.price);
+      // Si el precio no lo escribió la persona (vacío o propuesto antes), se propone el del producto elegido ahora.
+      if (!row.controls.unitPrice.pristine && row.controls.unitPrice.value !== null) return;
+      row.controls.unitPrice.setValue(agreement && agreement.price > 0 ? agreement.price : null);
     });
     this.form.controls.items.push(row);
   }

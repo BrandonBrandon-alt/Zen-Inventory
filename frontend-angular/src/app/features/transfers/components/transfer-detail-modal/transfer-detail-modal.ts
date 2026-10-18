@@ -60,6 +60,11 @@ export class TransferDetailModal {
   protected readonly statusInfo = STATUS_INFO;
   protected readonly priorityInfo = PRIORITY_INFO;
 
+  private readonly formKey = computed(() => {
+    const transfer = this.transfer();
+    return transfer ? `${transfer.id}:${transfer.status}` : null;
+  });
+
   protected readonly actions = computed(() => {
     const transfer = this.transfer();
     return transfer ? transferActions(transfer, this.actor()) : null;
@@ -99,12 +104,15 @@ export class TransferDetailModal {
   protected readonly hasIssue = computed(() => (this.transfer()?.lines ?? []).some((l) => l.missing > 0));
 
   constructor() {
+    // Solo al abrir, al cambiar de traslado o al avanzar de estado (cambian las cantidades enviadas que propone el
+    // formulario de recepción): recargar la lista de fondo no debe cerrar el formulario que se está llenando.
     effect(() => {
       if (!this.open()) return;
-      const transfer = this.transfer();
+      this.formKey();
       untracked(() => {
         this.mode.set('view');
         this.error.set(null);
+        const transfer = this.transfer();
         if (transfer) this.resetForms(transfer);
       });
     });
@@ -236,15 +244,13 @@ export class TransferDetailModal {
     const sent = this.dispatchForm.controls.sent;
     sent.clear({ emitEvent: false });
     for (const line of transfer.lines) sent.push(quantityControl(line.requested, line.requested), { emitEvent: false });
-    this.dispatchForm.reset({ carrier: '', trackingNumber: '', shippingCost: 0, estimatedArrival: null }, { emitEvent: false });
+    this.dispatchForm.reset({ carrier: '', trackingNumber: '', shippingCost: 0, estimatedArrival: null, sent: transfer.lines.map((l) => l.requested) }, { emitEvent: false });
     this.now.set(new Date());
-    sent.controls.forEach((control, i) => control.setValue(transfer.lines[i].requested, { emitEvent: false }));
 
     const received = this.receiveForm.controls.received;
     received.clear({ emitEvent: false });
     for (const line of transfer.lines) received.push(quantityControl(line.sent ?? line.requested, line.sent ?? line.requested), { emitEvent: false });
-    this.receiveForm.reset({ notes: '' }, { emitEvent: false });
-    received.controls.forEach((control, i) => control.setValue(transfer.lines[i].sent ?? transfer.lines[i].requested, { emitEvent: false }));
+    this.receiveForm.reset({ notes: '', received: transfer.lines.map((l) => l.sent ?? l.requested) }, { emitEvent: false });
 
     this.reasonForm.reset({ reason: '' }, { emitEvent: false });
   }

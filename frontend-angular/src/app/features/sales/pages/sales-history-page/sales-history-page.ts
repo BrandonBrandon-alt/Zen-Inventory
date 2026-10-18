@@ -15,7 +15,7 @@ import {
 import { toApiError } from '@core/api/api-error';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
-import { formatDateTime, formatMoney } from '@shared/format/format';
+import { formatDateTime, formatMoney, normalizeText } from '@shared/format/format';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
@@ -33,7 +33,6 @@ interface SaleRow extends Sale {
 }
 
 const rowKey = (row: SaleRow): number => row.id;
-const normalize = (text: string): string => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 @Component({
   selector: 'app-sales-history-page',
@@ -89,10 +88,10 @@ export class SalesHistoryPage {
 
   protected readonly rows = computed<SaleRow[]>(() => {
     const status = this.statusFilter();
-    const needle = normalize(this.search().trim());
+    const needle = normalizeText(this.search().trim());
     return this.sales()
       .filter((s) => status === 'all' || s.status === status)
-      .filter((s) => !needle || normalize(`${s.id} ${s.customerName} ${s.customerDocument} ${s.seller}`).includes(needle))
+      .filter((s) => !needle || normalizeText(`${s.id} ${s.customerName} ${s.customerDocument} ${s.seller}`).includes(needle))
       .map((s) => ({ ...s, customer: customerLabel(s.customerName), statusLabel: SALE_INFO[s.status].label }));
   });
 

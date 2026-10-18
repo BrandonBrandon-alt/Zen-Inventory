@@ -18,7 +18,7 @@ import { toApiError } from '@core/api/api-error';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { CatalogOptionsApi, type ProductOption } from '@core/catalog/catalog-options-api';
 import { type UserName, UserOptionsApi } from '@core/users/user-options-api';
-import { formatDateTime, formatQuantity } from '@shared/format/format';
+import { formatDateTime, formatQuantity, normalizeText } from '@shared/format/format';
 import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
@@ -31,7 +31,6 @@ import { MOVEMENT_REASONS, type AuditMovement, AuditApi, type MovementReason, ty
 import { REASON_INFO, documentLabel, subReasonText } from '../../data-access/audit-labels';
 
 const rowKey = (row: AuditRow): number => row.id;
-const normalize = (text: string): string => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 const endOfDay = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
 
 @Component({
@@ -135,7 +134,7 @@ export class AuditPage {
   });
 
   protected readonly rows = computed<AuditRow[]>(() => {
-    const needle = normalize(this.search().trim());
+    const needle = normalizeText(this.search().trim());
     const branch = this.branchFilter();
     const type = this.typeFilter();
     const reason = this.reasonFilter();
@@ -147,7 +146,7 @@ export class AuditPage {
       if (reason !== null && r.reason !== reason) return false;
       if (from !== null && r.date < from) return false;
       if (to !== null && r.date > endOfDay(to)) return false;
-      return !needle || normalize(`${r.product} ${r.responsible} ${r.document} ${r.reasonLabel} ${r.observations} ${r.id}`).includes(needle);
+      return !needle || normalizeText(`${r.product} ${r.responsible} ${r.document} ${r.reasonLabel} ${r.observations} ${r.id}`).includes(needle);
     });
   });
 

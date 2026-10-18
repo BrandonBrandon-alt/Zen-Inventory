@@ -17,6 +17,7 @@ import {
 } from '@angular/core';
 import { type ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { LucideCheck, LucideChevronDown, LucideDynamicIcon, LucideSearch, type LucideIconData } from '@lucide/angular';
+import { normalizeText } from '../../format/format';
 import { FieldControl, FormField } from '../form-field/form-field';
 
 /** Una opción del selector. `icon` y `description` son opcionales. */
@@ -29,11 +30,6 @@ export interface SelectOption<T = unknown> {
 }
 
 let nextId = 0;
-
-/** Minúsculas y sin acentos: "Panamá" coincide con "panama" al buscar. */
-function normalize(text: string): string {
-  return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-}
 
 /**
  * Selector desplegable propio (reemplaza al `<select>` nativo): iconos por opción, búsqueda interna y teclado
@@ -185,9 +181,9 @@ export class Select<T = unknown> implements ControlValueAccessor, FieldControl {
   protected readonly selected = computed(() => this.options().find((option) => option.value === this.value()) ?? null);
   protected readonly triggerIcon = computed(() => this.selected()?.icon ?? this.icon());
   protected readonly visible = computed(() => {
-    const needle = normalize(this.query().trim());
+    const needle = normalizeText(this.query().trim());
     if (needle === '') return this.options();
-    return this.options().filter((option) => normalize(`${option.label} ${option.description ?? ''}`).includes(needle));
+    return this.options().filter((option) => normalizeText(`${option.label} ${option.description ?? ''}`).includes(needle));
   });
   protected readonly activeOptionId = computed(() => (this.open() && this.activeIndex() >= 0 ? this.optionId(this.activeIndex()) : null));
 
@@ -353,11 +349,11 @@ export class Select<T = unknown> implements ControlValueAccessor, FieldControl {
   /** Sin búsqueda: escribir una letra salta a la siguiente opción que empieza por ella. */
   private jumpToInitial(letter: string): void {
     const options = this.visible();
-    const initial = normalize(letter);
+    const initial = normalizeText(letter);
     const start = this.open() ? this.activeIndex() + 1 : 0;
     for (let offset = 0; offset < options.length; offset++) {
       const index = (start + offset) % options.length;
-      if (!options[index].disabled && normalize(options[index].label).startsWith(initial)) {
+      if (!options[index].disabled && normalizeText(options[index].label).startsWith(initial)) {
         if (!this.open()) this.openPanel();
         this.activeIndex.set(index);
         this.scrollActiveIntoView();

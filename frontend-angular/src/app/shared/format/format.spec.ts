@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDateTime, formatMoney, formatMoneyCompact, formatQuantity, formatShortDate, formatShortMonth } from './format';
+import { formatDateTime, formatMoney, formatMoneyCompact, formatQuantity, formatShortDate, formatShortMonth, normalizeText, parseDate } from './format';
 
 // Intl separa el símbolo con un espacio duro (U+00A0): se normaliza para comparar.
 const NBSP = String.fromCharCode(160);
@@ -45,6 +45,17 @@ describe('format', () => {
   it('formatShortDate: día y mes abreviado, sin "de"', () => {
     expect(formatShortDate(new Date(2026, 9, 15))).toBe('15 oct');
     expect(formatShortDate(null)).toBe('—');
+  });
+
+  it('normalizeText: minúsculas y sin acentos', () => {
+    expect(normalizeText('Panamá ÑANDÚ')).toBe('panama nandu');
+  });
+
+  it('parseDate: fecha válida o null', () => {
+    expect(parseDate('2026-10-15T08:30:00')).toEqual(new Date(2026, 9, 15, 8, 30));
+    expect(parseDate('no es fecha')).toBeNull();
+    expect(parseDate(undefined)).toBeNull();
+    expect(parseDate('')).toBeNull();
   });
 
   it('formatShortMonth: mes abreviado', () => {

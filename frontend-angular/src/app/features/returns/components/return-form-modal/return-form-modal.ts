@@ -85,14 +85,15 @@ export class ReturnFormModal {
       for (const line of request.lines) processed.set(line.productId, (processed.get(line.productId) ?? 0) + line.quantity);
     }
     // Una venta puede repetir un producto en varias líneas: se unen, como hace el servidor.
-    const merged = new Map<number, { name: string; sold: number; unitPrice: number }>();
+    // El precio pagado por unidad es el promedio ponderado: dos líneas del mismo producto pueden haberse cobrado distinto.
+    const merged = new Map<number, { name: string; sold: number; paid: number }>();
     for (const line of sale.lines) {
       const current = merged.get(line.productId);
-      merged.set(line.productId, { name: line.productName, sold: (current?.sold ?? 0) + line.quantity, unitPrice: line.unitPrice });
+      merged.set(line.productId, { name: line.productName, sold: (current?.sold ?? 0) + line.quantity, paid: (current?.paid ?? 0) + line.paid });
     }
     return [...merged].map(([productId, m]) => {
       const done = processed.get(productId) ?? 0;
-      return { productId, name: m.name, sold: m.sold, processed: done, available: Math.max(0, m.sold - done), unitPrice: m.unitPrice };
+      return { productId, name: m.name, sold: m.sold, processed: done, available: Math.max(0, m.sold - done), unitPrice: m.sold > 0 ? Math.round((m.paid / m.sold) * 100) / 100 : 0 };
     });
   });
 
