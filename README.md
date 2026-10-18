@@ -202,6 +202,15 @@ docker-compose up --build -d
 
 **Aplicar cambios sin indicar servicios.** `docker compose up -d --build` reconstruye solo lo que cambió (caché de capas, y de dependencias Maven/npm) y recrea únicamente los contenedores afectados.
 
+**Servicios opcionales (no arrancan por defecto, para ahorrar memoria).** pgAdmin y el frontend anterior de Next.js están en perfiles:
+
+```bash
+docker compose --profile tools up -d pgadmin     # pgAdmin en http://localhost:5050
+docker compose --profile legacy up -d frontend   # Next.js en http://localhost:3000
+```
+
+Cada servicio tiene su tope de memoria y CPU en `docker-compose.yml` (la API usa ~250 MB, la base de datos ~20 MB) y los registros rotan solos.
+
 **Reconstrucción automática mientras desarrollas:**
 
 ```bash

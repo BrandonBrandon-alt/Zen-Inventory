@@ -103,3 +103,8 @@ En el frontend:
 - `core/notifications/NotificationService` + `layout/toast-container` (en la raíz de la app): avisos globales.
 - La lista de códigos vive en dos lados (`ErrorCode.java` y `api-error.ts`): al agregar uno en el backend, súmalo aquí.
 
+
+## Recursos de las pruebas
+
+`npm test` usa dos procesos de Vitest (ver `vitest-base.config.mts`): ocupa ~2 GB de RAM y deja el equipo usable (sin
+límite, usaba todos los núcleos y más de 4 GB). En una máquina holgada se puede subir con `VITEST_MAX_WORKERS=4 npm test`.
