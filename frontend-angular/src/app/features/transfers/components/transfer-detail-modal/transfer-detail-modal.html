@@ -1,0 +1,179 @@
+<app-modal [(open)]="open" [title]="title()" [description]="transfer() ? statusInfo[transfer()!.status].next : ''" size="lg" [dismissible]="!busy()">
+  @if (transfer(); as t) {
+    @if (error(); as message) {
+      <app-alert class="mb-4">{{ message }}</app-alert>
+    }
+
+    @switch (mode()) {
+      @case ('view') {
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <app-badge [variant]="statusInfo[t.status].variant" dot>{{ statusInfo[t.status].label }}</app-badge>
+          <p class="flex items-center gap-2 text-sm font-medium text-fg">
+            {{ branch(t.originBranchId) }}
+            <svg lucideArrowRight [size]="14" class="text-fg-subtle" aria-hidden="true"></svg>
+            {{ branch(t.destinationBranchId) }}
+          </p>
+          <app-badge [variant]="priorityInfo[t.priority].variant">Prioridad {{ priorityInfo[t.priority].label.toLowerCase() }}</app-badge>
+        </div>
+        @if (t.estimatedArrival && !t.actualArrival) {
+          <p class="mt-2 text-sm text-fg-subtle">Llegada estimada: {{ formatDateTime(t.estimatedArrival) }}</p>
+        }
+        @if (t.parentId) {
+          <p class="mt-2 text-sm text-fg-subtle">Reenvío de los faltantes del traslado #{{ t.parentId }}.</p>
+        }
+
+        <div class="mt-5 overflow-x-auto rounded-lg border border-line">
+          <table class="w-full border-collapse text-sm">
+            <caption class="sr-only">Productos del traslado</caption>
+            <thead class="bg-surface text-xs text-fg-subtle">
+              <tr>
+                <th scope="col" class="px-3 py-2 text-left font-medium">Producto</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Pedido</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Enviado</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Recibido</th>
+                <th scope="col" class="px-3 py-2 text-right font-medium">Faltante</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (line of t.lines; track line.id) {
+                <tr class="border-t border-line-subtle">
+                  <th scope="row" class="px-3 py-2 text-left font-medium text-fg">{{ line.productName }}</th>
+                  <td class="px-3 py-2 text-right tabular-nums text-fg-muted">{{ line.requested }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums text-fg-muted">{{ lineSent(line) }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums text-fg-muted">{{ line.received ?? '—' }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums" [class]="line.missing > 0 ? 'font-semibold text-danger' : 'text-fg-subtle'">{{ line.missing }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        @if (steps().length > 0) {
+          <ol class="mt-5 flex flex-col gap-2 border-t border-line pt-4 text-sm">
+            @for (step of steps(); track step.label) {
+              <li class="flex flex-wrap gap-x-2">
+                <span class="text-fg-subtle">{{ step.label }}</span>
+                <span class="font-medium text-fg">{{ step.who }}</span>
+                @if (step.detail) {
+                  <span class="text-fg-subtle">· {{ step.detail }}</span>
+                }
+              </li>
+            }
+          </ol>
+        }
+        @if (t.receiptNotes) {
+          <p class="mt-4 text-sm text-fg-muted"><span class="text-fg-subtle">Notas de recepción:</span> {{ t.receiptNotes }}</p>
+        }
+        @if (t.resolutionReason) {
+          <p class="mt-2 text-sm text-fg-muted"><span class="text-fg-subtle">Motivo:</span> {{ t.resolutionReason }}</p>
+        }
+      }
+
+      @case ('dispatch') {
+        <form id="transfer-action-form" class="flex flex-col gap-4" [formGroup]="dispatchForm" novalidate (ngSubmit)="submitDispatch()">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <app-form-field label="Transportista" [error]="fieldError('dispatch', 'carrier')">
+              <input appInput type="text" formControlName="carrier" autocomplete="off" />
+            </app-form-field>
+            <app-form-field label="Número de guía (opcional)">
+              <input appInput type="text" formControlName="trackingNumber" autocomplete="off" />
+            </app-form-field>
+            <app-form-field label="Costo del envío" [error]="fieldError('dispatch', 'shippingCost')">
+              <input appInput type="number" min="0" step="0.01" inputmode="decimal" formControlName="shippingCost" />
+            </app-form-field>
+            <app-form-field label="Llegada estimada (opcional)">
+              <input appInput type="datetime-local" formControlName="estimatedArrival" [min]="minArrival()" />
+            </app-form-field>
+          </div>
+          <fieldset class="flex flex-col gap-3 border-t border-line pt-4" formArrayName="sent">
+            <legend class="font-title text-lg font-bold text-fg">Cantidades que salen</legend>
+            <p class="-mt-2 text-xs text-fg-subtle">Si envías menos de lo pedido, la diferencia queda como faltante sin enviar.</p>
+            @for (line of t.lines; track line.id; let i = $index) {
+              <app-form-field [label]="line.productName + ' (pedido: ' + line.requested + ')'" [error]="lineError('sent', i)">
+                <input appInput type="number" min="0" [max]="line.requested" step="1" inputmode="numeric" [formControlName]="i" />
+              </app-form-field>
+            }
+          </fieldset>
+        </form>
+      }
+
+      @case ('receive') {
+        <form id="transfer-action-form" class="flex flex-col gap-4" [formGroup]="receiveForm" novalidate (ngSubmit)="submitReceive()">
+          <fieldset class="flex flex-col gap-3" formArrayName="received">
+            <legend class="font-title text-lg font-bold text-fg">Cantidades recibidas</legend>
+            <p class="-mt-2 text-xs text-fg-subtle">Si llega menos de lo enviado, el traslado queda con novedad para resolver la diferencia.</p>
+            @for (line of t.lines; track line.id; let i = $index) {
+              <app-form-field [label]="line.productName + ' (enviado: ' + lineSent(line) + ')'" [error]="lineError('received', i)">
+                <input appInput type="number" min="0" [max]="line.sent ?? line.requested" step="1" inputmode="numeric" [formControlName]="i" />
+              </app-form-field>
+            }
+          </fieldset>
+          <app-form-field label="Notas de recepción (opcional)">
+            <textarea appInput rows="3" formControlName="notes"></textarea>
+          </app-form-field>
+        </form>
+      }
+
+      @default {
+        <form id="transfer-action-form" class="flex flex-col gap-4" [formGroup]="reasonForm" novalidate (ngSubmit)="submitReason()">
+          <p class="text-sm text-fg-muted">
+            @if (mode() === 'cancel') {
+              {{ t.status === 'IN_TRANSIT' ? 'La mercancía que ya salió vuelve al inventario de la sucursal de origen.' : 'El stock reservado en la sucursal de origen vuelve a estar disponible.' }}
+            } @else {
+              {{ t.status === 'IN_TRANSIT' ? 'La mercancía en tránsito vuelve al inventario de la sucursal de origen.' : 'La solicitud se cierra y el stock reservado vuelve a estar disponible.' }}
+            }
+          </p>
+          <app-form-field [label]="mode() === 'cancel' ? 'Motivo de la cancelación' : 'Motivo del rechazo'" [error]="fieldError('reason', 'reason')">
+            <textarea appInput rows="3" formControlName="reason"></textarea>
+          </app-form-field>
+        </form>
+      }
+    }
+  }
+
+  <div data-slot="footer">
+    @if (transfer(); as t) {
+      @if (mode() === 'view') {
+        @if (actions(); as a) {
+          @if (a.resolve) {
+            <button appButton variant="ghost" type="button" [disabled]="busy()" (click)="resolve('shrinkage')">Aceptar como merma</button>
+            <button appButton variant="ghost" type="button" [disabled]="busy()" (click)="resolve('claim')">Abrir reclamo</button>
+            @if (hasIssue()) {
+              <button appButton type="button" [loading]="busy()" (click)="resolve('resend')">Reenviar faltantes</button>
+            }
+          }
+          @if (a.reject) {
+            <button appButton variant="ghost-danger" type="button" [disabled]="busy()" (click)="goto('reject')">Rechazar</button>
+          }
+          @if (a.cancel) {
+            <button appButton variant="ghost-danger" type="button" [disabled]="busy()" (click)="goto('cancel')">Cancelar traslado</button>
+          }
+          @if (a.approve) {
+            <button appButton type="button" [loading]="busy()" (click)="approve()">Aprobar</button>
+          }
+          @if (a.prepare) {
+            <button appButton type="button" [loading]="busy()" (click)="prepare()">Autorizar salida</button>
+          }
+          @if (a.dispatch) {
+            <button appButton type="button" (click)="goto('dispatch')">Despachar</button>
+          }
+          @if (a.receive) {
+            <button appButton type="button" (click)="goto('receive')">Recibir</button>
+          }
+        }
+        <button appButton variant="ghost" type="button" [disabled]="busy()" (click)="open.set(false)">Cerrar</button>
+      } @else {
+        <button appButton variant="ghost" type="button" [disabled]="busy()" (click)="goto('view')">Volver</button>
+        <button
+          appButton
+          type="submit"
+          form="transfer-action-form"
+          [variant]="mode() === 'cancel' || mode() === 'reject' ? 'danger' : 'primary'"
+          [loading]="busy()"
+        >
+          {{ submitLabel() }}
+        </button>
+      }
+    }
+  </div>
+</app-modal>

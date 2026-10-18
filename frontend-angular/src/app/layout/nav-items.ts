@@ -16,6 +16,7 @@ import {
   type LucideIconData,
 } from '@lucide/angular';
 import { ALERT_ROLES } from '@core/alerts/alert-count';
+
 import { ROLES, type Role } from '@core/auth/roles/role';
 
 export interface NavItem {
@@ -36,6 +37,8 @@ export interface NavSection {
 const EVERYONE: readonly Role[] = ROLES;
 const MANAGEMENT: readonly Role[] = ['ADMIN', 'MANAGER', 'SELLER'];
 const ADMIN_ONLY: readonly Role[] = ['ADMIN'];
+/** Los traslados son de gerencia e inventario (el backend responde 403 al vendedor). */
+const TRANSFER_ROLES: readonly Role[] = ['ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO'];
 /** Quienes administran usuarios: el ADMIN (todos) y el MANAGER (los de su sucursal). */
 const USER_ADMINS: readonly Role[] = ['ADMIN', 'MANAGER'];
 
@@ -47,7 +50,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { label: 'Panel', path: '/dashboard', icon: LucideLayoutDashboard.icon, roles: EVERYONE },
       { label: 'Inventario', path: '/inventory', icon: LucideLayers.icon, roles: EVERYONE },
       { label: 'Alertas', path: '/alerts', icon: LucideBell.icon, roles: ALERT_ROLES, alertBadge: true },
-      { label: 'Traslados', path: '/transfers', icon: LucideShuffle.icon, roles: EVERYONE },
+      { label: 'Traslados', path: '/transfers', icon: LucideShuffle.icon, roles: TRANSFER_ROLES },
       { label: 'Compras', path: '/purchases', icon: LucideShoppingBag.icon, roles: EVERYONE },
       { label: 'Ventas', path: '/sales/pos', icon: LucideReceipt.icon, roles: EVERYONE },
       { label: 'Historial Ventas', path: '/sales/history', icon: LucideRotateCcwClock.icon, roles: EVERYONE },

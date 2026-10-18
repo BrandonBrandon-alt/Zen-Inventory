@@ -4,6 +4,7 @@ import { type Observable, map } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { SKIP_ERROR_NOTIFICATION } from '@core/api/error.interceptor';
 import type { components } from '@core/api/schema';
+import { toLocalIso } from '@shared/format/format';
 
 type Schemas = components['schemas'];
 
@@ -77,11 +78,7 @@ export interface TransferInProgress {
 /** Estados de un traslado que todavía no terminó (ni se canceló ni se cerró con novedad). */
 const IN_PROGRESS = new Set(['PENDING', 'APPROVED_DEST', 'PREPARING', 'IN_TRANSIT']);
 
-/** Fecha y hora locales sin zona (`2026-10-15T08:30:00`): así las espera el backend. */
-export function toLocalIso(date: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}T${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
-}
+export { toLocalIso };
 
 /**
  * Desde cuándo y hasta cuándo cubre cada periodo. "Hoy" es el día completo; "7 días" son los últimos siete días

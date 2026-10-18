@@ -36,3 +36,9 @@ export function formatShortDate(value: Date | null | undefined): string {
 export function formatShortMonth(value: Date): string {
   return SHORT_MONTH.format(value);
 }
+
+/** Fecha y hora locales sin zona (`2026-10-15T08:30:00`): así las espera el backend. */
+export function toLocalIso(date: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}T${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
+}

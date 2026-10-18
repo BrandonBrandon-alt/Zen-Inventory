@@ -1,0 +1,66 @@
+<header class="mb-6 flex animate-enter flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Traslados</h1>
+    @if (!loading() && !error()) {
+      <p class="mt-1 text-sm text-fg-subtle">
+        {{ summary() }}@if (pending() > 0) {, {{ pending() === 1 ? '1 espera tu acción' : pending() + ' esperan tu acción' }}}
+      </p>
+    }
+  </div>
+  <button appButton type="button" (click)="requestOpen.set(true)"><svg lucidePlus [size]="16" />Solicitar traslado</button>
+</header>
+
+<div class="mb-4 flex animate-enter-delayed flex-wrap items-center gap-3">
+  @if (!isAdmin()) {
+    <app-segmented [options]="directionOptions" [(value)]="direction" ariaLabel="Dirección del traslado" />
+  }
+  <div class="w-56">
+    <app-select [(value)]="statusFilter" [options]="statusOptions" [icon]="filterIcon" ariaLabel="Estado del traslado" />
+  </div>
+</div>
+
+<app-data-table
+  class="block animate-enter-delayed"
+  caption="Traslados entre sucursales"
+  [columns]="columns"
+  [rows]="rows()"
+  [rowKey]="rowKey"
+  [loading]="loading()"
+  [error]="error()"
+  [pageSize]="10"
+  [clickableRows]="true"
+  [emptyTitle]="statusFilter() === 'open' ? 'No hay traslados en curso' : 'Ningún traslado coincide'"
+  [emptyDescription]="statusFilter() === 'open' ? 'Solicita uno para pedir mercancía a otra sucursal.' : 'Prueba con otro estado o dirección.'"
+  minWidth="52rem"
+  (rowClick)="openDetail($event)"
+  (retry)="load()"
+>
+  <ng-template appCell="statusLabel" let-t>
+    <span class="inline-flex items-center gap-2">
+      <app-badge [variant]="statusVariant(t)" dot>{{ t.statusLabel }}</app-badge>
+      @if (t.needsMe) {
+        <span class="rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-semibold text-brand">Te toca</span>
+      }
+    </span>
+  </ng-template>
+  <ng-template appCell="priorityLabel" let-t>
+    <app-badge [variant]="priorityVariant(t)">{{ t.priorityLabel }}</app-badge>
+  </ng-template>
+  <ng-template appCell="acciones" let-t>
+    <div class="flex justify-end">
+      <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Ver traslado ' + t.id" appTooltip="Ver detalle" (click)="openDetail(t)">
+        <svg lucideEye [size]="16" />
+      </button>
+    </div>
+  </ng-template>
+</app-data-table>
+
+<app-transfer-request-modal
+  [(open)]="requestOpen"
+  [branches]="branches()"
+  [products]="products()"
+  [ownBranchId]="isAdmin() ? null : ownBranchId()"
+  (saved)="load(true)"
+/>
+
+<app-transfer-detail-modal [(open)]="detailOpen" [transfer]="selected()" [branchNames]="names()" [actor]="actor()" (changed)="load(true)" />
