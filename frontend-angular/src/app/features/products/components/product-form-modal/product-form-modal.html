@@ -1,0 +1,89 @@
+<app-modal
+  [(open)]="open"
+  [title]="product() ? 'Editar producto' : 'Nuevo producto'"
+  [description]="product() ? 'Actualiza los datos del producto.' : 'Completa los datos del nuevo producto.'"
+  size="lg"
+  [dismissible]="!saving()"
+>
+  <form [id]="formId" class="flex flex-col gap-4" [formGroup]="form" novalidate (ngSubmit)="submit()">
+    @if (serverError(); as message) {
+      <app-alert>{{ message }}</app-alert>
+    }
+    <div class="grid gap-4 sm:grid-cols-[1fr_2fr]">
+      <app-form-field label="SKU" [error]="error('sku')">
+        <input appInput type="text" formControlName="sku" autocomplete="off" placeholder="TOR-001" (input)="upperSku($event)" />
+      </app-form-field>
+      <app-form-field label="Nombre" [error]="error('nombre')">
+        <input appInput type="text" formControlName="nombre" autocomplete="off" />
+      </app-form-field>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-3">
+      <app-form-field label="Unidad base" [error]="error('unitId')">
+        <app-select formControlName="unitId" [options]="unitOptions()" [icon]="unitIcon" searchable searchPlaceholder="Buscar unidad…" placeholder="Selecciona" />
+      </app-form-field>
+      @if (product()) {
+        <div class="flex flex-col gap-1.5">
+          <span class="text-[13px] font-medium text-fg-muted">Costo promedio</span>
+          <p class="py-[11px] text-sm text-fg">{{ formatMoney(product()?.cost) }}</p>
+          <p class="text-xs text-fg-subtle">Lo calcula el sistema con cada compra.</p>
+        </div>
+      } @else {
+        <app-form-field label="Costo inicial" [error]="error('cost')">
+          <input appInput type="number" min="0" step="0.01" inputmode="decimal" formControlName="cost" />
+        </app-form-field>
+      }
+      <app-form-field label="Precio de venta" [error]="error('price')">
+        <input appInput type="number" min="0" step="0.01" inputmode="decimal" formControlName="price" />
+      </app-form-field>
+    </div>
+
+    @if (product()) {
+      <label class="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
+        <input type="checkbox" formControlName="activo" class="size-4 accent-(--brand-500)" />
+        Producto activo
+      </label>
+    }
+
+    <fieldset class="flex flex-col gap-3 border-t border-line pt-4" formArrayName="suppliers">
+      <legend class="sr-only">Proveedores del producto</legend>
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="font-title text-lg font-bold text-fg">Proveedores</h3>
+        <button appButton variant="ghost-brand" size="sm" type="button" (click)="addSupplier()">
+          <svg lucidePlus [size]="16" aria-hidden="true"></svg>
+          Agregar proveedor
+        </button>
+      </div>
+      @if (form.controls.suppliers.length === 0) {
+        <p class="text-sm text-fg-subtle">Sin proveedores. Agrega al menos uno para poder crear órdenes de compra de este producto.</p>
+      }
+      @for (row of form.controls.suppliers.controls; track row; let i = $index) {
+        <div class="grid items-start gap-3 rounded-lg border border-line-subtle p-3 sm:grid-cols-[2fr_1fr_1fr_auto]" [formGroupName]="i">
+          <app-form-field label="Proveedor" [error]="supplierError(row, 'supplierId')">
+            <app-select formControlName="supplierId" [options]="supplierOptions(row)" [icon]="truckIcon" searchable searchPlaceholder="Buscar proveedor…" placeholder="Selecciona" />
+          </app-form-field>
+          <app-form-field label="Precio pactado" [error]="supplierError(row, 'negotiatedPrice')">
+            <input appInput type="number" min="0" step="0.01" inputmode="decimal" formControlName="negotiatedPrice" />
+          </app-form-field>
+          <app-form-field label="Entrega (días)" [error]="supplierError(row, 'deliveryDays')">
+            <input appInput type="number" min="0" step="1" inputmode="numeric" formControlName="deliveryDays" />
+          </app-form-field>
+          <div class="flex items-center gap-3 sm:pt-7">
+            <label class="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
+              <input type="checkbox" class="size-4 accent-(--brand-500)" [checked]="row.controls.preferred.value" (change)="setPreferred(row, $any($event.target).checked)" />
+              Preferido
+            </label>
+            <button appButton variant="ghost-danger" size="sm" type="button" appTooltip="Quitar proveedor" [attr.aria-label]="'Quitar proveedor ' + (i + 1)" (click)="removeSupplier(i)">
+              <svg lucideTrash2 [size]="16" aria-hidden="true"></svg>
+            </button>
+          </div>
+        </div>
+      }
+    </fieldset>
+  </form>
+  <div data-slot="footer">
+    <button appButton variant="ghost" type="button" [disabled]="saving()" (click)="open.set(false)">Cancelar</button>
+    <button appButton type="submit" [attr.form]="formId" [loading]="saving()">
+      {{ product() ? 'Guardar cambios' : 'Crear producto' }}
+    </button>
+  </div>
+</app-modal>

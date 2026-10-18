@@ -1,0 +1,66 @@
+<header class="mb-6 flex animate-enter flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Productos</h1>
+    @if (!loading() && !error() && products().length > 0) {
+      <p class="mt-1 text-sm text-fg-subtle">{{ summary() }}</p>
+    }
+  </div>
+  <button appButton type="button" (click)="openCreate()"><svg lucidePlus [size]="16" />Nuevo producto</button>
+</header>
+
+<div class="mb-4 max-w-sm animate-enter-delayed">
+  <app-form-field>
+    <input appInput type="search" placeholder="Buscar por producto o SKU…" aria-label="Buscar producto" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
+    <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
+  </app-form-field>
+</div>
+
+<app-data-table
+  class="block animate-enter-delayed"
+  caption="Listado de productos"
+  [columns]="columns"
+  [rows]="rows()"
+  [rowKey]="rowKey"
+  [loading]="loading()"
+  [error]="error()"
+  [pageSize]="10"
+  [emptyTitle]="search() ? 'Ningún producto coincide' : 'Todavía no hay productos'"
+  [emptyDescription]="search() ? 'Prueba con otro nombre o SKU.' : 'Crea el primer producto del catálogo.'"
+  minWidth="56rem"
+  (retry)="load()"
+>
+  <ng-template appCell="suppliers" let-product>
+    <span [class.text-fg-subtle]="product.suppliers.length === 0">{{ suppliersLabel(product) }}</span>
+  </ng-template>
+  <ng-template appCell="activo" let-product>
+    <app-badge [variant]="product.activo ? 'success' : 'neutral'" dot>{{ product.activo ? 'Activo' : 'Inactivo' }}</app-badge>
+  </ng-template>
+  <ng-template appCell="acciones" let-product>
+    <div class="flex justify-end gap-1">
+      <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Editar ' + product.nombre" appTooltip="Editar producto" (click)="openEdit(product)">
+        <svg lucidePencil [size]="16" />
+      </button>
+      <button appButton variant="ghost" size="sm" type="button" [attr.aria-label]="'Unidades de ' + product.nombre" appTooltip="Unidades alternas" (click)="openUnits(product)">
+        <svg lucideRuler [size]="16" />
+      </button>
+      @if (product.activo) {
+        <button appButton variant="ghost-danger" size="sm" type="button" [attr.aria-label]="'Desactivar ' + product.nombre" appTooltip="Desactivar producto" (click)="askDeactivate(product)">
+          <svg lucideBan [size]="16" />
+        </button>
+      }
+    </div>
+  </ng-template>
+</app-data-table>
+
+<app-product-form-modal [(open)]="formOpen" [product]="editing()" [units]="units()" [suppliers]="suppliers()" (saved)="load(true)" />
+<app-product-units-modal [(open)]="unitsOpen" [product]="unitsFor()" [allUnits]="units()" />
+
+<app-confirm-dialog
+  [(open)]="confirmOpen"
+  title="Desactivar producto"
+  [message]="'¿Desactivar ' + (deactivating()?.nombre ?? '') + '? Dejará de ofrecerse en ventas, compras y traslados; su historial se conserva.'"
+  confirmLabel="Desactivar"
+  [busy]="deactivateBusy()"
+  [error]="deactivateError()"
+  (confirmed)="confirmDeactivate()"
+/>

@@ -15,6 +15,9 @@ const IMPLEMENTED: Readonly<Record<string, () => Promise<Type<unknown>>>> = {
   '/branches': () =>
     import('./features/branches/pages/branches-page/branches-page').then((m) => m.BranchesPage),
   '/dashboard': () => import('./features/dashboard/pages/dashboard-page/dashboard-page').then((m) => m.DashboardPage),
+  '/catalog/products': () => import('./features/products/pages/products-page/products-page').then((m) => m.ProductsPage),
+  '/catalog/units': () => import('./features/units/pages/units-page/units-page').then((m) => m.UnitsPage),
+  '/catalog/suppliers': () => import('./features/suppliers/pages/suppliers-page/suppliers-page').then((m) => m.SuppliersPage),
   '/inventory': () => import('./features/inventory/pages/inventory-page/inventory-page').then((m) => m.InventoryPage),
   '/users': () => import('./features/users/pages/users-page/users-page').then((m) => m.UsersPage),
 };
