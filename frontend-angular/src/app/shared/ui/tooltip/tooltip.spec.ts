@@ -108,6 +108,36 @@ describe('computeTooltipPosition', () => {
     expect(computeTooltipPosition({ top: 400, left: 990, width: 20, height: 20 }, tip, viewport, 'top').left).toBe(1000 - 120 - 8);
   });
 
+  describe('a los lados', () => {
+    const side = { width: 200, height: 60 };
+
+    it('a la derecha va junto al elemento y centrada en vertical', () => {
+      const r = computeTooltipPosition({ top: 300, left: 20, width: 180, height: 40 }, side, viewport, 'right');
+      expect(r).toEqual({ placement: 'right', left: 20 + 180 + 8, top: 300 + 20 - 30 });
+    });
+
+    it('si a la derecha no cabe, pasa a la izquierda', () => {
+      const r = computeTooltipPosition({ top: 300, left: 850, width: 140, height: 40 }, side, viewport, 'right');
+      expect(r.placement).toBe('left');
+      expect(r.left).toBe(850 - 8 - 200);
+    });
+
+    it('a la izquierda, si no cabe, pasa a la derecha', () => {
+      const r = computeTooltipPosition({ top: 300, left: 10, width: 40, height: 40 }, side, viewport, 'left');
+      expect(r.placement).toBe('right');
+    });
+
+    it('no se sale por arriba ni por abajo de la ventana', () => {
+      expect(computeTooltipPosition({ top: 0, left: 20, width: 100, height: 20 }, side, viewport, 'right').top).toBe(8);
+      expect(computeTooltipPosition({ top: 790, left: 20, width: 100, height: 20 }, side, viewport, 'right').top).toBe(800 - 60 - 8);
+    });
+
+    it('si no cabe en ningún lado, se queda en el pedido', () => {
+      const r = computeTooltipPosition({ top: 300, left: 10, width: 980, height: 40 }, { width: 400, height: 60 }, viewport, 'right');
+      expect(r.placement).toBe('right');
+    });
+  });
+
   it('si no cabe ni arriba ni abajo, se queda en el lado pedido', () => {
     const r = computeTooltipPosition({ top: 20, left: 500, width: 40, height: 760 }, tip, viewport, 'top');
     expect(r.placement).toBe('top');

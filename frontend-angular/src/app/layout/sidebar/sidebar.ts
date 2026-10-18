@@ -15,6 +15,7 @@ import { LOGIN_URL } from '@core/auth/auth-urls';
 import { AlertCount } from '@core/alerts/alert-count';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { Logo } from '@shared/ui/logo/logo';
+import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { ThemeToggle } from '@shared/ui/theme-toggle/theme-toggle';
 import { MobileMenu } from '../mobile-menu';
 import { type NavItem, navSectionsFor } from '../nav-items';
@@ -51,6 +52,7 @@ const EDGE_WIDTH = 10;
     LucidePin,
     LucideX,
     ThemeToggle,
+    Tooltip,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -195,6 +197,16 @@ export class Sidebar {
   /** Texto de la insignia: más de 99 se resume como "99+". */
   protected badgeText(count: number): string {
     return count > 99 ? '99+' : String(count);
+  }
+
+  /**
+   * Descripción de un enlace del menú. Con el menú completo el nombre ya se ve, así que solo se explica para qué sirve;
+   * contraído (solo iconos), el nombre va primero. Si hay alertas activas, se dice cuántas.
+   */
+  protected tooltipFor(item: NavItem): string {
+    const count = item.alertBadge ? this.alertCount() : 0;
+    const lines = [this.compact() ? item.label : '', item.description, count > 0 ? `${count} ${count === 1 ? 'activa' : 'activas'} ahora.` : ''];
+    return lines.filter(Boolean).join('\n');
   }
 
   protected linkLabel(item: NavItem): string {

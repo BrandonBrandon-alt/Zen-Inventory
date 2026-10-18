@@ -473,4 +473,50 @@ describe('Sidebar', () => {
       expect(screen.getByRole('link', { name: 'Inventario' })).not.toHaveTextContent('3');
     });
   });
+
+  describe('descripciones (tooltip)', () => {
+    it('enfocar un enlace explica para qué sirve esa pantalla, sin repetir su nombre', async () => {
+      await renderSidebar('ADMIN');
+      const link = screen.getByRole('link', { name: 'Traslados' });
+      link.focus();
+      const tip = await screen.findByRole('tooltip');
+      expect(tip).toHaveTextContent('Pedir, aprobar, despachar y recibir mercancía entre sucursales.');
+      expect(tip.textContent).not.toMatch(/^Traslados/);
+      expect(link).toHaveAttribute('aria-describedby', tip.id);
+    });
+
+    it('con el menú contraído la descripción empieza por el nombre (no se ve en pantalla)', async () => {
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, 'true');
+      await renderSidebar('ADMIN');
+      screen.getByRole('link', { name: 'Inventario' }).focus();
+      const tip = await screen.findByRole('tooltip');
+      expect(tip.textContent?.startsWith('Inventario')).toBe(true);
+      expect(tip).toHaveTextContent('kardex');
+    });
+
+    it('la descripción de Alertas dice cuántas hay activas', async () => {
+      alertTotal.set(3);
+      await renderSidebar('ADMIN');
+      screen.getByRole('link', { name: 'Alertas, 3 activas' }).focus();
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('3 activas ahora.');
+    });
+
+    it('cada enlace del menú tiene su propia descripción', async () => {
+      await renderSidebar('ADMIN');
+      const seen = new Set<string>();
+      for (const link of screen.getAllByRole('link')) {
+        link.focus();
+        const tip = await screen.findByRole('tooltip');
+        seen.add(tip.textContent ?? '');
+        link.blur();
+      }
+      expect(seen.size).toBe(screen.getAllByRole('link').length);
+    });
+
+    it('los botones del pie también explican qué hacen', async () => {
+      await renderSidebar('ADMIN');
+      screen.getByRole('button', { name: 'Cerrar sesión' }).focus();
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('Sale de tu cuenta en este equipo.');
+    });
+  });
 });

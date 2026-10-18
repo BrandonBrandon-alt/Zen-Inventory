@@ -25,6 +25,8 @@ export interface NavItem {
   readonly path: string;
   readonly icon: LucideIconData;
   readonly roles: readonly Role[];
+  /** Una frase que dice para qué sirve la pantalla: se muestra al pasar el cursor o enfocar el enlace. */
+  readonly description: string;
   /** Muestra en el menú cuántas alertas activas hay junto a este ítem. */
   readonly alertBadge?: boolean;
 }
@@ -47,25 +49,25 @@ export const NAV_SECTIONS: readonly NavSection[] = [
   {
     title: 'Navegación',
     items: [
-      { label: 'Panel', path: '/dashboard', icon: LucideLayoutDashboard.icon, roles: EVERYONE },
-      { label: 'Inventario', path: '/inventory', icon: LucideLayers.icon, roles: EVERYONE },
-      { label: 'Alertas', path: '/alerts', icon: LucideBell.icon, roles: ALERT_ROLES, alertBadge: true },
-      { label: 'Traslados', path: '/transfers', icon: LucideShuffle.icon, roles: TRANSFER_ROLES },
-      { label: 'Compras', path: '/purchases', icon: LucideShoppingBag.icon, roles: EVERYONE },
-      { label: 'Ventas', path: '/sales/pos', icon: LucideReceipt.icon, roles: EVERYONE },
-      { label: 'Historial Ventas', path: '/sales/history', icon: LucideRotateCcwClock.icon, roles: EVERYONE },
-      { label: 'Devoluciones', path: '/returns', icon: LucideUndo2.icon, roles: EVERYONE },
-      { label: 'Sucursales', path: '/branches', icon: LucideStore.icon, roles: ADMIN_ONLY },
-      { label: 'Usuarios', path: '/users', icon: LucideUsers.icon, roles: USER_ADMINS },
-      { label: 'Auditoría Global', path: '/audit', icon: LucideFileText.icon, roles: MANAGEMENT },
+      { label: 'Panel', description: 'Resumen del negocio: ventas, inventario, traslados y lo que necesita atención.', path: '/dashboard', icon: LucideLayoutDashboard.icon, roles: EVERYONE },
+      { label: 'Inventario', description: 'Existencias por producto, ajuste de stock, mínimos y el kardex de movimientos.', path: '/inventory', icon: LucideLayers.icon, roles: EVERYONE },
+      { label: 'Alertas', description: 'Productos bajo su mínimo y otros avisos que esperan una acción.', path: '/alerts', icon: LucideBell.icon, roles: ALERT_ROLES, alertBadge: true },
+      { label: 'Traslados', description: 'Pedir, aprobar, despachar y recibir mercancía entre sucursales.', path: '/transfers', icon: LucideShuffle.icon, roles: TRANSFER_ROLES },
+      { label: 'Compras', description: 'Órdenes de compra a proveedores y recepción de la mercancía.', path: '/purchases', icon: LucideShoppingBag.icon, roles: EVERYONE },
+      { label: 'Ventas', description: 'Punto de venta: registra una venta nueva.', path: '/sales/pos', icon: LucideReceipt.icon, roles: EVERYONE },
+      { label: 'Historial Ventas', description: 'Consulta las ventas ya registradas y anula las que lo necesiten.', path: '/sales/history', icon: LucideRotateCcwClock.icon, roles: EVERYONE },
+      { label: 'Devoluciones', description: 'Registra y revisa las devoluciones de los clientes.', path: '/returns', icon: LucideUndo2.icon, roles: EVERYONE },
+      { label: 'Sucursales', description: 'Crea y administra las sedes de la empresa.', path: '/branches', icon: LucideStore.icon, roles: ADMIN_ONLY },
+      { label: 'Usuarios', description: 'Personas con acceso al sistema, sus roles y sus sucursales.', path: '/users', icon: LucideUsers.icon, roles: USER_ADMINS },
+      { label: 'Auditoría Global', description: 'Registro de quién hizo qué en el sistema.', path: '/audit', icon: LucideFileText.icon, roles: MANAGEMENT },
     ],
   },
   {
     title: 'Maestros',
     items: [
-      { label: 'Productos', path: '/catalog/products', icon: LucidePackage.icon, roles: ADMIN_ONLY },
-      { label: 'Proveedores', path: '/catalog/suppliers', icon: LucideTruck.icon, roles: ADMIN_ONLY },
-      { label: 'Unidades de medida', path: '/catalog/units', icon: LucideRuler.icon, roles: ADMIN_ONLY },
+      { label: 'Productos', description: 'Catálogo: productos, precios, proveedores y unidades alternas.', path: '/catalog/products', icon: LucidePackage.icon, roles: ADMIN_ONLY },
+      { label: 'Proveedores', description: 'Empresas a las que se compra y sus tiempos de entrega.', path: '/catalog/suppliers', icon: LucideTruck.icon, roles: ADMIN_ONLY },
+      { label: 'Unidades de medida', description: 'Unidades en que se cuentan los productos: kilo, caja, unidad…', path: '/catalog/units', icon: LucideRuler.icon, roles: ADMIN_ONLY },
     ],
   },
 ];

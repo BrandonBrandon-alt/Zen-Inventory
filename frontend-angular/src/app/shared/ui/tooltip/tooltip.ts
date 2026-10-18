@@ -1,7 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { DestroyRef, Directive, ElementRef, effect, inject, input, numberAttribute, signal } from '@angular/core';
 
-export type TooltipPlacement = 'top' | 'bottom';
+export type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right';
 
 export interface Box {
   readonly top: number;
@@ -15,7 +15,8 @@ const MARGIN = 8;
 
 /**
  * Posición de la descripción respecto a su elemento: centrada, en el lado pedido y, si ahí no cabe, en el contrario;
- * sin salirse horizontalmente de la ventana. Función pura para poder probarla sin navegador.
+ * sin salirse de la ventana. Arriba y abajo se centra en horizontal; a los lados, en vertical (es lo que usa el menú
+ * lateral, donde la descripción sale a la derecha del enlace). Función pura para poder probarla sin navegador.
  */
 export function computeTooltipPosition(
   host: Box,
@@ -23,6 +24,15 @@ export function computeTooltipPosition(
   viewport: { width: number; height: number },
   preferred: TooltipPlacement,
 ): { top: number; left: number; placement: TooltipPlacement } {
+  if (preferred === 'left' || preferred === 'right') {
+    const fitsRight = host.left + host.width + GAP + tooltip.width <= viewport.width - MARGIN;
+    const fitsLeft = host.left - GAP - tooltip.width >= MARGIN;
+    const side: TooltipPlacement = preferred === 'right' ? (fitsRight || !fitsLeft ? 'right' : 'left') : fitsLeft || !fitsRight ? 'left' : 'right';
+    const x = side === 'right' ? host.left + host.width + GAP : host.left - GAP - tooltip.width;
+    const middle = host.top + host.height / 2 - tooltip.height / 2;
+    const y = Math.max(MARGIN, Math.min(middle, viewport.height - tooltip.height - MARGIN));
+    return { top: y, left: x, placement: side };
+  }
   const fitsAbove = host.top - GAP - tooltip.height >= MARGIN;
   const fitsBelow = host.top + host.height + GAP + tooltip.height <= viewport.height - MARGIN;
   const placement: TooltipPlacement = preferred === 'top' ? (fitsAbove || !fitsBelow ? 'top' : 'bottom') : fitsBelow || !fitsAbove ? 'bottom' : 'top';

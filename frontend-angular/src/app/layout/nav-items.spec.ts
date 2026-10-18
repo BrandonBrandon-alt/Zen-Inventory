@@ -26,6 +26,21 @@ describe('NAV_SECTIONS', () => {
   });
 });
 
+describe('descripciones del menú', () => {
+  it('cada pantalla dice para qué sirve, en una frase corta que termina en punto o puntos suspensivos', () => {
+    for (const item of allItems) {
+      expect(item.description.length, item.label).toBeGreaterThan(15);
+      expect(item.description.length, item.label).toBeLessThanOrEqual(90);
+      expect(item.description, item.label).toMatch(/[.…]$/);
+    }
+  });
+
+  it('no hay dos pantallas con la misma descripción', () => {
+    const texts = allItems.map((item) => item.description);
+    expect(new Set(texts).size).toBe(texts.length);
+  });
+});
+
 describe('navSectionsFor', () => {
   it('ADMIN ve todo, incluidos los maestros', () => {
     expect(labels('ADMIN')).toEqual(allItems.map((item) => item.label));

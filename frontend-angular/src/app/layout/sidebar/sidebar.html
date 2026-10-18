@@ -4,7 +4,8 @@
     type="button"
     class="group absolute inset-y-0 left-0 flex w-2.5 cursor-e-resize items-center outline-none"
     aria-label="Abrir menú"
-    title="Abrir menú (Ctrl + S)"
+    appTooltip="Abrir menú (Ctrl + S)"
+    tooltipPlacement="right"
     aria-keyshortcuts="Control+S Meta+S"
     aria-controls="app-sidebar"
     [attr.aria-expanded]="shown()"
@@ -31,7 +32,8 @@
         type="button"
         class="absolute top-2 -right-3 flex size-6 cursor-pointer items-center justify-center rounded-full border border-line bg-card text-fg-muted transition-colors hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
         [attr.aria-label]="state.collapsed() ? 'Expandir menú' : 'Contraer menú'"
-        [attr.title]="(state.collapsed() ? 'Expandir menú' : 'Contraer menú') + ' (Ctrl + S)'"
+        [appTooltip]="(state.collapsed() ? 'Expandir menú' : 'Contraer menú') + ' (Ctrl + S)'"
+        tooltipPlacement="right"
         aria-keyshortcuts="Control+S Meta+S"
         [attr.aria-expanded]="!state.collapsed()"
         (click)="state.toggle()"
@@ -72,7 +74,9 @@
               class="relative flex items-center gap-3 rounded-md py-2.5 text-sm text-fg-muted transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
               [class]="compact() ? 'justify-center px-3' : 'px-3'"
               [attr.aria-label]="linkLabel(item)"
-              [attr.title]="compact() ? item.label : null"
+              [appTooltip]="tooltipFor(item)"
+              tooltipPlacement="right"
+              [tooltipDelay]="300"
             >
               <svg [lucideIcon]="item.icon" [size]="18" [strokeWidth]="1.8" class="shrink-0" />
               @if (!compact()) {
@@ -102,6 +106,9 @@
         [class.justify-center]="compact()"
         [attr.aria-pressed]="state.autoHide()"
         [attr.aria-label]="state.autoHide() ? 'Fijar menú' : 'Ocultar menú automáticamente'"
+        [appTooltip]="state.autoHide() ? 'Deja el menú siempre visible.' : 'Oculta el menú y lo abre al acercar el mouse al borde izquierdo (Ctrl + S).'"
+        tooltipPlacement="right"
+        [tooltipDelay]="300"
         (click)="state.toggleAutoHide()"
       >
         @if (state.autoHide()) {
@@ -115,15 +122,18 @@
         }
       </button>
     }
-    <app-theme-toggle variant="row" [labelVisible]="!compact()" />
+    <app-theme-toggle variant="row" [labelVisible]="!compact()" appTooltip="Cambia entre el tema claro y el oscuro." tooltipPlacement="right" [tooltipDelay]="300" />
 
-    <app-user-card [compact]="compact()" />
+    <app-user-card [compact]="compact()" appTooltip="Tu perfil: foto, nombre y contraseña." tooltipPlacement="right" [tooltipDelay]="300" />
 
     <button
       type="button"
       class="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm text-fg-subtle transition-colors hover:bg-danger/10 hover:text-danger focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
       [class.justify-center]="compact()"
       aria-label="Cerrar sesión"
+      appTooltip="Sale de tu cuenta en este equipo."
+      tooltipPlacement="right"
+      [tooltipDelay]="300"
       (click)="logout()"
     >
       <svg lucideLogOut [size]="18" class="shrink-0" />
