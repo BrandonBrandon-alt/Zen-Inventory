@@ -15,7 +15,7 @@ import {
 import { toApiError } from '@core/api/api-error';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
-import { formatDateTime, formatMoney, normalizeText } from '@shared/format/format';
+import { formatDateTime, formatMoney, formatQuantity, normalizeText } from '@shared/format/format';
 import { inDateRange, inNumberRange, numberFromInput, optionsFrom } from '@shared/filters/filter-helpers';
 import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
@@ -146,7 +146,7 @@ export class SalesHistoryPage {
   protected readonly summary = computed(() => {
     const rows = this.rows().filter((r) => r.status === 'COMPLETED');
     const total = rows.reduce((sum, r) => sum + r.total, 0);
-    return `${rows.length === 1 ? '1 venta completada' : `${rows.length} ventas completadas`}, ${formatMoney(total)}`;
+    return `${rows.length === 1 ? '1 venta completada' : `${formatQuantity(rows.length)} ventas completadas`}, ${formatMoney(total)}`;
   });
 
   constructor() {
