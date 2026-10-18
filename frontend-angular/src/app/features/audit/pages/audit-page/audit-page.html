@@ -1,0 +1,68 @@
+<header class="mb-6 animate-enter">
+  <div>
+    <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Auditoría global</h1>
+    @if (!loading() && !error() && movements().length > 0) {
+      <p class="mt-1 text-sm text-fg-subtle">{{ summary() }}</p>
+    }
+  </div>
+</header>
+
+<div class="mb-4 grid animate-enter-delayed grid-cols-2 items-center gap-3 md:grid-cols-3 2xl:grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_0.8fr_auto]">
+  <div>
+    <app-form-field>
+      <input appInput type="search" placeholder="Buscar producto, responsable, documento…" aria-label="Buscar movimiento" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
+      <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
+    </app-form-field>
+  </div>
+  <div><app-select [(value)]="branchFilter" [options]="branchOptions()" [icon]="storeIcon" ariaLabel="Sucursal" /></div>
+  <div><app-select [(value)]="typeFilter" [options]="typeOptions" [icon]="typeIcon" ariaLabel="Tipo de movimiento" /></div>
+  <div><app-select [(value)]="reasonFilter" [options]="reasonOptions" [icon]="tagIcon" ariaLabel="Motivo" /></div>
+  <div><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
+  <div><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
+  @if (filtered()) {
+    <button appButton variant="ghost" size="sm" type="button" (click)="clearFilters()">Quitar filtros</button>
+  }
+</div>
+
+<app-data-table
+  class="block animate-enter-delayed"
+  caption="Movimientos de existencias de todas las sucursales"
+  [columns]="columns"
+  [rows]="rows()"
+  [rowKey]="rowKey"
+  [loading]="loading()"
+  [error]="error()"
+  [pageSize]="15"
+  exportName="auditoria"
+  [exportColumns]="exportColumns"
+  [clickableRows]="true"
+  [emptyTitle]="filtered() ? 'Ningún movimiento coincide' : 'Todavía no hay movimientos'"
+  [emptyDescription]="filtered() ? 'Prueba quitando algún filtro.' : 'Las compras, ventas, traslados y ajustes que muevan existencias aparecerán aquí.'"
+  minWidth="64rem"
+  (rowClick)="openDetail($event)"
+  (retry)="load()"
+>
+  <ng-template appCell="typeLabel" let-m>
+    <app-badge [variant]="m.type === 'INGRESO' ? 'success' : 'danger'" dot>{{ m.typeLabel }}</app-badge>
+  </ng-template>
+  <ng-template appCell="reasonLabel" let-m>
+    <span class="inline-flex flex-col items-start gap-0.5">
+      <app-badge [variant]="reasonVariant(m)">{{ m.reasonLabel }}</app-badge>
+      @if (m.subReason) {
+        <span class="text-[11px] text-fg-subtle">{{ subReason(m) }}</span>
+      }
+    </span>
+  </ng-template>
+  <ng-template appCell="signedQuantity" let-m>
+    <span class="font-semibold tabular-nums" [class]="m.type === 'INGRESO' ? 'text-success' : 'text-danger'">{{ m.type === 'INGRESO' ? '+' : '−' }}{{ formatQuantity(m.quantity) }}</span>
+  </ng-template>
+  <ng-template appCell="acciones" let-m>
+    <div class="flex justify-end">
+      <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Ver movimiento ' + m.id" appTooltip="Ver detalle y observaciones" (click)="openDetail(m)">
+        <svg lucideEye [size]="16" />
+      </button>
+    </div>
+  </ng-template>
+</app-data-table>
+
+<app-audit-detail-modal [(open)]="detailOpen" [row]="selected()" />

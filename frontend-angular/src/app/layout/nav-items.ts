@@ -37,7 +37,6 @@ export interface NavSection {
 }
 
 const EVERYONE: readonly Role[] = ROLES;
-const MANAGEMENT: readonly Role[] = ['ADMIN', 'MANAGER', 'SELLER'];
 const ADMIN_ONLY: readonly Role[] = ['ADMIN'];
 /** Traslados y compras son de gerencia e inventario (el backend responde 403 al vendedor). */
 const STOCK_ROLES: readonly Role[] = ['ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO'];
@@ -59,7 +58,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       { label: 'Devoluciones', description: 'Registra y revisa las devoluciones de los clientes.', path: '/returns', icon: LucideUndo2.icon, roles: EVERYONE },
       { label: 'Sucursales', description: 'Crea y administra las sedes de la empresa.', path: '/branches', icon: LucideStore.icon, roles: ADMIN_ONLY },
       { label: 'Usuarios', description: 'Personas con acceso al sistema, sus roles y sus sucursales.', path: '/users', icon: LucideUsers.icon, roles: USER_ADMINS },
-      { label: 'Auditoría Global', description: 'Registro de quién hizo qué en el sistema.', path: '/audit', icon: LucideFileText.icon, roles: MANAGEMENT },
+      { label: 'Auditoría Global', description: 'Registro de quién hizo qué en el sistema.', path: '/audit', icon: LucideFileText.icon, roles: ADMIN_ONLY },
     ],
   },
   {

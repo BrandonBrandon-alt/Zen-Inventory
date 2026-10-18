@@ -21,6 +21,15 @@
     <p role="status" class="sr-only">Cargando datos…</p>
   }
 
+  @if (showExport()) {
+    <div class="flex items-center justify-start border-b border-line px-3 py-2">
+      <button appButton variant="ghost" size="sm" type="button" (click)="exportCsv()">
+        <svg lucideDownload [size]="15" aria-hidden="true"></svg>
+        Exportar CSV
+      </button>
+    </div>
+  }
+
   <div class="overflow-x-auto">
     <table class="w-full border-collapse text-sm" [style.min-width]="minWidth()" [attr.aria-busy]="loading() || null">
       <caption class="sr-only">{{ caption() }}</caption>
@@ -138,7 +147,7 @@
     </table>
   </div>
 
-  @if (pageSize() && !skeleton() && !error() && rows().length > 0) {
+  @if (showFooter()) {
     <div class="border-t border-line px-4 py-3">
       <app-pagination [page]="currentPage()" [pageSize]="pageSize()!" [total]="rows().length" (pageChange)="setPage($event)" />
     </div>

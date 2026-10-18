@@ -14,7 +14,9 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { LucideArrowDown, LucideArrowUp, LucideArrowUpDown, LucideDynamicIcon, type LucideIconData, LucideInbox, LucideTriangleAlert } from '@lucide/angular';
+import { LucideArrowDown, LucideArrowUp, LucideArrowUpDown, LucideDownload, LucideDynamicIcon, type LucideIconData, LucideInbox, LucideTriangleAlert } from '@lucide/angular';
+import { downloadCsv, toCsv } from '@shared/export/csv';
+import { formatDateTime } from '@shared/format/format';
 import { Button } from '../button/button';
 import { EmptyState } from '../empty-state/empty-state';
 import { Pagination } from '../pagination/pagination';
@@ -36,6 +38,11 @@ export interface TableColumn<T> {
   /** Columna que identifica la fila (nombre, código): se destaca tipográficamente. */
   readonly primary?: boolean;
   readonly width?: string;
+  /**
+   * Cómo sale la columna en el CSV: `false` la deja fuera; una función da el valor (útil para listas o textos armados);
+   * sin ella se exporta el valor de la celda (los números como números, las fechas con su hora, los Sí/No en texto).
+   */
+  readonly export?: false | ((row: T) => CellValue);
 }
 
 /** Contexto de una plantilla de celda: `let-row` es la fila. */
@@ -74,7 +81,7 @@ function compareValues(a: CellValue, b: CellValue): number {
  */
 @Component({
   selector: 'app-data-table',
-  imports: [NgTemplateOutlet, Button, EmptyState, Pagination, LucideDynamicIcon, LucideArrowUp, LucideArrowDown, LucideArrowUpDown, LucideInbox, LucideTriangleAlert],
+  imports: [NgTemplateOutlet, Button, EmptyState, Pagination, LucideDownload, LucideDynamicIcon, LucideArrowUp, LucideArrowDown, LucideArrowUpDown, LucideInbox, LucideTriangleAlert],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block' },
   templateUrl: './data-table.html',
@@ -98,6 +105,14 @@ export class DataTable<T> {
 
   readonly emptyTitle = input('No hay datos para mostrar');
   readonly emptyDescription = input<string>();
+
+  /**
+   * Activa el botón "Exportar CSV" sobre la tabla; es el comienzo del nombre del archivo (`inventario` → `inventario-2026-10-18.csv`).
+   * Exporta todas las filas recibidas (no solo la página que se ve), en el orden elegido; la columna de acciones no sale.
+   */
+  readonly exportName = input<string | null>(null);
+  /** Columnas del CSV cuando difieren de las de la pantalla (p. ej. para agregar observaciones largas). */
+  readonly exportColumns = input<readonly TableColumn<T>[] | null>(null);
 
   readonly rowClick = output<T>();
   readonly retry = output<void>();
@@ -143,6 +158,12 @@ export class DataTable<T> {
     return this.sortedRows().slice(start, start + size);
   });
 
+  /** Hay datos que exportar: el botón va sobre la tabla (no cuando se carga, falla o no hay filas). */
+  protected readonly showExport = computed(() => !!this.exportName() && !this.skeleton() && !this.error() && this.rows().length > 0);
+
+  /** Paginación bajo la tabla. */
+  protected readonly showFooter = computed(() => !this.skeleton() && !this.error() && this.rows().length > 0 && !!this.pageSize());
+
   protected readonly currentPage = computed(() => Math.min(this.page(), this.pageCount()));
 
   constructor() {
@@ -166,6 +187,28 @@ export class DataTable<T> {
     if (value instanceof Date) return value.toLocaleDateString('es-CO');
     if (typeof value === 'number') return value.toLocaleString('es-CO');
     return value;
+  }
+
+  /** Descarga el CSV con todas las filas y las columnas exportables, en el orden actual. */
+  protected exportCsv(): void {
+    const name = this.exportName();
+    if (!name || this.rows().length === 0) return;
+    const columns = (this.exportColumns() ?? this.columns()).filter((c) => c.export !== false && c.key !== 'acciones');
+    const header = columns.map((c) => c.header);
+    const body = this.sortedRows().map((row) => columns.map((c) => this.exportValue(c, row)));
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadCsv(`${name}-${stamp}.csv`, toCsv([header, ...body]));
+  }
+
+  private exportValue(column: TableColumn<T>, row: T): string | number | null {
+    const raw: CellValue | unknown = typeof column.export === 'function' ? column.export(row) : this.valueOf(column, row);
+    if (raw == null || raw === '') return '';
+    if (typeof raw === 'number') return raw;
+    if (typeof raw === 'boolean') return raw ? 'Sí' : 'No';
+    if (raw instanceof Date) return Number.isNaN(raw.getTime()) ? '' : formatDateTime(raw);
+    if (typeof raw === 'string') return raw;
+    // Un objeto o lista no cabe en una celda: se usa el texto que la tabla muestra (si lo hay).
+    return column.display ? column.display(row) : '';
   }
 
   protected ariaSort(column: TableColumn<T>): 'ascending' | 'descending' | 'none' | null {

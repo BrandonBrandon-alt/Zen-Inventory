@@ -23,6 +23,7 @@ const IMPLEMENTED: Readonly<Record<string, () => Promise<Type<unknown>>>> = {
   '/purchases': () => import('./features/purchases/pages/purchases-page/purchases-page').then((m) => m.PurchasesPage),
   '/sales/pos': () => import('./features/sales/pages/pos-page/pos-page').then((m) => m.PosPage),
   '/sales/history': () => import('./features/sales/pages/sales-history-page/sales-history-page').then((m) => m.SalesHistoryPage),
+  '/audit': () => import('./features/audit/pages/audit-page/audit-page').then((m) => m.AuditPage),
   '/inventory': () => import('./features/inventory/pages/inventory-page/inventory-page').then((m) => m.InventoryPage),
   '/users': () => import('./features/users/pages/users-page/users-page').then((m) => m.UsersPage),
 };

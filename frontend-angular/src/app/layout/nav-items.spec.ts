@@ -26,6 +26,13 @@ describe('NAV_SECTIONS', () => {
   });
 });
 
+describe('Auditoría Global', () => {
+  it('es solo del administrador (los gerentes ya ven los movimientos de su sucursal en el kardex)', () => {
+    expect(labels('ADMIN')).toContain('Auditoría Global');
+    for (const role of ['MANAGER', 'SELLER', 'OPERADOR_INVENTARIO'] as const) expect(labels(role)).not.toContain('Auditoría Global');
+  });
+});
+
 describe('descripciones del menú', () => {
   it('cada pantalla dice para qué sirve, en una frase corta que termina en punto o puntos suspensivos', () => {
     for (const item of allItems) {

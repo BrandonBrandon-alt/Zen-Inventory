@@ -50,7 +50,7 @@ describe('rutas (guardas + shell + login)', () => {
 
   it('una pantalla aún no migrada muestra el aviso en lugar de la vista', async () => {
     const { harness } = await setup('ADMIN');
-    await harness.navigateByUrl('/audit');
+    await harness.navigateByUrl('/returns');
     expect(await screen.findByText(/todavía no está disponible/)).toBeInTheDocument();
   });
 

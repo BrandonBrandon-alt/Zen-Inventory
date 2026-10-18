@@ -21,7 +21,7 @@ const COLUMNS: readonly TableColumn<Product>[] = [
   { key: 'unitAbbreviation', header: 'Unidad', icon: LucideRuler.icon },
   { key: 'cost', header: 'Costo prom.', icon: LucideCoins.icon, sortable: true, align: 'end', display: (p) => formatMoney(p.cost) },
   { key: 'price', header: 'Precio venta', icon: LucideTag.icon, sortable: true, align: 'end', display: (p) => formatMoney(p.price) },
-  { key: 'suppliers', header: 'Proveedores', icon: LucideTruck.icon },
+  { key: 'suppliers', header: 'Proveedores', icon: LucideTruck.icon, export: (p) => p.suppliers.map((s) => s.nombre).join('; ') },
   { key: 'activo', header: 'Estado', icon: LucideCircleCheck.icon, sortable: true },
   { key: 'acciones', header: 'Acciones', icon: LucideEllipsis.icon, align: 'end' },
 ];

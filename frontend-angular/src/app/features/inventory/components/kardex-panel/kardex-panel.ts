@@ -48,6 +48,7 @@ const rowKey = (row: MovementRow): number => row.id;
 
     <app-data-table
       caption="Historial de movimientos"
+      exportName="kardex"
       [columns]="columns"
       [rows]="rows()"
       [rowKey]="rowKey"

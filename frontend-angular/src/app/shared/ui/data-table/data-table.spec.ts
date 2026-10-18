@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Badge } from '../badge/badge';
 import { LucideStore } from '@lucide/angular';
 import { Button } from '../button/button';
@@ -377,5 +377,114 @@ describe('DataTable — filas clicables', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Editar Norte' }));
     expect(props.onInner).toHaveBeenCalledWith(BRANCHES[0]);
     expect(props.onRowClick).not.toHaveBeenCalled();
+  });
+});
+
+describe('DataTable — exportar a CSV', () => {
+  let captured: { blob: Blob | null; name: string };
+
+  beforeEach(() => {
+    captured = { blob: null, name: '' };
+    URL.createObjectURL = vi.fn((blob: Blob) => ((captured.blob = blob), 'blob:csv'));
+    URL.revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      captured.name = this.download;
+    });
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  const csvLines = async () => ((await captured.blob?.text()) ?? '').replace('\uFEFF', '').split('\r\n');
+  const TABLE = (extra: string) =>
+    `<app-data-table caption="Sucursales" [columns]="columns" [rows]="rows" [rowKey]="rowKey" ${extra}></app-data-table>`;
+  const setupExport = (extra: string, props: Record<string, unknown> = {}) =>
+    render(TABLE(extra), {
+      imports,
+      componentProperties: { columns: COLUMNS, rows: BRANCHES, rowKey: (r: Branch) => r.id, ...props },
+    });
+
+  it('sin exportName no hay botón de exportar', async () => {
+    await setupExport('');
+    expect(screen.queryByRole('button', { name: /Exportar CSV/ })).not.toBeInTheDocument();
+  });
+
+  it('con exportName aparece el botón y descarga <nombre>-<fecha>.csv con encabezados y todas las filas', async () => {
+    await setupExport('exportName="sucursales"');
+    await userEvent.click(screen.getByRole('button', { name: /Exportar CSV/ }));
+    expect(captured.name).toMatch(/^sucursales-\d{4}-\d{2}-\d{2}\.csv$/);
+    const lines = await csvLines();
+    expect(lines[0]).toBe('Nombre,Ventas,Activa');
+    expect(lines).toHaveLength(5); // encabezado + 4 sucursales
+    expect(lines[1]).toBe('Norte,10,Sí');
+  });
+
+  it('exporta todas las filas aunque la tabla esté paginada', async () => {
+    await setupExport('exportName="s" [pageSize]="2"');
+    expect(screen.getAllByRole('row').slice(1)).toHaveLength(2); // se ven 2
+    await userEvent.click(screen.getByRole('button', { name: /Exportar CSV/ }));
+    expect(await csvLines()).toHaveLength(5);
+  });
+
+  it('respeta el orden elegido en la tabla', async () => {
+    await setupExport('exportName="s"');
+    const nombre = within(screen.getByRole('columnheader', { name: /Nombre/ })).getByRole('button');
+    await userEvent.click(nombre); // ascendente
+    await userEvent.click(screen.getByRole('button', { name: /Exportar CSV/ }));
+    const names = (await csvLines()).slice(1).map((l) => l.split(',')[0]);
+    expect(names).toEqual(['Alberto Este', 'Álvaro Sur', 'Norte', 'Zona Ñandú']);
+  });
+
+  it('los números salen como números (sin formato) y los vacíos como celdas vacías', async () => {
+    await setupExport('exportName="s"');
+    await userEvent.click(screen.getByRole('button', { name: /Exportar CSV/ }));
+    const lines = await csvLines();
+    expect(lines.find((l) => l.startsWith('Alberto Este'))).toBe('Alberto Este,,');
+    expect(lines.find((l) => l.startsWith('Zona Ñandú'))).toBe('Zona Ñandú,100,Sí');
+  });
+
+  it('la columna "acciones" y las que piden export:false no salen', async () => {
+    await setupExport('exportName="s"', {
+      columns: [...COLUMNS, { key: 'secreto', header: 'Secreto', export: false }, { key: 'acciones', header: 'Acciones' }],
+    });
+    await userEvent.click(screen.getByRole('button', { name: /Exportar CSV/ }));
+    expect((await csvLines())[0]).toBe('Nombre,Ventas,Activa');
+  });
+
+  it('una columna puede dar su propio valor de exportación (listas, textos armados)', async () => {
+    await setupExport('exportName="s"', {
+      columns: [{ key: 'nombre', header: 'Sucursal' }, { key: 'etiqueta', header: 'Etiqueta', export: (r: Branch) => `#${r.id} ${r.nombre}` }],
+    });
+    await userEvent.click(screen.getByRole('button', { name: /Exportar CSV/ }));
+    expect((await csvLines())[1]).toBe('Norte,#1 Norte');
+  });
+
+  it('exportColumns reemplaza las columnas de la pantalla en el archivo', async () => {
+    await setupExport('exportName="s" [exportColumns]="extra"', { extra: [{ key: 'id', header: 'Código' }, { key: 'nombre', header: 'Nombre' }] });
+    await userEvent.click(screen.getByRole('button', { name: /Exportar CSV/ }));
+    const lines = await csvLines();
+    expect(lines[0]).toBe('Código,Nombre');
+    expect(lines[1]).toBe('1,Norte');
+  });
+
+  it('un valor que parece fórmula se neutraliza y uno con coma se entrecomilla', async () => {
+    await setupExport('exportName="s"', {
+      columns: [{ key: 'nombre', header: 'Nombre' }],
+      rows: [{ id: 1, nombre: '=HYPERLINK("x")', ventas: 0, activa: true }, { id: 2, nombre: 'Uno, dos', ventas: 0, activa: true }],
+    });
+    await userEvent.click(screen.getByRole('button', { name: /Exportar CSV/ }));
+    expect((await csvLines()).slice(1)).toEqual(['"\'=HYPERLINK(""x"")"', '"Uno, dos"']);
+  });
+
+  it('las fechas salen con día y hora legibles', async () => {
+    await setupExport('exportName="s"', {
+      columns: [{ key: 'cuando', header: 'Cuándo', value: () => new Date(2026, 9, 15, 14, 30) }],
+    });
+    await userEvent.click(screen.getByRole('button', { name: /Exportar CSV/ }));
+    expect((await csvLines())[1]).toMatch(/15/);
+    expect((await csvLines())[1]).toMatch(/14:30|2:30/);
+  });
+
+  it('sin filas, cargando o con error no se ofrece exportar', async () => {
+    await setupExport('exportName="s"', { rows: [] });
+    expect(screen.queryByRole('button', { name: /Exportar CSV/ })).not.toBeInTheDocument();
   });
 });
