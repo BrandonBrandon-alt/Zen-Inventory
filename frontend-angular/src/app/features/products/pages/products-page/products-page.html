@@ -8,12 +8,30 @@
   <button appButton type="button" (click)="openCreate()"><svg lucidePlus [size]="16" />Nuevo producto</button>
 </header>
 
-<div class="mb-4 max-w-sm animate-enter-delayed">
-  <app-form-field>
-    <input appInput type="search" placeholder="Buscar por producto o SKU…" aria-label="Buscar producto" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
-    <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
-  </app-form-field>
+<div class="mb-3 flex animate-enter-delayed flex-wrap items-center gap-3">
+  <div class="w-72 max-w-full">
+    <app-form-field>
+      <input appInput type="search" placeholder="Buscar por producto o SKU…" aria-label="Buscar producto" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
+      <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
+    </app-form-field>
+  </div>
+  <div class="w-52"><app-select [(value)]="statusFilter" [options]="statusOptions" ariaLabel="Estado del producto" /></div>
+  <div class="w-56"><app-select [(value)]="unitFilter" [options]="unitOptions()" ariaLabel="Unidad de medida" /></div>
+  <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
+    <app-select [(value)]="supplierFilter" [options]="supplierOptions()" ariaLabel="Proveedor" searchable searchPlaceholder="Buscar proveedor…" />
+    <app-form-field label="Precio desde">
+      <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="minPrice() ?? ''" (input)="minPrice.set(numberFromInput($event))" />
+    </app-form-field>
+    <app-form-field label="Precio hasta">
+      <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="maxPrice() ?? ''" (input)="maxPrice.set(numberFromInput($event))" />
+    </app-form-field>
+    <label class="flex items-center gap-2 text-sm text-fg-muted">
+      <input type="checkbox" class="size-4 accent-[var(--brand-500)]" [checked]="noSuppliers()" (change)="noSuppliers.set($any($event.target).checked)" />
+      Solo sin proveedores
+    </label>
+  </app-advanced-filters>
 </div>
+<app-active-filters class="mb-4 animate-enter-delayed" [filters]="activeFilters()" (removed)="removeFilter($event)" (cleared)="clearFilters()" />
 
 <app-data-table
   exportName="productos"
@@ -25,8 +43,8 @@
   [loading]="loading()"
   [error]="error()"
   [pageSize]="10"
-  [emptyTitle]="search() ? 'Ningún producto coincide' : 'Todavía no hay productos'"
-  [emptyDescription]="search() ? 'Prueba con otro nombre o SKU.' : 'Crea el primer producto del catálogo.'"
+  [emptyTitle]="activeFilters().length > 0 ? 'Ningún producto coincide' : 'Todavía no hay productos'"
+  [emptyDescription]="activeFilters().length > 0 ? 'Prueba quitando algún filtro.' : 'Crea el primer producto del catálogo.'"
   minWidth="56rem"
   (retry)="load()"
 >

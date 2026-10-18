@@ -3,9 +3,10 @@ import { TestBed } from '@angular/core/testing';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { errorInterceptor } from '@core/api/error.interceptor';
+import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
 import { NotificationService } from '@core/notifications/notification.service';
 import { chooseOption } from '@testing/select-helpers';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
@@ -55,6 +56,95 @@ const renderPage = () =>
 const skus = () => screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0].textContent?.trim());
 
 describe('ProductsPage', () => {
+  describe('filtros', () => {
+    const STORE = 'zen:filters:1:products';
+    const login = () => localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token: 't', email: 'e@z.co', nombre: 'Yo', rol: 'ADMIN', id: 1 }));
+    const openAdvanced = async () => userEvent.click(await screen.findByRole('button', { name: /Más filtros/ }));
+    beforeEach(() => localStorage.clear());
+    afterEach(() => localStorage.clear());
+
+    it('filtra por estado y por unidad de medida', async () => {
+      stub();
+      await renderPage();
+      await screen.findByText('Tornillo');
+      await chooseOption('Estado del producto', 'Solo inactivos');
+      expect(skus()).toEqual(['ARA-003']);
+      await chooseOption('Estado del producto', 'Solo activos');
+      expect(skus()).toEqual(['TOR-001', 'TUE-002']);
+      await chooseOption('Estado del producto', 'Activos e inactivos');
+      await chooseOption('Unidad de medida', 'Kilogramo');
+      expect(skus()).toEqual(['ARA-003']);
+    });
+
+    it('filtra por proveedor, por rango de precio y por «solo sin proveedores» desde «Más filtros»', async () => {
+      stub();
+      await renderPage();
+      await screen.findByText('Tornillo');
+      await openAdvanced();
+      await chooseOption('Proveedor', 'Aceros del Sur');
+      expect(skus()).toEqual(['TOR-001']);
+      await chooseOption('Proveedor', 'Todos los proveedores');
+      await userEvent.type(screen.getByLabelText('Precio desde'), '1000');
+      await userEvent.type(screen.getByLabelText('Precio hasta'), '4000');
+      expect(skus()).toEqual(['TUE-002']); // 3.000
+      await userEvent.clear(screen.getByLabelText('Precio desde'));
+      await userEvent.clear(screen.getByLabelText('Precio hasta'));
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Solo sin proveedores' }));
+      expect(skus()).toEqual(['TUE-002', 'ARA-003']);
+      expect(screen.getByLabelText('1 filtro activo')).toBeInTheDocument();
+    });
+
+    it('las etiquetas se quitan una a una y todas juntas', async () => {
+      stub();
+      await renderPage();
+      await screen.findByText('Tornillo');
+      await chooseOption('Estado del producto', 'Solo activos');
+      await userEvent.type(screen.getByLabelText('Buscar producto'), 'tor');
+      expect(skus()).toEqual(['TOR-001']);
+      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro Estado: Activos' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+      expect(screen.getByLabelText('Buscar producto')).toHaveValue('');
+      expect(skus()).toHaveLength(3);
+    });
+
+    it('recuerda los filtros la próxima vez que se entra, pero no la búsqueda', async () => {
+      login();
+      stub();
+      const first = await renderPage();
+      await screen.findByText('Tornillo');
+      await chooseOption('Estado del producto', 'Solo activos');
+      await openAdvanced();
+      await userEvent.type(screen.getByLabelText('Precio desde'), '4000');
+      await userEvent.type(screen.getByLabelText('Buscar producto'), 'zzz');
+      await vi.waitFor(() => expect(JSON.parse(localStorage.getItem(STORE) ?? '{}')).toMatchObject({ status: 'active', minPrice: 4000, advancedOpen: true }));
+      first.fixture.destroy();
+      TestBed.resetTestingModule(); // otra visita
+
+      await renderPage();
+      await screen.findByText('Tornillo');
+      expect(screen.getByLabelText('Buscar producto')).toHaveValue('');
+      expect(screen.getByLabelText('Precio desde')).toHaveValue(4000);
+      expect(skus()).toEqual(['TOR-001']);
+    });
+
+    it('un valor guardado dañado se ignora', async () => {
+      login();
+      localStorage.setItem(STORE, JSON.stringify({ status: 'INVENTADO', unit: 'x', minPrice: 'abc' }));
+      stub();
+      await renderPage();
+      expect(await screen.findByText('Tornillo')).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
+    });
+
+    it('el panel abierto no tiene problemas de accesibilidad detectables', async () => {
+      stub();
+      await renderPage();
+      await screen.findByText('Tornillo');
+      await openAdvanced();
+      await expectAccessible();
+    });
+  });
+
   describe('lista', () => {
     it('no tiene problemas de accesibilidad detectables', async () => {
       stub();

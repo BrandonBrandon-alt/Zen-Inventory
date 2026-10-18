@@ -5,11 +5,16 @@ import { toApiError } from '@core/api/api-error';
 import { CatalogOptionsApi, type SupplierOption, type UnitOption } from '@core/catalog/catalog-options-api';
 import { NotificationService } from '@core/notifications/notification.service';
 import { formatMoney, normalizeText } from '@shared/format/format';
+import { inNumberRange, numberFromInput } from '@shared/filters/filter-helpers';
+import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
 import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog/confirm-dialog';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
+import { ActiveFilters, type ActiveFilter } from '@shared/ui/filters/active-filters';
+import { AdvancedFilters } from '@shared/ui/filters/advanced-filters';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
+import { Select, type SelectOption } from '@shared/ui/select/select';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { ProductFormModal } from '../../components/product-form-modal/product-form-modal';
 import { ProductUnitsModal } from '../../components/product-units-modal/product-units-modal';
@@ -38,6 +43,9 @@ const rowKey = (product: Product): number => product.id;
     Badge,
     Button,
     ConfirmDialog,
+    ActiveFilters,
+    AdvancedFilters,
+    Select,
     FormField,
     InputDirective,
     ProductFormModal,
@@ -66,7 +74,22 @@ export class ProductsPage {
   protected readonly suppliers = signal<readonly SupplierOption[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+  // Los filtros se recuerdan por persona (la búsqueda de texto no: se escribe cada vez).
+  private static readonly SCREEN = 'products';
   protected readonly search = signal('');
+  protected readonly statusFilter = persistedFilter(ProductsPage.SCREEN, 'status', 'all' as 'all' | 'active' | 'inactive', codecs.oneOf(['all', 'active', 'inactive'] as const));
+  protected readonly unitFilter = persistedFilter(ProductsPage.SCREEN, 'unit', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly supplierFilter = persistedFilter(ProductsPage.SCREEN, 'supplier', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly minPrice = persistedFilter(ProductsPage.SCREEN, 'minPrice', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly maxPrice = persistedFilter(ProductsPage.SCREEN, 'maxPrice', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly noSuppliers = persistedFilter(ProductsPage.SCREEN, 'noSuppliers', false, codecs.bool());
+  protected readonly advancedOpen = persistedFilter(ProductsPage.SCREEN, 'advancedOpen', false, codecs.bool());
+  protected readonly numberFromInput = numberFromInput;
+  protected readonly statusOptions: readonly SelectOption<'all' | 'active' | 'inactive'>[] = [
+    { value: 'all', label: 'Activos e inactivos' },
+    { value: 'active', label: 'Solo activos' },
+    { value: 'inactive', label: 'Solo inactivos' },
+  ];
 
   protected readonly formOpen = signal(false);
   protected readonly editing = signal<Product | null>(null);
@@ -79,10 +102,53 @@ export class ProductsPage {
   protected readonly deactivateBusy = signal(false);
   protected readonly deactivateError = signal<string | null>(null);
 
+  protected readonly unitOptions = computed<SelectOption<number | null>[]>(() => [
+    { value: null, label: 'Todas las unidades' },
+    ...this.units().map((u) => ({ value: u.id, label: `${u.nombre} (${u.abreviatura})` })),
+  ]);
+  protected readonly supplierOptions = computed<SelectOption<number | null>[]>(() => [
+    { value: null, label: 'Todos los proveedores' },
+    ...this.suppliers().map((s) => ({ value: s.id, label: s.nombre })),
+  ]);
+
   protected readonly rows = computed(() => {
     const term = normalizeText(this.search().trim());
-    if (!term) return this.products();
-    return this.products().filter((p) => normalizeText(p.nombre).includes(term) || normalizeText(p.sku).includes(term));
+    const status = this.statusFilter();
+    const { unit, supplier, minPrice, maxPrice, noSuppliers } = {
+      unit: this.unitFilter(),
+      supplier: this.supplierFilter(),
+      minPrice: this.minPrice(),
+      maxPrice: this.maxPrice(),
+      noSuppliers: this.noSuppliers(),
+    };
+    return this.products()
+      .filter((p) => status === 'all' || (status === 'active') === p.activo)
+      .filter((p) => unit === null || p.unitId === unit)
+      .filter((p) => supplier === null || p.suppliers.some((s) => s.supplierId === supplier))
+      .filter((p) => inNumberRange(p.price, minPrice, maxPrice))
+      .filter((p) => !noSuppliers || p.suppliers.length === 0)
+      .filter((p) => !term || normalizeText(p.nombre).includes(term) || normalizeText(p.sku).includes(term));
+  });
+
+  /** Los filtros del panel «Más filtros» que están aplicados (el botón muestra cuántos). */
+  protected readonly advancedCount = computed(
+    () => [this.supplierFilter() !== null, this.minPrice() !== null, this.maxPrice() !== null, this.noSuppliers()].filter(Boolean).length,
+  );
+
+  /** Todos los filtros aplicados, para mostrarlos como etiquetas que se quitan. */
+  protected readonly activeFilters = computed<ActiveFilter[]>(() => {
+    const list: ActiveFilter[] = [];
+    if (this.statusFilter() !== 'all') list.push({ id: 'status', label: 'Estado', text: this.statusFilter() === 'active' ? 'Activos' : 'Inactivos' });
+    if (this.unitFilter() !== null) {
+      const unit = this.units().find((u) => u.id === this.unitFilter());
+      list.push({ id: 'unit', label: 'Unidad', text: unit ? unit.nombre : `Unidad ${this.unitFilter()}` });
+    }
+    if (this.supplierFilter() !== null) list.push({ id: 'supplier', label: 'Proveedor', text: this.suppliers().find((s) => s.id === this.supplierFilter())?.nombre ?? `Proveedor ${this.supplierFilter()}` });
+    if (this.minPrice() !== null) list.push({ id: 'minPrice', label: 'Precio desde', text: formatMoney(this.minPrice()) });
+    if (this.maxPrice() !== null) list.push({ id: 'maxPrice', label: 'Precio hasta', text: formatMoney(this.maxPrice()) });
+    if (this.noSuppliers()) list.push({ id: 'noSuppliers', label: 'Sin', text: 'proveedores' });
+    if (this.search().trim()) list.push({ id: 'search', label: 'Búsqueda', text: this.search().trim() });
+    return list;
   });
 
   protected readonly summary = computed(() => {
@@ -117,6 +183,22 @@ export class ProductsPage {
 
   protected onSearch(event: Event): void {
     this.search.set((event.target as HTMLInputElement).value);
+  }
+
+  protected removeFilter(id: string): void {
+    switch (id) {
+      case 'status': this.statusFilter.set('all'); break;
+      case 'unit': this.unitFilter.set(null); break;
+      case 'supplier': this.supplierFilter.set(null); break;
+      case 'minPrice': this.minPrice.set(null); break;
+      case 'maxPrice': this.maxPrice.set(null); break;
+      case 'noSuppliers': this.noSuppliers.set(false); break;
+      case 'search': this.search.set(''); break;
+    }
+  }
+
+  protected clearFilters(): void {
+    for (const filter of this.activeFilters()) this.removeFilter(filter.id);
   }
 
   /** Proveedor que se muestra en la tabla: el preferido o, si no hay, el primero. */
