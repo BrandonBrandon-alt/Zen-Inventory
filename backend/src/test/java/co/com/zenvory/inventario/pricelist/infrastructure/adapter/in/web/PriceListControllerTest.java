@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -71,6 +72,17 @@ class PriceListControllerTest {
 
         mockMvc.perform(get("/api/v1/price-lists"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("PUT precio: sin precio, en cero o negativo es 400 y no guarda nada")
+    void upsertWithInvalidPrice_returns400() throws Exception {
+        for (String body : new String[] {"{}", "{\"precio\": 0}", "{\"precio\": -5}"}) {
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/price-lists/1/products/1/price")
+                    .contentType("application/json").content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        org.mockito.Mockito.verify(priceListUseCase, org.mockito.Mockito.never()).upsertProductPrice(any(), any(), any());
     }
 
     @Test
