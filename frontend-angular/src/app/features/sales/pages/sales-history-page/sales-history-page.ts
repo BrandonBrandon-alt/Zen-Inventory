@@ -16,8 +16,13 @@ import { toApiError } from '@core/api/api-error';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { formatDateTime, formatMoney, normalizeText } from '@shared/format/format';
+import { inDateRange, inNumberRange, numberFromInput, optionsFrom } from '@shared/filters/filter-helpers';
+import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
+import { DatePicker } from '@shared/ui/date-picker/date-picker';
+import { ActiveFilters, type ActiveFilter } from '@shared/ui/filters/active-filters';
+import { AdvancedFilters } from '@shared/ui/filters/advanced-filters';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Select, type SelectOption } from '@shared/ui/select/select';
@@ -33,10 +38,11 @@ interface SaleRow extends Sale {
 }
 
 const rowKey = (row: SaleRow): number => row.id;
+const DAY = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' });
 
 @Component({
   selector: 'app-sales-history-page',
-  imports: [DataTable, DataTableCell, Badge, Button, FormField, InputDirective, Select, Tooltip, SaleDetailModal, LucideEye, LucideSearch],
+  imports: [DataTable, DataTableCell, Badge, Button, DatePicker, ActiveFilters, AdvancedFilters, FormField, InputDirective, Select, Tooltip, SaleDetailModal, LucideEye, LucideSearch],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './sales-history-page.html',
@@ -59,8 +65,17 @@ export class SalesHistoryPage {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
-  protected readonly branchFilter = signal<number | null>(null);
-  protected readonly statusFilter = signal<'all' | SaleStatus>('all');
+  // Los filtros se recuerdan por persona (la búsqueda de texto no: se escribe cada vez).
+  private static readonly SCREEN = 'sales-history';
+  protected readonly branchFilter = persistedFilter(SalesHistoryPage.SCREEN, 'branch', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly statusFilter = persistedFilter(SalesHistoryPage.SCREEN, 'status', 'all' as 'all' | SaleStatus, codecs.oneOf(['all', ...SALE_STATUSES] as const));
+  protected readonly from = persistedFilter(SalesHistoryPage.SCREEN, 'from', null as Date | null, codecs.nullable(codecs.date()));
+  protected readonly to = persistedFilter(SalesHistoryPage.SCREEN, 'to', null as Date | null, codecs.nullable(codecs.date()));
+  protected readonly sellerFilter = persistedFilter(SalesHistoryPage.SCREEN, 'seller', null as string | null, codecs.nullable(codecs.text()));
+  protected readonly productFilter = persistedFilter(SalesHistoryPage.SCREEN, 'product', null as string | null, codecs.nullable(codecs.text()));
+  protected readonly minTotal = persistedFilter(SalesHistoryPage.SCREEN, 'minTotal', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly maxTotal = persistedFilter(SalesHistoryPage.SCREEN, 'maxTotal', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly advancedOpen = persistedFilter(SalesHistoryPage.SCREEN, 'advancedOpen', false, codecs.bool());
   protected readonly search = signal('');
 
   protected readonly detailOpen = signal(false);
@@ -86,13 +101,44 @@ export class SalesHistoryPage {
     { key: 'acciones', header: 'Acciones', align: 'end' as const },
   ]);
 
+  protected readonly sellerOptions = computed(() => optionsFrom(this.sales().map((s) => s.seller), this.sellerFilter(), 'Todos los vendedores'));
+  protected readonly productOptions = computed(() => optionsFrom(this.sales().flatMap((s) => s.lines.map((l) => l.productName)), this.productFilter(), 'Todos los productos'));
+
   protected readonly rows = computed<SaleRow[]>(() => {
     const status = this.statusFilter();
     const needle = normalizeText(this.search().trim());
+    const { from, to, minTotal, maxTotal } = { from: this.from(), to: this.to(), minTotal: this.minTotal(), maxTotal: this.maxTotal() };
+    const seller = this.sellerFilter();
+    const product = this.productFilter();
     return this.sales()
       .filter((s) => status === 'all' || s.status === status)
+      .filter((s) => inDateRange(s.date, from, to))
+      .filter((s) => seller === null || s.seller === seller)
+      .filter((s) => product === null || s.lines.some((l) => l.productName === product))
+      .filter((s) => inNumberRange(s.total, minTotal, maxTotal))
       .filter((s) => !needle || normalizeText(`${s.id} ${s.customerName} ${s.customerDocument} ${s.seller}`).includes(needle))
       .map((s) => ({ ...s, customer: customerLabel(s.customerName), statusLabel: SALE_INFO[s.status].label }));
+  });
+
+  /** Los filtros del panel «Más filtros» que están aplicados (el botón muestra cuántos). */
+  protected readonly advancedCount = computed(
+    () => [this.sellerFilter() !== null, this.productFilter() !== null, this.minTotal() !== null, this.maxTotal() !== null].filter(Boolean).length,
+  );
+
+  /** Todos los filtros aplicados, para mostrarlos como etiquetas que se quitan. */
+  protected readonly activeFilters = computed<ActiveFilter[]>(() => {
+    const list: ActiveFilter[] = [];
+    const branch = this.branchFilter();
+    if (this.statusFilter() !== 'all') list.push({ id: 'status', label: 'Estado', text: SALE_INFO[this.statusFilter() as SaleStatus].label });
+    if (this.isAdmin() && branch !== null) list.push({ id: 'branch', label: 'Sucursal', text: this.branches().find((b) => b.id === branch)?.nombre ?? `Sucursal ${branch}` });
+    if (this.from() !== null) list.push({ id: 'from', label: 'Desde', text: DAY.format(this.from()!) });
+    if (this.to() !== null) list.push({ id: 'to', label: 'Hasta', text: DAY.format(this.to()!) });
+    if (this.sellerFilter() !== null) list.push({ id: 'seller', label: 'Vendedor', text: this.sellerFilter()! });
+    if (this.productFilter() !== null) list.push({ id: 'product', label: 'Producto', text: this.productFilter()! });
+    if (this.minTotal() !== null) list.push({ id: 'minTotal', label: 'Total desde', text: formatMoney(this.minTotal()) });
+    if (this.maxTotal() !== null) list.push({ id: 'maxTotal', label: 'Total hasta', text: formatMoney(this.maxTotal()) });
+    if (this.search().trim()) list.push({ id: 'search', label: 'Búsqueda', text: this.search().trim() });
+    return list;
   });
 
   protected readonly selected = computed(() => this.sales().find((s) => s.id === this.selectedId()) ?? null);
@@ -136,6 +182,26 @@ export class SalesHistoryPage {
 
   protected onSearch(event: Event): void {
     this.search.set((event.target as HTMLInputElement).value);
+  }
+
+  protected readonly numberFromInput = numberFromInput;
+
+  protected removeFilter(id: string): void {
+    switch (id) {
+      case 'status': this.statusFilter.set('all'); break;
+      case 'branch': this.branchFilter.set(null); break;
+      case 'from': this.from.set(null); break;
+      case 'to': this.to.set(null); break;
+      case 'seller': this.sellerFilter.set(null); break;
+      case 'product': this.productFilter.set(null); break;
+      case 'minTotal': this.minTotal.set(null); break;
+      case 'maxTotal': this.maxTotal.set(null); break;
+      case 'search': this.search.set(''); break;
+    }
+  }
+
+  protected clearFilters(): void {
+    for (const filter of this.activeFilters()) this.removeFilter(filter.id);
   }
 
   protected openDetail(row: SaleRow): void {

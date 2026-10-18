@@ -165,6 +165,122 @@ describe('SalesHistoryPage', () => {
       await vi.waitFor(() => expect(asked).toEqual([null, '20']));
     });
 
+    describe('filtros avanzados', () => {
+      const STORE = 'zen:filters:1:sales-history';
+      const ids = () => screen.queryAllByRole('row').slice(1).map((r) => /#(\d+)/.exec(r.textContent ?? '')?.[1]);
+      const openAdvanced = async () => userEvent.click(await screen.findByRole('button', { name: /Más filtros/ }));
+
+      it('filtra por vendedor y por rango de total desde «Más filtros», y el botón cuenta los activos', async () => {
+        useSession('MANAGER', 10);
+        stub();
+        await renderPage();
+        await screen.findByText('#4');
+        expect(screen.queryByLabelText('Total desde')).not.toBeInTheDocument(); // el panel empieza cerrado
+        await openAdvanced();
+        await chooseOption('Vendedor', 'Sofía');
+        expect(ids()).toEqual(['3']);
+        expect(screen.getByLabelText('1 filtro activo')).toBeInTheDocument();
+        await chooseOption('Vendedor', 'Todos los vendedores');
+        await userEvent.type(screen.getByLabelText('Total desde'), '2000');
+        await userEvent.type(screen.getByLabelText('Total hasta'), '3000');
+        expect(ids().sort()).toEqual(['2', '3']);
+        expect(screen.getByLabelText('2 filtros activos')).toBeInTheDocument();
+      });
+
+      it('filtra por producto', async () => {
+        useSession('MANAGER', 10);
+        stub([
+          sale(1, 'COMPLETED'),
+          sale(2, 'COMPLETED', { details: [{ id: 21, productId: 2, productName: 'Tuerca', quantity: 1, unitPriceApplied: 2000, discountPercentage: 0, subtotalLine: 2000 }] }),
+        ]);
+        await renderPage();
+        await screen.findByText('#2');
+        await openAdvanced();
+        await chooseOption('Producto', 'Tuerca');
+        expect(ids()).toEqual(['2']);
+      });
+
+      it('las etiquetas de filtros aplicados se quitan una a una y todas juntas', async () => {
+        useSession('MANAGER', 10);
+        stub();
+        await renderPage();
+        await screen.findByText('#4');
+        await chooseOption('Estado de la venta', 'Anulada');
+        await userEvent.type(screen.getByLabelText('Buscar venta'), 'Luis');
+        const chips = screen.getByRole('group', { name: 'Filtros aplicados' });
+        expect(chips).toHaveTextContent('Estado:');
+        expect(chips).toHaveTextContent('Búsqueda:');
+        await userEvent.click(within(chips).getByRole('button', { name: 'Quitar filtro Estado: Anulada' }));
+        expect(screen.queryByRole('button', { name: /Quitar filtro Estado/ })).not.toBeInTheDocument();
+        await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+        expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Buscar venta')).toHaveValue('');
+        expect(ids().length).toBe(4);
+      });
+
+      it('recuerda los filtros la próxima vez que se entra, pero no el texto de la búsqueda', async () => {
+        useSession('MANAGER', 10);
+        stub();
+        const first = await renderPage();
+        await screen.findByText('#4');
+        await chooseOption('Estado de la venta', 'Anulada');
+        await userEvent.type(screen.getByLabelText('Buscar venta'), 'Luis');
+        await openAdvanced();
+        await userEvent.type(screen.getByLabelText('Total desde'), '1500');
+        await vi.waitFor(() => expect(JSON.parse(localStorage.getItem(STORE) ?? '{}')).toMatchObject({ status: 'CANCELED', minTotal: 1500, advancedOpen: true }));
+        first.fixture.destroy();
+        TestBed.resetTestingModule(); // otra visita: se vuelve a construir todo desde cero
+
+        await renderPage();
+        expect(await screen.findByRole('combobox', { name: 'Estado de la venta' })).toHaveTextContent('Anulada');
+        expect(screen.getByLabelText('Total desde')).toHaveValue(1500); // el panel queda abierto como se dejó
+        expect(screen.getByLabelText('Buscar venta')).toHaveValue('');
+        await screen.findByText('#2');
+        expect(ids()).toEqual(['2']);
+      });
+
+      it('un rango de fechas recordado se aplica y se ve como etiqueta', async () => {
+        useSession('MANAGER', 10);
+        localStorage.setItem(STORE, JSON.stringify({ from: new Date(2026, 9, 12).toISOString(), to: new Date(2026, 9, 13).toISOString() }));
+        stub();
+        await renderPage();
+        await screen.findByText('#2');
+        expect(ids().sort()).toEqual(['2', '3']); // 12 y 13 de octubre, completos
+        const chips = screen.getByRole('group', { name: 'Filtros aplicados' });
+        expect(chips).toHaveTextContent('Desde:');
+        expect(chips).toHaveTextContent('Hasta:');
+      });
+
+      it('un filtro recordado que ya no coincide con nada sigue a la vista y se puede quitar', async () => {
+        useSession('MANAGER', 10);
+        localStorage.setItem(STORE, JSON.stringify({ seller: 'Ana la que ya no trabaja' }));
+        stub();
+        await renderPage();
+        expect(await screen.findByText('Ninguna venta coincide')).toBeInTheDocument();
+        await userEvent.click(screen.getByRole('button', { name: /Quitar filtro Vendedor/ }));
+        expect(await screen.findByText('#4')).toBeInTheDocument();
+        expect(localStorage.getItem(STORE)).toBeNull(); // volver al valor inicial borra lo guardado
+      });
+
+      it('un valor guardado dañado se ignora (no rompe la pantalla)', async () => {
+        useSession('MANAGER', 10);
+        localStorage.setItem(STORE, JSON.stringify({ status: 'INVENTADO', minTotal: 'abc', from: 'no es fecha' }));
+        stub();
+        await renderPage();
+        expect(await screen.findByText('#4')).toBeInTheDocument();
+        expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
+      });
+
+      it('el panel abierto no tiene problemas de accesibilidad detectables', async () => {
+        useSession('MANAGER', 10);
+        stub();
+        await renderPage();
+        await screen.findByText('#4');
+        await openAdvanced();
+        await expectAccessible();
+      });
+    });
+
     it('si la respuesta de una sucursal anterior llega tarde, no pisa la de la elegida', async () => {
       useSession('ADMIN');
       stub();

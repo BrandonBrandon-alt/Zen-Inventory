@@ -5,7 +5,7 @@
   }
 </header>
 
-<div class="mb-4 flex animate-enter-delayed flex-wrap items-center gap-3">
+<div class="mb-3 flex animate-enter-delayed flex-wrap items-center gap-3">
   <div class="w-72 max-w-full">
     <app-form-field>
       <input appInput type="search" placeholder="Buscar por n.º, cliente, documento o vendedor…" aria-label="Buscar venta" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
@@ -20,7 +20,20 @@
       <app-select [(value)]="branchFilter" [options]="branchOptions()" [icon]="storeIcon" ariaLabel="Sucursal" />
     </div>
   }
+  <div class="w-44"><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
+  <div class="w-44"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
+  <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
+    <app-select [(value)]="sellerFilter" [options]="sellerOptions()" ariaLabel="Vendedor" />
+    <app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" />
+    <app-form-field label="Total desde">
+      <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="minTotal() ?? ''" (input)="minTotal.set(numberFromInput($event))" />
+    </app-form-field>
+    <app-form-field label="Total hasta">
+      <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="maxTotal() ?? ''" (input)="maxTotal.set(numberFromInput($event))" />
+    </app-form-field>
+  </app-advanced-filters>
 </div>
+<app-active-filters class="mb-4 animate-enter-delayed" [filters]="activeFilters()" (removed)="removeFilter($event)" (cleared)="clearFilters()" />
 
 <app-data-table
   exportName="ventas"
@@ -33,8 +46,8 @@
   [error]="error()"
   [pageSize]="10"
   [clickableRows]="true"
-  [emptyTitle]="search() || statusFilter() !== 'all' ? 'Ninguna venta coincide' : 'Todavía no hay ventas'"
-  [emptyDescription]="search() || statusFilter() !== 'all' ? 'Prueba con otra búsqueda o estado.' : 'Las ventas que registres en el punto de venta aparecerán aquí.'"
+  [emptyTitle]="activeFilters().length > 0 ? 'Ninguna venta coincide' : 'Todavía no hay ventas'"
+  [emptyDescription]="activeFilters().length > 0 ? 'Prueba quitando algún filtro.' : 'Las ventas que registres en el punto de venta aparecerán aquí.'"
   minWidth="52rem"
   (rowClick)="openDetail($event)"
   (retry)="load()"
