@@ -7,6 +7,7 @@ import {
   LucideHash,
   LucideListFilter,
   LucidePlus,
+  LucideSearch,
   LucideStore,
   LucideTruck,
   LucideWallet,
@@ -16,9 +17,15 @@ import { toApiError } from '@core/api/api-error';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { CatalogOptionsApi, type ProductOption, type SupplierOption } from '@core/catalog/catalog-options-api';
-import { formatDateTime, formatMoney } from '@shared/format/format';
+import { formatDateTime, formatMoney, normalizeText } from '@shared/format/format';
+import { inDateRange, inNumberRange, numberFromInput, optionsFrom } from '@shared/filters/filter-helpers';
+import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
+import { DatePicker } from '@shared/ui/date-picker/date-picker';
+import { ActiveFilters, type ActiveFilter } from '@shared/ui/filters/active-filters';
+import { AdvancedFilters } from '@shared/ui/filters/advanced-filters';
+import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
@@ -26,7 +33,7 @@ import { PurchaseDetailModal } from '../../components/purchase-detail-modal/purc
 import { PurchaseFormModal } from '../../components/purchase-form-modal/purchase-form-modal';
 import { OPEN_RECEPTIONS, PAYMENT_INFO, RECEPTION_INFO } from '../../data-access/purchase-labels';
 import { purchaseActions } from '../../data-access/purchase-permissions';
-import { type Purchase, PurchasesApi, RECEPTION_STATUSES, type ReceptionStatus } from '../../data-access/purchases-api';
+import { PAYMENT_STATUSES, type PaymentStatus, type Purchase, PurchasesApi, RECEPTION_STATUSES, type ReceptionStatus } from '../../data-access/purchases-api';
 
 /** Fila de la tabla: la orden con los textos que se muestran y se ordenan. */
 interface PurchaseRow extends Purchase {
@@ -38,10 +45,11 @@ interface PurchaseRow extends Purchase {
 }
 
 const rowKey = (row: PurchaseRow): number => row.id;
+const DAY = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' });
 
 @Component({
   selector: 'app-purchases-page',
-  imports: [DataTable, DataTableCell, Badge, Button, Select, Tooltip, PurchaseDetailModal, PurchaseFormModal, LucideEye, LucidePlus],
+  imports: [DataTable, DataTableCell, Badge, Button, DatePicker, ActiveFilters, AdvancedFilters, FormField, InputDirective, Select, Tooltip, PurchaseDetailModal, PurchaseFormModal, LucideEye, LucidePlus, LucideSearch],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './purchases-page.html',
@@ -54,6 +62,7 @@ export class PurchasesPage {
 
   protected readonly rowKey = rowKey;
   protected readonly filterIcon = LucideListFilter.icon;
+  protected readonly paymentIcon = LucideWallet.icon;
   protected readonly role = this.auth.role;
   protected readonly isAdmin = computed(() => this.role() === 'ADMIN');
 
@@ -64,7 +73,21 @@ export class PurchasesPage {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
-  protected readonly statusFilter = signal<'open' | 'all' | ReceptionStatus>('open');
+  // Los filtros se recuerdan por persona (la búsqueda de texto no: se escribe cada vez).
+  private static readonly SCREEN = 'purchases';
+  protected readonly search = signal('');
+  protected readonly statusFilter = persistedFilter(PurchasesPage.SCREEN, 'status', 'open' as 'open' | 'all' | ReceptionStatus, codecs.oneOf(['open', 'all', ...RECEPTION_STATUSES] as const));
+  protected readonly paymentFilter = persistedFilter(PurchasesPage.SCREEN, 'payment', null as PaymentStatus | null, codecs.nullable(codecs.oneOf(PAYMENT_STATUSES)));
+  protected readonly from = persistedFilter(PurchasesPage.SCREEN, 'from', null as Date | null, codecs.nullable(codecs.date()));
+  protected readonly to = persistedFilter(PurchasesPage.SCREEN, 'to', null as Date | null, codecs.nullable(codecs.date()));
+  protected readonly supplierFilter = persistedFilter(PurchasesPage.SCREEN, 'supplier', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly branchFilter = persistedFilter(PurchasesPage.SCREEN, 'branch', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly productFilter = persistedFilter(PurchasesPage.SCREEN, 'product', null as string | null, codecs.nullable(codecs.text()));
+  protected readonly minTotal = persistedFilter(PurchasesPage.SCREEN, 'minTotal', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly maxTotal = persistedFilter(PurchasesPage.SCREEN, 'maxTotal', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly onlyMine = persistedFilter(PurchasesPage.SCREEN, 'onlyMine', false, codecs.bool());
+  protected readonly advancedOpen = persistedFilter(PurchasesPage.SCREEN, 'advancedOpen', false, codecs.bool());
+  protected readonly numberFromInput = numberFromInput;
 
   protected readonly formOpen = signal(false);
   protected readonly detailOpen = signal(false);
@@ -75,6 +98,20 @@ export class PurchasesPage {
     { value: 'all', label: 'Todas' },
     ...RECEPTION_STATUSES.map((value) => ({ value, label: RECEPTION_INFO[value].label, icon: RECEPTION_INFO[value].icon })),
   ];
+
+  protected readonly paymentOptions: readonly SelectOption<PaymentStatus | null>[] = [
+    { value: null, label: 'Todos los pagos' },
+    ...PAYMENT_STATUSES.map((value) => ({ value, label: PAYMENT_INFO[value].label, icon: PAYMENT_INFO[value].icon })),
+  ];
+  protected readonly supplierOptions = computed<SelectOption<number | null>[]>(() => [
+    { value: null, label: 'Todos los proveedores' },
+    ...this.suppliers().map((s) => ({ value: s.id, label: s.nombre })),
+  ]);
+  protected readonly branchOptions = computed<SelectOption<number | null>[]>(() => [
+    { value: null, label: 'Todas las sucursales' },
+    ...this.branches().map((b) => ({ value: b.id, label: b.nombre })),
+  ]);
+  protected readonly productOptions = computed(() => optionsFrom(this.purchases().flatMap((p) => p.lines.map((l) => this.productNames().get(l.productId) ?? `Producto ${l.productId}`)), this.productFilter(), 'Todos los productos'));
 
   private readonly supplierNames = computed(() => new Map(this.suppliers().map((s) => [s.id, s.nombre])));
   private readonly branchNames = computed(() => new Map(this.branches().map((b) => [b.id, b.nombre])));
@@ -95,8 +132,27 @@ export class PurchasesPage {
     const status = this.statusFilter();
     const suppliers = this.supplierNames();
     const branches = this.branchNames();
+    const names = this.productNames();
+    const needle = normalizeText(this.search().trim());
+    const { payment, from, to, supplier, branch, product, minTotal, maxTotal } = {
+      payment: this.paymentFilter(),
+      from: this.from(),
+      to: this.to(),
+      supplier: this.supplierFilter(),
+      branch: this.isAdmin() ? this.branchFilter() : null,
+      product: this.productFilter(),
+      minTotal: this.minTotal(),
+      maxTotal: this.maxTotal(),
+    };
     return this.purchases()
       .filter((p) => (status === 'open' ? OPEN_RECEPTIONS.includes(p.reception) : status === 'all' || p.reception === status))
+      .filter((p) => payment === null || p.payment === payment)
+      .filter((p) => inDateRange(p.requestDate, from, to))
+      .filter((p) => supplier === null || p.supplierId === supplier)
+      .filter((p) => branch === null || p.branchId === branch)
+      .filter((p) => product === null || p.lines.some((l) => (names.get(l.productId) ?? `Producto ${l.productId}`) === product))
+      .filter((p) => inNumberRange(p.total, minTotal, maxTotal))
+      .filter((p) => !needle || normalizeText(`${p.id} ${suppliers.get(p.supplierId) ?? ''}`).includes(needle))
       .map((p) => {
         const actions = purchaseActions(p, this.role());
         return {
@@ -108,7 +164,31 @@ export class PurchasesPage {
           // Le toca a quien mira: aprobar una orden, o recibir la que ya viene en camino.
           needsMe: actions.approve || (actions.receive && p.reception === 'IN_TRANSIT'),
         };
-      });
+      })
+      .filter((r) => !this.onlyMine() || r.needsMe);
+  });
+
+  /** Los filtros del panel «Más filtros» que están aplicados (el botón muestra cuántos). */
+  protected readonly advancedCount = computed(
+    () => [this.supplierFilter() !== null, this.isAdmin() && this.branchFilter() !== null, this.productFilter() !== null, this.minTotal() !== null, this.maxTotal() !== null, this.onlyMine()].filter(Boolean).length,
+  );
+
+  /** Todos los filtros aplicados (menos el estado «En curso», que es el de siempre), para mostrarlos como etiquetas. */
+  protected readonly activeFilters = computed<ActiveFilter[]>(() => {
+    const list: ActiveFilter[] = [];
+    const status = this.statusFilter();
+    if (status !== 'open') list.push({ id: 'status', label: 'Estado', text: status === 'all' ? 'Todas' : RECEPTION_INFO[status].label });
+    if (this.paymentFilter() !== null) list.push({ id: 'payment', label: 'Pago', text: PAYMENT_INFO[this.paymentFilter()!].label });
+    if (this.from() !== null) list.push({ id: 'from', label: 'Desde', text: DAY.format(this.from()!) });
+    if (this.to() !== null) list.push({ id: 'to', label: 'Hasta', text: DAY.format(this.to()!) });
+    if (this.supplierFilter() !== null) list.push({ id: 'supplier', label: 'Proveedor', text: this.supplierNames().get(this.supplierFilter()!) ?? `Proveedor ${this.supplierFilter()}` });
+    if (this.isAdmin() && this.branchFilter() !== null) list.push({ id: 'branch', label: 'Sucursal', text: this.branchNames().get(this.branchFilter()!) ?? `Sede ${this.branchFilter()}` });
+    if (this.productFilter() !== null) list.push({ id: 'product', label: 'Producto', text: this.productFilter()! });
+    if (this.minTotal() !== null) list.push({ id: 'minTotal', label: 'Total desde', text: formatMoney(this.minTotal()) });
+    if (this.maxTotal() !== null) list.push({ id: 'maxTotal', label: 'Total hasta', text: formatMoney(this.maxTotal()) });
+    if (this.onlyMine()) list.push({ id: 'onlyMine', label: 'Solo las que', text: 'esperan mi acción' });
+    if (this.search().trim()) list.push({ id: 'search', label: 'Búsqueda', text: this.search().trim() });
+    return list;
   });
 
   protected readonly selected = computed(() => this.purchases().find((p) => p.id === this.selectedId()) ?? null);
@@ -145,6 +225,30 @@ export class PurchasesPage {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  protected onSearch(event: Event): void {
+    this.search.set((event.target as HTMLInputElement).value);
+  }
+
+  protected removeFilter(id: string): void {
+    switch (id) {
+      case 'status': this.statusFilter.set('open'); break;
+      case 'payment': this.paymentFilter.set(null); break;
+      case 'from': this.from.set(null); break;
+      case 'to': this.to.set(null); break;
+      case 'supplier': this.supplierFilter.set(null); break;
+      case 'branch': this.branchFilter.set(null); break;
+      case 'product': this.productFilter.set(null); break;
+      case 'minTotal': this.minTotal.set(null); break;
+      case 'maxTotal': this.maxTotal.set(null); break;
+      case 'onlyMine': this.onlyMine.set(false); break;
+      case 'search': this.search.set(''); break;
+    }
+  }
+
+  protected clearFilters(): void {
+    for (const filter of this.activeFilters()) this.removeFilter(filter.id);
   }
 
   protected openDetail(row: PurchaseRow): void {

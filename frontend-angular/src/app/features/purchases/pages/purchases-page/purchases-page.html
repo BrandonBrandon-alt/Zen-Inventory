@@ -10,11 +10,38 @@
   <button appButton type="button" (click)="formOpen.set(true)"><svg lucidePlus [size]="16" />Nueva orden de compra</button>
 </header>
 
-<div class="mb-4 flex animate-enter-delayed flex-wrap items-center gap-3">
+<div class="mb-3 flex animate-enter-delayed flex-wrap items-center gap-3">
+  <div class="w-64 max-w-full">
+    <app-form-field>
+      <input appInput type="search" placeholder="Buscar por n.º o proveedor…" aria-label="Buscar orden" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
+      <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
+    </app-form-field>
+  </div>
   <div class="w-56">
     <app-select [(value)]="statusFilter" [options]="statusOptions" [icon]="filterIcon" ariaLabel="Estado de la orden" />
   </div>
+  <div class="w-52"><app-select [(value)]="paymentFilter" [options]="paymentOptions" [icon]="paymentIcon" ariaLabel="Estado del pago" /></div>
+  <div class="w-44"><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
+  <div class="w-44"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
+  <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
+    <app-select [(value)]="supplierFilter" [options]="supplierOptions()" ariaLabel="Proveedor" searchable searchPlaceholder="Buscar proveedor…" />
+    @if (isAdmin()) {
+      <app-select [(value)]="branchFilter" [options]="branchOptions()" ariaLabel="Sucursal" />
+    }
+    <app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" />
+    <app-form-field label="Total desde">
+      <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="minTotal() ?? ''" (input)="minTotal.set(numberFromInput($event))" />
+    </app-form-field>
+    <app-form-field label="Total hasta">
+      <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="maxTotal() ?? ''" (input)="maxTotal.set(numberFromInput($event))" />
+    </app-form-field>
+    <label class="flex items-center gap-2 text-sm text-fg-muted">
+      <input type="checkbox" class="size-4 accent-[var(--brand-500)]" [checked]="onlyMine()" (change)="onlyMine.set($any($event.target).checked)" />
+      Solo las que esperan mi acción
+    </label>
+  </app-advanced-filters>
 </div>
+<app-active-filters class="mb-4 animate-enter-delayed" [filters]="activeFilters()" (removed)="removeFilter($event)" (cleared)="clearFilters()" />
 
 <app-data-table
   exportName="compras"
@@ -27,8 +54,8 @@
   [error]="error()"
   [pageSize]="10"
   [clickableRows]="true"
-  [emptyTitle]="statusFilter() === 'open' ? 'No hay órdenes en curso' : 'Ninguna orden coincide'"
-  [emptyDescription]="statusFilter() === 'open' ? 'Crea una orden para pedir mercancía a un proveedor.' : 'Prueba con otro estado.'"
+  [emptyTitle]="activeFilters().length === 0 ? 'No hay órdenes en curso' : 'Ninguna orden coincide'"
+  [emptyDescription]="activeFilters().length === 0 ? 'Crea una orden para pedir mercancía a un proveedor.' : 'Prueba quitando algún filtro.'"
   minWidth="54rem"
   (rowClick)="openDetail($event)"
   (retry)="load()"

@@ -368,6 +368,104 @@ describe('PurchasesPage', () => {
     });
   });
 
+  describe('filtros', () => {
+    const STORE = 'zen:filters:1:purchases';
+    const ids = () => screen.queryAllByRole('row').slice(1).map((r) => /#(\d+)/.exec(r.textContent ?? '')?.[1]);
+    const openAdvanced = async () => userEvent.click(await screen.findByRole('button', { name: /Más filtros/ }));
+
+    it('busca por número o por proveedor', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      await renderPage();
+      await screen.findByText('#1');
+      await userEvent.type(screen.getByLabelText('Buscar orden'), 'aceros');
+      expect(ids()).toEqual(['1']); // Aceros del Sur
+      await userEvent.clear(screen.getByLabelText('Buscar orden'));
+      await userEvent.type(screen.getByLabelText('Buscar orden'), '3');
+      expect(ids()).toEqual(['3']);
+    });
+
+    it('filtra por proveedor, por producto, por rango de total y por «solo las que esperan mi acción»', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      await renderPage();
+      await screen.findByText('#1');
+      expect(ids().sort()).toEqual(['1', '2', '3', '4']); // en curso
+      await openAdvanced();
+      await chooseOption('Proveedor', 'Ferretería Central');
+      expect(ids().sort()).toEqual(['2', '3', '4']);
+      await chooseOption('Producto', 'Tuerca');
+      expect(ids()).toEqual(['4']);
+      await chooseOption('Producto', 'Todos los productos');
+      await userEvent.type(screen.getByLabelText('Total desde'), '1100');
+      expect(ids()).toEqual(['4']); // total 1200
+      await userEvent.clear(screen.getByLabelText('Total desde'));
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Solo las que esperan mi acción' }));
+      expect(ids()).toEqual(['3']); // al gerente le toca recibir la que va en camino (la #4 ya tiene recepción parcial)
+    });
+
+    it('filtra por estado del pago y lo dice cuando nada coincide', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      await renderPage();
+      await screen.findByText('#1');
+      await chooseOption('Estado del pago', 'Pagada');
+      expect(await screen.findByText('Ninguna orden coincide')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro Pago: Pagada' }));
+      expect(ids().length).toBe(4);
+    });
+
+    it('el estado «En curso» es el de siempre: no sale como etiqueta; otro estado sí y se quita', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      await renderPage();
+      await screen.findByText('#1');
+      expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
+      await chooseOption('Estado de la orden', 'Todas');
+      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro Estado: Todas' }));
+      expect(screen.getByRole('combobox', { name: 'Estado de la orden' })).toHaveTextContent('En curso');
+    });
+
+    it('recuerda los filtros la próxima vez que se entra, pero no la búsqueda', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      const first = await renderPage();
+      await screen.findByText('#1');
+      await chooseOption('Estado de la orden', 'Todas');
+      await openAdvanced();
+      await chooseOption('Proveedor', 'Aceros del Sur');
+      await userEvent.type(screen.getByLabelText('Buscar orden'), '1');
+      await vi.waitFor(() => expect(JSON.parse(localStorage.getItem(STORE) ?? '{}')).toMatchObject({ status: 'all', supplier: 101, advancedOpen: true }));
+      first.fixture.destroy();
+      TestBed.resetTestingModule(); // otra visita
+
+      await renderPage();
+      await screen.findByText('#1');
+      await vi.waitFor(() => expect(screen.getByRole('combobox', { name: 'Proveedor' })).toHaveTextContent('Aceros del Sur'));
+      expect(screen.getByRole('combobox', { name: 'Estado de la orden' })).toHaveTextContent('Todas');
+      expect(screen.getByLabelText('Buscar orden')).toHaveValue('');
+      expect(ids()).toEqual(['1']);
+    });
+
+    it('un valor guardado dañado se ignora', async () => {
+      useSession('MANAGER', 10);
+      localStorage.setItem(STORE, JSON.stringify({ status: 'INVENTADO', payment: 5, minTotal: 'x', supplier: 'no' }));
+      stub();
+      await renderPage();
+      expect(await screen.findByText('#1')).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
+    });
+
+    it('el panel abierto no tiene problemas de accesibilidad detectables', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await screen.findByText('#1');
+      await openAdvanced();
+      await expectAccessible();
+    });
+  });
+
   describe('nueva orden', () => {
     it('propone el plazo del proveedor y el precio pactado, calcula el total y envía la orden', async () => {
       useSession('MANAGER', 10);
