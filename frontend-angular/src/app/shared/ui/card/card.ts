@@ -23,7 +23,7 @@ let nextId = 0;
   host: { class: 'block', role: 'region', '[attr.aria-labelledby]': 'titleId' },
   template: `
     <div [class]="frame()">
-      <header class="flex items-start justify-between gap-4">
+      <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
           <h2 [id]="titleId" class="font-title text-xl font-bold tracking-tight text-fg">{{ title() }}</h2>
           @if (description(); as text) {
@@ -31,7 +31,7 @@ let nextId = 0;
           }
         </div>
         <div class="flex shrink-0 items-center gap-2 empty:hidden"><ng-content select="[data-slot=actions]" /></div>
-      </header>
+      </div>
       <div class="mt-4"><ng-content /></div>
     </div>
   `,

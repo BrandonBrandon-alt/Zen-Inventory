@@ -10,6 +10,7 @@ import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
 import { NotificationService } from '@core/notifications/notification.service';
 import { chooseOption } from '@testing/select-helpers';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
+import { expectAccessible } from '@testing/a11y';
 import { CompanyInfo, DEFAULT_COMPANY } from '@core/company/company-info';
 import { PrintService } from '@shared/print/print.service';
 import { SalesHistoryPage } from './sales-history-page';
@@ -74,6 +75,14 @@ describe('SalesHistoryPage', () => {
   afterEach(() => localStorage.clear());
 
   describe('lista', () => {
+    it('no tiene problemas de accesibilidad detectables', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      await renderPage();
+      await vi.waitFor(() => expect(screen.getAllByRole('row').length).toBeGreaterThan(1));
+      await expectAccessible();
+    });
+
     it('muestra las ventas, la más reciente primero, con cliente, estado en texto y total', async () => {
       useSession('MANAGER', 10);
       stub();

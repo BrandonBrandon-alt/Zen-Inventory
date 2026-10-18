@@ -54,6 +54,7 @@ let nextId = 0;
 
         <app-tabs [tabs]="typeTabs" [active]="type()" (activeChange)="setType($event)" idPrefix="adjust" ariaLabel="Tipo de movimiento" />
 
+        <div role="tabpanel" class="flex flex-col gap-4" [id]="'adjust-panel-' + type()" [attr.aria-labelledby]="'adjust-tab-' + type()">
         <app-form-field label="Motivo" [error]="error('reason')">
           <app-select formControlName="reason" [options]="reasonOptions()" placeholder="Selecciona un motivo" />
         </app-form-field>
@@ -96,6 +97,7 @@ let nextId = 0;
           <textarea appInput rows="3" formControlName="observations" [attr.maxlength]="500"></textarea>
         </app-form-field>
         }
+        </div>
       </form>
       <div data-slot="footer">
         <button appButton variant="ghost" type="button" [disabled]="saving()" (click)="open.set(false)">Cancelar</button>

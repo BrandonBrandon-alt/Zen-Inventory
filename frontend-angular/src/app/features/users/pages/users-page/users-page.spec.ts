@@ -9,6 +9,7 @@ import { errorInterceptor } from '@core/api/error.interceptor';
 import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
 import { NotificationService } from '@core/notifications/notification.service';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
+import { expectAccessible } from '@testing/a11y';
 import { UsersPage } from './users-page';
 
 const URL = `${TEST_API}/api/users`;
@@ -69,6 +70,14 @@ describe('UsersPage', () => {
   });
 
   describe('listado', () => {
+    it('no tiene problemas de accesibilidad detectables', async () => {
+      useSession('ADMIN', 1);
+      stub();
+      await renderPage();
+      await vi.waitFor(() => expect(screen.getAllByRole('row').length).toBeGreaterThan(1));
+      await expectAccessible();
+    });
+
     it('muestra usuarios con rol, nombre de la sucursal y estado en texto', async () => {
       useSession('ADMIN', 1);
       stub();

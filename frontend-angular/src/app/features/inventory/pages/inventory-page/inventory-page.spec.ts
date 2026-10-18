@@ -10,6 +10,7 @@ import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
 import { NotificationService } from '@core/notifications/notification.service';
 import { chooseOption } from '@testing/select-helpers';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
+import { expectAccessible } from '@testing/a11y';
 import { InventoryPage } from './inventory-page';
 
 const PRODUCTS = [
@@ -59,6 +60,14 @@ describe('InventoryPage', () => {
   });
 
   describe('existencias', () => {
+    it('no tiene problemas de accesibilidad detectables', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await vi.waitFor(() => expect(screen.getAllByRole('row').length).toBeGreaterThan(1));
+      await expectAccessible();
+    });
+
     it('lista los productos activos con su stock, marca crítico y agotado, y resume', async () => {
       useSession('ADMIN');
       stub();

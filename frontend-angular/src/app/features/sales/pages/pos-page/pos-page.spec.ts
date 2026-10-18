@@ -8,6 +8,7 @@ import { errorInterceptor } from '@core/api/error.interceptor';
 import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
 import { chooseOption } from '@testing/select-helpers';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
+import { expectAccessible } from '@testing/a11y';
 import { CompanyInfo, DEFAULT_COMPANY } from '@core/company/company-info';
 import { PrintService } from '@shared/print/print.service';
 import { PosPage } from './pos-page';
@@ -77,6 +78,14 @@ describe('PosPage', () => {
   afterEach(() => localStorage.clear());
 
   describe('productos', () => {
+    it('no tiene problemas de accesibilidad detectables', async () => {
+      useSession('SELLER', 10);
+      stub();
+      await renderPage();
+      await screen.findByRole('button', { name: 'Agregar Tornillo' });
+      await expectAccessible();
+    });
+
     it('lista los productos activos con su precio y existencias en la sucursal', async () => {
       useSession('SELLER', 10);
       stub();

@@ -12,6 +12,7 @@ import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
 import { NotificationService } from '@core/notifications/notification.service';
 import { chooseOption } from '@testing/select-helpers';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
+import { expectAccessible } from '@testing/a11y';
 import { AlertsPage } from './alerts-page';
 
 const ALERTS = [
@@ -72,6 +73,14 @@ describe('AlertsPage', () => {
   afterEach(() => localStorage.clear());
 
   describe('lista', () => {
+    it('no tiene problemas de accesibilidad detectables', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await vi.waitFor(() => expect(screen.getAllByRole('row').length).toBeGreaterThan(1));
+      await expectAccessible();
+    });
+
     it('muestra las alertas con su tipo (en texto), producto por nombre y la más reciente primero', async () => {
       useSession('ADMIN');
       stub();
@@ -226,6 +235,18 @@ describe('AlertsPage', () => {
       await userEvent.click(screen.getAllByRole('button', { name })[0]);
       return screen.getByRole('dialog', { name: 'Resolver alerta' });
     };
+
+    it('el diálogo de resolver no tiene problemas de accesibilidad en ninguna de sus pestañas', async () => {
+      useSession('MANAGER');
+      stub();
+      await renderPage();
+      const dialog = await open('Resolver alerta de Tornillo');
+      await expectAccessible(dialog);
+      for (const tab of within(dialog).getAllByRole('tab')) {
+        await userEvent.click(tab);
+        await expectAccessible(dialog);
+      }
+    });
 
     it('pidiendo a otra sucursal: no ofrece la propia ni las inactivas y envía la solicitud', async () => {
       useSession('MANAGER');

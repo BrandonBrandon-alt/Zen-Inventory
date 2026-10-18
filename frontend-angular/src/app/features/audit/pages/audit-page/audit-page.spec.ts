@@ -9,6 +9,7 @@ import { errorInterceptor } from '@core/api/error.interceptor';
 import { NotificationService } from '@core/notifications/notification.service';
 import { chooseOption } from '@testing/select-helpers';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
+import { expectAccessible } from '@testing/a11y';
 import { AuditPage } from './audit-page';
 
 const movement = (id: number, extra: object = {}) => ({
@@ -67,6 +68,13 @@ describe('AuditPage', () => {
   afterEach(() => vi.restoreAllMocks());
 
   describe('lista', () => {
+    it('no tiene problemas de accesibilidad detectables', async () => {
+      stub();
+      await renderPage();
+      await vi.waitFor(() => expect(screen.getAllByRole('row').length).toBeGreaterThan(1));
+      await expectAccessible();
+    });
+
     it('muestra los movimientos de todas las sucursales, el más reciente primero, con nombres en lugar de códigos', async () => {
       stub();
       await renderPage();

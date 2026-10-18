@@ -10,6 +10,7 @@ import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
 import { NotificationService } from '@core/notifications/notification.service';
 import { chooseOption } from '@testing/select-helpers';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
+import { expectAccessible } from '@testing/a11y';
 import { PurchasesPage } from './purchases-page';
 
 const detail = (id: number, productId: number, quantity: number, unitPrice: number, discountPct = 0, receivedQuantity = 0) => ({
@@ -87,6 +88,14 @@ describe('PurchasesPage', () => {
   afterEach(() => localStorage.clear());
 
   describe('lista', () => {
+    it('no tiene problemas de accesibilidad detectables', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      await renderPage();
+      await vi.waitFor(() => expect(screen.getAllByRole('row').length).toBeGreaterThan(1));
+      await expectAccessible();
+    });
+
     it('muestra por defecto las órdenes en curso, con proveedor por nombre, estado y total', async () => {
       useSession('MANAGER', 10);
       stub();

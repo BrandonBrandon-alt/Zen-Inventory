@@ -9,6 +9,7 @@ import { API_BASE_URL } from '@core/api/api-base-url';
 import { errorInterceptor } from '@core/api/error.interceptor';
 import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
 import { NotificationService } from '@core/notifications/notification.service';
+import { expectAccessible } from '@testing/a11y';
 import { chooseOption } from '@testing/select-helpers';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
 import type { InventoryItem } from '../../data-access/inventory-api';
@@ -58,6 +59,15 @@ describe('AdjustStockModal', () => {
   afterEach(() => {
     localStorage.clear();
     document.body.style.overflow = '';
+  });
+
+  describe('accesibilidad', () => {
+    it('el formulario de ajuste y el aviso de otra pantalla no tienen problemas detectables', async () => {
+      await setup();
+      await expectAccessible();
+      await chooseOption('Motivo', 'Compra a proveedor');
+      await expectAccessible();
+    });
   });
 
   describe('movimientos que se registran en otra pantalla', () => {

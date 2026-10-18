@@ -40,6 +40,7 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/user-event": "^14.6.7",
     "angular-eslint": "22.6.0",
+    "axe-core": "^4.14.0",
     "eslint": "^10.12.0",
     "jsdom": "^30.0.0",
     "msw": "^3.0.3",

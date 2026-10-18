@@ -8,6 +8,7 @@ import { API_BASE_URL } from '@core/api/api-base-url';
 import { errorInterceptor } from '@core/api/error.interceptor';
 import { NotificationService } from '@core/notifications/notification.service';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
+import { expectAccessible } from '@testing/a11y';
 import { UnitsPage } from './units-page';
 
 const UNITS = [
@@ -22,6 +23,13 @@ const renderPage = () =>
 const names = () => screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0].textContent?.trim());
 
 describe('UnitsPage', () => {
+  it('no tiene problemas de accesibilidad detectables', async () => {
+    server.use(http.get(URL, () => HttpResponse.json(UNITS)));
+    await renderPage();
+    await vi.waitFor(() => expect(screen.getAllByRole('row').length).toBeGreaterThan(1));
+    await expectAccessible();
+  });
+
   it('lista las unidades con su abreviatura y el resumen', async () => {
     server.use(http.get(URL, () => HttpResponse.json(UNITS)));
     await renderPage();

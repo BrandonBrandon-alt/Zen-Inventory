@@ -9,6 +9,7 @@ import { errorInterceptor } from '@core/api/error.interceptor';
 import { NotificationService } from '@core/notifications/notification.service';
 import { chooseOption } from '@testing/select-helpers';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
+import { expectAccessible } from '@testing/a11y';
 import { ProductsPage } from './products-page';
 
 const PRODUCTS = [
@@ -55,6 +56,13 @@ const skus = () => screen.getAllByRole('row').slice(1).map((r) => within(r).getA
 
 describe('ProductsPage', () => {
   describe('lista', () => {
+    it('no tiene problemas de accesibilidad detectables', async () => {
+      stub();
+      await renderPage();
+      await vi.waitFor(() => expect(screen.getAllByRole('row').length).toBeGreaterThan(1));
+      await expectAccessible();
+    });
+
     it('muestra los productos con unidad, precios, proveedor preferido y estado en texto', async () => {
       stub();
       await renderPage();

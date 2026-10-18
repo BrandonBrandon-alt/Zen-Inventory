@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthStore } from '@core/auth/session/auth-store';
+import { expectAccessible } from '@testing/a11y';
 import { BranchLabelApi } from '../data-access/branch-label-api';
 import { MobileMenu } from '../mobile-menu';
 import { Shell } from './shell';
@@ -35,6 +36,11 @@ describe('Shell', () => {
   afterEach(() => delete (window as { matchMedia?: unknown }).matchMedia);
 
   describe('escritorio', () => {
+    it('el menú y la estructura de la página no tienen problemas de accesibilidad detectables', async () => {
+      await renderShell(true);
+      await expectAccessible();
+    });
+
     it('muestra el menú siempre y no hay barra superior ni botón de menú', async () => {
       const { sidebar } = await renderShell(true);
       expect(sidebar).not.toHaveAttribute('inert');

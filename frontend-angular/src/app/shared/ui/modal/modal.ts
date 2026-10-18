@@ -63,21 +63,21 @@ let scrollLocks = 0;
       (click)="onDialogClick($event)"
     >
       <div class="flex max-h-[85dvh] flex-col">
-        <header class="px-6 pt-6 pb-4" [class.pr-14]="dismissible()">
+        <div class="px-6 pt-6 pb-4" [class.pr-14]="dismissible()">
           <h2 [id]="titleId" class="font-title text-xl font-bold tracking-tight text-fg">{{ title() }}</h2>
           @if (description(); as text) {
             <p [id]="descriptionId" class="mt-1 text-sm text-fg-subtle">{{ text }}</p>
           }
-        </header>
+        </div>
 
         <div class="flex-1 overflow-y-auto px-6 pb-6"><ng-content /></div>
 
         <!-- Los botones van dentro del contenedor proyectado [data-slot=footer]: es él quien los separa (gap-3). -->
-        <footer
+        <div
           class="border-t border-line px-6 py-4 empty:hidden [&>[data-slot=footer]]:flex [&>[data-slot=footer]]:flex-wrap [&>[data-slot=footer]]:items-center [&>[data-slot=footer]]:justify-end [&>[data-slot=footer]]:gap-3"
         >
           <ng-content select="[data-slot=footer]" />
-        </footer>
+        </div>
       </div>
 
       <!-- Último en el DOM a propósito: el foco inicial cae en el primer campo del contenido, no en la X. -->

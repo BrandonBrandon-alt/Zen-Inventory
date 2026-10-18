@@ -36,7 +36,7 @@ describe('ColumnChart', () => {
   it('al enfocar una columna aparece su descripción', async () => {
     await setup();
     await userEvent.tab();
-    expect(screen.getByRole('tooltip')).toHaveTextContent('Agosto 2026: $ 100');
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Agosto 2026: $ 100');
   });
 
   it('sin datos muestra el mensaje', async () => {
