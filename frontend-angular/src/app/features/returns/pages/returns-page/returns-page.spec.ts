@@ -104,6 +104,89 @@ describe('ReturnsPage', () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => localStorage.clear());
 
+  describe('filtros', () => {
+    const STORE = 'zen:filters:9:returns'; // el usuario de las pruebas de esta pantalla tiene id 9
+    const stubBranch = () => {
+      useSession('MANAGER', 10);
+      stub();
+      server.use(http.get(`${URL_R}/branch/:id`, () => HttpResponse.json(REQUESTS.filter((r) => r.sucursalId === 10))));
+    };
+    const rowIds = () => screen.queryAllByRole('row').slice(1).map((r) => /#(\d+)/.exec(r.textContent ?? '')?.[1]);
+    const openAdvanced = async () => userEvent.click(await screen.findByRole('button', { name: /Más filtros/ }));
+
+    it('busca por número de devolución, de venta o por producto', async () => {
+      stubBranch();
+      await renderPage();
+      await screen.findByText('#1');
+      await chooseOption('Estado de la devolución', 'Todas');
+      await userEvent.type(screen.getByLabelText('Buscar devolución'), 'tuerca');
+      expect(rowIds()).toEqual(['1']); // solo la #1 trae Tuerca
+      await userEvent.clear(screen.getByLabelText('Buscar devolución'));
+      await userEvent.type(screen.getByLabelText('Buscar devolución'), '53'); // venta #53 = devolución #3
+      expect(rowIds()).toEqual(['3']);
+    });
+
+    it('filtra por producto y por rango de valor desde «Más filtros»', async () => {
+      stubBranch();
+      await renderPage();
+      await screen.findByText('#1');
+      await chooseOption('Estado de la devolución', 'Todas');
+      await openAdvanced();
+      await chooseOption('Producto', 'Tuerca');
+      expect(rowIds()).toEqual(['1']);
+      await chooseOption('Producto', 'Todos los productos');
+      await userEvent.type(screen.getByLabelText('Valor desde'), '2400');
+      expect(rowIds()).toEqual(['1']); // 2.500; las otras valen 2.000
+      expect(screen.getByLabelText('1 filtro activo')).toBeInTheDocument();
+    });
+
+    it('el estado «Pendientes» es el de siempre: no sale como etiqueta; otro estado sí y se quita', async () => {
+      stubBranch();
+      await renderPage();
+      await screen.findByText('#1');
+      expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
+      await chooseOption('Estado de la devolución', 'Todas');
+      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro Estado: Todas' }));
+      expect(screen.getByRole('combobox', { name: 'Estado de la devolución' })).toHaveTextContent('Pendientes');
+    });
+
+    it('recuerda los filtros la próxima vez que se entra, pero no la búsqueda', async () => {
+      stubBranch();
+      const first = await renderPage();
+      await screen.findByText('#1');
+      await chooseOption('Estado de la devolución', 'Todas');
+      await openAdvanced();
+      await chooseOption('Producto', 'Tornillo');
+      await userEvent.type(screen.getByLabelText('Buscar devolución'), '1');
+      await vi.waitFor(() => expect(JSON.parse(localStorage.getItem(STORE) ?? '{}')).toMatchObject({ status: 'all', product: 'Tornillo', advancedOpen: true }));
+      first.fixture.destroy();
+      TestBed.resetTestingModule(); // otra visita
+
+      await renderPage();
+      await screen.findByText('#1');
+      expect(screen.getByRole('combobox', { name: 'Estado de la devolución' })).toHaveTextContent('Todas');
+      await vi.waitFor(() => expect(screen.getByRole('combobox', { name: 'Producto' })).toHaveTextContent('Tornillo'));
+      expect(screen.getByLabelText('Buscar devolución')).toHaveValue('');
+      expect(rowIds().sort()).toEqual(['1', '2', '3']);
+    });
+
+    it('un valor guardado dañado se ignora', async () => {
+      stubBranch();
+      localStorage.setItem(STORE, JSON.stringify({ status: 'INVENTADO', minTotal: 'x', from: 'nada' }));
+      await renderPage();
+      expect(await screen.findByText('#1')).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
+    });
+
+    it('el panel abierto no tiene problemas de accesibilidad detectables', async () => {
+      stubBranch();
+      await renderPage();
+      await screen.findByText('#1');
+      await openAdvanced();
+      await expectAccessible();
+    });
+  });
+
   describe('lista', () => {
     it('no tiene problemas de accesibilidad detectables', async () => {
       useSession('MANAGER', 10);

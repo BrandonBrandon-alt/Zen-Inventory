@@ -1,14 +1,20 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { catchError, firstValueFrom, forkJoin, of } from 'rxjs';
-import { LucideCalendar, LucideCircleCheck, LucideCoins, LucideEye, LucideHash, LucideListFilter, LucidePackage, LucidePlus, LucideReceipt, LucideStore, LucideUser } from '@lucide/angular';
+import { LucideCalendar, LucideCircleCheck, LucideCoins, LucideEye, LucideHash, LucideListFilter, LucidePackage, LucidePlus, LucideReceipt, LucideSearch, LucideStore, LucideUser } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { CatalogOptionsApi, type ProductOption } from '@core/catalog/catalog-options-api';
 import { type UserName, UserOptionsApi } from '@core/users/user-options-api';
-import { formatDateTime, formatMoney } from '@shared/format/format';
+import { formatDateTime, formatMoney, normalizeText } from '@shared/format/format';
+import { inDateRange, inNumberRange, numberFromInput, optionsFrom } from '@shared/filters/filter-helpers';
+import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
+import { DatePicker } from '@shared/ui/date-picker/date-picker';
+import { ActiveFilters, type ActiveFilter } from '@shared/ui/filters/active-filters';
+import { AdvancedFilters } from '@shared/ui/filters/advanced-filters';
+import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
@@ -26,11 +32,12 @@ interface ReturnRow extends ReturnRequest {
   readonly needsMe: boolean;
 }
 
+const DAY = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' });
 const rowKey = (row: ReturnRow): number => row.id;
 
 @Component({
   selector: 'app-returns-page',
-  imports: [DataTable, DataTableCell, Badge, Button, Select, Tooltip, ReturnDetailModal, ReturnFormModal, LucideEye, LucidePlus],
+  imports: [DataTable, DataTableCell, Badge, Button, DatePicker, ActiveFilters, AdvancedFilters, FormField, InputDirective, Select, Tooltip, ReturnDetailModal, ReturnFormModal, LucideEye, LucidePlus, LucideSearch],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './returns-page.html',
@@ -58,7 +65,19 @@ export class ReturnsPage {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
-  protected readonly statusFilter = signal<'all' | ReturnStatus>('PENDIENTE');
+  // Los filtros se recuerdan por persona (la búsqueda de texto no: se escribe cada vez).
+  private static readonly SCREEN = 'returns';
+  protected readonly search = signal('');
+  protected readonly statusFilter = persistedFilter(ReturnsPage.SCREEN, 'status', 'PENDIENTE' as 'all' | ReturnStatus, codecs.oneOf(['all', ...RETURN_STATUSES] as const));
+  protected readonly from = persistedFilter(ReturnsPage.SCREEN, 'from', null as Date | null, codecs.nullable(codecs.date()));
+  protected readonly to = persistedFilter(ReturnsPage.SCREEN, 'to', null as Date | null, codecs.nullable(codecs.date()));
+  protected readonly productFilter = persistedFilter(ReturnsPage.SCREEN, 'product', null as string | null, codecs.nullable(codecs.text()));
+  protected readonly requesterFilter = persistedFilter(ReturnsPage.SCREEN, 'requester', null as string | null, codecs.nullable(codecs.text()));
+  protected readonly branchFilter = persistedFilter(ReturnsPage.SCREEN, 'branch', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly minTotal = persistedFilter(ReturnsPage.SCREEN, 'minTotal', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly maxTotal = persistedFilter(ReturnsPage.SCREEN, 'maxTotal', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly advancedOpen = persistedFilter(ReturnsPage.SCREEN, 'advancedOpen', false, codecs.bool());
+  protected readonly numberFromInput = numberFromInput;
 
   protected readonly formOpen = signal(false);
   protected readonly detailOpen = signal(false);
@@ -69,6 +88,17 @@ export class ReturnsPage {
     { value: 'all', label: 'Todas' },
     ...RETURN_STATUSES.filter((s) => s !== 'PENDIENTE').map((value) => ({ value, label: RETURN_INFO[value].label, icon: RETURN_INFO[value].icon })),
   ];
+
+  protected readonly branchOptions = computed<SelectOption<number | null>[]>(() => [
+    { value: null, label: 'Todas las sucursales' },
+    ...this.branches().map((b) => ({ value: b.id, label: b.nombre })),
+  ]);
+  protected readonly productOptions = computed(() =>
+    optionsFrom(this.requests().flatMap((r) => r.lines.map((l) => this.productNames().get(l.productId) ?? `Producto ${l.productId}`)), this.productFilter(), 'Todos los productos'),
+  );
+  protected readonly requesterOptions = computed(() =>
+    optionsFrom(this.requests().map((r) => (r.requesterId === null ? '' : (this.userNames().get(r.requesterId) ?? `Usuario ${r.requesterId}`))), this.requesterFilter(), 'Todos'),
+  );
 
   private readonly branchNames = computed(() => new Map(this.branches().map((b) => [b.id, b.nombre])));
   protected readonly productNames = computed<ReadonlyMap<number, string>>(() => new Map(this.products().map((p) => [p.id, p.nombre])));
@@ -91,8 +121,26 @@ export class ReturnsPage {
     const branches = this.branchNames();
     const products = this.productNames();
     const users = this.userNames();
+    const needle = normalizeText(this.search().trim());
+    const { from, to, product, requester, branch, minTotal, maxTotal } = {
+      from: this.from(),
+      to: this.to(),
+      product: this.productFilter(),
+      requester: this.requesterFilter(),
+      branch: this.isAdmin() ? this.branchFilter() : null,
+      minTotal: this.minTotal(),
+      maxTotal: this.maxTotal(),
+    };
+    const productName = (id: number) => products.get(id) ?? `Producto ${id}`;
+    const requesterName = (id: number | null) => (id === null ? '—' : (users.get(id) ?? `Usuario ${id}`));
     return this.requests()
       .filter((r) => status === 'all' || r.status === status)
+      .filter((r) => inDateRange(r.requestDate, from, to))
+      .filter((r) => product === null || r.lines.some((l) => productName(l.productId) === product))
+      .filter((r) => requester === null || requesterName(r.requesterId) === requester)
+      .filter((r) => branch === null || r.branchId === branch)
+      .filter((r) => inNumberRange(r.total, minTotal, maxTotal))
+      .filter((r) => !needle || normalizeText(`${r.id} ${r.saleId} ${r.lines.map((l) => productName(l.productId)).join(' ')}`).includes(needle))
       .map((r) => {
         const [first] = r.lines;
         const others = r.lines.length - 1;
@@ -106,6 +154,27 @@ export class ReturnsPage {
           needsMe: this.canDecide() && r.status === 'PENDIENTE',
         };
       });
+  });
+
+  /** Los filtros del panel «Más filtros» que están aplicados (el botón muestra cuántos). */
+  protected readonly advancedCount = computed(
+    () => [this.productFilter() !== null, this.requesterFilter() !== null, this.isAdmin() && this.branchFilter() !== null, this.minTotal() !== null, this.maxTotal() !== null].filter(Boolean).length,
+  );
+
+  /** Todos los filtros aplicados (menos «Pendientes», que es el de siempre), para mostrarlos como etiquetas. */
+  protected readonly activeFilters = computed<ActiveFilter[]>(() => {
+    const list: ActiveFilter[] = [];
+    const status = this.statusFilter();
+    if (status !== 'PENDIENTE') list.push({ id: 'status', label: 'Estado', text: status === 'all' ? 'Todas' : RETURN_INFO[status].label });
+    if (this.from() !== null) list.push({ id: 'from', label: 'Desde', text: DAY.format(this.from()!) });
+    if (this.to() !== null) list.push({ id: 'to', label: 'Hasta', text: DAY.format(this.to()!) });
+    if (this.productFilter() !== null) list.push({ id: 'product', label: 'Producto', text: this.productFilter()! });
+    if (this.requesterFilter() !== null) list.push({ id: 'requester', label: 'Solicitó', text: this.requesterFilter()! });
+    if (this.isAdmin() && this.branchFilter() !== null) list.push({ id: 'branch', label: 'Sucursal', text: this.branchNames().get(this.branchFilter()!) ?? `Sede ${this.branchFilter()}` });
+    if (this.minTotal() !== null) list.push({ id: 'minTotal', label: 'Valor desde', text: formatMoney(this.minTotal()) });
+    if (this.maxTotal() !== null) list.push({ id: 'maxTotal', label: 'Valor hasta', text: formatMoney(this.maxTotal()) });
+    if (this.search().trim()) list.push({ id: 'search', label: 'Búsqueda', text: this.search().trim() });
+    return list;
   });
 
   protected readonly selected = computed(() => this.requests().find((r) => r.id === this.selectedId()) ?? null);
@@ -152,6 +221,28 @@ export class ReturnsPage {
   /** Tras crear o decidir una solicitud se vuelve a pedir la lista (de ahí sale lo que ya se devolvió de cada venta). */
   protected async refresh(): Promise<void> {
     await this.load(true);
+  }
+
+  protected onSearch(event: Event): void {
+    this.search.set((event.target as HTMLInputElement).value);
+  }
+
+  protected removeFilter(id: string): void {
+    switch (id) {
+      case 'status': this.statusFilter.set('PENDIENTE'); break;
+      case 'from': this.from.set(null); break;
+      case 'to': this.to.set(null); break;
+      case 'product': this.productFilter.set(null); break;
+      case 'requester': this.requesterFilter.set(null); break;
+      case 'branch': this.branchFilter.set(null); break;
+      case 'minTotal': this.minTotal.set(null); break;
+      case 'maxTotal': this.maxTotal.set(null); break;
+      case 'search': this.search.set(''); break;
+    }
+  }
+
+  protected clearFilters(): void {
+    for (const filter of this.activeFilters()) this.removeFilter(filter.id);
   }
 
   protected openDetail(row: ReturnRow): void {

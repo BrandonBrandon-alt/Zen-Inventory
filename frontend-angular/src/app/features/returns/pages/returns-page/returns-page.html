@@ -8,11 +8,33 @@
   <button appButton type="button" (click)="formOpen.set(true)"><svg lucidePlus [size]="16" />Solicitar devolución</button>
 </header>
 
-<div class="mb-4 flex animate-enter-delayed flex-wrap items-center gap-3">
+<div class="mb-3 flex animate-enter-delayed flex-wrap items-center gap-3">
+  <div class="w-64 max-w-full">
+    <app-form-field>
+      <input appInput type="search" placeholder="Buscar por n.º, venta o producto…" aria-label="Buscar devolución" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
+      <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
+    </app-form-field>
+  </div>
   <div class="w-56">
     <app-select [(value)]="statusFilter" [options]="statusOptions" [icon]="filterIcon" ariaLabel="Estado de la devolución" />
   </div>
+  <div class="w-44"><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
+  <div class="w-44"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
+  <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
+    <app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" />
+    <app-select [(value)]="requesterFilter" [options]="requesterOptions()" ariaLabel="Solicitó" searchable searchPlaceholder="Buscar persona…" />
+    @if (isAdmin()) {
+      <app-select [(value)]="branchFilter" [options]="branchOptions()" ariaLabel="Sucursal" />
+    }
+    <app-form-field label="Valor desde">
+      <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="minTotal() ?? ''" (input)="minTotal.set(numberFromInput($event))" />
+    </app-form-field>
+    <app-form-field label="Valor hasta">
+      <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="maxTotal() ?? ''" (input)="maxTotal.set(numberFromInput($event))" />
+    </app-form-field>
+  </app-advanced-filters>
 </div>
+<app-active-filters class="mb-4 animate-enter-delayed" [filters]="activeFilters()" (removed)="removeFilter($event)" (cleared)="clearFilters()" />
 
 <app-data-table
   exportName="devoluciones"
@@ -25,8 +47,8 @@
   [error]="error()"
   [pageSize]="10"
   [clickableRows]="true"
-  [emptyTitle]="statusFilter() === 'PENDIENTE' ? 'No hay devoluciones pendientes' : 'Ninguna devolución coincide'"
-  [emptyDescription]="statusFilter() === 'PENDIENTE' ? 'Cuando un cliente devuelva algo, solicítala aquí para que un gerente la decida.' : 'Prueba con otro estado.'"
+  [emptyTitle]="activeFilters().length === 0 ? 'No hay devoluciones pendientes' : 'Ninguna devolución coincide'"
+  [emptyDescription]="activeFilters().length === 0 ? 'Cuando un cliente devuelva algo, solicítala aquí para que un gerente la decida.' : 'Prueba quitando algún filtro.'"
   minWidth="52rem"
   (rowClick)="openDetail($event)"
   (retry)="load()"
