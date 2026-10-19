@@ -55,7 +55,8 @@ export class AuthApi {
       nombre: response.nombre ?? '',
       rol: response.rol ?? '',
       id: response.id,
-      sucursalId: response.sucursalId,
+      // El ADMIN no tiene sucursal: el servidor manda `null` (no la omite), y la sesión espera un número o nada.
+      sucursalId: response.sucursalId ?? undefined,
       // Sin foto el servidor manda `null` (no la omite): se normaliza a "sin versión".
       avatarVersion: response.avatarActualizadoEn ?? undefined,
     };

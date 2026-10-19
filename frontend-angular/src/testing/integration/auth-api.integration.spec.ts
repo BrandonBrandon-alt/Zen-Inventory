@@ -61,6 +61,14 @@ describe('AuthApi (contrato HTTP real con MSW)', () => {
     expect(store.isAuthenticated()).toBe(true);
   });
 
+  it('un administrador sin sucursal (el servidor manda sucursalId: null) inicia sesión y queda sin sucursal', async () => {
+    server.use(http.post(LOGIN, () => HttpResponse.json({ ...okLogin, rol: 'ADMIN', sucursalId: null })));
+    const session = await api.login(credentials);
+    expect(session.sucursalId).toBeUndefined();
+    expect(store.isAuthenticated()).toBe(true);
+    expect(store.role()).toBe('ADMIN');
+  });
+
   it('INVALID_CREDENTIALS (contraseña incorrecta o correo inexistente): "credentials" con el mensaje del backend y sin sesión', async () => {
     server.use(http.post(LOGIN, () => HttpResponse.json(apiErrorBody(401, 'INVALID_CREDENTIALS', 'Credenciales incorrectas'), { status: 401 })));
     const error = await fail();
