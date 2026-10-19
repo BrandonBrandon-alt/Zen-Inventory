@@ -332,6 +332,8 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
     public List<ReplenishmentInsight> findReplenishmentInsights(Long branchId) {
         StringBuilder query = new StringBuilder("""
                 SELECT 
+                    i.sucursal_id as branch_id,
+                    s.nombre as branch_name,
                     p.id as product_id,
                     p.nombre as product_name,
                     i.cantidad_actual as current_stock,
@@ -343,6 +345,7 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
                     END as priority
                 FROM producto p
                 JOIN inventario_local i ON p.id = i.producto_id
+                JOIN sucursal s ON s.id = i.sucursal_id
                 WHERE i.cantidad_actual <= i.stock_minimo * 1.5
                 """);
         List<Object> args = new ArrayList<>();
@@ -355,6 +358,8 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
         query.append(" ORDER BY CAST(i.cantidad_actual AS DECIMAL) / COALESCE(NULLIF(i.stock_minimo, 0), 1) ASC ");
 
         return jdbcTemplate.query(query.toString(), (rs, rowNum) -> new ReplenishmentInsight(
+                rs.getLong("branch_id"),
+                rs.getString("branch_name"),
                 rs.getLong("product_id"),
                 rs.getString("product_name"),
                 rs.getBigDecimal("current_stock"),

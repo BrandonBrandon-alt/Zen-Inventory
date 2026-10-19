@@ -1883,6 +1883,9 @@ export interface components {
         };
         ReplenishmentInsight: {
             /** Format: int64 */
+            branchId?: number;
+            branchName?: string;
+            /** Format: int64 */
             productId?: number;
             productName?: string;
             currentStock?: number;

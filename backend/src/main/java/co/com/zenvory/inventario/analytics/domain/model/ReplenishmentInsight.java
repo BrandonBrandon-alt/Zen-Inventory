@@ -7,6 +7,8 @@ import java.math.BigDecimal;
  * Ayuda en la toma de decisiones proactiva para el reabastecimiento.
  */
 public record ReplenishmentInsight(
+        Long branchId,
+        String branchName,
         Long productId,
         String productName,
         BigDecimal currentStock,

@@ -77,13 +77,23 @@
             <p class="text-sm text-fg-subtle">Ningún producto está por debajo de su mínimo.</p>
           } @else {
             <ul class="divide-y divide-line">
-              @for (item of attention(); track item.productId) {
+              @for (item of attention(); track item.branchId + '-' + item.productId) {
                 <li class="flex items-center justify-between gap-3 py-2.5">
                   <div class="min-w-0">
                     <p class="truncate text-sm font-medium text-fg">{{ item.name }}</p>
-                    <p class="text-xs text-fg-subtle">{{ formatQuantity(item.stock) }} de {{ formatQuantity(item.minimum) }} mínimas</p>
+                    <p class="text-xs text-fg-subtle">
+                      @if (isAdmin() && item.branchName) {
+                        {{ item.branchName }} ·
+                      }
+                      {{ formatQuantity(item.stock) }} de {{ formatQuantity(item.minimum) }} mínimas
+                    </p>
                   </div>
-                  <app-badge [variant]="priority[item.priority].variant">{{ priority[item.priority].label }}</app-badge>
+                  <div class="flex shrink-0 items-center gap-2">
+                    <app-badge [variant]="priority[item.priority].variant">{{ priority[item.priority].label }}</app-badge>
+                    @if (item.alert) {
+                      <button appButton variant="ghost-brand" size="sm" type="button" [attr.aria-label]="'Gestionar stock de ' + item.name" (click)="manage(item)">Gestionar</button>
+                    }
+                  </div>
                 </li>
               }
             </ul>
@@ -171,4 +181,13 @@
       }
     </app-card>
   </div>
+
+  <app-alert-resolution-modal
+    [(open)]="resolveOpen"
+    [alert]="resolving()"
+    [productName]="resolvingName()"
+    [branches]="branchOptions()"
+    [canDismiss]="canDismiss()"
+    (resolved)="onResolved()"
+  />
 }

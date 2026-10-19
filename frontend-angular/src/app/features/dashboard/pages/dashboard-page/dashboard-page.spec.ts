@@ -24,16 +24,17 @@ function useSession(rol: string) {
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token: 't', email: 'e@z.co', nombre: 'Ana Pérez', rol, id: 1, sucursalId: 10 }));
 }
 
-function stub(overrides: { replenishment?: unknown[]; transfers?: unknown[] } = {}) {
+function stub(overrides: { replenishment?: unknown[]; transfers?: unknown[]; alerts?: unknown[] } = {}) {
   server.use(
     http.get(`${TEST_API}/api/v1/analytics/dashboard`, () => HttpResponse.json(DASHBOARD)),
     http.get(`${TEST_API}/api/v1/analytics/monthly-sales`, () => HttpResponse.json([{ monthName: 'Septiembre', year: 2026, revenue: 5_000_000, volume: 10 }])),
     http.get(`${TEST_API}/api/v1/analytics/inventory-rotation`, () => HttpResponse.json([])),
     http.get(`${TEST_API}/api/v1/analytics/replenishment-insights`, () =>
-      HttpResponse.json(overrides.replenishment ?? [{ productId: 2, productName: 'Tuerca', currentStock: 1, minStock: 5, priority: 'HIGH' }]),
+      HttpResponse.json(overrides.replenishment ?? [{ branchId: 10, branchName: 'Sede Central', productId: 2, productName: 'Tuerca', currentStock: 1, minStock: 5, priority: 'HIGH' }]),
     ),
-    http.get(`${TEST_API}/api/v1/alerts`, () => HttpResponse.json([])),
+    http.get(`${TEST_API}/api/v1/alerts`, () => HttpResponse.json(overrides.alerts ?? [])),
     http.get(`${TEST_API}/api/v1/transfers`, () => HttpResponse.json(overrides.transfers ?? [])),
+    http.get(`${TEST_API}/api/catalog/suppliers`, () => HttpResponse.json([])),
     http.get(`${TEST_API}/api/branches`, () => HttpResponse.json([{ id: 10, nombre: 'Sede Central', activa: true }])),
   );
 }
@@ -126,5 +127,38 @@ describe('DashboardPage', () => {
     server.use(http.get(`${TEST_API}/api/v1/analytics/dashboard`, () => HttpResponse.json(DASHBOARD)));
     await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
     expect(await screen.findByText('Unidades vendidas')).toBeTruthy();
+  });
+  describe('Por atender: gestionar el stock desde el panel', () => {
+    const ALERT = { id: 7, branchId: 10, productId: 2, message: 'Stock bajo: quedan 1 de 5', alertDate: '2026-10-15T08:00:00', resolved: false, type: 'LOW_STOCK' };
+
+    it('si el producto ya tiene su alerta abierta, ofrece «Gestionar» y abre la resolución de esa alerta', async () => {
+      useSession('MANAGER');
+      stub({ alerts: [ALERT] });
+      await renderPage();
+      await userEvent.click(await screen.findByRole('button', { name: 'Gestionar stock de Tuerca' }));
+      expect(await screen.findByRole('dialog', { name: 'Resolver alerta' })).toBeTruthy();
+    });
+
+    it('sin alerta abierta de ese producto en esa sucursal no hay botón (la alerta de otra sucursal no cuenta)', async () => {
+      useSession('MANAGER');
+      stub({ alerts: [{ ...ALERT, branchId: 20 }] });
+      await renderPage();
+      await screen.findByText('Tuerca');
+      expect(screen.queryByRole('button', { name: /Gestionar stock/ })).toBeNull();
+    });
+
+    it('el administrador ve de qué sucursal es cada fila, y dos sucursales con el mismo producto no se mezclan', async () => {
+      useSession('ADMIN');
+      stub({
+        replenishment: [
+          { branchId: 10, branchName: 'Sede Central', productId: 2, productName: 'Tuerca', currentStock: 1, minStock: 5, priority: 'HIGH' },
+          { branchId: 20, branchName: 'Sucursal Norte', productId: 2, productName: 'Tuerca', currentStock: 0, minStock: 8, priority: 'HIGH' },
+        ],
+      });
+      await renderPage();
+      expect(await screen.findByText(/Sede Central ·/)).toBeTruthy();
+      expect(screen.getByText(/Sucursal Norte ·/)).toBeTruthy();
+      expect(screen.getAllByText('Tuerca')).toHaveLength(2);
+    });
   });
 });
