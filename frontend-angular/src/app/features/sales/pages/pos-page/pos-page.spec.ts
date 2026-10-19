@@ -14,14 +14,14 @@ import { PrintService } from '@shared/print/print.service';
 import { PosPage } from './pos-page';
 
 const PRODUCTS = [
-  { id: 1, sku: 'TOR-1', nombre: 'Tornillo', unitAbbreviation: 'UND', precioVenta: 1000, activo: true },
-  { id: 2, sku: 'TUE-2', nombre: 'Tuérca', unitAbbreviation: 'UND', precioVenta: 500, activo: true },
+  { id: 1, sku: 'TOR-1', nombre: 'Tornillo', unitAbbreviation: 'UND', precioVenta: 1000, activo: true, proveedores: [{ id: 5, nombre: 'Ferretería Sur' }] },
+  { id: 2, sku: 'TUE-2', nombre: 'Tuérca', unitAbbreviation: 'UND', precioVenta: 500, activo: true, proveedores: [{ id: 5, nombre: 'Ferretería Sur' }, { id: 6, nombre: 'Tornillos SA' }] },
   { id: 3, sku: 'ARA-3', nombre: 'Arandela', unitAbbreviation: 'UND', precioVenta: 200, activo: true },
   { id: 4, sku: 'OLD-4', nombre: 'Descontinuado', unitAbbreviation: 'UND', precioVenta: 1, activo: false },
 ];
 const STOCK = [
   { productId: 1, stockActual: 10 },
-  { productId: 2, stockActual: 3 },
+  { productId: 2, stockActual: 3, stockMinimo: 5 },
   // Arandela sin registro de inventario: sin stock.
 ];
 const BRANCHES = [
@@ -76,6 +76,49 @@ const cart = () => screen.getByRole('region', { name: 'Venta actual' });
 describe('PosPage', () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => localStorage.clear());
+
+  describe('filtros de productos', () => {
+    const listed = () => screen.queryAllByRole('button', { name: /^Agregar / }).map((b) => b.getAttribute('aria-label')?.replace('Agregar ', ''));
+
+    it('filtra por proveedor: solo los productos que ese proveedor surte', async () => {
+      useSession('SELLER', 10);
+      stub();
+      await renderPage();
+      await screen.findByRole('button', { name: 'Agregar Tornillo' });
+      await chooseOption('Proveedor', 'Tornillos SA');
+      expect(listed()).toEqual(['Tuérca']);
+      await chooseOption('Proveedor', 'Ferretería Sur');
+      expect(listed()).toEqual(['Tornillo', 'Tuérca']);
+    });
+
+    it('filtra por disponibilidad: con stock, stock bajo (en o bajo el mínimo) y sin stock', async () => {
+      useSession('SELLER', 10);
+      stub();
+      await renderPage();
+      await screen.findByRole('button', { name: 'Agregar Tornillo' });
+      await chooseOption('Disponibilidad', 'Con stock');
+      expect(listed()).toEqual(['Tornillo', 'Tuérca']);
+      await chooseOption('Disponibilidad', 'Stock bajo (en o bajo el mínimo)');
+      expect(listed()).toEqual(['Tuérca']); // 3 de mínimo 5; el tornillo no tiene mínimo definido
+      await chooseOption('Disponibilidad', 'Sin stock');
+      expect(listed()).toEqual(['Arandela']);
+    });
+
+    it('los filtros se combinan con la búsqueda y «Quitar filtros» los limpia', async () => {
+      useSession('SELLER', 10);
+      stub();
+      await renderPage();
+      await screen.findByRole('button', { name: 'Agregar Tornillo' });
+      await chooseOption('Proveedor', 'Ferretería Sur');
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar producto' }), 'tuer');
+      expect(listed()).toEqual(['Tuérca']);
+      await chooseOption('Disponibilidad', 'Sin stock');
+      expect(await screen.findByText('Ningún producto coincide')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+      expect(listed()).toEqual(['Tuérca']); // queda la búsqueda
+      expect(screen.queryByRole('button', { name: 'Quitar filtros' })).not.toBeInTheDocument();
+    });
+  });
 
   describe('productos', () => {
     it('no tiene problemas de accesibilidad detectables', async () => {

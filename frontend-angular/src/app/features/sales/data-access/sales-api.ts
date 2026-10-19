@@ -95,7 +95,11 @@ export interface PosProduct {
   readonly name: string;
   readonly unit: string;
   readonly stock: number;
+  /** Stock mínimo en la sucursal (0 si no tiene definido). */
+  readonly minimum: number;
   readonly price: number;
+  /** Proveedores que lo surten, para filtrar. */
+  readonly suppliers: readonly { id: number; name: string }[];
 }
 
 export interface PriceListOption {
@@ -187,10 +191,11 @@ export class SalesApi {
     }).pipe(
       map(({ products, inventory }) => {
         const stock = new Map(inventory.filter((row) => typeof row.productId === 'number').map((row) => [row.productId as number, row.stockActual ?? 0]));
+        const minimum = new Map(inventory.filter((row) => typeof row.productId === 'number').map((row) => [row.productId as number, row.stockMinimo ?? 0]));
         return products
           .flatMap((p): PosProduct[] =>
             typeof p.id === 'number' && p.nombre?.trim() && p.activo !== false
-              ? [{ id: p.id, sku: p.sku?.trim() ?? '', name: p.nombre.trim(), unit: p.unitAbbreviation?.trim() ?? '', stock: stock.get(p.id) ?? 0, price: p.precioVenta ?? 0 }]
+              ? [{ id: p.id, sku: p.sku?.trim() ?? '', name: p.nombre.trim(), unit: p.unitAbbreviation?.trim() ?? '', stock: stock.get(p.id) ?? 0, minimum: minimum.get(p.id) ?? 0, price: p.precioVenta ?? 0, suppliers: (p.proveedores ?? []).flatMap((s) => (typeof s.id === 'number' && s.nombre?.trim() ? [{ id: s.id, name: s.nombre.trim() }] : [])) }]
               : [],
           )
           .sort((a, b) => a.name.localeCompare(b.name, 'es'));

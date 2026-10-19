@@ -27,6 +27,13 @@
         />
         <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
       </app-form-field>
+      <div class="mt-3 flex flex-wrap items-center gap-3">
+        <div class="w-56 max-w-full"><app-select [(value)]="supplierFilter" [options]="supplierOptions()" ariaLabel="Proveedor" searchable searchPlaceholder="Buscar proveedor…" /></div>
+        <div class="w-64 max-w-full"><app-select [(value)]="availabilityFilter" [options]="availabilityOptions" ariaLabel="Disponibilidad" /></div>
+        @if (filtering()) {
+          <button appButton variant="ghost" size="sm" type="button" (click)="clearFilters()">Quitar filtros</button>
+        }
+      </div>
     </div>
 
     @if (loading()) {
@@ -34,7 +41,7 @@
     } @else if (loadError(); as message) {
       <app-alert>{{ message }}</app-alert>
     } @else if (results().length === 0) {
-      <app-empty-state [title]="search() ? 'Ningún producto coincide' : 'No hay productos para vender'" [description]="search() ? 'Prueba con otro nombre o SKU.' : 'Crea productos en el catálogo para poder venderlos.'" />
+      <app-empty-state [title]="search() || filtering() ? 'Ningún producto coincide' : 'No hay productos para vender'" [description]="search() || filtering() ? 'Prueba con otro nombre o SKU, o quita algún filtro.' : 'Crea productos en el catálogo para poder venderlos.'" />
     } @else {
       <ul class="divide-y divide-line overflow-hidden rounded-lg border border-line bg-card">
         @for (product of results(); track product.id) {
