@@ -11,7 +11,7 @@
 # así no hay CORS entre dominios. CAMBIA la URL por la de tu servicio en Render.
 [[redirects]]
   from = "/api/*"
-  to = "https://TU-API.onrender.com/api/:splat"
+  to = "https://zen-inventory-api.onrender.com/api/:splat"
   status = 200
   force = true
 
