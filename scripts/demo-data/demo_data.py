@@ -4,6 +4,10 @@
     python3 scripts/demo-data/demo_data.py load     # borra la demostración anterior y carga una nueva
     python3 scripts/demo-data/demo_data.py clean    # deja la base sin los datos de demostración
     python3 scripts/demo-data/demo_data.py sql > demo.sql   # solo genera el SQL (sin tocar la base)
+    PGPASSWORD=… python3 scripts/demo-data/demo_data.py load --conn "host=… dbname=… user=… sslmode=require"   # una base remota (Neon…)
+
+`sql` asume una base vacía (los ids empiezan en 1): si la base ya trae datos, como los de V2, usa `load`, que mira
+el id máximo de cada tabla antes de generar.
 
 Los usuarios de demostración son nombre.apellido@demo.zeninventory.co y admin@demo.zeninventory.co, todos con la
 contraseña Demo-2026*. `clean` solo borra lo de la demostración; lo que se cree después con la aplicación se conserva.
@@ -26,8 +30,19 @@ from generate import TABLES_WITH_OFFSETS, Sim  # noqa: E402
 PSQL = ["docker", "exec", "-i", "{container}", "sh", "-c", 'psql -q -v ON_ERROR_STOP=1 -At -U "$POSTGRES_USER" -d "$POSTGRES_DB"']
 
 
+def psql_command(container: str, conn: str | None = None) -> list[str]:
+    """El comando de psql: contra el contenedor de Docker o, con `conn`, contra una base remota (la clave va en PGPASSWORD)."""
+    if conn:
+        return ["psql", "-q", "-v", "ON_ERROR_STOP=1", "-At", conn]
+    return [part.format(container=container) for part in PSQL]
+
+
+# Se fija en main(): `--conn` cambia a qué base hablan todos los comandos.
+CONN: str | None = None
+
+
 def psql(container: str, sql: str) -> str:
-    cmd = [part.format(container=container) for part in PSQL]
+    cmd = psql_command(container, CONN)
     result = subprocess.run(cmd, input=sql, text=True, capture_output=True)
     if result.returncode != 0:
         sys.exit(f"psql falló:\n{result.stderr.strip()}")
@@ -64,7 +79,10 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42, help="semilla: la misma semilla da siempre los mismos datos")
     parser.add_argument("--today", help="fecha de hoy AAAA-MM-DD (por defecto, la del sistema)")
     parser.add_argument("--container", default="zenvory-db", help="contenedor de PostgreSQL")
+    parser.add_argument("--conn", help='conexión a una base remota para psql (p. ej. "host=… dbname=… user=… sslmode=require"); la clave, en PGPASSWORD')
     args = parser.parse_args()
+    global CONN
+    CONN = args.conn
 
     if args.command == "clean":
         psql(args.container, clean_sql())
