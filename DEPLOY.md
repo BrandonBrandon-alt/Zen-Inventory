@@ -21,6 +21,10 @@ igual que hace nginx en Docker. Los límites de los planes gratuitos cambian: co
 1. Crea un proyecto en <https://neon.tech> (PostgreSQL 16 o superior) y una base, por ejemplo `inventario`.
 2. Copia los datos de conexión: **host**, **base**, **usuario** y **contraseña**. La URL JDBC es:
    `jdbc:postgresql://<host>/<base>?sslmode=require`
+   - **Usa el host directo, el que NO lleva `-pooler`.** El host con `-pooler` pasa por PgBouncer en modo transacción,
+     que no admite lo que Flyway necesita al migrar (estado de sesión y bloqueos) y puede fallar con errores
+     confusos. Lo mismo vale para `psql`/`pg_dump` al cargar los datos de demostración.
+   - Neon apaga el cómputo tras ~5 minutos sin uso: la primera consulta después tarda un poco más. Es normal.
 3. Flyway crea el esquema solo la primera vez que arranca la API (no hace falta ejecutar nada a mano).
 
 ## 2. API: Render
