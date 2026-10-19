@@ -519,4 +519,64 @@ describe('Sidebar', () => {
       expect(await screen.findByRole('tooltip')).toHaveTextContent('Sale de tu cuenta en este equipo.');
     });
   });
+  describe('atajos Ctrl + 1…9 para cambiar de pantalla', () => {
+    const press = (init: KeyboardEventInit) => {
+      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
+      document.dispatchEvent(event);
+      return event;
+    };
+    const spyNavigate = () => vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    it('Ctrl + n va a la n-ésima pantalla del menú, en el orden en que se ve, y evita el cambio de pestaña', async () => {
+      await renderSidebar('ADMIN');
+      const navigate = spyNavigate();
+      const first = press({ key: '1', ctrlKey: true });
+      expect(first.defaultPrevented).toBe(true);
+      expect(navigate).toHaveBeenLastCalledWith('/dashboard');
+      press({ key: '4', ctrlKey: true });
+      expect(navigate).toHaveBeenLastCalledWith('/transfers');
+      press({ key: '7', ctrlKey: true });
+      expect(navigate).toHaveBeenLastCalledWith('/sales/history');
+    });
+
+    it('también con ⌘ (Mac)', async () => {
+      await renderSidebar('ADMIN');
+      const navigate = spyNavigate();
+      press({ key: '2', metaKey: true });
+      expect(navigate).toHaveBeenLastCalledWith('/inventory');
+    });
+
+    it('la numeración sigue el menú de cada rol: sin pantalla en ese número, no hace nada ni bloquea la tecla', async () => {
+      await renderSidebar('OPERADOR_INVENTARIO'); // 8 pantallas: sin Reportes ni administración
+      const navigate = spyNavigate();
+      press({ key: '8', ctrlKey: true });
+      expect(navigate).toHaveBeenLastCalledWith('/returns');
+      navigate.mockClear();
+      const ninth = press({ key: '9', ctrlKey: true });
+      expect(navigate).not.toHaveBeenCalled();
+      expect(ninth.defaultPrevented).toBe(false);
+    });
+
+    it.each([
+      ['sin Ctrl', { key: '1' }],
+      ['con Mayús', { key: '1', ctrlKey: true, shiftKey: true }],
+      ['con Alt', { key: '1', ctrlKey: true, altKey: true }],
+      ['con el 0', { key: '0', ctrlKey: true }],
+    ] as const)('se ignora %s', async (_name, init) => {
+      await renderSidebar('ADMIN');
+      const navigate = spyNavigate();
+      const event = press(init);
+      expect(navigate).not.toHaveBeenCalled();
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it('los enlaces con atajo lo anuncian (tooltip y aria-keyshortcuts) y los demás no', async () => {
+      await renderSidebar('ADMIN');
+      const transfers = screen.getByRole('link', { name: 'Traslados' });
+      expect(transfers).toHaveAttribute('aria-keyshortcuts', 'Control+4');
+      transfers.focus();
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('Atajo: Ctrl + 4');
+      expect(screen.getByRole('link', { name: 'Usuarios' })).not.toHaveAttribute('aria-keyshortcuts'); // la 11.ª: sin atajo
+    });
+  });
 });
