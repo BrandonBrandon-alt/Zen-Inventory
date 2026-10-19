@@ -15,6 +15,7 @@ import {
 import { toApiError } from '@core/api/api-error';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
+import { CatalogOptionsApi, type SupplierOption } from '@core/catalog/catalog-options-api';
 import { formatDateTime, formatMoney, formatQuantity } from '@shared/format/format';
 import { numberFromInput, optionsFrom } from '@shared/filters/filter-helpers';
 import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
@@ -55,6 +56,7 @@ const DAY = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' });
 export class SalesHistoryPage {
   private readonly api = inject(SalesApi);
   private readonly branchApi = inject(BranchOptionsApi);
+  private readonly catalogApi = inject(CatalogOptionsApi);
   private readonly auth = inject(AuthStore);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -73,6 +75,7 @@ export class SalesHistoryPage {
   private readonly sellers = signal<readonly string[]>([]);
   private readonly products = signal<readonly string[]>([]);
   protected readonly branches = signal<readonly BranchOption[]>([]);
+  protected readonly suppliers = signal<readonly SupplierOption[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
@@ -86,6 +89,9 @@ export class SalesHistoryPage {
   protected readonly productFilter = persistedFilter(SalesHistoryPage.SCREEN, 'product', null as string | null, codecs.nullable(codecs.text()));
   protected readonly minTotal = persistedFilter(SalesHistoryPage.SCREEN, 'minTotal', null as number | null, codecs.nullable(codecs.number()));
   protected readonly maxTotal = persistedFilter(SalesHistoryPage.SCREEN, 'maxTotal', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly supplierFilter = persistedFilter(SalesHistoryPage.SCREEN, 'supplier', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly discountFilter = persistedFilter(SalesHistoryPage.SCREEN, 'discount', 'all' as 'all' | 'with' | 'without', codecs.oneOf(['all', 'with', 'without'] as const));
+  protected readonly customerFilter = persistedFilter(SalesHistoryPage.SCREEN, 'customer', 'all' as 'all' | 'registered' | 'anonymous', codecs.oneOf(['all', 'registered', 'anonymous'] as const));
   protected readonly advancedOpen = persistedFilter(SalesHistoryPage.SCREEN, 'advancedOpen', false, codecs.bool());
   protected readonly search = signal('');
   /** Lo buscado, ya con la pausa: es lo que se envía al servidor. */
@@ -103,6 +109,21 @@ export class SalesHistoryPage {
   protected readonly branchOptions = computed<SelectOption<number | null>[]>(() => [
     { value: null, label: 'Todas las sucursales' },
     ...this.branches().map((b) => ({ value: b.id, label: b.nombre })),
+  ]);
+
+  protected readonly discountOptions: readonly SelectOption<'all' | 'with' | 'without'>[] = [
+    { value: 'all', label: 'Con o sin descuento' },
+    { value: 'with', label: 'Con descuento' },
+    { value: 'without', label: 'Sin descuento' },
+  ];
+  protected readonly customerOptions: readonly SelectOption<'all' | 'registered' | 'anonymous'>[] = [
+    { value: 'all', label: 'Todos los clientes' },
+    { value: 'registered', label: 'Cliente registrado' },
+    { value: 'anonymous', label: 'Cliente sin registrar' },
+  ];
+  protected readonly supplierOptions = computed<SelectOption<number | null>[]>(() => [
+    { value: null, label: 'Todos los proveedores' },
+    ...this.suppliers().map((s) => ({ value: s.id, label: s.nombre })),
   ]);
 
   protected readonly columns = computed<readonly TableColumn<SaleRow>[]>(() => [
@@ -134,6 +155,9 @@ export class SalesHistoryPage {
     minTotal: this.minTotal(),
     maxTotal: this.maxTotal(),
     text: this.searchTerm(),
+    supplierId: this.supplierFilter(),
+    withDiscount: this.discountFilter() === 'all' ? null : this.discountFilter() === 'with',
+    registeredCustomer: this.customerFilter() === 'all' ? null : this.customerFilter() === 'registered',
   }));
   protected readonly page = linkedSignal<unknown, number>({ source: this.filters, computation: () => 1 });
 
@@ -150,7 +174,7 @@ export class SalesHistoryPage {
 
   /** Los filtros del panel «Más filtros» que están aplicados (el botón muestra cuántos). */
   protected readonly advancedCount = computed(
-    () => [this.sellerFilter() !== null, this.productFilter() !== null, this.minTotal() !== null, this.maxTotal() !== null].filter(Boolean).length,
+    () => [this.sellerFilter() !== null, this.productFilter() !== null, this.supplierFilter() !== null, this.discountFilter() !== 'all', this.customerFilter() !== 'all', this.minTotal() !== null, this.maxTotal() !== null].filter(Boolean).length,
   );
 
   /** Todos los filtros aplicados, para mostrarlos como etiquetas que se quitan. */
@@ -163,6 +187,9 @@ export class SalesHistoryPage {
     if (this.to() !== null) list.push({ id: 'to', label: 'Hasta', text: DAY.format(this.to()!) });
     if (this.sellerFilter() !== null) list.push({ id: 'seller', label: 'Vendedor', text: this.sellerFilter()! });
     if (this.productFilter() !== null) list.push({ id: 'product', label: 'Producto', text: this.productFilter()! });
+    if (this.supplierFilter() !== null) list.push({ id: 'supplier', label: 'Proveedor', text: this.suppliers().find((s) => s.id === this.supplierFilter())?.nombre ?? `Proveedor ${this.supplierFilter()}` });
+    if (this.discountFilter() !== 'all') list.push({ id: 'discount', label: 'Descuento', text: this.discountFilter() === 'with' ? 'Con descuento' : 'Sin descuento' });
+    if (this.customerFilter() !== 'all') list.push({ id: 'customer', label: 'Cliente', text: this.customerFilter() === 'registered' ? 'Registrado' : 'Sin registrar' });
     if (this.minTotal() !== null) list.push({ id: 'minTotal', label: 'Total desde', text: formatMoney(this.minTotal()) });
     if (this.maxTotal() !== null) list.push({ id: 'maxTotal', label: 'Total hasta', text: formatMoney(this.maxTotal()) });
     if (this.search().trim()) list.push({ id: 'search', label: 'Búsqueda', text: this.search().trim() });
@@ -183,6 +210,10 @@ export class SalesHistoryPage {
         .pipe(catchError(() => of([])))
         .subscribe((branches) => this.branches.set(branches));
     }
+    this.catalogApi
+      .suppliers()
+      .pipe(catchError(() => of([])))
+      .subscribe((suppliers) => this.suppliers.set(suppliers));
     // Cada cambio de página, orden o filtro vuelve a pedir la página al servidor.
     effect(() => {
       const query = this.query();
@@ -242,6 +273,9 @@ export class SalesHistoryPage {
       case 'to': this.to.set(null); break;
       case 'seller': this.sellerFilter.set(null); break;
       case 'product': this.productFilter.set(null); break;
+      case 'supplier': this.supplierFilter.set(null); break;
+      case 'discount': this.discountFilter.set('all'); break;
+      case 'customer': this.customerFilter.set('all'); break;
       case 'minTotal': this.minTotal.set(null); break;
       case 'maxTotal': this.maxTotal.set(null); break;
       case 'search': this.search.set(''); clearTimeout(this.searchTimer); this.searchTerm.set(''); break;

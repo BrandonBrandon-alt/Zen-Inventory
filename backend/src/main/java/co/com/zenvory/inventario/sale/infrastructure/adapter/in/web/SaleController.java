@@ -105,14 +105,18 @@ public class SaleController {
             @RequestParam(required = false) String product,
             @RequestParam(required = false) BigDecimal minTotal,
             @RequestParam(required = false) BigDecimal maxTotal,
-            @RequestParam(required = false, name = "q") String text) {
+            @RequestParam(required = false, name = "q") String text,
+            @RequestParam(required = false) Long supplierId,
+            @RequestParam(required = false) Boolean withDiscount,
+            @RequestParam(required = false) Boolean registeredCustomer) {
         CurrentUser current = CurrentUser.resolve(userRepositoryPort);
         Long effectiveBranch = current.isAdmin() ? branchId : current.resolveBranch(null);
         int safePage = Math.max(0, page);
         int safeSize = Math.min(Math.max(1, size), MAX_PAGE_SIZE);
 
         SalePage result = saleManagementUseCase.searchSales(
-                new SaleSearchCriteria(effectiveBranch, status, from, to, blankToNull(seller), blankToNull(product), minTotal, maxTotal, text),
+                new SaleSearchCriteria(effectiveBranch, status, from, to, blankToNull(seller), blankToNull(product), minTotal, maxTotal, text,
+                        supplierId, withDiscount, registeredCustomer),
                 safePage, safeSize, sortBy, !"desc".equalsIgnoreCase(direction));
 
         int totalPages = (int) Math.ceil(result.totalElements() / (double) safeSize);

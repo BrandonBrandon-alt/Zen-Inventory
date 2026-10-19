@@ -96,6 +96,25 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
                 sub.select(detail.get("id")).where(cb.equal(detail.get("sale"), root), cb.equal(detail.get("productName"), c.product()));
                 predicates.add(cb.exists(sub));
             }
+            if (c.supplierId() != null) {
+                // Ventas con algún producto que ese proveedor surte (tabla producto_proveedor, del catálogo).
+                var supplied = query.subquery(Long.class);
+                var link = supplied.from(co.com.zenvory.inventario.catalog.infrastructure.adapter.out.persistence.ProductSupplierEntity.class);
+                supplied.select(link.<Long>get("productId")).where(cb.equal(link.get("supplierId"), c.supplierId()));
+                var sub = query.subquery(Long.class);
+                var detail = sub.from(SaleDetailEntity.class);
+                sub.select(detail.get("id")).where(cb.equal(detail.get("sale"), root), detail.<Long>get("productId").in(supplied));
+                predicates.add(cb.exists(sub));
+            }
+            if (c.withDiscount() != null) {
+                var discount = root.<BigDecimal>get("totalDiscount");
+                predicates.add(c.withDiscount() ? cb.greaterThan(discount, BigDecimal.ZERO) : cb.lessThanOrEqualTo(discount, BigDecimal.ZERO));
+            }
+            if (c.registeredCustomer() != null) {
+                var name = root.<String>get("customerName");
+                var hasName = cb.and(cb.isNotNull(name), cb.notEqual(cb.trim(name), ""));
+                predicates.add(c.registeredCustomer() ? hasName : cb.not(hasName));
+            }
             if (c.text() != null && !c.text().isBlank()) {
                 String like = "%" + escapeLike(normalize(c.text())) + "%";
                 predicates.add(cb.or(

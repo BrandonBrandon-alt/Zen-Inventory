@@ -56,6 +56,12 @@ export interface SaleQuery {
   readonly minTotal: number | null;
   readonly maxTotal: number | null;
   readonly text: string;
+  /** Ventas con algún producto que surte este proveedor. */
+  readonly supplierId: number | null;
+  /** `true`: solo con descuento; `false`: solo sin descuento; `null`: todas. */
+  readonly withDiscount: boolean | null;
+  /** `true`: con nombre de cliente; `false`: sin registrar; `null`: todas. */
+  readonly registeredCustomer: boolean | null;
 }
 
 /** Una página del historial; el resumen abarca todas las ventas que cumplen los filtros, no solo la página. */
@@ -245,7 +251,7 @@ export class SalesApi {
 
   /** Una página del historial, filtrada y ordenada por el servidor (ADMIN: elige sucursal; el resto: la suya). */
   search(query: SaleQuery): Observable<SalePage> {
-    const params: Record<string, string | number> = { page: query.page - 1, size: query.size, direction: query.direction };
+    const params: Record<string, string | number | boolean> = { page: query.page - 1, size: query.size, direction: query.direction };
     if (query.sortBy) params['sortBy'] = query.sortBy;
     if (query.branchId !== null) params['branchId'] = query.branchId;
     if (query.status) params['status'] = query.status;
@@ -256,6 +262,9 @@ export class SalesApi {
     if (query.minTotal !== null) params['minTotal'] = query.minTotal;
     if (query.maxTotal !== null) params['maxTotal'] = query.maxTotal;
     if (query.text.trim()) params['q'] = query.text.trim();
+    if (query.supplierId !== null) params['supplierId'] = query.supplierId;
+    if (query.withDiscount !== null) params['withDiscount'] = query.withDiscount;
+    if (query.registeredCustomer !== null) params['registeredCustomer'] = query.registeredCustomer;
     return this.http.get<RawSalePage>(`${this.baseUrl}/api/v1/sales/search`, { ...this.options, params }).pipe(
       map((page) => ({
         sales: (page.content ?? []).map(toSale).filter((s): s is Sale => s !== null),

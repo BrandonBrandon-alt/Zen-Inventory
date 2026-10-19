@@ -25,6 +25,9 @@
   <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
     <app-form-field label="Vendedor"><app-select [(value)]="sellerFilter" [options]="sellerOptions()" ariaLabel="Vendedor" /></app-form-field>
     <app-form-field label="Producto"><app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" /></app-form-field>
+    <app-form-field label="Proveedor"><app-select [(value)]="supplierFilter" [options]="supplierOptions()" ariaLabel="Proveedor" searchable searchPlaceholder="Buscar proveedor…" /></app-form-field>
+    <app-form-field label="Descuento"><app-select [(value)]="discountFilter" [options]="discountOptions" ariaLabel="Descuento" /></app-form-field>
+    <app-form-field label="Cliente"><app-select [(value)]="customerFilter" [options]="customerOptions" ariaLabel="Cliente" /></app-form-field>
     <app-form-field label="Total desde">
       <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="minTotal() ?? ''" (input)="minTotal.set(numberFromInput($event))" />
     </app-form-field>

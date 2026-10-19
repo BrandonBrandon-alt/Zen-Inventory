@@ -186,7 +186,7 @@ class SaleControllerTest {
                 org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean()))
                 .thenReturn(emptyPage());
 
-        mockMvc.perform(get("/api/v1/sales/search?branchId=3&status=CANCELED&from=2026-01-01&to=2026-01-31&seller=Ana&product=Cafe&minTotal=10&maxTotal=99.5&q=perez"))
+        mockMvc.perform(get("/api/v1/sales/search?branchId=3&status=CANCELED&from=2026-01-01&to=2026-01-31&seller=Ana&product=Cafe&minTotal=10&maxTotal=99.5&q=perez&supplierId=7&withDiscount=true&registeredCustomer=false"))
                 .andExpect(status().isOk());
 
         var c = searchedCriteria(10);
@@ -199,6 +199,9 @@ class SaleControllerTest {
         org.assertj.core.api.Assertions.assertThat(c.minTotal()).isEqualByComparingTo("10");
         org.assertj.core.api.Assertions.assertThat(c.maxTotal()).isEqualByComparingTo("99.5");
         org.assertj.core.api.Assertions.assertThat(c.text()).isEqualTo("perez");
+        org.assertj.core.api.Assertions.assertThat(c.supplierId()).isEqualTo(7L);
+        org.assertj.core.api.Assertions.assertThat(c.withDiscount()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(c.registeredCustomer()).isFalse();
     }
 
     @Test

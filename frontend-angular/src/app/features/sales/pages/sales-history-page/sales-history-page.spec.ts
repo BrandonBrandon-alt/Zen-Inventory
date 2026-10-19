@@ -64,6 +64,9 @@ function searchResponse(sales: RawSale[], params: URLSearchParams) {
     .filter((s) => !params.get('to') || day(s.date) <= params.get('to')!)
     .filter((s) => !params.get('seller') || s.userName === params.get('seller'))
     .filter((s) => !params.get('product') || s.details.some((d) => d.productName === params.get('product')))
+    .filter((s) => num('supplierId') === null || s.details.some((d) => SUPPLIED_BY[d.productId]?.includes(num('supplierId')!)))
+    .filter((s) => params.get('withDiscount') === null || (s.totalDiscount > 0) === (params.get('withDiscount') === 'true'))
+    .filter((s) => params.get('registeredCustomer') === null || !!s.customerName.trim() === (params.get('registeredCustomer') === 'true'))
     .filter((s) => num('minTotal') === null || s.totalFinal >= num('minTotal')!)
     .filter((s) => num('maxTotal') === null || s.totalFinal <= num('maxTotal')!)
     .filter((s) => !q || plain(`${s.id} ${s.customerName} ${s.customerDocument} ${s.userName}`).includes(q));
@@ -88,6 +91,13 @@ function searchResponse(sales: RawSale[], params: URLSearchParams) {
   };
 }
 
+const SUPPLIERS = [
+  { id: 5, nombre: 'Ferretería Sur', tiempoEntregaDias: 3 },
+  { id: 6, nombre: 'Tornillos SA', tiempoEntregaDias: 2 },
+];
+/** Qué proveedores surten cada producto (por id de producto). */
+const SUPPLIED_BY: Record<number, number[]> = { 1: [6], 2: [5] };
+
 const asked: URLSearchParams[] = [];
 
 function stub(sales: RawSale[] = SALES) {
@@ -102,6 +112,7 @@ function stub(sales: RawSale[] = SALES) {
       HttpResponse.json({ sellers: [...new Set(sales.map((s) => s.userName))], products: [...new Set(sales.flatMap((s) => s.details.map((d) => d.productName)))] }),
     ),
     http.get(`${TEST_API}/api/branches`, () => HttpResponse.json(BRANCHES)),
+    http.get(`${TEST_API}/api/catalog/suppliers`, () => HttpResponse.json(SUPPLIERS)),
   );
 }
 
@@ -303,6 +314,43 @@ describe('SalesHistoryPage', () => {
         await userEvent.type(screen.getByLabelText('Total hasta'), '3000');
         await vi.waitFor(() => expect(ids().sort()).toEqual(['2', '3']));
         expect(screen.getByLabelText('2 filtros activos')).toBeInTheDocument();
+      });
+
+      it('filtra por proveedor: las ventas con algún producto que ese proveedor surte', async () => {
+        useSession('MANAGER', 10);
+        stub([
+          sale(1, 'COMPLETED'),
+          sale(2, 'COMPLETED', { details: [{ id: 21, productId: 2, productName: 'Tuerca', quantity: 1, unitPriceApplied: 2000, discountPercentage: 0, subtotalLine: 2000 }] }),
+        ]);
+        await renderPage();
+        await screen.findByText('#2');
+        await openAdvanced();
+        await chooseOption('Proveedor', 'Ferretería Sur');
+        await vi.waitFor(() => expect(ids()).toEqual(['2']));
+        expect(asked.at(-1)?.get('supplierId')).toBe('5');
+        expect(screen.getByRole('group', { name: 'Filtros aplicados' })).toHaveTextContent('Proveedor:Ferretería Sur');
+      });
+
+      it('filtra por descuento y por cliente registrado', async () => {
+        useSession('MANAGER', 10);
+        stub([
+          sale(1, 'COMPLETED', { totalDiscount: 100 }),
+          sale(2, 'COMPLETED', { customerName: '', customerDocument: '' }),
+          sale(3, 'COMPLETED'),
+        ]);
+        await renderPage();
+        await screen.findByText('#3');
+        await openAdvanced();
+        await chooseOption('Descuento', 'Con descuento');
+        await vi.waitFor(() => expect(ids()).toEqual(['1']));
+        expect(asked.at(-1)?.get('withDiscount')).toBe('true');
+        await chooseOption('Descuento', 'Con o sin descuento');
+        await chooseOption('Cliente', 'Cliente sin registrar');
+        await vi.waitFor(() => expect(ids()).toEqual(['2']));
+        expect(asked.at(-1)?.get('registeredCustomer')).toBe('false');
+        await chooseOption('Cliente', 'Cliente registrado');
+        await vi.waitFor(() => expect(ids().sort()).toEqual(['1', '3']));
+        expect(screen.getByLabelText('1 filtro activo')).toBeInTheDocument();
       });
 
       it('filtra por producto', async () => {
