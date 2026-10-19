@@ -5,6 +5,7 @@ from collections import Counter
 from datetime import date
 
 import catalog as C
+from demo_data import psql_command
 from emit import clean_sql, load_sql
 from generate import Sim
 
@@ -94,6 +95,15 @@ class DemoDataTest(unittest.TestCase):
         shifted = Sim(date(2026, 10, 18), 20, 0.2, 7, {"ventas": 5000, "movimiento_inventario": 90000})
         shifted.run()
         self.assertEqual(min(s["id"] for s in shifted.rows["ventas"]), 5001)
+
+    def test_psql_habla_con_docker_o_con_una_base_remota(self):
+        docker = psql_command("zenvory-db")
+        self.assertEqual(docker[:4], ["docker", "exec", "-i", "zenvory-db"])
+        remoto = psql_command("zenvory-db", "host=ep-x.neon.tech dbname=neondb user=u sslmode=require")
+        self.assertEqual(remoto[0], "psql")
+        self.assertIn("ON_ERROR_STOP=1", remoto)
+        self.assertEqual(remoto[-1], "host=ep-x.neon.tech dbname=neondb user=u sslmode=require")
+        self.assertNotIn("docker", remoto)
 
 
 if __name__ == "__main__":
