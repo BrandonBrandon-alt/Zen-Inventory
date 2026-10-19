@@ -1,0 +1,22 @@
+# Despliegue del frontend en Netlify (ver DEPLOY.md en la raíz del repositorio).
+# Se pone «Base directory = frontend-angular» al importar el sitio en Netlify; este archivo vive en esa carpeta.
+[build]
+  command = "npm ci && npm run build"
+  publish = "dist/frontend-angular/browser" # relativo a la carpeta base
+
+[build.environment]
+  NODE_VERSION = "24"
+
+# La API: el navegador llama a /api/... en el mismo sitio y Netlify lo reenvía al backend (como hace nginx en Docker),
+# así no hay CORS entre dominios. CAMBIA la URL por la de tu servicio en Render.
+[[redirects]]
+  from = "/api/*"
+  to = "https://TU-API.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+# Rutas de la SPA (/login, /inventory…): las resuelve Angular en el navegador.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

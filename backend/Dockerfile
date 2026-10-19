@@ -25,5 +25,6 @@ COPY --from=builder /app/target/*.jar app.jar
 # Exponer el puerto
 EXPOSE 8080
 
-# Comando de inicio optimizado
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Comando de inicio. La JVM se ajusta a la memoria del contenedor (los planes gratuitos dan ~512 MB):
+# usa hasta el 70 % como heap y el recolector serial, que gasta menos que el G1 en instancias pequeñas.
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-XX:+UseSerialGC", "-jar", "app.jar"]

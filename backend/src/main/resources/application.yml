@@ -37,7 +37,8 @@ spring:
     locations: classpath:db/migration
 
 server:
-  port: ${SERVER_PORT:8080}
+  # Render y similares entregan el puerto en PORT; en local y en Docker sigue siendo 8080.
+  port: ${SERVER_PORT:${PORT:8080}}
 
 security:
   jwt:
