@@ -239,4 +239,13 @@ describe('Modal', () => {
       expect(document.body.style.overflow).toBe('');
     });
   });
+  it('se ancla a la pantalla (fixed) y no a su sitio en la página: así queda centrado aunque haya scroll', async () => {
+    const { dialog } = await setup();
+    const classes = dialog().classList;
+    expect(classes.contains('fixed')).toBe(true);
+    expect(classes.contains('inset-0')).toBe(true);
+    expect(classes.contains('m-auto')).toBe(true);
+    // `relative` anularía el `position: fixed` nativo del modal y lo dejaría arriba de la página.
+    expect(classes.contains('relative')).toBe(false);
+  });
 });
