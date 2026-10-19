@@ -20,7 +20,7 @@
 @if (!hasAnalytics()) {
   <app-empty-state title="Tu cuenta no incluye indicadores" description="Usa el menú para ir a las pantallas de tu trabajo." />
 } @else {
-  <div class="grid animate-enter-delayed gap-8">
+  <div class="grid animate-enter-delayed grid-cols-[minmax(0,1fr)] gap-8">
     <!-- Cifras del periodo -->
     <section aria-label="Cifras del periodo">
       @if (overview.error(); as message) {
@@ -29,25 +29,25 @@
           <button type="button" class="ml-2 underline" (click)="retryOverview()">Reintentar</button>
         </app-alert>
       } @else if (overview.data(); as data) {
-        <dl class="grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4 lg:divide-x lg:divide-line">
+        <dl class="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-x-4 gap-y-5 sm:gap-x-6 lg:grid-cols-4 lg:divide-x lg:divide-line">
           @if (canSeeMoney()) {
             <div class="lg:pr-6">
               <dt class="text-sm text-fg-subtle">Ingresos</dt>
-              <dd class="mt-1 font-title text-3xl font-bold text-fg">{{ formatMoneyCompact(data.summary.revenue) }}</dd>
+              <dd class="mt-1 font-title text-2xl font-bold break-words text-fg sm:text-3xl">{{ formatMoneyCompact(data.summary.revenue) }}</dd>
             </div>
           }
           <div class="lg:px-6">
             <dt class="text-sm text-fg-subtle">Unidades vendidas</dt>
-            <dd class="mt-1 font-title text-3xl font-bold text-fg">{{ formatQuantity(data.summary.units) }}</dd>
+            <dd class="mt-1 font-title text-2xl font-bold break-words text-fg sm:text-3xl">{{ formatQuantity(data.summary.units) }}</dd>
           </div>
           @if (canSeeMoney()) {
             <div class="lg:px-6">
               <dt class="text-sm text-fg-subtle">Ticket promedio</dt>
-              <dd class="mt-1 font-title text-3xl font-bold text-fg">{{ formatMoneyCompact(data.summary.averageTicket) }}</dd>
+              <dd class="mt-1 font-title text-2xl font-bold break-words text-fg sm:text-3xl">{{ formatMoneyCompact(data.summary.averageTicket) }}</dd>
             </div>
             <div class="lg:pl-6">
               <dt class="text-sm text-fg-subtle">Valor del inventario</dt>
-              <dd class="mt-1 font-title text-3xl font-bold text-fg">{{ formatMoneyCompact(data.summary.inventoryValue) }}</dd>
+              <dd class="mt-1 font-title text-2xl font-bold break-words text-fg sm:text-3xl">{{ formatMoneyCompact(data.summary.inventoryValue) }}</dd>
             </div>
           }
         </dl>
@@ -68,7 +68,7 @@
       </app-card>
     }
 
-    <div class="grid gap-8 lg:grid-cols-2">
+    <div class="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-2">
       <app-card title="Por atender" description="Reposición y traslados que esperan una acción">
         @if (replenishment.error(); as message) {
           <app-alert variant="danger">{{ message }}</app-alert>
@@ -113,7 +113,7 @@
       </app-card>
     </div>
 
-    <div class="grid gap-8 lg:grid-cols-2">
+    <div class="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-2">
       <app-card title="Traslados en curso" variant="plain">
         @if (transfers.error(); as message) {
           <app-alert variant="danger">{{ message }}</app-alert>
