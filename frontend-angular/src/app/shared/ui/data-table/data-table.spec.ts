@@ -556,3 +556,42 @@ describe('DataTable · orden recordado (persistKey)', () => {
     await vi.waitFor(() => expect(localStorage.getItem(STORE)).toBeNull());
   });
 });
+
+describe('DataTable — paginación en el servidor ([total])', () => {
+  // Quien usa la tabla entrega solo la página que se ve; la tabla no corta, no ordena ni exporta por su cuenta.
+  const PAGE_ROWS = BRANCHES.slice(0, 3);
+  const setup = (extra = '') =>
+    render(
+      `<app-data-table caption="Sucursales" [columns]="columns" [rows]="rows" [rowKey]="rowKey" [pageSize]="3" [total]="total" [(page)]="page" (sortChange)="onSort($event)" ${extra}></app-data-table>`,
+      {
+        imports,
+        componentProperties: { columns: COLUMNS, rows: PAGE_ROWS, rowKey: (r: Branch) => r.id, total: 8, page: 1, onSort: vi.fn() },
+      },
+    );
+  const names = () => screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0].textContent?.trim());
+
+  it('muestra las filas recibidas tal cual y cuenta páginas con el total del servidor', async () => {
+    await setup();
+    expect(names()).toEqual(['Norte', 'Álvaro Sur', 'Alberto Este']);
+    expect(screen.getByText('1–3 de 8')).toBeInTheDocument();
+    expect(screen.getByText('Página 1 de 3')).toBeInTheDocument();
+  });
+
+  it('al cambiar de página actualiza [(page)] para que quien la usa pida esa página', async () => {
+    const { fixture } = await setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(fixture.componentInstance['page']).toBe(2);
+  });
+
+  it('ordenar emite sortChange y no reordena las filas recibidas', async () => {
+    const { fixture } = await setup();
+    await userEvent.click(within(screen.getByRole('columnheader', { name: /Nombre/ })).getByRole('button'));
+    expect(fixture.componentInstance['onSort']).toHaveBeenLastCalledWith({ key: 'nombre', direction: 'asc' });
+    expect(names()).toEqual(['Norte', 'Álvaro Sur', 'Alberto Este']); // el servidor es quien las ordena
+  });
+
+  it('no ofrece exportar: solo tendría la página que se ve', async () => {
+    await setup('exportName="sucursales"');
+    expect(screen.queryByRole('button', { name: /Exportar CSV/ })).not.toBeInTheDocument();
+  });
+});

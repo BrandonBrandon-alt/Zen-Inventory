@@ -1,11 +1,16 @@
 package co.com.zenvory.inventario.sale.application.port.in;
 
 import co.com.zenvory.inventario.sale.domain.model.Sale;
+import co.com.zenvory.inventario.sale.application.port.out.SaleFilterOptions;
+import co.com.zenvory.inventario.sale.application.port.out.SalePage;
+import co.com.zenvory.inventario.sale.application.port.out.SaleSearchCriteria;
 import java.util.List;
 
 public interface SaleManagementUseCase {
     List<Sale> getAllSales();
     List<Sale> getSalesByBranch(Long branchId);
+    SalePage searchSales(SaleSearchCriteria criteria, int page, int size, String sortBy, boolean ascending);
+    SaleFilterOptions getFilterOptions(Long branchId);
     Sale getSaleById(Long id);
     /** Venta bloqueada hasta el fin de la transacción: para leerla y luego cambiar su estado sin carreras. */
     Sale getSaleForUpdate(Long id);

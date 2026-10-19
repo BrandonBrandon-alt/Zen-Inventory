@@ -40,6 +40,48 @@ export interface Sale {
   readonly lines: readonly SaleLine[];
 }
 
+/** Filtros y paginación del historial; el servidor los aplica. `page` empieza en 1. */
+export interface SaleQuery {
+  readonly page: number;
+  readonly size: number;
+  /** Clave de columna: id, date, customer, seller, branchName, total o status. */
+  readonly sortBy: string | null;
+  readonly direction: 'asc' | 'desc';
+  readonly branchId: number | null;
+  readonly status: SaleStatus | null;
+  readonly from: Date | null;
+  readonly to: Date | null;
+  readonly seller: string | null;
+  readonly product: string | null;
+  readonly minTotal: number | null;
+  readonly maxTotal: number | null;
+  readonly text: string;
+}
+
+/** Una página del historial; el resumen abarca todas las ventas que cumplen los filtros, no solo la página. */
+export interface SalePage {
+  readonly sales: Sale[];
+  readonly total: number;
+  readonly completedCount: number;
+  readonly completedTotal: number;
+}
+
+export interface SaleFilterOptions {
+  readonly sellers: readonly string[];
+  readonly products: readonly string[];
+}
+
+/** Respuestas de los endpoints paginados (el OpenAPI generado todavía no las describe). */
+interface RawSalePage {
+  content?: SaleResponse[];
+  totalElements?: number;
+  completedCount?: number;
+  completedTotal?: number;
+}
+
+/** Día local como `aaaa-mm-dd` (no UTC: de noche no debe saltar al día siguiente). */
+const isoDay = (date: Date): string => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
 /** Un producto que se puede vender en el punto de venta, con su existencia en la sucursal. */
 export interface PosProduct {
   readonly id: number;
@@ -199,6 +241,39 @@ export class SalesApi {
             .sort((a, b) => b.id - a.id),
         ),
       );
+  }
+
+  /** Una página del historial, filtrada y ordenada por el servidor (ADMIN: elige sucursal; el resto: la suya). */
+  search(query: SaleQuery): Observable<SalePage> {
+    const params: Record<string, string | number> = { page: query.page - 1, size: query.size, direction: query.direction };
+    if (query.sortBy) params['sortBy'] = query.sortBy;
+    if (query.branchId !== null) params['branchId'] = query.branchId;
+    if (query.status) params['status'] = query.status;
+    if (query.from) params['from'] = isoDay(query.from);
+    if (query.to) params['to'] = isoDay(query.to);
+    if (query.seller) params['seller'] = query.seller;
+    if (query.product) params['product'] = query.product;
+    if (query.minTotal !== null) params['minTotal'] = query.minTotal;
+    if (query.maxTotal !== null) params['maxTotal'] = query.maxTotal;
+    if (query.text.trim()) params['q'] = query.text.trim();
+    return this.http.get<RawSalePage>(`${this.baseUrl}/api/v1/sales/search`, { ...this.options, params }).pipe(
+      map((page) => ({
+        sales: (page.content ?? []).map(toSale).filter((s): s is Sale => s !== null),
+        total: page.totalElements ?? 0,
+        completedCount: page.completedCount ?? 0,
+        completedTotal: page.completedTotal ?? 0,
+      })),
+    );
+  }
+
+  /** Vendedores y productos que aparecen en las ventas visibles, para los filtros del historial. */
+  filterOptions(branchId: number | null): Observable<SaleFilterOptions> {
+    return this.http
+      .get<{ sellers?: string[]; products?: string[] }>(`${this.baseUrl}/api/v1/sales/filter-options`, {
+        ...this.options,
+        ...(branchId !== null ? { params: { branchId } } : {}),
+      })
+      .pipe(map((o) => ({ sellers: o.sellers ?? [], products: o.products ?? [] })));
   }
 
   /** Anula la venta y devuelve el stock a la sucursal (ADMIN y MANAGER). */

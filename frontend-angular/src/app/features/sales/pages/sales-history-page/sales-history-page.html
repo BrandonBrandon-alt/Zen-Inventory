@@ -1,6 +1,6 @@
 <header class="mb-6 animate-enter">
   <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Historial de ventas</h1>
-  @if (!loading() && !error() && sales().length > 0) {
+  @if (!loading() && !error() && total() > 0) {
     <p class="mt-1 text-sm text-fg-subtle">{{ summary() }}</p>
   }
 </header>
@@ -36,7 +36,6 @@
 <app-active-filters class="mb-4 animate-enter-delayed" [filters]="activeFilters()" (removed)="removeFilter($event)" (cleared)="clearFilters()" />
 
 <app-data-table
-  exportName="ventas"
   persistKey="ventas"
   class="block animate-enter-delayed"
   caption="Ventas registradas"
@@ -46,11 +45,14 @@
   [loading]="loading()"
   [error]="error()"
   [pageSize]="10"
+  [total]="total()"
+  [(page)]="page"
   [clickableRows]="true"
   [emptyTitle]="activeFilters().length > 0 ? 'Ninguna venta coincide' : 'Todavía no hay ventas'"
   [emptyDescription]="activeFilters().length > 0 ? 'Prueba quitando algún filtro.' : 'Las ventas que registres en el punto de venta aparecerán aquí.'"
   minWidth="52rem"
   (rowClick)="openDetail($event)"
+  (sortChange)="sort.set($event)"
   (retry)="load()"
 >
   <ng-template appCell="statusLabel" let-s>
