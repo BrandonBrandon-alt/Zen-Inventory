@@ -8,7 +8,10 @@ import co.com.zenvory.inventario.pricelist.application.port.in.PriceListUseCase;
 import co.com.zenvory.inventario.sale.application.port.in.CreateSaleCommand;
 import co.com.zenvory.inventario.sale.application.port.in.CreateSaleUseCase;
 import co.com.zenvory.inventario.sale.application.port.in.SaleManagementUseCase;
+import co.com.zenvory.inventario.sale.application.port.out.SaleFilterOptions;
+import co.com.zenvory.inventario.sale.application.port.out.SalePage;
 import co.com.zenvory.inventario.sale.application.port.out.SaleRepositoryPort;
+import co.com.zenvory.inventario.sale.application.port.out.SaleSearchCriteria;
 import co.com.zenvory.inventario.sale.domain.model.Sale;
 import co.com.zenvory.inventario.sale.domain.model.SaleDetail;
 import co.com.zenvory.inventario.branch.application.port.in.BranchUseCase;
@@ -138,6 +141,16 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
     @Override
     public List<Sale> getSalesByBranch(Long branchId) {
         return saleRepositoryPort.findByBranchId(branchId);
+    }
+
+    @Override
+    public SalePage searchSales(SaleSearchCriteria criteria, int page, int size, String sortBy, boolean ascending) {
+        return saleRepositoryPort.search(criteria, page, size, sortBy, ascending);
+    }
+
+    @Override
+    public SaleFilterOptions getFilterOptions(Long branchId) {
+        return saleRepositoryPort.filterOptions(branchId);
     }
 
     @Override

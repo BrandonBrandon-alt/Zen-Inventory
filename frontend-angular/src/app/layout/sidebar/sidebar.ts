@@ -37,6 +37,9 @@ const HIDE_DELAY = 350;
 /** Ancho (px) de la franja del borde que, al acercarse, abre el menú oculto. */
 const EDGE_WIDTH = 10;
 
+/** Cuántas pantallas del menú tienen atajo Ctrl + número (las teclas 1 a 9). */
+const MAX_NAV_SHORTCUTS = 9;
+
 @Component({
   selector: 'app-sidebar',
   imports: [
@@ -117,6 +120,9 @@ export class Sidebar {
     );
   });
   protected readonly sections = computed(() => navSectionsFor(this.store.role()));
+
+  /** Ctrl + 1…9 llevan a las primeras nueve pantallas del menú, en el orden en que se ven. */
+  private readonly shortcutItems = computed(() => this.sections().flatMap((s) => s.items).slice(0, MAX_NAV_SHORTCUTS));
   protected readonly widthPx = computed(() =>
     this.state.collapsed() && !this.state.autoHide() ? SIDEBAR_COLLAPSED_WIDTH : this.state.width(),
   );
@@ -150,6 +156,7 @@ export class Sidebar {
    * menú fijo lo contrae o lo expande, y en móvil abre o cierra el cajón. Sustituye al "Guardar página" del navegador.
    */
   protected onShortcut(event: KeyboardEvent): void {
+    if (this.onNavShortcut(event)) return;
     if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 's') return;
     event.preventDefault();
     if (!this.viewport.isDesktop()) {
@@ -165,6 +172,24 @@ export class Sidebar {
     } else {
       this.state.toggle();
     }
+  }
+
+  /** Ctrl + número: va a esa pantalla del menú. Devuelve si el evento era uno de estos atajos. */
+  private onNavShortcut(event: KeyboardEvent): boolean {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || !/^[1-9]$/.test(event.key)) return false;
+    const item = this.shortcutItems()[Number(event.key) - 1];
+    if (!item) return false;
+    // Sustituye al cambio de pestaña del navegador (donde este permite reemplazarlo).
+    event.preventDefault();
+    void this.router.navigateByUrl(item.path);
+    this.menu.close();
+    return true;
+  }
+
+  /** El número del atajo Ctrl + n de una pantalla del menú; `null` si no tiene (solo las nueve primeras). */
+  protected shortcutOf(item: NavItem): number | null {
+    const index = this.shortcutItems().findIndex((i) => i.path === item.path);
+    return index === -1 ? null : index + 1;
   }
 
   /** Pulsar fuera cierra un menú abierto con el atajo (abierto con el puntero se cierra al alejarlo). */
@@ -205,7 +230,8 @@ export class Sidebar {
    */
   protected tooltipFor(item: NavItem): string {
     const count = item.alertBadge ? this.alertCount() : 0;
-    const lines = [this.compact() ? item.label : '', item.description, count > 0 ? `${count} ${count === 1 ? 'activa' : 'activas'} ahora.` : ''];
+    const shortcut = this.shortcutOf(item);
+    const lines = [this.compact() ? item.label : '', item.description, count > 0 ? `${count} ${count === 1 ? 'activa' : 'activas'} ahora.` : '', shortcut ? `Atajo: Ctrl + ${shortcut}` : ''];
     return lines.filter(Boolean).join('\n');
   }
 

@@ -74,6 +74,7 @@
               class="relative flex items-center gap-3 rounded-md py-2.5 text-sm text-fg-muted transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
               [class]="compact() ? 'justify-center px-3' : 'px-3'"
               [attr.aria-label]="linkLabel(item)"
+              [attr.aria-keyshortcuts]="shortcutOf(item) ? 'Control+' + shortcutOf(item) : null"
               [appTooltip]="tooltipFor(item)"
               tooltipPlacement="right"
               [tooltipDelay]="300"

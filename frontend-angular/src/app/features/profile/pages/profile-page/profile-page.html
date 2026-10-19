@@ -8,7 +8,7 @@
     <app-card title="Foto">
       <div class="flex flex-col items-center gap-4">
         <app-user-avatar [userId]="current.id" [name]="current.nombre" [version]="current.avatarVersion" size="xl" />
-        <p class="text-center text-xs text-fg-subtle">JPG, PNG o GIF de hasta 5 MB. Se recorta en cuadrado.</p>
+        <p class="text-center text-xs text-fg-subtle">JPG, PNG o GIF de hasta 5 MB. Se recorta en circulo</p>
         @if (photoError(); as message) {
           <app-alert class="w-full">{{ message }}</app-alert>
         }

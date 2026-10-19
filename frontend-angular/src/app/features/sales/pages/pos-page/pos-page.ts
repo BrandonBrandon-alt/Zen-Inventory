@@ -84,6 +84,8 @@ export class PosPage {
   protected readonly loading = signal(true);
   protected readonly loadError = signal<string | null>(null);
   protected readonly search = signal('');
+  protected readonly supplierFilter = signal<number | null>(null);
+  protected readonly availabilityFilter = signal<'all' | 'in-stock' | 'low' | 'out'>('all');
 
   // ---- Venta ----
   protected readonly cart = signal<readonly CartLine[]>([]);
@@ -107,17 +109,39 @@ export class PosPage {
     ...this.priceLists().map((l) => ({ value: l.id, label: l.name, description: l.description || undefined })),
   ]);
 
-  protected readonly results = computed(() => {
-    const needle = normalizeText(this.search().trim());
-    const all = this.products();
-    const matches = needle ? all.filter((p) => normalizeText(p.name).includes(needle) || normalizeText(p.sku).includes(needle)) : all;
-    return matches.slice(0, MAX_RESULTS);
+  protected readonly availabilityOptions: readonly SelectOption<'all' | 'in-stock' | 'low' | 'out'>[] = [
+    { value: 'all', label: 'Todo el stock' },
+    { value: 'in-stock', label: 'Con stock' },
+    { value: 'low', label: 'Stock bajo (en o bajo el mínimo)' },
+    { value: 'out', label: 'Sin stock' },
+  ];
+  protected readonly supplierOptions = computed<SelectOption<number | null>[]>(() => {
+    const suppliers = new Map(this.products().flatMap((p) => p.suppliers).map((s) => [s.id, s.name]));
+    return [
+      { value: null, label: 'Todos los proveedores' },
+      ...[...suppliers].sort((a, b) => a[1].localeCompare(b[1], 'es')).map(([value, label]) => ({ value, label })),
+    ];
   });
-  protected readonly truncated = computed(() => {
+  /** Hay algún filtro además de la búsqueda de texto. */
+  protected readonly filtering = computed(() => this.supplierFilter() !== null || this.availabilityFilter() !== 'all');
+
+  /** Productos que cumplen la búsqueda y los filtros (antes de recortar a los primeros). */
+  private readonly matches = computed(() => {
     const needle = normalizeText(this.search().trim());
-    const total = needle ? this.products().filter((p) => normalizeText(p.name).includes(needle) || normalizeText(p.sku).includes(needle)).length : this.products().length;
-    return total > MAX_RESULTS ? total - MAX_RESULTS : 0;
+    const supplier = this.supplierFilter();
+    const availability = this.availabilityFilter();
+    return this.products().filter(
+      (p) =>
+        (!needle || normalizeText(p.name).includes(needle) || normalizeText(p.sku).includes(needle)) &&
+        (supplier === null || p.suppliers.some((s) => s.id === supplier)) &&
+        (availability === 'all' ||
+          (availability === 'in-stock' && p.stock > 0) ||
+          (availability === 'out' && p.stock <= 0) ||
+          (availability === 'low' && p.minimum > 0 && p.stock <= p.minimum)),
+    );
   });
+  protected readonly results = computed(() => this.matches().slice(0, MAX_RESULTS));
+  protected readonly truncated = computed(() => Math.max(0, this.matches().length - MAX_RESULTS));
 
   protected readonly rows = computed<CartRow[]>(() => {
     const byId = new Map(this.products().map((p) => [p.id, p]));
@@ -170,6 +194,11 @@ export class PosPage {
       });
     });
     this.api.priceLists().subscribe((lists) => this.priceLists.set(lists));
+  }
+
+  protected clearFilters(): void {
+    this.supplierFilter.set(null);
+    this.availabilityFilter.set('all');
   }
 
   protected setSearch(event: Event): void {

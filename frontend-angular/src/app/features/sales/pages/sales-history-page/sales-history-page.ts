@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
 import { catchError, firstValueFrom, of } from 'rxjs';
 import {
   LucideCalendar,
@@ -15,8 +15,9 @@ import {
 import { toApiError } from '@core/api/api-error';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
-import { formatDateTime, formatMoney, formatQuantity, normalizeText } from '@shared/format/format';
-import { inDateRange, inNumberRange, numberFromInput, optionsFrom } from '@shared/filters/filter-helpers';
+import { CatalogOptionsApi, type SupplierOption } from '@core/catalog/catalog-options-api';
+import { formatDateTime, formatMoney, formatQuantity } from '@shared/format/format';
+import { numberFromInput, optionsFrom } from '@shared/filters/filter-helpers';
 import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
@@ -29,7 +30,7 @@ import { Select, type SelectOption } from '@shared/ui/select/select';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { SaleDetailModal } from '../../components/sale-detail-modal/sale-detail-modal';
 import { SALE_INFO, customerLabel } from '../../data-access/sale-labels';
-import { SALE_STATUSES, type Sale, type SaleStatus, SalesApi } from '../../data-access/sales-api';
+import { SALE_STATUSES, type Sale, type SaleQuery, type SaleStatus, SalesApi } from '../../data-access/sales-api';
 
 /** Fila de la tabla: la venta con los textos que se muestran y se ordenan. */
 interface SaleRow extends Sale {
@@ -38,6 +39,11 @@ interface SaleRow extends Sale {
 }
 
 const rowKey = (row: SaleRow): number => row.id;
+const PAGE_SIZE = 10;
+/** Pausa tras la última tecla antes de buscar en el servidor. */
+const SEARCH_DELAY_MS = 300;
+/** Columnas de la tabla → clave de orden del servidor. */
+const SORT_KEYS: Readonly<Record<string, string>> = { statusLabel: 'status' };
 const DAY = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' });
 
 @Component({
@@ -50,7 +56,9 @@ const DAY = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' });
 export class SalesHistoryPage {
   private readonly api = inject(SalesApi);
   private readonly branchApi = inject(BranchOptionsApi);
+  private readonly catalogApi = inject(CatalogOptionsApi);
   private readonly auth = inject(AuthStore);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly rowKey = rowKey;
   protected readonly storeIcon = LucideStore.icon;
@@ -60,8 +68,14 @@ export class SalesHistoryPage {
   /** Anular una venta es de ADMIN y MANAGER. */
   protected readonly canCancel = computed(() => this.auth.role() === 'ADMIN' || this.auth.role() === 'MANAGER');
 
+  /** Las ventas de la página que se ve; el resto las pide el servidor al cambiar de página, orden o filtros. */
   protected readonly sales = signal<readonly Sale[]>([]);
+  protected readonly total = signal(0);
+  private readonly completed = signal({ count: 0, total: 0 });
+  private readonly sellers = signal<readonly string[]>([]);
+  private readonly products = signal<readonly string[]>([]);
   protected readonly branches = signal<readonly BranchOption[]>([]);
+  protected readonly suppliers = signal<readonly SupplierOption[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
@@ -75,8 +89,15 @@ export class SalesHistoryPage {
   protected readonly productFilter = persistedFilter(SalesHistoryPage.SCREEN, 'product', null as string | null, codecs.nullable(codecs.text()));
   protected readonly minTotal = persistedFilter(SalesHistoryPage.SCREEN, 'minTotal', null as number | null, codecs.nullable(codecs.number()));
   protected readonly maxTotal = persistedFilter(SalesHistoryPage.SCREEN, 'maxTotal', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly supplierFilter = persistedFilter(SalesHistoryPage.SCREEN, 'supplier', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly discountFilter = persistedFilter(SalesHistoryPage.SCREEN, 'discount', 'all' as 'all' | 'with' | 'without', codecs.oneOf(['all', 'with', 'without'] as const));
+  protected readonly customerFilter = persistedFilter(SalesHistoryPage.SCREEN, 'customer', 'all' as 'all' | 'registered' | 'anonymous', codecs.oneOf(['all', 'registered', 'anonymous'] as const));
   protected readonly advancedOpen = persistedFilter(SalesHistoryPage.SCREEN, 'advancedOpen', false, codecs.bool());
   protected readonly search = signal('');
+  /** Lo buscado, ya con la pausa: es lo que se envía al servidor. */
+  private readonly searchTerm = signal('');
+  private searchTimer: ReturnType<typeof setTimeout> | undefined;
+  protected readonly sort = signal<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   protected readonly detailOpen = signal(false);
   protected readonly selectedId = signal<number | null>(null);
@@ -90,6 +111,21 @@ export class SalesHistoryPage {
     ...this.branches().map((b) => ({ value: b.id, label: b.nombre })),
   ]);
 
+  protected readonly discountOptions: readonly SelectOption<'all' | 'with' | 'without'>[] = [
+    { value: 'all', label: 'Con o sin descuento' },
+    { value: 'with', label: 'Con descuento' },
+    { value: 'without', label: 'Sin descuento' },
+  ];
+  protected readonly customerOptions: readonly SelectOption<'all' | 'registered' | 'anonymous'>[] = [
+    { value: 'all', label: 'Todos los clientes' },
+    { value: 'registered', label: 'Cliente registrado' },
+    { value: 'anonymous', label: 'Cliente sin registrar' },
+  ];
+  protected readonly supplierOptions = computed<SelectOption<number | null>[]>(() => [
+    { value: null, label: 'Todos los proveedores' },
+    ...this.suppliers().map((s) => ({ value: s.id, label: s.nombre })),
+  ]);
+
   protected readonly columns = computed<readonly TableColumn<SaleRow>[]>(() => [
     { key: 'id', header: 'N.º', icon: LucideHash.icon, sortable: true, width: '5rem', display: (r) => `#${r.id}` },
     { key: 'date', header: 'Fecha', icon: LucideCalendar.icon, sortable: true, width: '11.5rem', value: (r) => r.date, display: (r) => formatDateTime(r.date) },
@@ -101,28 +137,44 @@ export class SalesHistoryPage {
     { key: 'acciones', header: 'Acciones', align: 'end' as const },
   ]);
 
-  protected readonly sellerOptions = computed(() => optionsFrom(this.sales().map((s) => s.seller), this.sellerFilter(), 'Todos los vendedores'));
-  protected readonly productOptions = computed(() => optionsFrom(this.sales().flatMap((s) => s.lines.map((l) => l.productName)), this.productFilter(), 'Todos los productos'));
+  protected readonly sellerOptions = computed(() => optionsFrom(this.sellers(), this.sellerFilter(), 'Todos los vendedores'));
+  protected readonly productOptions = computed(() => optionsFrom(this.products(), this.productFilter(), 'Todos los productos'));
 
-  protected readonly rows = computed<SaleRow[]>(() => {
-    const status = this.statusFilter();
-    const needle = normalizeText(this.search().trim());
-    const { from, to, minTotal, maxTotal } = { from: this.from(), to: this.to(), minTotal: this.minTotal(), maxTotal: this.maxTotal() };
-    const seller = this.sellerFilter();
-    const product = this.productFilter();
-    return this.sales()
-      .filter((s) => status === 'all' || s.status === status)
-      .filter((s) => inDateRange(s.date, from, to))
-      .filter((s) => seller === null || s.seller === seller)
-      .filter((s) => product === null || s.lines.some((l) => l.productName === product))
-      .filter((s) => inNumberRange(s.total, minTotal, maxTotal))
-      .filter((s) => !needle || normalizeText(`${s.id} ${s.customerName} ${s.customerDocument} ${s.seller}`).includes(needle))
-      .map((s) => ({ ...s, customer: customerLabel(s.customerName), statusLabel: SALE_INFO[s.status].label }));
+  protected readonly rows = computed<SaleRow[]>(() =>
+    this.sales().map((s) => ({ ...s, customer: customerLabel(s.customerName), statusLabel: SALE_INFO[s.status].label })),
+  );
+
+  /** Lo que filtra al servidor; si cambia, se vuelve a la primera página. */
+  private readonly filters = computed(() => ({
+    branchId: this.isAdmin() ? this.branchFilter() : null,
+    status: this.statusFilter() === 'all' ? null : (this.statusFilter() as SaleStatus),
+    from: this.from(),
+    to: this.to(),
+    seller: this.sellerFilter(),
+    product: this.productFilter(),
+    minTotal: this.minTotal(),
+    maxTotal: this.maxTotal(),
+    text: this.searchTerm(),
+    supplierId: this.supplierFilter(),
+    withDiscount: this.discountFilter() === 'all' ? null : this.discountFilter() === 'with',
+    registeredCustomer: this.customerFilter() === 'all' ? null : this.customerFilter() === 'registered',
+  }));
+  protected readonly page = linkedSignal<unknown, number>({ source: this.filters, computation: () => 1 });
+
+  private readonly query = computed<SaleQuery>(() => {
+    const sort = this.sort();
+    return {
+      ...this.filters(),
+      page: this.page(),
+      size: PAGE_SIZE,
+      sortBy: sort ? (SORT_KEYS[sort.key] ?? sort.key) : null,
+      direction: sort?.direction ?? 'desc',
+    };
   });
 
   /** Los filtros del panel «Más filtros» que están aplicados (el botón muestra cuántos). */
   protected readonly advancedCount = computed(
-    () => [this.sellerFilter() !== null, this.productFilter() !== null, this.minTotal() !== null, this.maxTotal() !== null].filter(Boolean).length,
+    () => [this.sellerFilter() !== null, this.productFilter() !== null, this.supplierFilter() !== null, this.discountFilter() !== 'all', this.customerFilter() !== 'all', this.minTotal() !== null, this.maxTotal() !== null].filter(Boolean).length,
   );
 
   /** Todos los filtros aplicados, para mostrarlos como etiquetas que se quitan. */
@@ -135,6 +187,9 @@ export class SalesHistoryPage {
     if (this.to() !== null) list.push({ id: 'to', label: 'Hasta', text: DAY.format(this.to()!) });
     if (this.sellerFilter() !== null) list.push({ id: 'seller', label: 'Vendedor', text: this.sellerFilter()! });
     if (this.productFilter() !== null) list.push({ id: 'product', label: 'Producto', text: this.productFilter()! });
+    if (this.supplierFilter() !== null) list.push({ id: 'supplier', label: 'Proveedor', text: this.suppliers().find((s) => s.id === this.supplierFilter())?.nombre ?? `Proveedor ${this.supplierFilter()}` });
+    if (this.discountFilter() !== 'all') list.push({ id: 'discount', label: 'Descuento', text: this.discountFilter() === 'with' ? 'Con descuento' : 'Sin descuento' });
+    if (this.customerFilter() !== 'all') list.push({ id: 'customer', label: 'Cliente', text: this.customerFilter() === 'registered' ? 'Registrado' : 'Sin registrar' });
     if (this.minTotal() !== null) list.push({ id: 'minTotal', label: 'Total desde', text: formatMoney(this.minTotal()) });
     if (this.maxTotal() !== null) list.push({ id: 'maxTotal', label: 'Total hasta', text: formatMoney(this.maxTotal()) });
     if (this.search().trim()) list.push({ id: 'search', label: 'Búsqueda', text: this.search().trim() });
@@ -144,9 +199,8 @@ export class SalesHistoryPage {
   protected readonly selected = computed(() => this.sales().find((s) => s.id === this.selectedId()) ?? null);
 
   protected readonly summary = computed(() => {
-    const rows = this.rows().filter((r) => r.status === 'COMPLETED');
-    const total = rows.reduce((sum, r) => sum + r.total, 0);
-    return `${rows.length === 1 ? '1 venta completada' : `${formatQuantity(rows.length)} ventas completadas`}, ${formatMoney(total)}`;
+    const { count, total } = this.completed();
+    return `${count === 1 ? '1 venta completada' : `${formatQuantity(count)} ventas completadas`}, ${formatMoney(total)}`;
   });
 
   constructor() {
@@ -156,23 +210,45 @@ export class SalesHistoryPage {
         .pipe(catchError(() => of([])))
         .subscribe((branches) => this.branches.set(branches));
     }
-    // La sucursal elegida la filtra el servidor (solo el ADMIN puede elegir); cada cambio vuelve a pedir la lista.
+    this.catalogApi
+      .suppliers()
+      .pipe(catchError(() => of([])))
+      .subscribe((suppliers) => this.suppliers.set(suppliers));
+    // Cada cambio de página, orden o filtro vuelve a pedir la página al servidor.
     effect(() => {
-      const branch = this.branchFilter();
-      untracked(() => void this.load(false, branch));
+      const query = this.query();
+      untracked(() => void this.load(false, query));
     });
+    // Los vendedores y productos que se pueden elegir dependen de la sucursal.
+    effect(() => {
+      const branch = this.isAdmin() ? this.branchFilter() : null;
+      untracked(() =>
+        this.api
+          .filterOptions(branch)
+          .pipe(catchError(() => of({ sellers: [], products: [] })))
+          .subscribe((o) => {
+            this.sellers.set(o.sellers);
+            this.products.set(o.products);
+          }),
+      );
+    });
+    this.destroyRef.onDestroy(() => clearTimeout(this.searchTimer));
   }
 
-  /** Solo la última petición manda: al cambiar de sucursal rápido, la respuesta de la anterior no debe pisar la lista. */
+  /** Solo la última petición manda: al cambiar de página o filtro rápido, la respuesta de la anterior no debe pisar la lista. */
   private loadId = 0;
 
-  protected async load(silent = false, branch = this.branchFilter()): Promise<void> {
+  protected async load(silent = false, query = untracked(this.query)): Promise<void> {
     const id = ++this.loadId;
     if (!silent) this.loading.set(true);
     this.error.set(null);
     try {
-      const sales = await firstValueFrom(this.api.list(this.isAdmin() ? branch : null));
-      if (id === this.loadId) this.sales.set(sales);
+      const page = await firstValueFrom(this.api.search(query));
+      if (id === this.loadId) {
+        this.sales.set(page.sales);
+        this.total.set(page.total);
+        this.completed.set({ count: page.completedCount, total: page.completedTotal });
+      }
     } catch (error) {
       if (id === this.loadId) this.error.set(toApiError(error).message);
     } finally {
@@ -181,7 +257,10 @@ export class SalesHistoryPage {
   }
 
   protected onSearch(event: Event): void {
-    this.search.set((event.target as HTMLInputElement).value);
+    const value = (event.target as HTMLInputElement).value;
+    this.search.set(value);
+    clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => this.searchTerm.set(value.trim()), SEARCH_DELAY_MS);
   }
 
   protected readonly numberFromInput = numberFromInput;
@@ -194,9 +273,12 @@ export class SalesHistoryPage {
       case 'to': this.to.set(null); break;
       case 'seller': this.sellerFilter.set(null); break;
       case 'product': this.productFilter.set(null); break;
+      case 'supplier': this.supplierFilter.set(null); break;
+      case 'discount': this.discountFilter.set('all'); break;
+      case 'customer': this.customerFilter.set('all'); break;
       case 'minTotal': this.minTotal.set(null); break;
       case 'maxTotal': this.maxTotal.set(null); break;
-      case 'search': this.search.set(''); break;
+      case 'search': this.search.set(''); clearTimeout(this.searchTimer); this.searchTerm.set(''); break;
     }
   }
 

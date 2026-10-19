@@ -10,6 +10,7 @@ import {
   effect,
   inject,
   input,
+  model,
   output,
   signal,
   untracked,
@@ -101,6 +102,13 @@ export class DataTable<T> {
   readonly error = input<string | null>(null);
   /** Filas por página; `null` muestra todas sin paginación. */
   readonly pageSize = input<number | null>(null);
+  /**
+   * Paginación en el servidor: total de filas que cumplen los filtros (no solo las recibidas). Con este valor la tabla
+   * no corta ni ordena `rows` (ya llegan como deben): pide la página con `[(page)]` y el orden con `(sortChange)`.
+   */
+  readonly total = input<number | null>(null);
+  /** Página visible, desde 1. Con paginación en el servidor la controla quien usa la tabla. */
+  readonly page = model(1);
   readonly clickableRows = input(false, { transform: booleanAttribute });
   /** Ancho mínimo de la tabla: por debajo, se desplaza horizontalmente en vez de comprimirse. */
   readonly minWidth = input('40rem');
@@ -119,6 +127,8 @@ export class DataTable<T> {
   readonly exportColumns = input<readonly TableColumn<T>[] | null>(null);
 
   readonly rowClick = output<T>();
+  /** El orden elegido (`null`: el original). Solo se usa con paginación en el servidor. */
+  readonly sortChange = output<{ key: string; direction: Direction } | null>();
   readonly retry = output<void>();
 
   private readonly cells = contentChildren(DataTableCell);
@@ -127,7 +137,7 @@ export class DataTable<T> {
   protected readonly skeletonWidths = SKELETON_WIDTHS;
 
   protected readonly sort = signal<{ key: string; direction: Direction } | null>(null);
-  protected readonly page = signal(1);
+  protected readonly serverSide = computed(() => this.total() !== null);
 
   private readonly templates = computed(() => new Map(this.cells().map((cell) => [cell.name(), cell.template])));
 
@@ -139,7 +149,7 @@ export class DataTable<T> {
   protected readonly sortedRows = computed(() => {
     const sort = this.sort();
     const column = sort ? this.columns().find((c) => c.key === sort.key) : undefined;
-    if (!sort || !column) return this.rows();
+    if (!sort || !column || this.serverSide()) return this.rows();
     const sign = sort.direction === 'asc' ? 1 : -1;
     return [...this.rows()].sort((a, b) => {
       const va = this.valueOf(column, a);
@@ -152,18 +162,18 @@ export class DataTable<T> {
 
   protected readonly pageCount = computed(() => {
     const size = this.pageSize();
-    return size ? Math.max(1, Math.ceil(this.rows().length / size)) : 1;
+    return size ? Math.max(1, Math.ceil((this.total() ?? this.rows().length) / size)) : 1;
   });
 
   protected readonly visibleRows = computed(() => {
     const size = this.pageSize();
-    if (!size) return this.sortedRows();
+    if (!size || this.serverSide()) return this.sortedRows();
     const start = (Math.min(this.page(), this.pageCount()) - 1) * size;
     return this.sortedRows().slice(start, start + size);
   });
 
   /** Hay datos que exportar: el botón va sobre la tabla (no cuando se carga, falla o no hay filas). */
-  protected readonly showExport = computed(() => !!this.exportName() && !this.skeleton() && !this.error() && this.rows().length > 0);
+  protected readonly showExport = computed(() => !!this.exportName() && !this.serverSide() && !this.skeleton() && !this.error() && this.rows().length > 0);
 
   /** Paginación bajo la tabla. */
   protected readonly showFooter = computed(() => !this.skeleton() && !this.error() && this.rows().length > 0 && !!this.pageSize());
@@ -195,11 +205,20 @@ export class DataTable<T> {
       const sort = this.sort();
       if (key && hydrated) saveStored(this.userId, `table:${key}`, 'sort', sort, null);
     });
-    // Si cambian los datos o el orden, se vuelve a la primera página.
+    // Si cambian los datos o el orden, se vuelve a la primera página (con paginación en el servidor, quien la usa decide).
     effect(() => {
+      if (this.serverSide()) return;
       this.rows();
       this.sort();
       untracked(() => this.page.set(1));
+    });
+    effect(() => {
+      const sort = this.sort();
+      if (!untracked(() => this.serverSide())) return;
+      untracked(() => {
+        this.page.set(1);
+        this.sortChange.emit(sort);
+      });
     });
   }
 

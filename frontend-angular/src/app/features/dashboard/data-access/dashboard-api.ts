@@ -45,6 +45,8 @@ export interface MonthlySales {
 }
 export type ReplenishmentPriority = 'HIGH' | 'MEDIUM' | 'LOW';
 export interface Replenishment {
+  readonly branchId: number;
+  readonly branchName: string;
   readonly productId: number;
   readonly name: string;
   readonly stock: number;
@@ -162,8 +164,8 @@ export class DashboardApi {
       map((items) =>
         items
           .flatMap((i): Replenishment[] =>
-            typeof i.productId === 'number' && i.productName
-              ? [{ productId: i.productId, name: i.productName, stock: i.currentStock ?? 0, minimum: i.minStock ?? 0, priority: i.priority === 'HIGH' || i.priority === 'LOW' ? i.priority : 'MEDIUM' }]
+            typeof i.productId === 'number' && typeof i.branchId === 'number' && i.productName
+              ? [{ branchId: i.branchId, branchName: i.branchName?.trim() ?? '', productId: i.productId, name: i.productName, stock: i.currentStock ?? 0, minimum: i.minStock ?? 0, priority: i.priority === 'HIGH' || i.priority === 'LOW' ? i.priority : 'MEDIUM' }]
               : [],
           )
           .sort((a, b) => order[a.priority] - order[b.priority] || a.stock - a.minimum - (b.stock - b.minimum)),

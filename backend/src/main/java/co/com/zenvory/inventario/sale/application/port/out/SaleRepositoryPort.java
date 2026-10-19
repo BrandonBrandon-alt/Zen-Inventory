@@ -10,6 +10,9 @@ public interface SaleRepositoryPort {
     Optional<Sale> findById(Long id);
     List<Sale> findAll();
     List<Sale> findByBranchId(Long branchId);
+    /** Una página de ventas que cumplen los filtros; {@code sortBy} es una clave de columna (id, date, customer, seller, branchName, total, status). */
+    SalePage search(SaleSearchCriteria criteria, int page, int size, String sortBy, boolean ascending);
+    SaleFilterOptions filterOptions(Long branchId);
     /** Como {@link #findById} pero bloquea la fila: toda transición de estado de la venta debe leerla así. */
     Optional<Sale> findByIdForUpdate(Long id);
 }

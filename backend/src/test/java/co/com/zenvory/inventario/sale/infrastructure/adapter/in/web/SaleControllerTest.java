@@ -145,4 +145,101 @@ class SaleControllerTest {
         when(saleManagementUseCase.getSaleById(1L)).thenReturn(sale);
         mockMvc.perform(get("/api/v1/sales/1")).andExpect(status().isForbidden());
     }
+
+    private static co.com.zenvory.inventario.sale.application.port.out.SalePage emptyPage() {
+        return new co.com.zenvory.inventario.sale.application.port.out.SalePage(List.of(), 0, 0, java.math.BigDecimal.ZERO);
+    }
+
+    private co.com.zenvory.inventario.sale.application.port.out.SaleSearchCriteria searchedCriteria(int size) {
+        org.mockito.ArgumentCaptor<co.com.zenvory.inventario.sale.application.port.out.SaleSearchCriteria> captor =
+                org.mockito.ArgumentCaptor.forClass(co.com.zenvory.inventario.sale.application.port.out.SaleSearchCriteria.class);
+        org.mockito.Mockito.verify(saleManagementUseCase).searchSales(
+                captor.capture(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.eq(size),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean());
+        return captor.getValue();
+    }
+
+    @Test
+    @DisplayName("GET /sales/search: devuelve la página con el total y el resumen de todo lo filtrado")
+    void search_returnsPageWithSummary() throws Exception {
+        Sale sale = mock(Sale.class);
+        when(sale.getStatus()).thenReturn(co.com.zenvory.inventario.sale.domain.model.SaleStatus.COMPLETED);
+        when(sale.getDetails()).thenReturn(List.of());
+        when(saleManagementUseCase.searchSales(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(2),
+                org.mockito.ArgumentMatchers.eq(10), org.mockito.ArgumentMatchers.eq("total"), org.mockito.ArgumentMatchers.eq(true)))
+                .thenReturn(new co.com.zenvory.inventario.sale.application.port.out.SalePage(List.of(sale), 25, 20, new java.math.BigDecimal("1500.50")));
+
+        mockMvc.perform(get("/api/v1/sales/search?page=2&size=10&sortBy=total&direction=asc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.totalElements").value(25))
+                .andExpect(jsonPath("$.totalPages").value(3))
+                .andExpect(jsonPath("$.page").value(2))
+                .andExpect(jsonPath("$.completedCount").value(20))
+                .andExpect(jsonPath("$.completedTotal").value(1500.50));
+    }
+
+    @Test
+    @DisplayName("GET /sales/search: pasa los filtros al caso de uso (ADMIN puede elegir sucursal)")
+    void search_forwardsFilters() throws Exception {
+        when(saleManagementUseCase.searchSales(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenReturn(emptyPage());
+
+        mockMvc.perform(get("/api/v1/sales/search?branchId=3&status=CANCELED&from=2026-01-01&to=2026-01-31&seller=Ana&product=Cafe&minTotal=10&maxTotal=99.5&q=perez&supplierId=7&withDiscount=true&registeredCustomer=false"))
+                .andExpect(status().isOk());
+
+        var c = searchedCriteria(10);
+        org.assertj.core.api.Assertions.assertThat(c.branchId()).isEqualTo(3L);
+        org.assertj.core.api.Assertions.assertThat(c.status()).isEqualTo(co.com.zenvory.inventario.sale.domain.model.SaleStatus.CANCELED);
+        org.assertj.core.api.Assertions.assertThat(c.from()).isEqualTo(java.time.LocalDate.of(2026, 1, 1));
+        org.assertj.core.api.Assertions.assertThat(c.to()).isEqualTo(java.time.LocalDate.of(2026, 1, 31));
+        org.assertj.core.api.Assertions.assertThat(c.seller()).isEqualTo("Ana");
+        org.assertj.core.api.Assertions.assertThat(c.product()).isEqualTo("Cafe");
+        org.assertj.core.api.Assertions.assertThat(c.minTotal()).isEqualByComparingTo("10");
+        org.assertj.core.api.Assertions.assertThat(c.maxTotal()).isEqualByComparingTo("99.5");
+        org.assertj.core.api.Assertions.assertThat(c.text()).isEqualTo("perez");
+        org.assertj.core.api.Assertions.assertThat(c.supplierId()).isEqualTo(7L);
+        org.assertj.core.api.Assertions.assertThat(c.withDiscount()).isTrue();
+        org.assertj.core.api.Assertions.assertThat(c.registeredCustomer()).isFalse();
+    }
+
+    @Test
+    @DisplayName("GET /sales/search: quien no es ADMIN solo ve su sucursal, aunque pida otra")
+    void search_nonAdmin_isRestrictedToOwnBranch() throws Exception {
+        actAsManagerOfBranch(1L);
+        when(saleManagementUseCase.searchSales(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenReturn(emptyPage());
+
+        mockMvc.perform(get("/api/v1/sales/search?branchId=2")).andExpect(status().isOk());
+
+        org.assertj.core.api.Assertions.assertThat(searchedCriteria(10).branchId()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("GET /sales/search: el tamaño de página tiene tope y la página no es negativa")
+    void search_clampsPageSize() throws Exception {
+        when(saleManagementUseCase.searchSales(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenReturn(emptyPage());
+
+        mockMvc.perform(get("/api/v1/sales/search?page=-4&size=100000")).andExpect(status().isOk());
+
+        org.mockito.Mockito.verify(saleManagementUseCase).searchSales(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(100),
+                org.mockito.ArgumentMatchers.eq("id"), org.mockito.ArgumentMatchers.eq(false));
+    }
+
+    @Test
+    @DisplayName("GET /sales/filter-options: devuelve vendedores y productos")
+    void filterOptions_returnsLists() throws Exception {
+        when(saleManagementUseCase.getFilterOptions(null))
+                .thenReturn(new co.com.zenvory.inventario.sale.application.port.out.SaleFilterOptions(List.of("Ana"), List.of("Cafe", "Te")));
+
+        mockMvc.perform(get("/api/v1/sales/filter-options"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sellers[0]").value("Ana"))
+                .andExpect(jsonPath("$.products.length()").value(2));
+    }
 }

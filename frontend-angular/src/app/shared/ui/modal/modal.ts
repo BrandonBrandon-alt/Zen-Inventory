@@ -51,11 +51,12 @@ let scrollLocks = 0;
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
   template: `
+    <!-- fixed + inset-0 + m-auto + h-fit: se ancla a la pantalla y se centra aunque la página esté desplazada (con relative se quedaba en su sitio del documento). -->
     <!-- El clic en el fondo es un atajo para el ratón: quien usa teclado cierra con Escape o con el botón "Cerrar". -->
     <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
     <dialog
       #dialog
-      class="relative m-auto w-[calc(100vw-2rem)] rounded-xl border border-line bg-card p-0 text-fg shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-[2px] open:animate-modal-in open:backdrop:animate-backdrop-in"
+      class="fixed inset-0 m-auto h-fit w-[calc(100vw-2rem)] rounded-xl border border-line bg-card p-0 text-fg shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-[2px] open:animate-modal-in open:backdrop:animate-backdrop-in"
       [class]="sizeClass()"
       [attr.aria-labelledby]="titleId"
       [attr.aria-describedby]="description() ? descriptionId : null"
