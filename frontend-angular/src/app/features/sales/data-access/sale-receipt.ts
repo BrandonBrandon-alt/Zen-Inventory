@@ -1,5 +1,6 @@
 import { type Company, DEFAULT_COMPANY } from '@core/company/company-info';
 import { formatDateTime, formatMoney, formatQuantity } from '@shared/format/format';
+import { paymentLabel } from '@core/sales/payment-method';
 import { customerLabel } from './sale-labels';
 import type { Sale } from './sales-api';
 
@@ -60,6 +61,8 @@ export function buildSaleReceiptHtml(sale: Sale, company: Company = DEFAULT_COMP
   <div class="rule"></div>
   <div class="label">Fecha</div><div class="strong">${escapeHtml(formatDateTime(sale.date))}</div>
   ${sale.seller ? `<div class="label" style="margin-top:6px">Atendido por</div><div class="strong">${escapeHtml(sale.seller)}</div>` : ''}
+  <div class="label" style="margin-top:6px">Forma de pago</div>
+  <div class="strong">${escapeHtml(paymentLabel(sale.paymentMethod))}${sale.paymentReference ? ` · ${escapeHtml(sale.paymentReference)}` : ''}</div>
   <div class="label" style="margin-top:6px">Cliente</div>
   <div class="strong">${escapeHtml(customerLabel(sale.customerName))}</div>
   ${sale.customerDocument ? `<div class="muted">${escapeHtml(sale.customerDocument)}</div>` : ''}

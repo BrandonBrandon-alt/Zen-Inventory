@@ -15,7 +15,7 @@ Dos áreas en un mismo módulo:
 
 | Tabla | Qué guarda |
 |---|---|
-| `ventas` | Cabecera: `fecha`, `sucursal_id`, `usuario_id`, `subtotal`, `descuento_total`, `total_final`, `estado`, `motivo_anulacion`, `cliente_nombre`/`cliente_documento`, `global_discount_percentage`, y la "foto" `sucursal_nombre` + `vendedor_nombre` |
+| `ventas` | Cabecera: `fecha`, `sucursal_id`, `usuario_id`, `subtotal`, `descuento_total`, `total_final`, `estado`, `motivo_anulacion`, `cliente_nombre`/`cliente_documento`, `metodo_pago` (EFECTIVO, TARJETA, TRANSFERENCIA, OTRO) y `referencia_pago` (migración V6; **nulos en las ventas anteriores**, que se muestran como «Sin registrar»), `global_discount_percentage`, y la "foto" `sucursal_nombre` + `vendedor_nombre` |
 | `detalles_venta` | Líneas: `producto_id`, `producto_nombre` (foto), `cantidad`, `precio_unitario_aplicado`, `porcentaje_descuento`, `subtotal_linea` |
 | `solicitudes_devolucion` | `venta_id`, `sucursal_id`, `solicitante_id`, `aprobador_id`, `estado`, `motivo_general`, `comentario_aprobador`, fechas |
 | `detalles_devolucion_solicitud` | Líneas: `producto_id`, `cantidad`, `motivo_especifico`, `precio_unidad_venta` |
@@ -65,7 +65,7 @@ sale/
 
 ## Flujo 1: registrar una venta (`SaleService.execute`, transaccional)
 
-1. El controller toma al vendedor y la sucursal de `CurrentUser` (ignora lo que venga en el JSON).
+1. El controller toma al vendedor y la sucursal de `CurrentUser` (ignora lo que venga en el JSON). La **forma de pago es obligatoria** (`paymentMethod`); `paymentReference` es opcional (n.º de voucher o de transferencia).
 2. Por cada ítem: busca el producto (`catalog`) y resuelve el precio con esta jerarquía:
    **lista de la línea → lista global de la venta → precio base del producto** (`pricelist`).
 3. **Pre-valida el stock de todas las líneas antes de guardar nada** (`inventory`).
@@ -99,7 +99,7 @@ Si cualquier paso falla, **todo se revierte** (no queda una venta sin descontar 
 El frontend ya no baja las 18.000 ventas. Este endpoint filtra, ordena y pagina en el servidor:
 
 - Parámetros: `page` (desde 0), `size` (máx. 100), `sortBy` (id, date, customer, seller, branchName, total, status),
-  `direction`, `branchId`, `status`, `from`, `to`, `seller`, `product`, `minTotal`, `maxTotal`, `q` (texto: n.º,
+  `direction`, `branchId`, `status`, `from`, `to`, `seller`, `product`, `minTotal`, `maxTotal`, `paymentMethod`, `q` (texto: n.º,
   cliente, documento o vendedor, sin importar tildes ni mayúsculas).
 - Responde `{content, totalElements, totalPages, completedCount, completedTotal}`: el **resumen** («N ventas
   completadas, $X») cubre todo lo filtrado, no solo la página.

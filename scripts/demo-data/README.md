@@ -27,6 +27,7 @@ Los usuarios de siempre (`admin@zeninventory.co`…) y sus datos no se tocan.
 Todo se simula en orden cronológico, así que lo que queda en la base respeta las reglas de la aplicación:
 
 - El stock de cada sucursal es la suma de sus movimientos y el último saldo del kardex coincide con las existencias.
+- Cada venta lleva su forma de pago (efectivo, tarjeta, transferencia u otro) y, en tarjeta y transferencia, una referencia. Las órdenes de compra pagadas traen sus pagos (hay abonos en las de pago parcial).
 - Las compras recibidas mueven el costo promedio con la fórmula del backend; hay recepciones parciales, órdenes por
   aprobar, en camino, canceladas y pagos pendientes, parciales y completos.
 - Un traslado descuenta del origen al despacharse y suma al destino al recibirse; hay novedades por faltantes,

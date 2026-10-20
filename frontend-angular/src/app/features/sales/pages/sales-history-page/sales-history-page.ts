@@ -4,6 +4,7 @@ import {
   LucideCalendar,
   LucideCircleCheck,
   LucideCoins,
+  LucideWallet,
   LucideEye,
   LucideHash,
   LucideListFilter,
@@ -29,12 +30,14 @@ import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { SaleDetailModal } from '../../components/sale-detail-modal/sale-detail-modal';
+import { PAYMENT_METHOD_LABELS, SALE_PAYMENT_METHODS, type SalePaymentMethod, paymentLabel } from '@core/sales/payment-method';
 import { SALE_INFO, customerLabel } from '../../data-access/sale-labels';
 import { SALE_STATUSES, type Sale, type SaleQuery, type SaleStatus, SalesApi } from '../../data-access/sales-api';
 
 /** Fila de la tabla: la venta con los textos que se muestran y se ordenan. */
 interface SaleRow extends Sale {
   readonly customer: string;
+  readonly paymentText: string;
   readonly statusLabel: string;
 }
 
@@ -92,6 +95,7 @@ export class SalesHistoryPage {
   protected readonly supplierFilter = persistedFilter(SalesHistoryPage.SCREEN, 'supplier', null as number | null, codecs.nullable(codecs.number()));
   protected readonly discountFilter = persistedFilter(SalesHistoryPage.SCREEN, 'discount', 'all' as 'all' | 'with' | 'without', codecs.oneOf(['all', 'with', 'without'] as const));
   protected readonly customerFilter = persistedFilter(SalesHistoryPage.SCREEN, 'customer', 'all' as 'all' | 'registered' | 'anonymous', codecs.oneOf(['all', 'registered', 'anonymous'] as const));
+  protected readonly paymentFilter = persistedFilter(SalesHistoryPage.SCREEN, 'payment', null as SalePaymentMethod | null, codecs.nullable(codecs.oneOf(SALE_PAYMENT_METHODS)));
   protected readonly advancedOpen = persistedFilter(SalesHistoryPage.SCREEN, 'advancedOpen', false, codecs.bool());
   protected readonly search = signal('');
   /** Lo buscado, ya con la pausa: es lo que se envía al servidor. */
@@ -121,6 +125,10 @@ export class SalesHistoryPage {
     { value: 'registered', label: 'Cliente registrado' },
     { value: 'anonymous', label: 'Cliente sin registrar' },
   ];
+  protected readonly paymentOptions: readonly SelectOption<SalePaymentMethod | null>[] = [
+    { value: null, label: 'Todas las formas de pago' },
+    ...SALE_PAYMENT_METHODS.map((value) => ({ value, label: PAYMENT_METHOD_LABELS[value] })),
+  ];
   protected readonly supplierOptions = computed<SelectOption<number | null>[]>(() => [
     { value: null, label: 'Todos los proveedores' },
     ...this.suppliers().map((s) => ({ value: s.id, label: s.nombre })),
@@ -133,6 +141,7 @@ export class SalesHistoryPage {
     { key: 'seller', header: 'Vendedor', icon: LucideUser.icon, sortable: true },
     ...(this.isAdmin() ? [{ key: 'branchName', header: 'Sucursal', icon: LucideStore.icon, sortable: true }] : []),
     { key: 'total', header: 'Total', icon: LucideCoins.icon, sortable: true, align: 'end' as const, display: (r: SaleRow) => formatMoney(r.total) },
+    { key: 'paymentText', header: 'Pago', icon: LucideWallet.icon, sortable: false },
     { key: 'statusLabel', header: 'Estado', icon: LucideCircleCheck.icon, sortable: true },
     { key: 'acciones', header: 'Acciones', align: 'end' as const },
   ]);
@@ -141,7 +150,7 @@ export class SalesHistoryPage {
   protected readonly productOptions = computed(() => optionsFrom(this.products(), this.productFilter(), 'Todos los productos'));
 
   protected readonly rows = computed<SaleRow[]>(() =>
-    this.sales().map((s) => ({ ...s, customer: customerLabel(s.customerName), statusLabel: SALE_INFO[s.status].label })),
+    this.sales().map((s) => ({ ...s, customer: customerLabel(s.customerName), statusLabel: SALE_INFO[s.status].label, paymentText: paymentLabel(s.paymentMethod) })),
   );
 
   /** Lo que filtra al servidor; si cambia, se vuelve a la primera página. */
@@ -158,6 +167,7 @@ export class SalesHistoryPage {
     supplierId: this.supplierFilter(),
     withDiscount: this.discountFilter() === 'all' ? null : this.discountFilter() === 'with',
     registeredCustomer: this.customerFilter() === 'all' ? null : this.customerFilter() === 'registered',
+    paymentMethod: this.paymentFilter(),
   }));
   protected readonly page = linkedSignal<unknown, number>({ source: this.filters, computation: () => 1 });
 
@@ -174,7 +184,7 @@ export class SalesHistoryPage {
 
   /** Los filtros del panel «Más filtros» que están aplicados (el botón muestra cuántos). */
   protected readonly advancedCount = computed(
-    () => [this.sellerFilter() !== null, this.productFilter() !== null, this.supplierFilter() !== null, this.discountFilter() !== 'all', this.customerFilter() !== 'all', this.minTotal() !== null, this.maxTotal() !== null].filter(Boolean).length,
+    () => [this.sellerFilter() !== null, this.productFilter() !== null, this.supplierFilter() !== null, this.discountFilter() !== 'all', this.customerFilter() !== 'all', this.paymentFilter() !== null, this.minTotal() !== null, this.maxTotal() !== null].filter(Boolean).length,
   );
 
   /** Todos los filtros aplicados, para mostrarlos como etiquetas que se quitan. */
@@ -190,6 +200,7 @@ export class SalesHistoryPage {
     if (this.supplierFilter() !== null) list.push({ id: 'supplier', label: 'Proveedor', text: this.suppliers().find((s) => s.id === this.supplierFilter())?.nombre ?? `Proveedor ${this.supplierFilter()}` });
     if (this.discountFilter() !== 'all') list.push({ id: 'discount', label: 'Descuento', text: this.discountFilter() === 'with' ? 'Con descuento' : 'Sin descuento' });
     if (this.customerFilter() !== 'all') list.push({ id: 'customer', label: 'Cliente', text: this.customerFilter() === 'registered' ? 'Registrado' : 'Sin registrar' });
+    if (this.paymentFilter() !== null) list.push({ id: 'payment', label: 'Pago', text: PAYMENT_METHOD_LABELS[this.paymentFilter()!] });
     if (this.minTotal() !== null) list.push({ id: 'minTotal', label: 'Total desde', text: formatMoney(this.minTotal()) });
     if (this.maxTotal() !== null) list.push({ id: 'maxTotal', label: 'Total hasta', text: formatMoney(this.maxTotal()) });
     if (this.search().trim()) list.push({ id: 'search', label: 'Búsqueda', text: this.search().trim() });
@@ -276,6 +287,7 @@ export class SalesHistoryPage {
       case 'supplier': this.supplierFilter.set(null); break;
       case 'discount': this.discountFilter.set('all'); break;
       case 'customer': this.customerFilter.set('all'); break;
+      case 'payment': this.paymentFilter.set(null); break;
       case 'minTotal': this.minTotal.set(null); break;
       case 'maxTotal': this.maxTotal.set(null); break;
       case 'search': this.search.set(''); clearTimeout(this.searchTimer); this.searchTerm.set(''); break;

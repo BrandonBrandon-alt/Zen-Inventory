@@ -60,6 +60,27 @@ class DemoDataTest(unittest.TestCase):
         returned = {s["id"] for s in self.sim.rows["ventas"] if s["status"] == "RETURNED"}
         self.assertEqual(approved, returned)
 
+    def test_cada_venta_trae_su_forma_de_pago(self):
+        sales = self.sim.rows["ventas"]
+        self.assertEqual({s["pay_method"] for s in sales} - {"EFECTIVO", "TARJETA", "TRANSFERENCIA", "OTRO"}, set())
+        self.assertGreater(len({s["pay_method"] for s in sales}), 2)
+        for s in sales:
+            self.assertEqual(s["pay_ref"] is not None, s["pay_method"] in ("TARJETA", "TRANSFERENCIA"))
+
+    def test_los_pagos_de_compras_cuadran_con_el_estado_de_pago(self):
+        paid: dict[int, float] = {}
+        for p in self.sim.rows["pagos_orden_compra"]:
+            self.assertGreater(p["amount"], 0)
+            paid[p["order"]] = paid.get(p["order"], 0) + p["amount"]
+        for o in self.sim.rows["ordenes_compra"]:
+            got = round(paid.get(o["id"], 0), 2)
+            if o["pay"] == "PAGADO":
+                self.assertAlmostEqual(got, o["total"], places=2, msg=f"orden {o['id']}")
+            elif o["pay"] == "PAGO_PARCIAL":
+                self.assertTrue(0 < got < o["total"], f"orden {o['id']}")
+            else:
+                self.assertEqual(got, 0, f"orden {o['id']}")
+
     def test_los_traslados_descuentan_y_suman_lo_que_dicen(self):
         out = Counter()
         into = Counter()

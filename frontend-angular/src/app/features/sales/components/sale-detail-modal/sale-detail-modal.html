@@ -19,6 +19,7 @@
             · {{ s.customerDocument }}
           }
         </p>
+        <p class="text-sm text-fg-subtle">Pago: <span class="text-fg">{{ paymentText(s.paymentMethod) }}</span>@if (s.paymentReference) { · {{ s.paymentReference }} }</p>
         @if (s.seller || s.branchName) {
           <p class="text-sm text-fg-subtle">{{ s.seller }}@if (s.seller && s.branchName) { · }{{ s.branchName }}</p>
         }

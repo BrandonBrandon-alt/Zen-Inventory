@@ -1,5 +1,6 @@
 package co.com.zenvory.inventario.sale.application.service;
 
+import co.com.zenvory.inventario.sale.domain.model.SalePaymentMethod;
 import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
 import co.com.zenvory.inventario.inventory.application.port.in.InventoryUseCase;
 import co.com.zenvory.inventario.sale.application.port.in.CreateReturnRequestCommand;
@@ -41,7 +42,7 @@ class ReturnRequestServiceTest {
         sales = mock(SaleManagementUseCase.class);
         inventory = mock(InventoryUseCase.class);
         service = new ReturnRequestService(repo, sales, inventory, mock(AlertUseCase.class));
-        sale = Sale.create(1L, "Sede", 2L, "Ana", "C", "1", BigDecimal.ZERO,
+        sale = Sale.create(1L, "Sede", 2L, "Ana", "C", "1", SalePaymentMethod.EFECTIVO, null, BigDecimal.ZERO,
                 List.of(SaleDetail.create(5L, "P", 3, new BigDecimal("25"), BigDecimal.ZERO)));
         when(sales.getSaleForUpdate(10L)).thenReturn(sale);
         when(repo.findBySaleId(10L)).thenReturn(List.of());
@@ -108,7 +109,7 @@ class ReturnRequestServiceTest {
     @Test
     @DisplayName("una venta con el mismo producto en dos líneas (distinto descuento) sí admite devolución")
     void saleWithDuplicateProductLinesCanBeReturned() {
-        Sale split = Sale.create(1L, "Sede", 2L, "Ana", "C", "1", BigDecimal.ZERO, List.of(
+        Sale split = Sale.create(1L, "Sede", 2L, "Ana", "C", "1", SalePaymentMethod.EFECTIVO, null, BigDecimal.ZERO, List.of(
                 SaleDetail.create(5L, "P", 2, new BigDecimal("100"), new BigDecimal("10")),
                 SaleDetail.create(5L, "P", 2, new BigDecimal("100"), BigDecimal.ZERO)));
         when(sales.getSaleForUpdate(10L)).thenReturn(split);
@@ -120,7 +121,7 @@ class ReturnRequestServiceTest {
     @Test
     @DisplayName("el precio devuelto es lo realmente pagado: 100 con 20 % de línea y 10 % global = 72")
     void returnPriceIncludesDiscounts() {
-        Sale discounted = Sale.create(1L, "Sede", 2L, "Ana", "C", "1", new BigDecimal("10"),
+        Sale discounted = Sale.create(1L, "Sede", 2L, "Ana", "C", "1", SalePaymentMethod.EFECTIVO, null, new BigDecimal("10"),
                 List.of(SaleDetail.create(5L, "P", 3, new BigDecimal("100"), new BigDecimal("20"))));
         when(sales.getSaleForUpdate(10L)).thenReturn(discounted);
         CreateReturnRequestCommand cmd = new CreateReturnRequestCommand(10L, 1L, 2L, "m",

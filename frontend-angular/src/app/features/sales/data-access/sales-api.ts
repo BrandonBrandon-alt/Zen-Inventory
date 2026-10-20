@@ -2,6 +2,7 @@ import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, catchError, forkJoin, map, of } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api-base-url';
+import { type SalePaymentMethod, isPaymentMethod } from '@core/sales/payment-method';
 import { SKIP_ERROR_NOTIFICATION } from '@core/api/error.interceptor';
 import type { components } from '@core/api/schema';
 
@@ -32,6 +33,9 @@ export interface Sale {
   readonly seller: string;
   readonly customerName: string;
   readonly customerDocument: string;
+  /** `null` en las ventas anteriores al registro de la forma de pago. */
+  readonly paymentMethod: SalePaymentMethod | null;
+  readonly paymentReference: string;
   readonly subtotal: number;
   readonly discount: number;
   readonly total: number;
@@ -62,6 +66,8 @@ export interface SaleQuery {
   readonly withDiscount: boolean | null;
   /** `true`: con nombre de cliente; `false`: sin registrar; `null`: todas. */
   readonly registeredCustomer: boolean | null;
+  /** Solo las ventas pagadas de esta forma; `null`: todas. */
+  readonly paymentMethod: SalePaymentMethod | null;
 }
 
 /** Una página del historial; el resumen abarca todas las ventas que cumplen los filtros, no solo la página. */
@@ -115,6 +121,9 @@ export interface SaleInput {
   readonly userId: number;
   readonly customerName: string;
   readonly customerDocument: string;
+  readonly paymentMethod: SalePaymentMethod;
+  /** N.º de voucher o de transferencia (opcional). */
+  readonly paymentReference: string;
   readonly globalDiscountPct: number;
   readonly priceListId: number | null;
   readonly items: readonly { productId: number; quantity: number; discountPct: number }[];
@@ -144,6 +153,8 @@ function toSale(raw: SaleResponse): Sale | null {
     seller: raw.userName?.trim() ?? '',
     customerName: raw.customerName?.trim() ?? '',
     customerDocument: raw.customerDocument?.trim() ?? '',
+    paymentMethod: isPaymentMethod(raw.paymentMethod) ? raw.paymentMethod : null,
+    paymentReference: raw.paymentReference?.trim() ?? '',
     subtotal: raw.subtotal ?? 0,
     discount: raw.totalDiscount ?? 0,
     total: raw.totalFinal ?? 0,
@@ -223,6 +234,7 @@ export class SalesApi {
   create(input: SaleInput): Observable<Sale> {
     const customerName = input.customerName.trim();
     const customerDocument = input.customerDocument.trim();
+    const paymentReference = input.paymentReference.trim();
     return this.http
       .post<SaleResponse>(
         `${this.baseUrl}/api/v1/sales`,
@@ -231,6 +243,8 @@ export class SalesApi {
           userId: input.userId,
           ...(customerName ? { customerName } : {}),
           ...(customerDocument ? { customerDocument } : {}),
+          paymentMethod: input.paymentMethod,
+          ...(paymentReference ? { paymentReference } : {}),
           globalDiscountPercentage: input.globalDiscountPct,
           ...(input.priceListId !== null ? { priceListId: input.priceListId } : {}),
           items: input.items.map((i) => ({ productId: i.productId, quantity: i.quantity, discountPercentage: i.discountPct })),
@@ -270,6 +284,7 @@ export class SalesApi {
     if (query.supplierId !== null) params['supplierId'] = query.supplierId;
     if (query.withDiscount !== null) params['withDiscount'] = query.withDiscount;
     if (query.registeredCustomer !== null) params['registeredCustomer'] = query.registeredCustomer;
+    if (query.paymentMethod !== null) params['paymentMethod'] = query.paymentMethod;
     return this.http.get<RawSalePage>(`${this.baseUrl}/api/v1/sales/search`, { ...this.options, params }).pipe(
       map((page) => ({
         sales: (page.content ?? []).map(toSale).filter((s): s is Sale => s !== null),

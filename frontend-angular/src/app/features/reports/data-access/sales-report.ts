@@ -8,6 +8,14 @@ export interface SellerSummary {
   readonly average: number;
 }
 
+/** Lo cobrado por cada forma de pago: es lo que se cuadra contra la caja. */
+export interface PaymentSummary {
+  /** `null` agrupa las ventas anteriores al registro de la forma de pago. */
+  readonly method: string | null;
+  readonly sales: number;
+  readonly total: number;
+}
+
 export interface ProductSummary {
   readonly name: string;
   readonly units: number;
@@ -29,6 +37,7 @@ export interface SalesReport {
   readonly canceledTotal: number;
   readonly bySeller: readonly SellerSummary[];
   readonly topProducts: readonly ProductSummary[];
+  readonly byPayment: readonly PaymentSummary[];
 }
 
 const startOfDay = (d: Date): Date => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -50,6 +59,7 @@ export function buildSalesReport(sales: readonly ReportSale[], from: Date, to: D
 
   const sellers = new Map<string, { sales: number; units: number; total: number }>();
   const products = new Map<string, { units: number; total: number }>();
+  const payments = new Map<string | null, { sales: number; total: number }>();
   let units = 0;
   for (const sale of counted) {
     const sellerKey = sale.seller || 'Sin vendedor';
@@ -65,6 +75,10 @@ export function buildSalesReport(sales: readonly ReportSale[], from: Date, to: D
       products.set(line.productName, product);
     }
     sellers.set(sellerKey, seller);
+    const payment = payments.get(sale.paymentMethod) ?? { sales: 0, total: 0 };
+    payment.sales += 1;
+    payment.total += sale.total;
+    payments.set(sale.paymentMethod, payment);
   }
 
   const total = counted.reduce((sum, s) => sum + s.total, 0);
@@ -82,6 +96,7 @@ export function buildSalesReport(sales: readonly ReportSale[], from: Date, to: D
     bySeller: [...sellers]
       .map(([seller, v]) => ({ seller, sales: v.sales, units: v.units, total: round(v.total), average: round(v.total / v.sales) }))
       .sort((a, b) => b.total - a.total || a.seller.localeCompare(b.seller)),
+    byPayment: [...payments].map(([method, v]) => ({ method, sales: v.sales, total: round(v.total) })).sort((a, b) => b.total - a.total),
     topProducts: [...products]
       .map(([name, v]) => ({ name, units: v.units, total: round(v.total) }))
       .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))

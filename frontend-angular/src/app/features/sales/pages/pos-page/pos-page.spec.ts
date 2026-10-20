@@ -320,6 +320,7 @@ describe('PosPage', () => {
           userId: 9,
           customerName: 'Ana Pérez',
           customerDocument: '123',
+          paymentMethod: 'EFECTIVO',
           globalDiscountPercentage: 10,
           priceListId: 7,
           items: [{ productId: 1, quantity: 2, discountPercentage: 0 }],
@@ -338,6 +339,20 @@ describe('PosPage', () => {
       expect(printed[0]).toContain('FACTURA DE VENTA N° FV-000055');
       await userEvent.click(within(receipt).getByRole('button', { name: 'Nueva venta' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('la forma de pago es obligatoria en la venta: empieza en efectivo y se puede cambiar con su referencia', async () => {
+      useSession('SELLER', 10);
+      stub({ lists: [] });
+      let body: Record<string, unknown> = {};
+      server.use(http.post(`${TEST_API}/api/v1/sales`, async ({ request }) => ((body = (await request.json()) as Record<string, unknown>), HttpResponse.json(SALE, { status: 201 }))));
+      await renderPage();
+      await add('Tornillo');
+      await chooseOption('Forma de pago', 'Tarjeta');
+      await userEvent.type(within(cart()).getByLabelText('Referencia (opcional)'), ' V-4455 ');
+      await userEvent.click(within(cart()).getByRole('button', { name: 'Registrar venta' }));
+      await vi.waitFor(() => expect(body['paymentMethod']).toBe('TARJETA'));
+      expect(body['paymentReference']).toBe('V-4455');
     });
 
     it('sin cliente ni descuento envía solo lo necesario', async () => {

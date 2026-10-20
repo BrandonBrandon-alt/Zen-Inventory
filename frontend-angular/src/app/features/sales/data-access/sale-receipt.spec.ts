@@ -13,6 +13,8 @@ const sale = (extra: Partial<Sale> = {}): Sale => ({
   seller: 'Laura',
   customerName: 'Ana Pérez',
   customerDocument: '123',
+  paymentMethod: 'TARJETA',
+  paymentReference: 'V-9',
   subtotal: 5000,
   discount: 500,
   total: 4500,
@@ -23,6 +25,14 @@ const sale = (extra: Partial<Sale> = {}): Sale => ({
 });
 
 describe('buildSaleReceiptHtml', () => {
+  it('muestra la forma de pago y su referencia; una venta anterior al registro dice «Sin registrar»', () => {
+    const html = buildSaleReceiptHtml(sale());
+    expect(html).toContain('Forma de pago');
+    expect(html).toContain('Tarjeta');
+    expect(html).toContain('V-9');
+    expect(buildSaleReceiptHtml(sale({ paymentMethod: null, paymentReference: '' }))).toContain('Sin registrar');
+  });
+
   it('trae número, cliente, productos, descuento y total', () => {
     const html = buildSaleReceiptHtml(sale());
     expect(html).toContain('FACTURA DE VENTA N° FV-000007');

@@ -1,5 +1,6 @@
 package co.com.zenvory.inventario.sale.application.service;
 
+import co.com.zenvory.inventario.sale.domain.model.SalePaymentMethod;
 import co.com.zenvory.inventario.alert.application.port.in.AlertUseCase;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
 import co.com.zenvory.inventario.auth.domain.model.User;
@@ -52,7 +53,7 @@ class SaleServiceTest {
         UserRepositoryPort users = mock(UserRepositoryPort.class);
         service = new SaleService(repo, products, inventory, branches, users, mock(PriceListUseCase.class), mock(AlertUseCase.class));
 
-        sale = Sale.create(1L, "Sede", 2L, "Vendedora", "C", "1", BigDecimal.ZERO,
+        sale = Sale.create(1L, "Sede", 2L, "Vendedora", "C", "1", SalePaymentMethod.EFECTIVO, null, BigDecimal.ZERO,
                 List.of(SaleDetail.create(5L, "P", 2, new BigDecimal("10"), BigDecimal.ZERO)));
         when(repo.findByIdForUpdate(7L)).thenReturn(Optional.of(sale));
         when(repo.save(any())).thenAnswer(i -> i.getArgument(0));
@@ -62,7 +63,7 @@ class SaleServiceTest {
     }
 
     private CreateSaleCommand command() {
-        return new CreateSaleCommand(1L, 9L, "C", "1", null, null,
+        return new CreateSaleCommand(1L, 9L, "C", "1", SalePaymentMethod.EFECTIVO, null, null, null,
                 List.of(new CreateSaleCommand.Detail(5L, 1, null, null)));
     }
 

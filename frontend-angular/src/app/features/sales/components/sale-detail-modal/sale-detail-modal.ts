@@ -13,6 +13,7 @@ import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Modal } from '@shared/ui/modal/modal';
+import { paymentLabel } from '@core/sales/payment-method';
 import { SALE_INFO, customerLabel } from '../../data-access/sale-labels';
 import { buildSaleReceiptHtml } from '../../data-access/sale-receipt';
 import { type Sale, SalesApi } from '../../data-access/sales-api';
@@ -53,6 +54,7 @@ export class SaleDetailModal {
   protected readonly formatQuantity = formatQuantity;
   protected readonly info = SALE_INFO;
   protected readonly customerLabel = customerLabel;
+  protected readonly paymentText = paymentLabel;
 
   protected readonly reasonForm = this.fb.group({ reason: ['', Validators.required] });
 

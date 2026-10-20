@@ -7,6 +7,8 @@ public record CreateSaleCommand(
         Long userId,
         String customerName,
         String customerDocument,
+        co.com.zenvory.inventario.sale.domain.model.SalePaymentMethod paymentMethod,
+        String paymentReference,
         java.math.BigDecimal globalDiscountPercentage,
         Long priceListId,
         List<Detail> items

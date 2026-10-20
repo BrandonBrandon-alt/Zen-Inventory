@@ -22,11 +22,21 @@ public class Sale {
     private String cancellationReason;
     private String customerName;
     private String customerDocument;
+    private SalePaymentMethod paymentMethod;
+    private String paymentReference;
     private BigDecimal globalDiscountPercentage;
     private List<SaleDetail> details;
 
-    public Sale(Long id, LocalDateTime date, Long branchId, String branchName, Long userId, String userName, SaleStatus status, 
+    public Sale(Long id, LocalDateTime date, Long branchId, String branchName, Long userId, String userName, SaleStatus status,
                 String cancellationReason, String customerName, String customerDocument, BigDecimal globalDiscountPercentage, List<SaleDetail> details) {
+        this(id, date, branchId, branchName, userId, userName, status, cancellationReason, customerName, customerDocument,
+                null, null, globalDiscountPercentage, details);
+    }
+
+    /** {@code paymentMethod} es nulo solo en las ventas anteriores al registro de la forma de pago. */
+    public Sale(Long id, LocalDateTime date, Long branchId, String branchName, Long userId, String userName, SaleStatus status,
+                String cancellationReason, String customerName, String customerDocument, SalePaymentMethod paymentMethod,
+                String paymentReference, BigDecimal globalDiscountPercentage, List<SaleDetail> details) {
         if (details == null || details.isEmpty()) {
             throw new EmptySaleException("Una factura de venta no puede estar vacía.");
         }
@@ -47,6 +57,8 @@ public class Sale {
         this.cancellationReason = cancellationReason;
         this.customerName = customerName;
         this.customerDocument = customerDocument;
+        this.paymentMethod = paymentMethod;
+        this.paymentReference = paymentReference == null || paymentReference.isBlank() ? null : paymentReference.trim();
         this.globalDiscountPercentage = globalDiscountPercentage != null ? globalDiscountPercentage : BigDecimal.ZERO;
         this.details = details;
         
@@ -54,8 +66,12 @@ public class Sale {
         calculateFinancials();
     }
 
-    public static Sale create(Long branchId, String branchName, Long userId, String userName, String customerName, String customerDocument, BigDecimal globalDiscountPercentage, List<SaleDetail> details) {
-        return new Sale(null, LocalDateTime.now(), branchId, branchName, userId, userName, SaleStatus.COMPLETED, null, customerName, customerDocument, globalDiscountPercentage, details);
+    public static Sale create(Long branchId, String branchName, Long userId, String userName, String customerName, String customerDocument,
+                              SalePaymentMethod paymentMethod, String paymentReference, BigDecimal globalDiscountPercentage, List<SaleDetail> details) {
+        if (paymentMethod == null) {
+            throw new IllegalArgumentException("La forma de pago es obligatoria.");
+        }
+        return new Sale(null, LocalDateTime.now(), branchId, branchName, userId, userName, SaleStatus.COMPLETED, null, customerName, customerDocument, paymentMethod, paymentReference, globalDiscountPercentage, details);
     }
 
     public void cancel(String reason) {
@@ -145,6 +161,8 @@ public class Sale {
     public String getCancellationReason() { return cancellationReason; }
     public String getCustomerName() { return customerName; }
     public String getCustomerDocument() { return customerDocument; }
+    public SalePaymentMethod getPaymentMethod() { return paymentMethod; }
+    public String getPaymentReference() { return paymentReference; }
     public BigDecimal getGlobalDiscountPercentage() { return globalDiscountPercentage; }
     public List<SaleDetail> getDetails() { return Collections.unmodifiableList(details); }
 }

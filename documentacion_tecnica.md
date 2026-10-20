@@ -175,6 +175,8 @@ erDiagram
         timestamp fecha
         decimal total_final
         string estado
+        string metodo_pago
+        string referencia_pago
     }
 
     PAGOS_ORDEN_COMPRA {
@@ -216,6 +218,8 @@ classDiagram
         +SaleStatus status
         +String cancellationReason
         +String customerName
+        +SalePaymentMethod paymentMethod
+        +String paymentReference
         +BigDecimal globalDiscountPercentage
         +create() Sale
         +cancel(reason)
@@ -231,6 +235,13 @@ classDiagram
         +BigDecimal discountPercentage
         +BigDecimal subtotalLine
         +computeSubtotal() BigDecimal
+    }
+    class SalePaymentMethod {
+        <<enumeration>>
+        EFECTIVO
+        TARJETA
+        TRANSFERENCIA
+        OTRO
     }
     class SaleStatus {
         <<enumeration>>
@@ -260,6 +271,7 @@ classDiagram
     }
     Sale "1" *-- "1..*" SaleDetail : líneas
     Sale --> SaleStatus
+    Sale --> SalePaymentMethod
     Sale "1" o-- "0..*" ReturnRequest : devoluciones
     SaleDetail --> Product : producto vendido
     Product "*" -- "*" Supplier : ProductSupplierDetail
@@ -507,7 +519,7 @@ sequenceDiagram
         I-->>S: stock disponible
         Note over S: sin stock suficiente se lanza InsufficientStockException y no se guarda nada
     end
-    S->>S: Sale.create() calcula subtotal, descuentos y total
+    S->>S: Sale.create() exige la forma de pago y calcula subtotal, descuentos y total
     S->>DB: guarda la venta y sus líneas
     loop descuento de stock
         S->>I: withdrawStock(motivo VENTA)

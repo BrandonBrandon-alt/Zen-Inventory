@@ -10,7 +10,7 @@ from generate import Sim
 
 SERIAL_TABLES = (
     "unidad_medida", "sucursal", "usuario", "proveedor", "producto", "producto_proveedor", "producto_unidad", "precio_por_lista",
-    "rutas_logisticas", "inventario_local", "ventas", "detalles_venta", "ordenes_compra", "detalles_orden_compra", "transferencias",
+    "rutas_logisticas", "inventario_local", "ventas", "detalles_venta", "ordenes_compra", "detalles_orden_compra", "pagos_orden_compra", "transferencias",
     "detalles_transferencia", "solicitudes_devolucion", "detalles_devolucion_solicitud", "movimiento_inventario", "alertas_stock",
 )
 
@@ -96,9 +96,9 @@ def load_sql(sim: Sim) -> str:
            [(sim.next_id("inventario_local"), b, p, round(i.stock, 4), i.minimum, i.last_update or start, i.reserved) for (b, p), i in sorted(sim.items.items())])
 
     sellers = sim.by_id
-    w.copy("ventas", "id, sucursal_id, usuario_id, fecha, subtotal, descuento_total, total_final, created_at, estado, motivo_anulacion, cliente_nombre, cliente_documento, sucursal_nombre, vendedor_nombre, global_discount_percentage",
+    w.copy("ventas", "id, sucursal_id, usuario_id, fecha, subtotal, descuento_total, total_final, created_at, estado, motivo_anulacion, cliente_nombre, cliente_documento, sucursal_nombre, vendedor_nombre, global_discount_percentage, metodo_pago, referencia_pago",
            [(s["id"], s["branch"], s["user"], s["ts"], s["subtotal"], s["discount"], s["total"], s["ts"], s["status"], s["reason"], s["customer"], s["doc"],
-             names[s["branch"]], sellers[s["user"]].name, float(s["global"])) for s in sim.rows["ventas"]])
+             names[s["branch"]], sellers[s["user"]].name, float(s["global"]), s["pay_method"], s["pay_ref"]) for s in sim.rows["ventas"]])
     w.copy("detalles_venta", "id, venta_id, producto_id, cantidad, precio_unitario_aplicado, porcentaje_descuento, subtotal_linea, producto_nombre",
            [(d[0], d[1], d[2], d[3], d[4], float(d[5]), d[6], d[7]) for d in sim.rows["detalles_venta"]])
 
@@ -107,6 +107,8 @@ def load_sql(sim: Sim) -> str:
              o["due"] or (o["ts"] + timedelta(days=o["plazo"])), o["plazo"], 0, o["note"], o["resolver"], o["resolved_ts"], False, o["lead"]) for o in sim.rows["ordenes_compra"]])
     w.copy("detalles_orden_compra", "id, orden_id, producto_id, cantidad, precio_unitario_pactado, subtotal, descuento_pct, cantidad_recibida",
            [(l["id"], l["order"], l["prod"], l["qty"], l["price"], l["sub"], float(l["disc"]), l["got"]) for l in sim.rows["detalles_orden_compra"]])
+    w.copy("pagos_orden_compra", "id, orden_id, monto, fecha, usuario_id, usuario_nombre, metodo, referencia, notas",
+           [(p["id"], p["order"], p["amount"], p["ts"], p["user"], sellers[p["user"]].name, p["method"], p["ref"], p["note"]) for p in sim.rows["pagos_orden_compra"]])
 
     def p(person):
         return person_ref(person)
@@ -155,6 +157,7 @@ UPDATE public.transferencias SET parent_transfer_id = NULL WHERE parent_transfer
 DELETE FROM public.detalles_transferencia WHERE transferencia_id IN (SELECT id FROM d_transfers);
 DELETE FROM public.transferencias WHERE id IN (SELECT id FROM d_transfers);
 CREATE TEMP TABLE d_orders ON COMMIT DROP AS SELECT id FROM public.ordenes_compra WHERE usuario_id IN (SELECT id FROM d_users) OR sucursal_id IN ({branches});
+DELETE FROM public.pagos_orden_compra WHERE orden_id IN (SELECT id FROM d_orders);
 DELETE FROM public.detalles_orden_compra WHERE orden_id IN (SELECT id FROM d_orders);
 DELETE FROM public.ordenes_compra WHERE id IN (SELECT id FROM d_orders);
 DELETE FROM public.alertas_stock WHERE producto_id BETWEEN {first} AND {last} OR sucursal_id IN ({branches});

@@ -20,6 +20,9 @@ public record SaleResponse(
         String cancellationReason,
         String customerName,
         String customerDocument,
+        /** Nulo en las ventas anteriores al registro de la forma de pago. */
+        String paymentMethod,
+        String paymentReference,
         BigDecimal globalDiscountPercentage,
         List<SaleDetailResponse> details
 ) {
@@ -48,6 +51,8 @@ public record SaleResponse(
                 sale.getCancellationReason(),
                 sale.getCustomerName(),
                 sale.getCustomerDocument(),
+                sale.getPaymentMethod() != null ? sale.getPaymentMethod().name() : null,
+                sale.getPaymentReference(),
                 sale.getGlobalDiscountPercentage(),
                 sale.getDetails().stream().map(d -> new SaleDetailResponse(
                         d.getId(),

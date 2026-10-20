@@ -7,6 +7,7 @@ const sale = (extra: Partial<ReportSale> = {}): ReportSale => ({
   canceled: false,
   branchName: 'Sede Central',
   seller: 'Luis',
+  paymentMethod: 'EFECTIVO',
   subtotal: 1000,
   discount: 0,
   total: 1000,
@@ -21,6 +22,26 @@ describe('buildSalesReport', () => {
   it('suma totales, unidades y ticket promedio de las ventas del periodo', () => {
     const r = buildSalesReport([sale(), sale({ subtotal: 3000, total: 3000, lines: [{ productName: 'Tuerca', quantity: 3, subtotal: 3000 }] })], day(15), day(15));
     expect(r).toMatchObject({ sales: 2, units: 5, subtotal: 4000, total: 4000, average: 2000, discount: 0 });
+  });
+
+  it('agrupa lo cobrado por forma de pago, deja aparte las anuladas y junta las ventas sin forma de pago', () => {
+    const r = buildSalesReport(
+      [
+        sale({ total: 1000 }),
+        sale({ total: 500, paymentMethod: 'TARJETA' }),
+        sale({ total: 300, paymentMethod: 'EFECTIVO' }),
+        sale({ total: 200, paymentMethod: null }),
+        sale({ total: 9999, paymentMethod: 'TARJETA', canceled: true }),
+      ],
+      day(15),
+      day(15),
+    );
+    expect(r.byPayment).toEqual([
+      { method: 'EFECTIVO', sales: 2, total: 1300 },
+      { method: 'TARJETA', sales: 1, total: 500 },
+      { method: null, sales: 1, total: 200 },
+    ]);
+    expect(r.byPayment.reduce((sum, p) => sum + p.total, 0)).toBe(r.total);
   });
 
   it('el rango incluye el día inicial y el final completos y deja fuera lo demás', () => {

@@ -18,6 +18,12 @@ public record SaleRequest(
         String customerName,
         String customerDocument,
 
+        @NotNull(message = "La forma de pago es obligatoria.")
+        co.com.zenvory.inventario.sale.domain.model.SalePaymentMethod paymentMethod,
+
+        @jakarta.validation.constraints.Size(max = 100, message = "La referencia admite hasta 100 caracteres.")
+        String paymentReference,
+
         @DecimalMin(value = "0", message = "El descuento no puede ser negativo")
         @DecimalMax(value = "100", message = "El descuento no puede superar el 100%")
         java.math.BigDecimal globalDiscountPercentage,

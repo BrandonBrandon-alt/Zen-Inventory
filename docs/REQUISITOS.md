@@ -89,6 +89,7 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 | ID | Requisito | Roles | Prio. | Estado |
 |---|---|---|---|---|
 | RF-19 | Registrar una venta en el punto de venta con varios productos, descuento por línea y descuento global, cliente opcional y lista de precios | Todos | A | Implementado |
+| RF-58 | Exigir la forma de pago de cada venta (efectivo, tarjeta, transferencia u otro) con una referencia opcional, y mostrarla en el historial, el detalle y la factura; el historial se puede filtrar por forma de pago | Todos | A | Implementado |
 | RF-20 | Resolver el precio de cada línea así: lista de la línea, luego lista global de la venta, luego precio base | Sistema | A | Implementado |
 | RF-21 | No permitir una venta si algún producto no tiene stock disponible suficiente, sin guardar nada | Sistema | A | Implementado |
 | RF-22 | Descontar el stock al vender y dejar el movimiento en el kardex | Sistema | A | Implementado |
@@ -141,7 +142,7 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 |---|---|---|---|---|
 | RF-48 | Panel con totales de ventas, productos más vendidos, valor del inventario por sucursal, desempeño por sucursal y tendencia de los últimos meses (el vendedor entra al panel pero sin analítica) | ADMIN, MANAGER, OPERADOR (según su sucursal) | A | Implementado |
 | RF-49 | Rotación de inventario, productos sin movimiento y sugerencias de reabastecimiento | ADMIN, MANAGER, OPERADOR | M | Implementado |
-| RF-50 | Reporte de cierre de caja y de ventas por vendedor, para imprimir o guardar como PDF | ADMIN, MANAGER | M | Implementado |
+| RF-50 | Reporte de cierre de caja y de ventas por vendedor, con lo cobrado por forma de pago, para imprimir o guardar como PDF | ADMIN, MANAGER | M | Implementado |
 | RF-51 | Consultar la auditoría global: todos los movimientos de inventario del sistema, con quién y cuándo | ADMIN | M | Implementado |
 
 ### 3.10 Interfaz
@@ -168,6 +169,7 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 | RN-09 | Reponer stock por anulación o devolución no es una compra y no modifica el costo promedio. |
 | RN-10 | Despachar un traslado exige la cantidad enviada de cada producto; si todo es cero se rechaza. |
 | RN-11 | Un pago a proveedor es inmutable y no puede exceder el saldo de la orden; el estado de pago se deduce de lo pagado y una orden cancelada no genera deuda. |
+| RN-12 | Una venta no se registra sin forma de pago. Las ventas anteriores a su registro quedan «Sin registrar»: no se inventa cómo se pagaron. |
 
 ## 5. Requisitos no funcionales
 
@@ -227,8 +229,8 @@ Se declara para no presentar como hecho lo que no lo está:
 | Alertas (`/alerts`) | ADMIN, MANAGER, OPERADOR | RF-43 a RF-46 |
 | Traslados (`/transfers`) | ADMIN, MANAGER, OPERADOR | RF-28 a RF-35 |
 | Compras (`/purchases`) | ADMIN, MANAGER, OPERADOR | RF-36 a RF-42, RF-56, RF-57 |
-| Ventas (`/sales/pos`) | Todos | RF-19 a RF-22, RF-25 |
-| Historial Ventas (`/sales/history`) | Todos | RF-23, RF-24 |
+| Ventas (`/sales/pos`) | Todos | RF-19 a RF-22, RF-25, RF-58 |
+| Historial Ventas (`/sales/history`) | Todos | RF-23, RF-24, RF-58 |
 | Devoluciones (`/returns`) | Todos | RF-26, RF-27 |
 | Reportes (`/reports`) | ADMIN, MANAGER | RF-49, RF-50 |
 | Sucursales (`/branches`) | ADMIN | RF-06 |

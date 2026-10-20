@@ -16,6 +16,7 @@ import co.com.zenvory.inventario.auth.domain.model.User;
 import co.com.zenvory.inventario.sale.application.port.out.SaleFilterOptions;
 import co.com.zenvory.inventario.sale.application.port.out.SalePage;
 import co.com.zenvory.inventario.sale.application.port.out.SaleSearchCriteria;
+import co.com.zenvory.inventario.sale.domain.model.SalePaymentMethod;
 import co.com.zenvory.inventario.sale.domain.model.SaleStatus;
 import org.springframework.format.annotation.DateTimeFormat;
 import java.math.BigDecimal;
@@ -48,6 +49,8 @@ public class SaleController {
                 current.id(),
                 request.customerName(),
                 request.customerDocument(),
+                request.paymentMethod(),
+                request.paymentReference(),
                 request.globalDiscountPercentage(),
                 request.priceListId(),
                 request.items().stream()
@@ -108,7 +111,8 @@ public class SaleController {
             @RequestParam(required = false, name = "q") String text,
             @RequestParam(required = false) Long supplierId,
             @RequestParam(required = false) Boolean withDiscount,
-            @RequestParam(required = false) Boolean registeredCustomer) {
+            @RequestParam(required = false) Boolean registeredCustomer,
+            @RequestParam(required = false) SalePaymentMethod paymentMethod) {
         CurrentUser current = CurrentUser.resolve(userRepositoryPort);
         Long effectiveBranch = current.isAdmin() ? branchId : current.resolveBranch(null);
         int safePage = Math.max(0, page);
@@ -116,7 +120,7 @@ public class SaleController {
 
         SalePage result = saleManagementUseCase.searchSales(
                 new SaleSearchCriteria(effectiveBranch, status, from, to, blankToNull(seller), blankToNull(product), minTotal, maxTotal, text,
-                        supplierId, withDiscount, registeredCustomer),
+                        supplierId, withDiscount, registeredCustomer, paymentMethod),
                 safePage, safeSize, sortBy, !"desc".equalsIgnoreCase(direction));
 
         int totalPages = (int) Math.ceil(result.totalElements() / (double) safeSize);

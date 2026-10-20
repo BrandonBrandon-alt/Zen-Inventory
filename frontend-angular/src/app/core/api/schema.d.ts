@@ -1512,6 +1512,9 @@ export interface components {
             userId: number;
             customerName?: string;
             customerDocument?: string;
+            /** @enum {string} */
+            paymentMethod: "EFECTIVO" | "TARJETA" | "TRANSFERENCIA" | "OTRO";
+            paymentReference?: string;
             globalDiscountPercentage?: number;
             /** Format: int64 */
             priceListId?: number;
@@ -1547,6 +1550,8 @@ export interface components {
             cancellationReason?: string;
             customerName?: string;
             customerDocument?: string;
+            paymentMethod?: string;
+            paymentReference?: string;
             globalDiscountPercentage?: number;
             details?: components["schemas"]["SaleDetailResponse"][];
         };

@@ -106,6 +106,8 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
                 userName,
                 command.customerName(),
                 command.customerDocument(),
+                command.paymentMethod(),
+                command.paymentReference(),
                 command.globalDiscountPercentage(),
                 details
         );

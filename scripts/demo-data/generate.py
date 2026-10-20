@@ -24,6 +24,7 @@ TABLES_WITH_OFFSETS = (
     "detalles_venta",
     "ordenes_compra",
     "detalles_orden_compra",
+    "pagos_orden_compra",
     "transferencias",
     "detalles_transferencia",
     "solicitudes_devolucion",
@@ -352,8 +353,11 @@ class Sim:
             detail.append((self.next_id("detalles_venta"), sid, p, qty, price, disc, line_total, self.products[p].name))
         discount_global = money(lines_total * global_pct / 100)
         final = money(lines_total - discount_global)
+        method = rng.choices(["EFECTIVO", "TARJETA", "TRANSFERENCIA", "OTRO"], weights=[44, 36, 17, 3])[0]
+        reference = {"TARJETA": f"V-{rng.randint(100000, 999999)}", "TRANSFERENCIA": f"TR-{rng.randint(1000000, 9999999)}"}.get(method)
         sale = {"id": sid, "branch": branch, "user": seller.id, "ts": ts, "subtotal": money(base), "discount": money(base - final), "total": final,
-                "status": "COMPLETED", "reason": None, "customer": name, "doc": doc, "global": global_pct, "lines": detail}
+                "status": "COMPLETED", "reason": None, "customer": name, "doc": doc, "global": global_pct, "lines": detail,
+                "pay_method": method, "pay_ref": reference}
         self.sales[sid] = sale
         self.rows["ventas"].append(sale)
         self.rows["detalles_venta"].extend(detail)
@@ -566,6 +570,17 @@ class Sim:
     def do_pay_order(self, ts: datetime, oid: int, partial: bool) -> None:
         order = self.orders[oid]
         if order["pay"] != "PAGADO":
+            rng = self.rng
+            paid = sum(p["amount"] for p in self.rows["pagos_orden_compra"] if p["order"] == oid)
+            amount = money(order["total"] * rng.uniform(0.3, 0.7)) if partial else money(order["total"] - paid)
+            if amount > 0:
+                method = rng.choices(["TRANSFERENCIA", "CHEQUE", "EFECTIVO"], weights=[70, 20, 10])[0]
+                self.rows["pagos_orden_compra"].append({
+                    "id": self.next_id("pagos_orden_compra"), "order": oid, "amount": amount, "ts": ts,
+                    "user": rng.choice(self.staff[order["branch"]]["manager"]).id, "method": method,
+                    "ref": {"TRANSFERENCIA": f"TR-{rng.randint(1000000, 9999999)}", "CHEQUE": f"CH-{rng.randint(10000, 99999)}"}.get(method),
+                    "note": "Abono" if partial else None,
+                })
             order["pay"] = "PAGO_PARCIAL" if partial else "PAGADO"
             order["paid_ts"] = ts
 
