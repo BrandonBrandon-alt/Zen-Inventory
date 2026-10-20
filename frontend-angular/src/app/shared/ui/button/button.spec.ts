@@ -9,6 +9,13 @@ describe('Button', () => {
     expect(screen.getByRole('button', { name: 'Guardar' })).toBeEnabled();
   });
 
+  it('anima solo las propiedades que cambian, nunca «all»', async () => {
+    await render('<button appButton>Guardar</button>', { imports: [Button] });
+    const classes = screen.getByRole('button', { name: 'Guardar' }).className;
+    expect(classes).not.toContain('transition-all');
+    expect(classes).toContain('transition-[');
+  });
+
   it('dispara el clic cuando está habilitado', async () => {
     const onClick = vi.fn();
     await render('<button appButton (click)="onClick()">Guardar</button>', {

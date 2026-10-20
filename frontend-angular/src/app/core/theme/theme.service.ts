@@ -11,6 +11,9 @@ export interface ThemeOrigin {
 
 export const THEME_STORAGE_KEY = 'zen_inventory_theme';
 
+/** Fondo de cada tema (igual que `--bg-base` en theme.css): es el `theme-color` de la página. */
+const THEME_COLOR: Readonly<Record<Theme, string>> = { dark: '#242421', light: '#f2f0e3' };
+
 function isTheme(value: unknown): value is Theme {
   return value === 'dark' || value === 'light';
 }
@@ -80,6 +83,8 @@ export class ThemeService {
 
   private apply(theme: Theme): void {
     this.root.dataset['theme'] = theme;
+    // La barra del navegador (en móvil) toma el color de fondo del tema vigente.
+    this.doc.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[theme]);
   }
 
   private canAnimate(): boolean {

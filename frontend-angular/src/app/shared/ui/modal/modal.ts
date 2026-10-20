@@ -72,7 +72,7 @@ let scrollLocks = 0;
           }
         </div>
 
-        <div class="flex-1 overflow-y-auto px-6 pb-6"><ng-content /></div>
+        <div class="flex-1 overflow-y-auto overscroll-contain px-6 pb-6"><ng-content /></div>
 
         <!-- Los botones van dentro del contenedor proyectado [data-slot=footer]: es él quien los separa (gap-3). -->
         <footer

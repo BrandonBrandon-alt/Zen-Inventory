@@ -14,6 +14,23 @@ describe('ThemeService', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
+  it('el color de la barra del navegador (theme-color) sigue al tema vigente', () => {
+    const meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    meta.content = '#000000';
+    document.head.append(meta);
+    try {
+      const service = createService();
+      expect(meta.content).toBe('#242421');
+      service.set('light');
+      expect(meta.content).toBe('#f2f0e3');
+      service.set('dark');
+      expect(meta.content).toBe('#242421');
+    } finally {
+      meta.remove();
+    }
+  });
+
   it('por defecto usa el tema oscuro y lo aplica al documento', () => {
     const service = createService();
     expect(service.theme()).toBe('dark');

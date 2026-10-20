@@ -19,6 +19,13 @@ import { Viewport } from '../viewport';
     '(document:keydown.escape)': 'menu.close()',
   },
   template: `
+    <!-- Primer elemento al tabular: salta el menú (unos quince enlaces) y va directo al contenido. -->
+    <a
+      href="#contenido"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[70] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary-fg focus:shadow-lg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none"
+      (click)="skipToContent($event, content)"
+      >Saltar al contenido</a
+    >
     <app-sidebar />
 
     @if (menu.open() && !viewport.isDesktop()) {
@@ -43,7 +50,7 @@ import { Viewport } from '../viewport';
         </header>
       }
 
-      <main class="min-w-0 flex-1 pb-10">
+      <main #content id="contenido" tabindex="-1" class="min-w-0 flex-1 pb-10 outline-none">
         <router-outlet />
       </main>
     </div>
@@ -52,4 +59,11 @@ import { Viewport } from '../viewport';
 export class Shell {
   protected readonly menu = inject(MobileMenu);
   protected readonly viewport = inject(Viewport);
+
+  /** Mueve el foco al contenido sin cambiar la URL (un `href="#…"` normal pasaría por el router). */
+  protected skipToContent(event: Event, content: HTMLElement): void {
+    event.preventDefault();
+    content.focus();
+    content.scrollIntoView({ block: 'start' });
+  }
 }
