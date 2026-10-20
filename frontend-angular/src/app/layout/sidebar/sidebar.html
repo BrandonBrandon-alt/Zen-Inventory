@@ -16,7 +16,7 @@
         tooltipPlacement="right"
         aria-keyshortcuts="Control+S Meta+S"
         [attr.aria-expanded]="!state.collapsed()"
-        (click)="state.toggle()"
+        (click)="toggleWithMotion()"
       >
         @if (state.collapsed()) {
           <svg lucideChevronRight [size]="14" />
@@ -36,7 +36,7 @@
     }
   </header>
 
-  <nav aria-label="Principal" class="flex-1 overflow-y-auto px-3">
+  <nav aria-label="Principal" class="flex-1 overflow-y-auto overscroll-contain px-3">
     @for (section of sections(); track section.title) {
       <p
         class="mt-4 mb-2 px-3 text-[10px] font-bold tracking-widest text-fg-subtle uppercase first:mt-0"

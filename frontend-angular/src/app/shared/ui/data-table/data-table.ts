@@ -184,7 +184,21 @@ export class DataTable<T> {
 
   private readonly userId = inject(AuthStore).session()?.id;
 
+  /** Los datos acaban de llegar (de marcador a filas): un fundido breve, una sola vez, en lugar de un corte seco. */
+  protected readonly revealing = signal(false);
+  private revealTimer: ReturnType<typeof setTimeout> | undefined;
+
   constructor() {
+    let wasSkeleton = false;
+    effect(() => {
+      const isSkeleton = this.skeleton();
+      if (wasSkeleton && !isSkeleton) {
+        this.revealing.set(true);
+        clearTimeout(this.revealTimer);
+        this.revealTimer = setTimeout(() => this.revealing.set(false), 200);
+      }
+      wasSkeleton = isSkeleton;
+    });
     // El orden recordado se lee una vez, cuando la pantalla dice cómo se llama (y solo si esa columna existe y se puede ordenar).
     let hydrated = false;
     effect(() => {

@@ -33,21 +33,21 @@
           @if (canSeeMoney()) {
             <div class="lg:pr-6">
               <dt class="text-sm text-fg-subtle">Ingresos</dt>
-              <dd class="mt-1 font-title text-2xl font-bold break-words text-fg sm:text-3xl">{{ formatMoneyCompact(data.summary.revenue) }}</dd>
+              <dd class="mt-1 font-title text-2xl font-bold break-words text-fg sm:text-3xl">@for (v of [formatMoneyCompact(data.summary.revenue)]; track v) {<span class="inline-block animate-kpi-in">{{ v }}</span>}</dd>
             </div>
           }
           <div class="lg:px-6">
             <dt class="text-sm text-fg-subtle">Unidades vendidas</dt>
-            <dd class="mt-1 font-title text-2xl font-bold break-words text-fg sm:text-3xl">{{ formatQuantity(data.summary.units) }}</dd>
+            <dd class="mt-1 font-title text-2xl font-bold break-words text-fg sm:text-3xl">@for (v of [formatQuantity(data.summary.units)]; track v) {<span class="inline-block animate-kpi-in">{{ v }}</span>}</dd>
           </div>
           @if (canSeeMoney()) {
             <div class="lg:px-6">
               <dt class="text-sm text-fg-subtle">Ticket promedio</dt>
-              <dd class="mt-1 font-title text-2xl font-bold break-words text-fg sm:text-3xl">{{ formatMoneyCompact(data.summary.averageTicket) }}</dd>
+              <dd class="mt-1 font-title text-2xl font-bold break-words text-fg sm:text-3xl">@for (v of [formatMoneyCompact(data.summary.averageTicket)]; track v) {<span class="inline-block animate-kpi-in">{{ v }}</span>}</dd>
             </div>
             <div class="lg:pl-6">
               <dt class="text-sm text-fg-subtle">Valor del inventario</dt>
-              <dd class="mt-1 font-title text-2xl font-bold break-words text-fg sm:text-3xl">{{ formatMoneyCompact(data.summary.inventoryValue) }}</dd>
+              <dd class="mt-1 font-title text-2xl font-bold break-words text-fg sm:text-3xl">@for (v of [formatMoneyCompact(data.summary.inventoryValue)]; track v) {<span class="inline-block animate-kpi-in">{{ v }}</span>}</dd>
             </div>
           }
         </dl>
@@ -86,7 +86,12 @@
           <app-alert variant="danger">{{ message }}</app-alert>
         } @else if (replenishment.data(); as items) {
           @if (items.length === 0) {
-            <p class="text-sm text-fg-subtle">Ningún producto está por debajo de su mínimo.</p>
+            <p class="flex items-center gap-2 text-sm text-fg-subtle">
+              <svg viewBox="0 0 16 16" class="size-4 shrink-0 fill-none stroke-success" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 8.5 6.4 12 13 4.5" pathLength="1" stroke-dasharray="1" class="animate-check-draw" />
+              </svg>
+              Ningún producto está por debajo de su mínimo.
+            </p>
           } @else {
             <ul class="divide-y divide-line">
               @for (item of attention(); track item.branchId + '-' + item.productId) {

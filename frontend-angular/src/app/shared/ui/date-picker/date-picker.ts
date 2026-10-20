@@ -1,4 +1,5 @@
 import {
+  DestroyRef,
   ChangeDetectionStrategy,
   Component,
   ElementRef,
@@ -18,6 +19,7 @@ import { DOCUMENT } from '@angular/common';
 import { type ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { LucideCalendar, LucideChevronLeft, LucideChevronRight } from '@lucide/angular';
 import { FieldControl, FormField } from '../form-field/form-field';
+import { ExitDelay } from '../motion/exit-delay';
 import {
   WEEKDAYS,
   addDays,
@@ -83,14 +85,16 @@ let nextId = 0;
       <span class="min-w-0 flex-1 truncate" [class.text-fg-subtle]="!value()">{{ label() }}</span>
     </button>
 
-    @if (open()) {
+    @if (open() || exit.active()) {
       <div
         #panel
         role="dialog"
         aria-label="Calendario"
         [id]="panelId"
         [attr.popover]="supportsPopover ? 'manual' : null"
-        class="m-0 w-[17.5rem] max-w-[calc(100vw-1rem)] rounded-lg border border-line bg-card p-2.5 text-fg shadow-2xl animate-alert-in"
+        class="m-0 w-[17.5rem] max-w-[calc(100vw-1rem)] rounded-lg border border-line bg-card p-2.5 text-fg shadow-2xl"
+        [class]="open() ? 'animate-pop-in' : 'pointer-events-none animate-pop-out'"
+        [style.transform-origin]="origin()"
         style="position: fixed; inset: auto"
         (keydown)="onPanelKeydown($event)"
       >
@@ -197,6 +201,10 @@ export class DatePicker implements ControlValueAccessor, FieldControl {
   protected readonly today = startOfDay(new Date());
 
   protected readonly open = signal(false);
+  /** Salida del calendario: sigue visible un instante, saliendo, antes de quitarse. */
+  protected readonly exit = new ExitDelay(inject(DestroyRef));
+  /** De qué borde del campo crece el calendario. */
+  protected readonly origin = signal('top left');
   /** Mes que se está mirando. */
   private readonly viewMonth = signal(startOfMonth(new Date()));
   /** Día con el cursor del teclado (el único que entra en el orden de Tab). */
@@ -292,6 +300,7 @@ export class DatePicker implements ControlValueAccessor, FieldControl {
     const start = this.value() ?? clampDay(new Date(), this.min(), this.max());
     this.cursor.set(startOfDay(start));
     this.viewMonth.set(startOfMonth(start));
+    this.exit.cancel();
     this.open.set(true);
     afterNextRender(
       () => {
@@ -312,16 +321,19 @@ export class DatePicker implements ControlValueAccessor, FieldControl {
 
   protected close(returnFocus: boolean): void {
     if (!this.open()) return;
-    const panel = this.panel()?.nativeElement;
-    if (panel && typeof panel.hidePopover === 'function') {
-      try {
-        panel.hidePopover();
-      } catch {
-        // Ya estaba oculto.
-      }
-    }
     this.open.set(false);
     this.onTouched();
+    // El calendario se quita cuando termina su salida (al instante si no hay movimiento).
+    this.exit.begin(() => {
+      const panel = this.panel()?.nativeElement;
+      if (panel && typeof panel.hidePopover === 'function') {
+        try {
+          panel.hidePopover();
+        } catch {
+          // Ya estaba oculto.
+        }
+      }
+    });
     if (returnFocus) this.trigger().nativeElement.focus();
   }
 
@@ -435,5 +447,6 @@ export class DatePicker implements ControlValueAccessor, FieldControl {
     if (viewportHeight > 0 && height > 0) top = Math.min(Math.max(8, top), Math.max(8, viewportHeight - height - 8));
     panel.style.left = `${left}px`;
     panel.style.top = `${top}px`;
+    this.origin.set(placeAbove ? 'bottom left' : 'top left');
   }
 }

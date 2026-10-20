@@ -51,6 +51,31 @@
     background: var(--neutral-500);
   }
 
+  /* Los toques en móvil no esperan el posible segundo toque de zoom. */
+  a,
+  button,
+  summary,
+  [role='button'],
+  [role='tab'],
+  [role='radio'],
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
+  }
+
+  /* Títulos sin palabras sueltas en la última línea. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  /* Al llegar al final del contenido de un diálogo, el scroll no se escapa a la página de atrás. */
+  dialog {
+    overscroll-behavior: contain;
+  }
+
   body {
     min-height: 100vh;
     background: var(--neutral-100);
@@ -62,6 +87,35 @@
     /* Sin `transition` de color/fondo: el cambio de tema lo anima la View Transition (ver más abajo) y una
        transición en el body haría que la captura de la pantalla nueva saliera con los colores a medio camino. */
   }
+}
+
+/* Pantalla cambiada con un atajo de teclado: sus secciones aparecen sin fundido (lo pone Sidebar y lo quita al terminar). */
+:root[data-nav-instant] .animate-enter,
+:root[data-nav-instant] .animate-enter-delayed {
+  animation: none;
+}
+
+/* Salida de los diálogos: el enter ya tiene su animación; al cerrarse se desvanecen y bajan 4px en 120ms (más discreto que
+   la entrada). `allow-discrete` mantiene el <dialog> en pantalla hasta que acaba la transición. */
+dialog {
+  transition:
+    opacity 0.12s ease-in,
+    transform 0.12s ease-in,
+    overlay 0.12s ease-in allow-discrete,
+    display 0.12s ease-in allow-discrete;
+}
+dialog:not([open]) {
+  opacity: 0;
+  transform: translateY(4px) scale(0.99);
+}
+dialog::backdrop {
+  transition:
+    opacity 0.12s ease-in,
+    overlay 0.12s ease-in allow-discrete,
+    display 0.12s ease-in allow-discrete;
+}
+dialog:not([open])::backdrop {
+  opacity: 0;
 }
 
 /* Cambio de tema claro/oscuro: el tema nuevo se extiende como una mancha de luz desde el botón pulsado, con el borde

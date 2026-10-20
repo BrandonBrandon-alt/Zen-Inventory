@@ -159,13 +159,13 @@ describe('Sidebar', () => {
       expect(width()).toBe(SIDEBAR_DEFAULT_WIDTH);
     });
 
-    it('mientras se arrastra se marca el menú como "redimensionando" (sin animación de ancho)', async () => {
+    it('mientras se arrastra se marca el menú como "redimensionando" y el ancho nunca se anima', async () => {
       const { container } = await renderSidebar('ADMIN');
-      expect(aside(container)).toHaveClass('transition-[width]');
+      expect(aside(container)).not.toHaveClass('transition-[width]');
       fireEvent.pointerDown(handle(), { clientX: 240, pointerId: 1, button: 0 });
       expect(aside(container)).not.toHaveClass('transition-[width]');
       fireEvent.pointerUp(handle(), { pointerId: 1 });
-      expect(aside(container)).toHaveClass('transition-[width]');
+      expect(aside(container)).not.toHaveClass('transition-[width]');
     });
 
     it('con el teclado: flechas cambian 16 px, Inicio y Fin van a los límites', async () => {
@@ -221,6 +221,27 @@ describe('Sidebar', () => {
     const aside = container.querySelector('aside') as HTMLElement;
     expect(aside).not.toHaveClass('w-full');
     expect(aside).toHaveStyle({ width: '240px' });
+  });
+
+  describe('movimiento del ancho', () => {
+    const aside = (container: Element) => container.querySelector('aside') as HTMLElement;
+
+    it('al pulsar el botón del borde el ancho se anima un instante (150 ms) y luego vuelve a quedar sin transición', async () => {
+      const { container } = await renderSidebar('ADMIN');
+      await userEvent.click(screen.getByRole('button', { name: 'Contraer menú' }));
+      expect(localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBe('true');
+      expect(aside(container)).toHaveClass('transition-[width]');
+      expect(aside(container)).toHaveClass('duration-150');
+      await vi.waitFor(() => expect(aside(container)).not.toHaveClass('transition-[width]'));
+    });
+
+    it('con el atajo Ctrl + S el ancho cambia al instante, sin transición (acción del teclado)', async () => {
+      const { container, fixture } = await renderSidebar('ADMIN');
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true }));
+      fixture.detectChanges();
+      expect(localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBe('true');
+      expect(aside(container)).not.toHaveClass('transition-[width]');
+    });
   });
 
   describe('atajo Ctrl + S', () => {
@@ -364,6 +385,8 @@ describe('Sidebar', () => {
       return event;
     };
     const spyNavigate = () => vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+    // La marca de un atajo anterior puede seguir puesta (se retira con un temporizador): cada prueba parte limpia.
+    beforeEach(() => document.documentElement.removeAttribute('data-nav-instant'));
 
     it('Ctrl + n va a la n-ésima pantalla del menú, en el orden en que se ve, y evita el cambio de pestaña', async () => {
       await renderSidebar('ADMIN');
@@ -375,6 +398,15 @@ describe('Sidebar', () => {
       expect(navigate).toHaveBeenLastCalledWith('/transfers');
       press({ key: '7', ctrlKey: true });
       expect(navigate).toHaveBeenLastCalledWith('/sales/history');
+    });
+
+    it('mientras dura el cambio de pantalla por atajo el documento queda marcado (sin fundido en las secciones) y la marca se retira sola', async () => {
+      await renderSidebar('ADMIN');
+      spyNavigate();
+      expect(document.documentElement).not.toHaveAttribute('data-nav-instant');
+      press({ key: '4', ctrlKey: true });
+      expect(document.documentElement).toHaveAttribute('data-nav-instant');
+      await vi.waitFor(() => expect(document.documentElement).not.toHaveAttribute('data-nav-instant'), { timeout: 2000 });
     });
 
     it('también con ⌘ (Mac)', async () => {

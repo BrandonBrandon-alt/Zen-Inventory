@@ -2,6 +2,7 @@ import { DOCUMENT } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   Injector,
   afterNextRender,
@@ -18,6 +19,7 @@ import {
 import { type ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { LucideCheck, LucideChevronDown, LucideDynamicIcon, LucideSearch, type LucideIconData } from '@lucide/angular';
 import { normalizeText } from '../../format/format';
+import { ExitDelay } from '../motion/exit-delay';
 import { FieldControl, FormField } from '../form-field/form-field';
 
 /** Una opción del selector. `icon` y `description` son opcionales. */
@@ -77,11 +79,13 @@ let nextId = 0;
       <svg lucideChevronDown [size]="16" class="shrink-0 text-fg-subtle transition-transform duration-200" [class.rotate-180]="open()" aria-hidden="true" />
     </button>
 
-    @if (open()) {
+    @if (open() || exit.active()) {
       <div
         #panel
         [attr.popover]="supportsPopover ? 'manual' : null"
-        class="m-0 overflow-hidden rounded-lg border border-line bg-card p-0 text-fg shadow-2xl animate-alert-in"
+        class="m-0 overflow-hidden rounded-lg border border-line bg-card p-0 text-fg shadow-2xl"
+        [class]="open() ? 'animate-pop-in' : 'pointer-events-none animate-pop-out'"
+        [style.transform-origin]="origin()"
         style="position: fixed; inset: auto"
       >
         @if (searchable()) {
@@ -173,6 +177,10 @@ export class Select<T = unknown> implements ControlValueAccessor, FieldControl {
   protected readonly listboxId = `app-select-list-${nextId++}`;
 
   protected readonly open = signal(false);
+  /** Salida del panel: sigue visible un instante, saliendo, antes de quitarse. */
+  protected readonly exit = new ExitDelay(inject(DestroyRef));
+  /** De qué borde del botón crece el panel (arriba si se abre hacia abajo, abajo si se voltea). */
+  protected readonly origin = signal('top left');
   protected readonly query = signal('');
   protected readonly activeIndex = signal(-1);
   private readonly formDisabled = signal(false);
@@ -238,6 +246,7 @@ export class Select<T = unknown> implements ControlValueAccessor, FieldControl {
     this.query.set('');
     const selectedIndex = this.options().findIndex((option) => option.value === this.value() && !option.disabled);
     this.activeIndex.set(selectedIndex >= 0 ? selectedIndex : this.firstEnabled(this.options(), 0, 1));
+    this.exit.cancel();
     this.open.set(true);
     // Cuando el panel ya está en el DOM: capa superior, posición y foco en la búsqueda.
     afterNextRender(
@@ -260,17 +269,20 @@ export class Select<T = unknown> implements ControlValueAccessor, FieldControl {
 
   private close(returnFocus: boolean): void {
     if (!this.open()) return;
-    const panel = this.panel()?.nativeElement;
-    if (panel && typeof panel.hidePopover === 'function') {
-      try {
-        panel.hidePopover();
-      } catch {
-        // Ya estaba oculto.
-      }
-    }
     this.open.set(false);
     this.activeIndex.set(-1);
     this.onTouched();
+    // El panel se quita del DOM cuando termina su salida (al instante si no hay movimiento).
+    this.exit.begin(() => {
+      const panel = this.panel()?.nativeElement;
+      if (panel && typeof panel.hidePopover === 'function') {
+        try {
+          panel.hidePopover();
+        } catch {
+          // Ya estaba oculto.
+        }
+      }
+    });
     if (returnFocus) this.trigger().nativeElement.focus();
   }
 
@@ -392,6 +404,7 @@ export class Select<T = unknown> implements ControlValueAccessor, FieldControl {
     const left = viewportWidth > 0 ? Math.max(8, Math.min(rect.left, viewportWidth - rect.width - 8)) : rect.left;
     panel.style.left = `${left}px`;
     panel.style.top = placeAbove ? `${Math.max(8, rect.top - height - 4)}px` : `${rect.bottom + 4}px`;
+    this.origin.set(placeAbove ? 'bottom left' : 'top left');
     panel.style.width = `${rect.width}px`;
   }
 }

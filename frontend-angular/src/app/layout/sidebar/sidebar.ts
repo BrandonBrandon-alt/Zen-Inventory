@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
@@ -63,6 +64,9 @@ export class Sidebar {
   private readonly store = inject(AuthStore);
   private readonly router = inject(Router);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly doc = inject(DOCUMENT);
+  private motionTimer: ReturnType<typeof setTimeout> | undefined;
+  private navTimer: ReturnType<typeof setTimeout> | undefined;
   protected readonly state = inject(SidebarState);
   protected readonly viewport = inject(Viewport);
   protected readonly menu = inject(MobileMenu);
@@ -74,7 +78,11 @@ export class Sidebar {
 
   /** Solo el escritorio tiene menú colapsado (solo iconos); el cajón móvil se ve completo. */
   protected readonly compact = computed(() => this.viewport.isDesktop() && this.state.collapsed());
-  protected readonly asideClass = computed(() => (this.resizing() ? '' : 'transition-[width] duration-300'));
+  /** El ancho solo se anima al pulsar el botón del borde: con el atajo (teclado) cambia al instante. */
+  private readonly widthMotion = signal(false);
+  protected readonly asideClass = computed(() =>
+    !this.resizing() && this.widthMotion() ? 'transition-[width] duration-150 ease-[cubic-bezier(0.16,1,0.3,1)]' : '',
+  );
   protected readonly sections = computed(() => navSectionsFor(this.store.role()));
 
   /** Ctrl + 1…9 llevan a las primeras nueve pantallas del menú, en el orden en que se ven. */
@@ -85,7 +93,32 @@ export class Sidebar {
     // Elegir una pantalla cierra el cajón.
     this.router.events
       .pipe(filter((event) => event instanceof NavigationEnd), takeUntilDestroyed())
-      .subscribe(() => this.menu.close());
+      .subscribe(() => {
+        this.menu.close();
+        this.endInstantNavigation();
+      });
+  }
+
+  /** Contraer o expandir con el botón del borde: una transición breve del ancho (el atajo de teclado no la usa). */
+  protected toggleWithMotion(): void {
+    this.widthMotion.set(true);
+    this.state.toggle();
+    clearTimeout(this.motionTimer);
+    this.motionTimer = setTimeout(() => this.widthMotion.set(false), 250);
+  }
+
+  /** Marca el documento mientras dura un cambio de pantalla hecho con el teclado: sus secciones no hacen fundido. */
+  private startInstantNavigation(): void {
+    this.doc.documentElement.setAttribute('data-nav-instant', '');
+    // Por si el atajo no produce navegación (ya se estaba en esa pantalla): la marca no se queda para siempre.
+    clearTimeout(this.navTimer);
+    this.navTimer = setTimeout(() => this.endInstantNavigation(), 800);
+  }
+
+  private endInstantNavigation(): void {
+    clearTimeout(this.navTimer);
+    // Un instante después de terminar la navegación: las secciones nuevas ya se crearon sin animación.
+    this.navTimer = setTimeout(() => this.doc.documentElement.removeAttribute('data-nav-instant'), 50);
   }
 
   /**
@@ -110,6 +143,7 @@ export class Sidebar {
     if (!item) return false;
     // Sustituye al cambio de pestaña del navegador (donde este permite reemplazarlo).
     event.preventDefault();
+    this.startInstantNavigation();
     void this.router.navigateByUrl(item.path);
     this.menu.close();
     return true;

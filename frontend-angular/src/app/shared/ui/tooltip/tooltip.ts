@@ -57,6 +57,19 @@ let nextId = 0;
  *   necesitando su propio `aria-label`: el tooltip complementa, no sustituye.
  * - En pantallas táctiles no hay "pasar el cursor": allí solo aparece al enfocar.
  */
+/** Margen (ms) tras cerrarse una descripción en que otra se considera «del mismo recorrido» y sale sin espera ni animación. */
+const WARM_MS = 500;
+/** Cuándo se cerró la última descripción, y cuántas hay abiertas ahora. */
+let lastHiddenAt = 0;
+let openCount = 0;
+const isWarm = (): boolean => openCount > 0 || Date.now() - lastHiddenAt < WARM_MS;
+
+/** Olvida el recorrido anterior: la próxima descripción vuelve a ser «la primera». Pensado para las pruebas. */
+export function resetTooltipGroup(): void {
+  lastHiddenAt = 0;
+  openCount = 0;
+}
+
 @Directive({
   selector: '[appTooltip]',
   host: {
@@ -98,7 +111,8 @@ export class Tooltip {
 
   protected scheduleShow(): void {
     this.clearTimer();
-    this.timer = setTimeout(() => this.show(), this.tooltipDelay());
+    // La primera descripción de un recorrido espera; al pasar a la siguiente enseguida, sale al instante.
+    this.timer = setTimeout(() => this.show(), isWarm() ? 0 : this.tooltipDelay());
   }
 
   protected show(): void {
@@ -106,12 +120,13 @@ export class Tooltip {
     const text = this.text();
     if (!text || this.element) return;
 
+    const instant = isWarm();
     const element = this.document.createElement('div');
     element.id = this.tooltipId;
     element.setAttribute('role', 'tooltip');
     element.textContent = text;
     element.className =
-      'pointer-events-none max-w-64 rounded-md whitespace-pre-line border border-line bg-card px-2.5 py-1.5 text-xs font-medium text-fg shadow-xl animate-error-in';
+      'pointer-events-none max-w-64 rounded-md whitespace-pre-line border border-line bg-card px-2.5 py-1.5 text-xs font-medium text-fg shadow-xl' + (instant ? '' : ' animate-error-in');
     element.style.cssText = 'position: fixed; inset: auto; margin: 0; z-index: 1000;';
     if (typeof element.showPopover === 'function') element.setAttribute('popover', 'manual');
     this.document.body.appendChild(element);
@@ -123,6 +138,7 @@ export class Tooltip {
       }
     }
     this.element = element;
+    openCount++;
     this.visible.set(true);
     this.place();
     this.document.defaultView?.addEventListener('scroll', this.onViewportChange, true);
@@ -136,6 +152,8 @@ export class Tooltip {
     this.document.defaultView?.removeEventListener('resize', this.onViewportChange);
     this.element.remove();
     this.element = null;
+    openCount = Math.max(0, openCount - 1);
+    lastHiddenAt = Date.now();
     this.visible.set(false);
   }
 

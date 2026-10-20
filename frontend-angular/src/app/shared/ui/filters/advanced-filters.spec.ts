@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { expectAccessible } from '@testing/a11y';
 import { AdvancedFilters } from './advanced-filters';
 
@@ -35,5 +35,35 @@ describe('AdvancedFilters', () => {
   it('no tiene problemas de accesibilidad detectables, abierto y cerrado', async () => {
     await setup({ open: true, count: 1 });
     await expectAccessible();
+  });
+
+  describe('salida animada', () => {
+    afterEach(() => delete (globalThis as { matchMedia?: unknown }).matchMedia);
+    const withMotion = () =>
+      Object.defineProperty(globalThis, 'matchMedia', { configurable: true, writable: true, value: vi.fn().mockReturnValue({ matches: false }) });
+
+    it('al cerrar con movimiento el panel sale (animate-reveal-out, sin recibir clics) y se quita después', async () => {
+      withMotion();
+      await setup({ open: true });
+      const button = screen.getByRole('button', { name: /Más filtros/ });
+      expect(screen.getByRole('group', { name: 'Más filtros' })).toHaveClass('animate-reveal');
+      await userEvent.click(button);
+      const leaving = screen.getByRole('group', { name: 'Más filtros' });
+      expect(leaving).toHaveClass('animate-reveal-out');
+      expect(leaving).toHaveClass('pointer-events-none');
+      expect(button).toHaveAttribute('aria-expanded', 'false');
+      await vi.waitFor(() => expect(screen.queryByRole('group', { name: 'Más filtros' })).not.toBeInTheDocument());
+    });
+
+    it('volver a abrirlo mientras sale lo deja abierto', async () => {
+      withMotion();
+      await setup({ open: true });
+      const button = screen.getByRole('button', { name: /Más filtros/ });
+      await userEvent.click(button);
+      await userEvent.click(button);
+      await new Promise((r) => setTimeout(r, 250));
+      expect(screen.getByRole('group', { name: 'Más filtros' })).toHaveClass('animate-reveal');
+      expect(button).toHaveAttribute('aria-expanded', 'true');
+    });
   });
 });

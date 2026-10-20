@@ -1,5 +1,8 @@
 /* Tokens de diseño — Zen Inventory. Oscuro por defecto, claro con [data-theme='light']. */
 :root {
+  /* Los controles nativos (barras de scroll, selects, campos de fecha) toman el tema de la app, no el del sistema. */
+  color-scheme: dark;
+
   --bg-base: #242421;
   --bg-surface: #1f1f1c;
   --bg-card: #2a2a26;
@@ -37,6 +40,8 @@
 }
 
 :root[data-theme='light'] {
+  color-scheme: light;
+
   --bg-base: #f2f0e3;
   --bg-surface: #eeebe4;
   --bg-card: #f2f0e3;
@@ -120,8 +125,9 @@
 
   /* Entrada de las pantallas (la misma del Next): el encabezado sube y aparece; el contenido lo sigue unos ms después.
      `backwards` (no `both`): al terminar no queda ningún `transform`, que crearía un contenedor para hijos con position fixed. */
-  --animate-enter: fadeInUp 0.4s ease backwards;
-  --animate-enter-delayed: fadeInUp 0.4s ease 0.07s backwards;
+  /* Entrada de las secciones de una pantalla: solo un fundido corto, sin desplazamiento ni retraso escalonado. */
+  --animate-enter: fadeIn 0.15s var(--ease-out-expo) backwards;
+  --animate-enter-delayed: fadeIn 0.15s var(--ease-out-expo) backwards;
 
   /* La línea de una gráfica de área se dibuja una vez al entrar (pathLength=1) y el relleno aparece después. */
   --animate-draw-line: drawLine 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.25s backwards;
@@ -163,16 +169,24 @@
   /* Movimiento de interfaz: entradas rápidas y salidas aún más rápidas (la salida no debe hacer esperar). */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --animate-form-in: fadeInUp 0.6s var(--ease-out-expo) 0.1s both;
-  --animate-alert-in: alertIn 0.28s var(--ease-out-expo) both;
+  --animate-alert-in: alertIn 0.2s var(--ease-out-expo) both;
   --animate-error-in: errorIn 0.2s ease-out both;
   --animate-toast-in: toastIn 0.35s var(--ease-out-expo) both;
   --animate-toast-out: toastOut 0.2s ease-in both;
   --animate-shake: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
   --animate-modal-in: modalIn 0.22s var(--ease-out-expo) both;
   /* Un panel que se abre desde su botón (Más filtros): baja un poco y se aclara. */
-  --animate-reveal: reveal 0.24s var(--ease-out-expo) both;
-  /* Una línea nueva en la venta: entra desde la izquierda y deja un resplandor de la marca que se apaga. */
-  --animate-line-in: lineIn 0.7s var(--ease-out-expo) both;
+  --animate-reveal: reveal 0.2s var(--ease-out-expo) both;
+  --animate-reveal-out: revealOut 0.12s ease-in both;
+  /* Desplegables (select, calendario): crecen desde su botón y salen más discretos. */
+  --animate-pop-in: popIn 0.14s var(--ease-out-expo) both;
+  --animate-pop-out: popOut 0.12s ease-in both;
+  /* Una cifra que cambia entra con un leve desenfoque que se aclara. */
+  --animate-kpi-in: kpiIn 0.2s var(--ease-out-expo) both;
+  /* Marca de verificación que se dibuja una vez. */
+  --animate-check-draw: checkDraw 0.45s var(--ease-out-expo) 0.1s both;
+  /* Una línea nueva en la venta: un destello breve de la marca, sin desplazamiento (es la acción más frecuente del cajero). */
+  --animate-line-in: lineIn 0.22s var(--ease-out-expo) both;
   --animate-backdrop-in: backdropIn 0.2s ease-out both;
 
   @keyframes letterReveal {
@@ -202,7 +216,7 @@
   @keyframes alertIn {
     from {
       opacity: 0;
-      transform: translateY(-8px);
+      transform: translateY(-6px);
     }
     to {
       opacity: 1;
@@ -254,17 +268,77 @@
     }
   }
 
-  @keyframes lineIn {
-    0% {
+  @keyframes fadeIn {
+    from {
       opacity: 0;
-      transform: translateX(-10px);
-      background-color: color-mix(in oklab, var(--brand-500) 18%, transparent);
     }
-    35% {
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes revealOut {
+    from {
       opacity: 1;
       transform: none;
     }
+    to {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
+  @keyframes popIn {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes popOut {
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+  }
+
+  @keyframes kpiIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+      filter: blur(3px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+      filter: blur(0);
+    }
+  }
+
+  @keyframes checkDraw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes lineIn {
+    0% {
+      opacity: 0.55;
+      background-color: color-mix(in oklab, var(--brand-500) 16%, transparent);
+    }
     100% {
+      opacity: 1;
       background-color: transparent;
     }
   }

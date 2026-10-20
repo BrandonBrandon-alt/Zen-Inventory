@@ -78,7 +78,7 @@
         </tr>
       </thead>
 
-      <tbody class="transition-opacity duration-300" [class.opacity-40]="refreshing()" [class.pointer-events-none]="refreshing()">
+      <tbody class="transition-opacity duration-300" [class.animate-enter]="revealing()" [class.opacity-40]="refreshing()" [class.pointer-events-none]="refreshing()">
         @if (skeleton()) {
           @for (row of skeletonRows; track row) {
             <tr class="border-b border-line-subtle last:border-b-0" aria-hidden="true">
