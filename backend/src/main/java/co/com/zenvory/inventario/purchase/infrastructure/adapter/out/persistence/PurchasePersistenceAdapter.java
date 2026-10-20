@@ -1,7 +1,9 @@
 package co.com.zenvory.inventario.purchase.infrastructure.adapter.out.persistence;
 
 import co.com.zenvory.inventario.purchase.application.port.out.PurchaseRepositoryPort;
+import co.com.zenvory.inventario.purchase.domain.model.PaymentMethod;
 import co.com.zenvory.inventario.purchase.domain.model.PaymentStatus;
+import co.com.zenvory.inventario.purchase.domain.model.PurchasePayment;
 import co.com.zenvory.inventario.purchase.domain.model.PurchaseOrder;
 import co.com.zenvory.inventario.purchase.domain.model.PurchaseOrderDetail;
 import co.com.zenvory.inventario.purchase.domain.model.ReceptionStatus;
@@ -79,6 +81,19 @@ public class PurchasePersistenceAdapter implements PurchaseRepositoryPort {
             entity.addDetail(dEntity);
         });
 
+        domain.getPayments().forEach(p -> {
+            PurchasePaymentEntity pEntity = new PurchasePaymentEntity();
+            pEntity.setId(p.getId());
+            pEntity.setAmount(p.getAmount());
+            pEntity.setDate(p.getDate());
+            pEntity.setUserId(p.getUserId());
+            pEntity.setUserName(p.getUserName());
+            pEntity.setMethod(p.getMethod().name());
+            pEntity.setReference(p.getReference());
+            pEntity.setNotes(p.getNotes());
+            entity.addPayment(pEntity);
+        });
+
         return entity;
     }
 
@@ -86,6 +101,10 @@ public class PurchasePersistenceAdapter implements PurchaseRepositoryPort {
         List<PurchaseOrderDetail> details = entity.getDetails().stream()
                 .map(d -> new PurchaseOrderDetail(d.getId(), d.getProductId(), d.getQuantity(), d.getUnitPrice(),
                         d.getDiscountPct(), d.getReceivedQuantity()))
+                .toList();
+        List<PurchasePayment> payments = entity.getPayments().stream()
+                .map(p -> new PurchasePayment(p.getId(), p.getAmount(), p.getDate(), p.getUserId(), p.getUserName(),
+                        PaymentMethod.valueOf(p.getMethod()), p.getReference(), p.getNotes()))
                 .toList();
 
         return new PurchaseOrder(
@@ -108,7 +127,8 @@ public class PurchasePersistenceAdapter implements PurchaseRepositoryPort {
                 entity.getResueltoPorId(),
                 entity.getFechaResolucion(),
                 entity.isExceptionApproved(),
-                entity.getVersion());
+                entity.getVersion(),
+                payments);
     }}
     
     

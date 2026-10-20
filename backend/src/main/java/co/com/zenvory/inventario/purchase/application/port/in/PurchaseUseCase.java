@@ -76,12 +76,21 @@ public interface PurchaseUseCase {
     PurchaseOrder closeShortfall(Long orderId, Long userId);
 
     /**
-     * Registra el pago total de la obligación con el proveedor.
-     * 
-     * @param orderId ID de la orden.
-     * @return La orden en estado de pago PAGADO.
+     * Registra un pago o abono al proveedor. El estado de pago queda en PAGO_PARCIAL mientras haya saldo y en PAGADO
+     * cuando se cubre el total.
+     *
+     * @param orderId   ID de la orden.
+     * @param amount    monto pagado; {@code null} paga todo el saldo pendiente.
+     * @param method    forma de pago.
+     * @param reference número de transferencia, cheque o comprobante (opcional).
+     * @param notes     observaciones (opcional).
+     * @param userId    usuario que registra el pago.
+     * @param userName  nombre de ese usuario, que se guarda junto al pago.
+     * @return La orden con el pago ya registrado.
      */
-    PurchaseOrder registerPayment(Long orderId);
+    PurchaseOrder registerPayment(Long orderId, java.math.BigDecimal amount,
+            co.com.zenvory.inventario.purchase.domain.model.PaymentMethod method, String reference, String notes,
+            Long userId, String userName);
 
     /**
      * Anula definitivamente una orden de compra.

@@ -123,6 +123,7 @@ export class PurchasesPage {
     { key: 'supplier', header: 'Proveedor', icon: LucideTruck.icon, sortable: true, primary: true },
     ...(this.isAdmin() ? [{ key: 'branch', header: 'Sucursal', icon: LucideStore.icon, sortable: true }] : []),
     { key: 'total', header: 'Total', icon: LucideCoins.icon, sortable: true, align: 'end' as const, display: (r: PurchaseRow) => formatMoney(r.total) },
+    { key: 'balance', header: 'Saldo', icon: LucideCoins.icon, sortable: true, align: 'end' as const, display: (r: PurchaseRow) => formatMoney(r.balance) },
     { key: 'paymentLabel', header: 'Pago', icon: LucideWallet.icon, sortable: true },
     { key: 'requestDate', header: 'Solicitada', icon: LucideCalendar.icon, sortable: true, width: '11.5rem', value: (r: PurchaseRow) => r.requestDate, display: (r: PurchaseRow) => formatDateTime(r.requestDate) },
     { key: 'acciones', header: 'Acciones', align: 'end' as const },
@@ -191,10 +192,18 @@ export class PurchasesPage {
     return list;
   });
 
+  /** Lo que se le debe a los proveedores en las órdenes visibles y cuántas ya vencieron. */
+  protected readonly payables = computed(() => {
+    const owed = this.purchases().filter((p) => p.balance > 0);
+    return { total: owed.reduce((sum, p) => sum + p.balance, 0), count: owed.length, overdue: owed.filter((p) => p.overdue).length };
+  });
+
   protected readonly selected = computed(() => this.purchases().find((p) => p.id === this.selectedId()) ?? null);
   protected readonly pending = computed(() => this.rows().filter((r) => r.needsMe).length);
   protected readonly selectedSupplier = computed(() => this.supplierNames().get(this.selected()?.supplierId ?? -1) ?? '');
   protected readonly selectedBranch = computed(() => (this.isAdmin() ? (this.branchNames().get(this.selected()?.branchId ?? -1) ?? '') : ''));
+
+  protected readonly formatMoney = formatMoney;
 
   protected readonly summary = computed(() => {
     const open = this.purchases().filter((p) => OPEN_RECEPTIONS.includes(p.reception)).length;

@@ -11,17 +11,19 @@ import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Modal } from '@shared/ui/modal/modal';
-import { PAYMENT_INFO, RECEPTION_INFO } from '../../data-access/purchase-labels';
+import { Select, type SelectOption } from '@shared/ui/select/select';
+import { PAYMENT_INFO, PAYMENT_METHOD_LABELS, RECEPTION_INFO } from '../../data-access/purchase-labels';
 import { purchaseActions } from '../../data-access/purchase-permissions';
-import { type Purchase, type PurchaseLine, PurchasesApi, type Receipt } from '../../data-access/purchases-api';
+import { PAYMENT_METHODS, type PaymentMethod, type Purchase, type PurchaseLine, PurchasesApi, type Receipt } from '../../data-access/purchases-api';
 
-type Mode = 'view' | 'receive' | 'cancel' | 'receipt';
+type Mode = 'view' | 'receive' | 'cancel' | 'receipt' | 'pay';
 
 /** Lo que falta por recibir de una línea (una orden parcialmente recibida ya trae parte). */
 export const pendingOf = (line: PurchaseLine): number => Math.max(0, line.quantity - line.received);
 
 const QUANTITY = { required: 'Escribe la cantidad.', min: 'No puede ser negativa.', max: 'Es más de lo que falta por recibir.' };
 const REASON = { required: 'Cuéntanos el motivo.' };
+const AMOUNT = { required: 'Escribe cuánto se pagó.', min: 'Debe ser mayor que cero.', max: 'Es más de lo que se debe.' };
 
 /**
  * Detalle de una orden de compra y lo que se puede hacer con ella según su estado y el rol de quien la mira.
@@ -29,7 +31,7 @@ const REASON = { required: 'Cuéntanos el motivo.' };
  */
 @Component({
   selector: 'app-purchase-detail-modal',
-  imports: [ReactiveFormsModule, Modal, Button, Alert, Badge, FormField, InputDirective],
+  imports: [ReactiveFormsModule, Modal, Button, Alert, Badge, FormField, InputDirective, Select],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './purchase-detail-modal.html',
 })
@@ -59,6 +61,8 @@ export class PurchaseDetailModal {
   protected readonly pending = pendingOf;
   protected readonly receptionInfo = RECEPTION_INFO;
   protected readonly paymentInfo = PAYMENT_INFO;
+  protected readonly methodLabels = PAYMENT_METHOD_LABELS;
+  protected readonly methodOptions: readonly SelectOption<PaymentMethod>[] = PAYMENT_METHODS.map((value) => ({ value, label: PAYMENT_METHOD_LABELS[value] }));
 
   protected readonly actions = computed(() => {
     const purchase = this.purchase();
@@ -69,6 +73,12 @@ export class PurchaseDetailModal {
 
   protected readonly receiveForm = this.fb.group({ received: new FormArray<FormControl<number | null>>([]) });
   protected readonly reasonForm = this.fb.group({ reason: ['', Validators.required] });
+  protected readonly payForm = this.fb.group({
+    amount: new FormControl<number | null>(null, [Validators.required, Validators.min(0.01)]),
+    method: this.fb.control<PaymentMethod>('TRANSFERENCIA'),
+    reference: ['', Validators.maxLength(100)],
+    notes: ['', Validators.maxLength(500)],
+  });
 
   constructor() {
     // Solo al abrir (o al cambiar de orden): la lista se recarga mientras se ve el resultado de una recepción, y ese
@@ -99,6 +109,10 @@ export class PurchaseDetailModal {
     return controlError(this.receiveForm.controls.received.at(index), QUANTITY);
   }
 
+  protected amountError(): string | null {
+    return controlError(this.payForm.controls.amount, AMOUNT);
+  }
+
   protected reasonError(): string | null {
     return controlError(this.reasonForm.controls.reason, REASON);
   }
@@ -109,7 +123,8 @@ export class PurchaseDetailModal {
   }
 
   protected submitLabel(): string {
-    return this.mode() === 'receive' ? 'Registrar recepción' : 'Cancelar orden';
+    const mode = this.mode();
+    return mode === 'receive' ? 'Registrar recepción' : mode === 'pay' ? 'Registrar pago' : 'Cancelar orden';
   }
 
   // ---- Acciones directas ----
@@ -121,11 +136,6 @@ export class PurchaseDetailModal {
   protected dispatch(): void {
     const p = this.purchase();
     if (p) void this.run(this.api.dispatch(p.id), `Orden #${p.id} marcada como enviada.`);
-  }
-
-  protected pay(): void {
-    const p = this.purchase();
-    if (p) void this.run(this.api.pay(p.id), `Orden #${p.id} marcada como pagada.`);
   }
 
   protected closeShortfall(): void {
@@ -147,6 +157,16 @@ export class PurchaseDetailModal {
         return;
       }
       void this.receive(p, items);
+    } else if (this.mode() === 'pay') {
+      this.payForm.markAllAsTouched();
+      if (this.payForm.invalid) return;
+      const { amount, method, reference, notes } = this.payForm.getRawValue();
+      const paid = amount ?? 0;
+      const full = paid >= p.balance;
+      void this.run(
+        this.api.pay(p.id, { amount: paid, method, reference, notes }),
+        full ? `Orden #${p.id} pagada por completo.` : `Abono de ${formatMoney(paid)} registrado en la orden #${p.id}.`,
+      );
     } else if (this.mode() === 'cancel') {
       this.reasonForm.markAllAsTouched();
       if (this.reasonForm.invalid) return;
@@ -192,5 +212,8 @@ export class PurchaseDetailModal {
       received.push(new FormControl<number | null>(pending, [Validators.required, Validators.min(0), Validators.max(pending)]), { emitEvent: false });
     }
     this.reasonForm.reset({ reason: '' }, { emitEvent: false });
+    this.payForm.reset({ amount: purchase.balance, method: 'TRANSFERENCIA', reference: '', notes: '' }, { emitEvent: false });
+    this.payForm.controls.amount.setValidators([Validators.required, Validators.min(0.01), Validators.max(purchase.balance)]);
+    this.payForm.controls.amount.updateValueAndValidity({ emitEvent: false });
   }
 }

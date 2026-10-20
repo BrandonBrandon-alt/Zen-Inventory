@@ -1619,6 +1619,19 @@ export interface components {
             paymentDueDays: number;
             items: components["schemas"]["PurchaseDetailRequest"][];
         };
+        PaymentResponse: {
+            /** Format: int64 */
+            id?: number;
+            amount?: number;
+            /** Format: date-time */
+            date?: string;
+            /** Format: int64 */
+            userId?: number;
+            userName?: string;
+            method?: string;
+            reference?: string;
+            notes?: string;
+        };
         PurchaseDetailResponse: {
             /** Format: int64 */
             id?: number;
@@ -1658,6 +1671,10 @@ export interface components {
             total?: number;
             reasonResolution?: string;
             exceptionApproved?: boolean;
+            paidAmount?: number;
+            balance?: number;
+            overdue?: boolean;
+            payments?: components["schemas"]["PaymentResponse"][];
             details?: components["schemas"]["PurchaseDetailResponse"][];
         };
         ItemReceipt: {

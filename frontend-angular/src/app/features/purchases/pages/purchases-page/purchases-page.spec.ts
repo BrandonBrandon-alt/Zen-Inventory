@@ -32,6 +32,10 @@ const order = (id: number, receptionStatus: string, extra: object = {}) => ({
   branchId: 10,
   paymentDueDays: 30,
   total: 1000,
+  paidAmount: 0,
+  balance: 1000,
+  overdue: false,
+  payments: [],
   details: [detail(id * 10, 1, 10, 100)],
   ...extra,
 });
@@ -40,7 +44,7 @@ const ORDERS = [
   order(1, 'AWAITING_APPROVAL', { supplierId: 101 }),
   order(2, 'PENDING'),
   order(3, 'IN_TRANSIT'),
-  order(4, 'RECEIVED_PARTIAL', { details: [detail(41, 1, 10, 100, 0, 6), detail(42, 2, 4, 50)], total: 1200 }),
+  order(4, 'RECEIVED_PARTIAL', { details: [detail(41, 1, 10, 100, 0, 6), detail(42, 2, 4, 50)], total: 1200, balance: 1200 }),
   order(5, 'RECEIVED_TOTAL'),
   order(6, 'CANCELLED', { reasonResolution: 'Ya no se necesita' }),
 ];
@@ -225,17 +229,101 @@ describe('PurchasesPage', () => {
       await vi.waitFor(() => expect(hit).toBe('2'));
     });
 
-    it('una orden recibida del todo se paga; una pagada ya no ofrece pagar', async () => {
+    it('registrar un pago envía monto, método y referencia, y ofrece el saldo completo por defecto', async () => {
       useSession('MANAGER', 10);
       stub();
+      let body: Record<string, unknown> | null = null;
       let paid = '';
-      server.use(http.post(`${URL_P}/:id/pay`, ({ params }) => ((paid = String(params['id'])), HttpResponse.json(order(5, 'RECEIVED_TOTAL', { paymentStatus: 'PAGADO' })))));
+      server.use(
+        http.post(`${URL_P}/:id/pay`, async ({ params, request }) => {
+          paid = String(params['id']);
+          body = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(order(5, 'RECEIVED_TOTAL', { paymentStatus: 'PAGADO', paidAmount: 1000, balance: 0 }));
+        }),
+      );
       await renderPage();
       await userEvent.click(screen.getByRole('combobox', { name: 'Estado de la orden' }));
       await userEvent.click(screen.getByRole('option', { name: 'Recibida' })); // exacto: "Recibida parcial" también existe
       const dialog = await openDetail(5);
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Marcar como pagada' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar pago' }));
+      expect(within(dialog).getByLabelText('Monto')).toHaveValue(1000);
+      await userEvent.type(within(dialog).getByLabelText(/Referencia/), 'TR-77');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar pago' }));
       await vi.waitFor(() => expect(paid).toBe('5'));
+      expect(body).toEqual({ amount: 1000, method: 'TRANSFERENCIA', reference: 'TR-77' });
+    });
+
+    it('un abono menor al saldo se envía con su monto', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      let body: Record<string, unknown> | null = null;
+      server.use(
+        http.post(`${URL_P}/:id/pay`, async ({ request }) => {
+          body = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(order(5, 'RECEIVED_TOTAL', { paymentStatus: 'PAGO_PARCIAL', paidAmount: 250, balance: 750 }));
+        }),
+      );
+      await renderPage();
+      await userEvent.click(screen.getByRole('combobox', { name: 'Estado de la orden' }));
+      await userEvent.click(screen.getByRole('option', { name: 'Recibida' }));
+      const dialog = await openDetail(5);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar pago' }));
+      const amount = within(dialog).getByLabelText('Monto');
+      await userEvent.clear(amount);
+      await userEvent.type(amount, '250');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar pago' }));
+      await vi.waitFor(() => expect(body).not.toBeNull());
+      expect(body).toMatchObject({ amount: 250 });
+    });
+
+    it('no deja pagar más que el saldo: muestra el error y no envía nada', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      let calls = 0;
+      server.use(http.post(`${URL_P}/:id/pay`, () => (calls++, HttpResponse.json(order(5, 'RECEIVED_TOTAL')))));
+      await renderPage();
+      await userEvent.click(screen.getByRole('combobox', { name: 'Estado de la orden' }));
+      await userEvent.click(screen.getByRole('option', { name: 'Recibida' }));
+      const dialog = await openDetail(5);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar pago' }));
+      const amount = within(dialog).getByLabelText('Monto');
+      await userEvent.clear(amount);
+      await userEvent.type(amount, '1500');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar pago' }));
+      expect(await within(dialog).findByText('Es más de lo que se debe.')).toBeInTheDocument();
+      expect(calls).toBe(0);
+    });
+
+    it('una orden ya pagada no ofrece pagar y muestra su historial de pagos', async () => {
+      useSession('MANAGER', 10);
+      stub([
+        order(5, 'RECEIVED_TOTAL', {
+          paymentStatus: 'PAGADO',
+          paidAmount: 1000,
+          balance: 0,
+          payments: [{ id: 1, amount: 1000, date: '2026-10-20T09:30:00', userId: 5, userName: 'Gerente Central', method: 'CHEQUE', reference: 'CH-12', notes: '' }],
+        }),
+      ]);
+      await renderPage();
+      await userEvent.click(screen.getByRole('combobox', { name: 'Estado de la orden' }));
+      await userEvent.click(screen.getByRole('option', { name: 'Recibida' }));
+      const dialog = await openDetail(5);
+      expect(within(dialog).queryByRole('button', { name: 'Registrar pago' })).not.toBeInTheDocument();
+      expect(within(dialog).getByText('Gerente Central')).toBeInTheDocument();
+      expect(within(dialog).getByText('Cheque')).toBeInTheDocument();
+      expect(within(dialog).getByText('CH-12')).toBeInTheDocument();
+    });
+
+    it('el encabezado resume lo que se debe a proveedores y cuántas órdenes están vencidas', async () => {
+      useSession('MANAGER', 10);
+      stub([
+        order(5, 'RECEIVED_TOTAL', { balance: 700, paidAmount: 300, paymentStatus: 'PAGO_PARCIAL', overdue: true }),
+        order(6, 'RECEIVED_TOTAL', { balance: 500 }),
+        order(7, 'RECEIVED_TOTAL', { paymentStatus: 'PAGADO', balance: 0, paidAmount: 1000 }),
+      ]);
+      await renderPage();
+      expect(await screen.findByText(/en 2 órdenes/)).toBeInTheDocument();
+      expect(screen.getByText('1 vencida')).toBeInTheDocument();
     });
 
     it('cerrar con faltante es solo del administrador', async () => {

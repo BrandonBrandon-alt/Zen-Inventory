@@ -8,7 +8,7 @@ import {
   type LucideIconData,
 } from '@lucide/angular';
 import type { BadgeVariant } from '@shared/ui/badge/badge';
-import type { PaymentStatus, ReceptionStatus } from './purchases-api';
+import type { PaymentMethod, PaymentStatus, ReceptionStatus } from './purchases-api';
 
 export interface StatusInfo {
   readonly label: string;
@@ -31,6 +31,14 @@ export const PAYMENT_INFO: Readonly<Record<PaymentStatus, { label: string; varia
   POR_PAGAR: { label: 'Por pagar', variant: 'warning', icon: LucideWallet.icon },
   PAGO_PARCIAL: { label: 'Pago parcial', variant: 'warning', icon: LucideWallet.icon },
   PAGADO: { label: 'Pagada', variant: 'success', icon: LucideWallet.icon },
+};
+
+export const PAYMENT_METHOD_LABELS: Readonly<Record<PaymentMethod, string>> = {
+  EFECTIVO: 'Efectivo',
+  TRANSFERENCIA: 'Transferencia',
+  CHEQUE: 'Cheque',
+  TARJETA: 'Tarjeta',
+  OTRO: 'Otro',
 };
 
 /** Órdenes que todavía se están moviendo (no recibidas del todo ni canceladas). */

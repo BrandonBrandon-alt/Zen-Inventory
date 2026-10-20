@@ -14,6 +14,10 @@ export type ReceptionStatus = (typeof RECEPTION_STATUSES)[number];
 export const PAYMENT_STATUSES = ['POR_PAGAR', 'PAGO_PARCIAL', 'PAGADO'] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
+export const PAYMENT_METHODS = ['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA', 'OTRO'] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+const isMethod = (value: unknown): value is PaymentMethod => (PAYMENT_METHODS as readonly unknown[]).includes(value);
+
 const isReception = (value: unknown): value is ReceptionStatus => (RECEPTION_STATUSES as readonly unknown[]).includes(value);
 const isPayment = (value: unknown): value is PaymentStatus => (PAYMENT_STATUSES as readonly unknown[]).includes(value);
 
@@ -28,6 +32,25 @@ export interface PurchaseLine {
   readonly subtotal: number;
 }
 
+/** Un pago o abono hecho al proveedor. */
+export interface PurchasePayment {
+  readonly id: number;
+  readonly amount: number;
+  readonly date: Date | null;
+  readonly userName: string;
+  readonly method: PaymentMethod;
+  readonly reference: string;
+  readonly notes: string;
+}
+
+/** Lo que se envía para registrar un pago; sin `amount` se paga todo el saldo. */
+export interface PaymentInput {
+  readonly amount: number | null;
+  readonly method: PaymentMethod;
+  readonly reference: string;
+  readonly notes: string;
+}
+
 export interface Purchase {
   readonly id: number;
   readonly reception: ReceptionStatus;
@@ -40,6 +63,13 @@ export interface Purchase {
   readonly paymentDueDays: number;
   readonly paymentDueDate: Date | null;
   readonly total: number;
+  /** Lo ya pagado al proveedor. */
+  readonly paid: number;
+  /** Lo que aún se le debe; cero si está pagada o cancelada. */
+  readonly balance: number;
+  /** Queda saldo y ya venció el plazo de pago. */
+  readonly overdue: boolean;
+  readonly payments: readonly PurchasePayment[];
   readonly reason: string;
   readonly lines: readonly PurchaseLine[];
 }
@@ -83,6 +113,14 @@ function toPurchase(raw: PurchaseResponse): Purchase | null {
     paymentDueDays: raw.paymentDueDays ?? 0,
     paymentDueDate: parseDate(raw.paymentDueDate),
     total: raw.total ?? 0,
+    paid: raw.paidAmount ?? 0,
+    balance: raw.balance ?? 0,
+    overdue: raw.overdue ?? false,
+    payments: (raw.payments ?? []).flatMap((p) =>
+      typeof p.id === 'number'
+        ? [{ id: p.id, amount: p.amount ?? 0, date: parseDate(p.date), userName: p.userName?.trim() || 'Desconocido', method: isMethod(p.method) ? p.method : 'OTRO', reference: p.reference?.trim() ?? '', notes: p.notes?.trim() ?? '' }]
+        : [],
+    ),
     reason: raw.reasonResolution?.trim() ?? '',
     lines: (raw.details ?? []).flatMap((d) =>
       typeof d.id === 'number' && typeof d.productId === 'number'
@@ -170,9 +208,15 @@ export class PurchasesApi {
       );
   }
 
-  /** Marca la orden como pagada. */
-  pay(id: number): Observable<Purchase> {
-    return this.http.post<PurchaseResponse>(`${this.url}/${id}/pay`, {}, this.options).pipe(map(requirePurchase));
+  /** Registra un pago o abono: la orden queda con pago parcial mientras haya saldo y pagada al cubrir el total. */
+  pay(id: number, input: PaymentInput): Observable<Purchase> {
+    const body = {
+      ...(input.amount !== null ? { amount: input.amount } : {}),
+      method: input.method,
+      ...(input.reference.trim() ? { reference: input.reference.trim() } : {}),
+      ...(input.notes.trim() ? { notes: input.notes.trim() } : {}),
+    };
+    return this.http.post<PurchaseResponse>(`${this.url}/${id}/pay`, body, this.options).pipe(map(requirePurchase));
   }
 
   cancel(id: number, reason: string): Observable<void> {

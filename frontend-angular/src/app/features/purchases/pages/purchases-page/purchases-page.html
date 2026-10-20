@@ -5,6 +5,13 @@
       <p class="mt-1 text-sm text-fg-subtle">
         {{ summary() }}@if (pending() > 0) {, {{ pending() === 1 ? '1 espera tu acción' : pending() + ' esperan tu acción' }}}
       </p>
+      @if (payables(); as owed) {
+        @if (owed.count > 0) {
+          <p class="mt-0.5 text-sm text-fg-subtle">
+            Por pagar a proveedores: <span class="font-medium tabular-nums text-fg">{{ formatMoney(owed.total) }}</span> en {{ owed.count === 1 ? '1 orden' : owed.count + ' órdenes' }}@if (owed.overdue > 0) {, <span class="font-medium text-danger">{{ owed.overdue === 1 ? '1 vencida' : owed.overdue + ' vencidas' }}</span>}
+          </p>
+        }
+      }
     }
   </div>
   <button appButton type="button" (click)="formOpen.set(true)"><svg lucidePlus [size]="16" />Nueva orden de compra</button>
@@ -71,6 +78,9 @@
   </ng-template>
   <ng-template appCell="paymentLabel" let-p>
     <app-badge [variant]="paymentVariant(p)">{{ p.paymentLabel }}</app-badge>
+    @if (p.overdue) {
+      <app-badge class="ml-1" variant="danger">Vencido</app-badge>
+    }
   </ng-template>
   <ng-template appCell="acciones" let-p>
     <div class="flex justify-end">

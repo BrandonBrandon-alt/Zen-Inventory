@@ -27,7 +27,7 @@ export function purchaseActions(purchase: Purchase, role: Role | null): Purchase
     approve: status === 'AWAITING_APPROVAL' && manager,
     dispatch: status === 'PENDING' && manager,
     receive: (status === 'PENDING' || status === 'IN_TRANSIT' || status === 'RECEIVED_PARTIAL') && operational,
-    pay: received && purchase.payment !== 'PAGADO' && manager,
+    pay: received && purchase.payment !== 'PAGADO' && purchase.balance > 0 && manager,
     cancel: (status === 'AWAITING_APPROVAL' || status === 'PENDING' || status === 'IN_TRANSIT') && manager,
     closeShortfall: status === 'RECEIVED_PARTIAL' && admin,
   };

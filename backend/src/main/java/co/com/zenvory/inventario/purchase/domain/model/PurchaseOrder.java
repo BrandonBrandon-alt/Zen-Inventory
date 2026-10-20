@@ -4,6 +4,7 @@ import co.com.zenvory.inventario.purchase.domain.exception.InvalidPurchaseStateE
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -29,6 +30,7 @@ public class PurchaseOrder {
     private LocalDateTime paymentDueDate;
     private BigDecimal total;
     private List<PurchaseOrderDetail> details;
+    private final List<PurchasePayment> payments = new ArrayList<>();
 
     // Campos de Resolución y Auditoría
     private String reasonResolution;
@@ -44,6 +46,18 @@ public class PurchaseOrder {
             LocalDateTime paymentDueDate, BigDecimal total, List<PurchaseOrderDetail> details,
             String reasonResolution, Long resolvedById, LocalDateTime resolutionDate, boolean exceptionApproved,
             Integer version) {
+        this(id, supplierId, branchId, userId, receivingUserId, requestDate, estimatedArrivalDate, actualArrivalDate,
+                deliveryLeadTimeDays, receptionStatus, paymentStatus, paymentDueDays, paymentDueDate, total, details,
+                reasonResolution, resolvedById, resolutionDate, exceptionApproved, version, List.of());
+    }
+
+    public PurchaseOrder(Long id, Long supplierId, Long branchId, Long userId, Long receivingUserId,
+            LocalDateTime requestDate, LocalDateTime estimatedArrivalDate, LocalDateTime actualArrivalDate,
+            Integer deliveryLeadTimeDays,
+            ReceptionStatus receptionStatus, PaymentStatus paymentStatus, Integer paymentDueDays,
+            LocalDateTime paymentDueDate, BigDecimal total, List<PurchaseOrderDetail> details,
+            String reasonResolution, Long resolvedById, LocalDateTime resolutionDate, boolean exceptionApproved,
+            Integer version, List<PurchasePayment> payments) {
         if (supplierId == null || branchId == null || userId == null) {
             throw new IllegalArgumentException("Proveedor, Sucursal y Usuario Autorizador son obligatorios.");
         }
@@ -73,6 +87,9 @@ public class PurchaseOrder {
         this.resolutionDate = resolutionDate;
         this.exceptionApproved = exceptionApproved;
         this.version = version;
+        if (payments != null) {
+            this.payments.addAll(payments);
+        }
     }
 
     public static PurchaseOrder create(Long supplierId, Long userId, Long branchId,
@@ -192,16 +209,60 @@ public class PurchaseOrder {
         this.resolutionDate = LocalDateTime.now();
     }
 
-    public void registerPayment() {
+    /**
+     * Registra un pago o abono al proveedor. Solo procede con la mercancía ya recibida (total o parcialmente) y no puede
+     * exceder el saldo. El estado de pago se deduce de lo pagado: {@code PAGO_PARCIAL} mientras quede saldo y
+     * {@code PAGADO} cuando se cubre el total.
+     *
+     * @param amount monto del pago; si es {@code null} se paga todo el saldo pendiente
+     * @return el pago registrado (aún sin id)
+     */
+    public PurchasePayment registerPayment(BigDecimal amount, PaymentMethod method, String reference, String notes,
+            Long userId, String userName) {
         if (this.receptionStatus != ReceptionStatus.RECEIVED_TOTAL
                 && this.receptionStatus != ReceptionStatus.RECEIVED_PARTIAL) {
             throw new InvalidPurchaseStateException(
                     "Solo se pueden pagar órdenes que ya han sido recibidas (total o parcialmente).");
         }
-        if (this.paymentStatus == PaymentStatus.PAGADO) {
+        BigDecimal pending = balance();
+        if (this.paymentStatus == PaymentStatus.PAGADO || pending.signum() <= 0) {
             throw new InvalidPurchaseStateException("La orden ya se encuentra pagada.");
         }
-        this.paymentStatus = PaymentStatus.PAGADO;
+        BigDecimal paying = (amount != null) ? amount : pending;
+        if (paying.signum() <= 0) {
+            throw new IllegalArgumentException("El monto del pago debe ser mayor que cero.");
+        }
+        if (paying.compareTo(pending) > 0) {
+            throw new InvalidPurchaseStateException(
+                    "El pago (" + paying.toPlainString() + ") excede el saldo pendiente (" + pending.toPlainString() + ").");
+        }
+        PurchasePayment payment = new PurchasePayment(null, paying, LocalDateTime.now(), userId, userName, method,
+                reference, notes);
+        this.payments.add(payment);
+        this.paymentStatus = balance().signum() == 0 ? PaymentStatus.PAGADO : PaymentStatus.PAGO_PARCIAL;
+        return payment;
+    }
+
+    /** Suma de lo pagado hasta ahora. */
+    public BigDecimal paidAmount() {
+        return payments.stream().map(PurchasePayment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /** Lo que aún se le debe al proveedor por esta orden; una orden cancelada no genera deuda. */
+    public BigDecimal balance() {
+        if (this.receptionStatus == ReceptionStatus.CANCELLED) {
+            return BigDecimal.ZERO;
+        }
+        return this.total.subtract(paidAmount()).max(BigDecimal.ZERO);
+    }
+
+    /** {@code true} si queda saldo y ya pasó la fecha de vencimiento. */
+    public boolean isOverdue(LocalDateTime now) {
+        return balance().signum() > 0 && paymentDueDate != null && now.isAfter(paymentDueDate);
+    }
+
+    public List<PurchasePayment> getPayments() {
+        return Collections.unmodifiableList(payments);
     }
 
     // Getters
