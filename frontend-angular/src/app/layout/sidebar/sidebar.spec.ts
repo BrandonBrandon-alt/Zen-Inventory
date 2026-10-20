@@ -3,14 +3,13 @@ import { Router, provideRouter } from '@angular/router';
 import { fireEvent, render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { of } from 'rxjs';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { signal } from '@angular/core';
 import { AlertCount } from '@core/alerts/alert-count';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { ThemeService } from '@core/theme/theme.service';
 import { BranchLabelApi } from '../data-access/branch-label-api';
 import {
-  SIDEBAR_AUTOHIDE_STORAGE_KEY,
   SIDEBAR_DEFAULT_WIDTH,
   SIDEBAR_MAX_WIDTH,
   SIDEBAR_MIN_WIDTH,
@@ -224,212 +223,51 @@ describe('Sidebar', () => {
     expect(aside).toHaveStyle({ width: '240px' });
   });
 
-  describe('ocultar automáticamente', () => {
-    const host = (container: Element) => container as HTMLElement;
-    const panel = (container: Element) => container.querySelector('aside') as HTMLElement;
-    const hidden = (container: Element) => panel(container).classList.contains('-translate-x-full');
-
+  describe('atajo Ctrl + S', () => {
     // Los eventos del documento no pasan por Testing Library: tras cada uno se actualiza la vista a mano.
-    let refresh = (): void => undefined;
-    async function renderHidden() {
-      localStorage.setItem(SIDEBAR_AUTOHIDE_STORAGE_KEY, 'true');
-      const result = await renderSidebar('ADMIN');
-      refresh = () => result.fixture.detectChanges();
-      return result;
-    }
+    const press = (fixture: { detectChanges: () => void }, init: KeyboardEventInit = { key: 's', ctrlKey: true }) => {
+      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
+      document.dispatchEvent(event);
+      fixture.detectChanges();
+      return event;
+    };
 
-    beforeEach(() => vi.useFakeTimers());
-    afterEach(() => vi.useRealTimers());
-
-    it('activarlo desde el menú lo esconde y lo recuerda', async () => {
-      vi.useRealTimers();
-      const { container } = await renderSidebar('ADMIN');
-      expect(hidden(container)).toBe(false);
-      await userEvent.click(screen.getByRole('button', { name: 'Ocultar menú automáticamente' }));
-      expect(localStorage.getItem(SIDEBAR_AUTOHIDE_STORAGE_KEY)).toBe('true');
-      expect(hidden(container)).toBe(true);
+    it('contrae y expande el menú a iconos, y evita el "Guardar página" del navegador', async () => {
+      const { fixture } = await renderSidebar('ADMIN');
+      const first = press(fixture);
+      expect(first.defaultPrevented).toBe(true);
+      expect(localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBe('true');
+      press(fixture);
+      expect(localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBe('false');
     });
 
-    it('oculto no empuja el contenido: queda fijo sobre él y solo mide la franja del borde', async () => {
-      const { container } = await renderHidden();
-      expect(host(container).className).toContain('md:fixed');
-      expect(host(container).className).not.toContain('md:sticky');
-      expect(host(container)).toHaveStyle({ width: '10px' });
-      expect(hidden(container)).toBe(true);
+    it('también con ⌘ + S y sin distinguir mayúsculas', async () => {
+      const { fixture } = await renderSidebar('ADMIN');
+      press(fixture, { key: 'S', metaKey: true });
+      expect(localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBe('true');
     });
 
-    it('esconde el menú también a los lectores de pantalla y al teclado (invisible) hasta que se abre', async () => {
-      const { container } = await renderHidden();
-      expect(panel(container)).toHaveClass('invisible');
+    it.each([
+      ['sin Ctrl', { key: 's' }],
+      ['otra tecla', { key: 'd', ctrlKey: true }],
+      ['con Mayús', { key: 's', ctrlKey: true, shiftKey: true }],
+      ['con Alt', { key: 's', ctrlKey: true, altKey: true }],
+    ])('%s no hace nada ni bloquea el navegador', async (_name, init) => {
+      const { fixture } = await renderSidebar('ADMIN');
+      const event = press(fixture, init);
+      expect(event.defaultPrevented).toBe(false);
+      expect(localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBeNull();
     });
 
-    it('al acercar el puntero se abre al instante, a su ancho y con sombra', async () => {
-      const { container } = await renderHidden();
-      fireEvent.mouseEnter(host(container));
-      expect(hidden(container)).toBe(false);
-      expect(panel(container)).not.toHaveClass('invisible');
-      expect(panel(container)).toHaveClass('shadow-2xl');
-      expect(host(container)).toHaveStyle({ width: '240px' });
-    });
-
-    it('al sacar el puntero se esconde tras una breve espera, no de golpe', async () => {
-      const { container } = await renderHidden();
-      fireEvent.mouseEnter(host(container));
-      fireEvent.mouseLeave(host(container));
-      vi.advanceTimersByTime(300);
-      expect(hidden(container)).toBe(false);
-      vi.advanceTimersByTime(100);
-      expect(hidden(container)).toBe(true);
-    });
-
-    it('volver a entrar antes de que pase la espera cancela el cierre', async () => {
-      const { container } = await renderHidden();
-      fireEvent.mouseEnter(host(container));
-      fireEvent.mouseLeave(host(container));
-      vi.advanceTimersByTime(200);
-      fireEvent.mouseEnter(host(container));
-      vi.advanceTimersByTime(1000);
-      expect(hidden(container)).toBe(false);
-    });
-
-    it('con el teclado: la franja del borde se enfoca, abre el menú y Escape lo cierra', async () => {
-      const { container } = await renderHidden();
-      const opener = screen.getByRole('button', { name: 'Abrir menú' });
-      expect(opener).toHaveAttribute('aria-expanded', 'false');
-      fireEvent.focusIn(opener);
-      expect(hidden(container)).toBe(false);
-      expect(opener).toHaveAttribute('aria-expanded', 'true');
-      fireEvent.keyDown(host(container), { key: 'Escape' });
-      expect(hidden(container)).toBe(true);
-    });
-
-    it('mover el foco entre los enlaces del menú no lo cierra; sacarlo fuera sí', async () => {
-      const { container } = await renderHidden();
-      fireEvent.mouseEnter(host(container));
-      const link = screen.getByRole('link', { name: 'Inventario' });
-      fireEvent.focusOut(link, { relatedTarget: screen.getByRole('link', { name: 'Alertas' }) });
-      vi.advanceTimersByTime(1000);
-      expect(hidden(container)).toBe(false);
-      fireEvent.focusOut(link, { relatedTarget: document.body });
-      vi.advanceTimersByTime(400);
-      expect(hidden(container)).toBe(true);
-    });
-
-    it('mientras se arrastra el borde para cambiar el ancho no se esconde', async () => {
-      const { container } = await renderHidden();
-      fireEvent.mouseEnter(host(container));
-      fireEvent.pointerDown(screen.getByRole('separator'), { clientX: 240, pointerId: 1, button: 0 });
-      fireEvent.mouseLeave(host(container));
-      vi.advanceTimersByTime(1000);
-      expect(hidden(container)).toBe(false);
-    });
-
-    it('en modo oculto no hay botón de contraer ni modo compacto, y "Fijar menú" lo devuelve a la barra fija', async () => {
-      vi.useRealTimers();
-      localStorage.setItem(SIDEBAR_STORAGE_KEY, 'true'); // estaba colapsado: oculto se ve completo igual
-      const { container } = await renderHidden();
-      fireEvent.mouseEnter(host(container));
-      expect(screen.queryByRole('button', { name: 'Expandir menú' })).not.toBeInTheDocument();
-      expect(screen.getByText('Inventario')).toBeInTheDocument();
-      await userEvent.click(screen.getByRole('button', { name: 'Fijar menú' }));
-      expect(host(container).className).toContain('md:sticky');
-      expect(localStorage.getItem(SIDEBAR_AUTOHIDE_STORAGE_KEY)).toBe('false');
-    });
-
-    it('en modo fijo no hay franja de apertura', async () => {
-      vi.useRealTimers();
+    it('el botón de contraer anuncia el atajo', async () => {
       await renderSidebar('ADMIN');
-      expect(screen.queryByRole('button', { name: 'Abrir menú' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Contraer menú' })).toHaveAttribute('aria-keyshortcuts', 'Control+S Meta+S');
     });
 
-    describe('atajo Ctrl + S', () => {
-      const press = (init: KeyboardEventInit = { key: 's', ctrlKey: true }) => {
-        const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
-        document.dispatchEvent(event);
-        refresh();
-        return event;
-      };
-
-      it('con el menú oculto lo abre y lo cierra, y evita el "Guardar página" del navegador', async () => {
-        const { container } = await renderHidden();
-        const first = press();
-        expect(first.defaultPrevented).toBe(true);
-        expect(hidden(container)).toBe(false);
-        press();
-        expect(hidden(container)).toBe(true);
-      });
-
-      it('también con ⌘ + S y sin distinguir mayúsculas', async () => {
-        const { container } = await renderHidden();
-        press({ key: 'S', metaKey: true });
-        expect(hidden(container)).toBe(false);
-      });
-
-      it('abierto con el atajo se queda abierto aunque el puntero salga', async () => {
-        const { container } = await renderHidden();
-        press();
-        fireEvent.mouseEnter(host(container));
-        fireEvent.mouseLeave(host(container));
-        vi.advanceTimersByTime(2000);
-        expect(hidden(container)).toBe(false);
-      });
-
-      it('abierto con el atajo se cierra con Escape o al pulsar fuera, pero no al pulsar dentro', async () => {
-        const { container } = await renderHidden();
-        press();
-        fireEvent.pointerDown(screen.getByRole('link', { name: 'Inventario' }));
-        expect(hidden(container)).toBe(false);
-        fireEvent.pointerDown(document.body);
-        expect(hidden(container)).toBe(true);
-        press();
-        fireEvent.keyDown(host(container), { key: 'Escape' });
-        expect(hidden(container)).toBe(true);
-      });
-
-      it('con el menú fijo contrae y expande a iconos', async () => {
-        vi.useRealTimers();
-        const { fixture } = await renderSidebar('ADMIN');
-        refresh = () => fixture.detectChanges();
-        press();
-        expect(localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBe('true');
-        press();
-        expect(localStorage.getItem(SIDEBAR_STORAGE_KEY)).toBe('false');
-      });
-
-      it.each([
-        ['sin Ctrl', { key: 's' }],
-        ['otra tecla', { key: 'd', ctrlKey: true }],
-        ['con Mayús', { key: 's', ctrlKey: true, shiftKey: true }],
-        ['con Alt', { key: 's', ctrlKey: true, altKey: true }],
-      ])('%s no hace nada ni bloquea el navegador', async (_name, init) => {
-        const { container } = await renderHidden();
-        const event = press(init);
-        expect(event.defaultPrevented).toBe(false);
-        expect(hidden(container)).toBe(true);
-      });
-
-      it('al abrirse, los enlaces entran en cascada (animación) y al cerrarse la pierden', async () => {
-        await renderHidden();
-        const link = () => screen.getByRole('link', { name: 'Inventario' }).closest('li') as HTMLElement;
-        expect(link()).not.toHaveClass('animate-nav-in');
-        press();
-        expect(link()).toHaveClass('animate-nav-in');
-        expect(link().style.getPropertyValue('--i')).not.toBe('');
-        press();
-        expect(link()).not.toHaveClass('animate-nav-in');
-      });
-
-      it('sale más rápido de lo que entra', async () => {
-        const { container } = await renderHidden();
-        expect(panel(container)).toHaveClass('duration-200');
-        press();
-        expect(panel(container)).toHaveClass('duration-300');
-      });
-
-      it('anuncia el atajo en el botón de apertura', async () => {
-        await renderHidden();
-        expect(screen.getByRole('button', { name: 'Abrir menú' })).toHaveAttribute('aria-keyshortcuts', 'Control+S Meta+S');
-      });
+    it('ya no existe la opción de ocultar el menú automáticamente', async () => {
+      await renderSidebar('ADMIN');
+      expect(screen.queryByRole('button', { name: /ocultar menú/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Abrir menú' })).not.toBeInTheDocument();
     });
   });
 
