@@ -41,6 +41,8 @@ export interface TableColumn<T> {
   /** Columna que identifica la fila (nombre, código): se destaca tipográficamente. */
   readonly primary?: boolean;
   readonly width?: string;
+  /** El contenido no se parte en varias líneas (códigos, fechas, cifras): la columna toma el ancho que necesita. */
+  readonly nowrap?: boolean;
   /**
    * Cómo sale la columna en el CSV: `false` la deja fuera; una función da el valor (útil para listas o textos armados);
    * sin ella se exporta el valor de la celda (los números como números, las fechas con su hora, los Sí/No en texto).

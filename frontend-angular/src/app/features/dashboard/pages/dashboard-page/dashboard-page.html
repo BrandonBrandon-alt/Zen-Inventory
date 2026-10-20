@@ -57,13 +57,25 @@
     </section>
 
     @if (canSeeMoney()) {
-      <app-card title="Ingresos" description="Ventas por día en el periodo elegido" variant="plain">
+      <app-card title="Ingresos" description="Ventas por día en el periodo elegido" variant="plain" [attr.aria-busy]="overview.loading()">
         @if (overview.data(); as data) {
-          @if (trendPoints().length > 1) {
-            <app-area-chart [points]="trendPoints()" [format]="formatMoneyCompact" ariaLabel="Ingresos por día" />
-          } @else {
-            <app-empty-state title="Sin ventas suficientes" description="Hacen falta al menos dos días con ventas para dibujar la tendencia." />
+          <!-- Al cambiar de periodo la gráfica anterior se queda atenuada, con una barra de progreso, hasta que llega la nueva. -->
+          @if (overview.loading()) {
+            <div class="mb-3 h-0.5 overflow-hidden rounded-full bg-line" aria-hidden="true">
+              <div class="h-full w-1/3 animate-progress rounded-full bg-brand motion-reduce:animate-none"></div>
+            </div>
           }
+          <div class="transition-opacity duration-300" [class.opacity-45]="overview.loading()">
+            @if (trendPoints().length > 1) {
+              <app-area-chart [points]="trendPoints()" [format]="formatMoneyCompact" ariaLabel="Ingresos por día" />
+            } @else {
+              <app-empty-state title="Sin ventas suficientes" description="Hacen falta al menos dos días con ventas para dibujar la tendencia." />
+            }
+          </div>
+        } @else if (overview.error(); as message) {
+          <p class="text-sm text-fg-subtle">No se pudo cargar la gráfica. {{ message }}</p>
+        } @else {
+          <app-chart-skeleton variant="area" />
         }
       </app-card>
     }
@@ -106,9 +118,13 @@
         }
       </app-card>
 
-      <app-card title="Más vendidos" description="Unidades en el periodo" variant="plain">
+      <app-card title="Más vendidos" description="Unidades en el periodo" variant="plain" [attr.aria-busy]="overview.loading()">
         @if (overview.data()) {
-          <app-bar-list [items]="topProducts()" [format]="formatQuantity" emptyText="Sin ventas en este periodo" />
+          <div class="transition-opacity duration-300" [class.opacity-45]="overview.loading()">
+            <app-bar-list [items]="topProducts()" [format]="formatQuantity" emptyText="Sin ventas en este periodo" />
+          </div>
+        } @else if (!overview.error()) {
+          <app-chart-skeleton variant="bars" />
         }
       </app-card>
     </div>
@@ -136,9 +152,13 @@
       </app-card>
 
       @if (isAdmin()) {
-        <app-card title="Por sede" description="Ingresos del periodo" variant="plain">
+        <app-card title="Por sede" description="Ingresos del periodo" variant="plain" [attr.aria-busy]="overview.loading()">
           @if (overview.data()) {
-            <app-bar-list [items]="branchBars()" [format]="formatMoneyCompact" emptyText="Sin ventas en este periodo" />
+            <div class="transition-opacity duration-300" [class.opacity-45]="overview.loading()">
+              <app-bar-list [items]="branchBars()" [format]="formatMoneyCompact" emptyText="Sin ventas en este periodo" />
+            </div>
+          } @else if (!overview.error()) {
+            <app-chart-skeleton variant="bars" />
           }
         </app-card>
       } @else if (canSeeMoney()) {
@@ -147,6 +167,8 @@
             <app-alert variant="danger">{{ message }}</app-alert>
           } @else if (monthly.data()) {
             <app-column-chart [items]="monthColumns()" emptyText="Sin ventas registradas" />
+          } @else {
+            <app-chart-skeleton variant="columns" />
           }
         </app-card>
       }
@@ -158,6 +180,8 @@
           <app-alert variant="danger">{{ message }}</app-alert>
         } @else if (monthly.data()) {
           <app-column-chart [items]="monthColumns()" emptyText="Sin ventas registradas" />
+        } @else {
+          <app-chart-skeleton variant="columns" />
         }
       </app-card>
     }

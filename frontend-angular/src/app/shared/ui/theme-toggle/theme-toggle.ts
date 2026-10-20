@@ -52,6 +52,6 @@ export class ThemeToggle {
     if (this.variant() === 'icon') {
       return 'size-9 justify-center rounded-full border border-line bg-card hover:bg-hover';
     }
-    return `w-full gap-3 rounded-md px-3 py-2.5 hover:bg-hover ${this.labelVisible() ? '' : 'justify-center'}`;
+    return `w-full gap-3 rounded-md px-3 py-2 hover:bg-hover ${this.labelVisible() ? '' : 'justify-center'}`;
   }
 }

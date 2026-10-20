@@ -116,7 +116,7 @@ export class AlertsPage {
     { key: 'product', header: 'Producto', icon: LucidePackage.icon, sortable: true, primary: true },
     ...(this.isAdmin() ? [{ key: 'branch', header: 'Sucursal', icon: LucideStore.icon, sortable: true }] : []),
     { key: 'message', header: 'Detalle', icon: LucideMessageSquareText.icon },
-    { key: 'date', header: 'Fecha', icon: LucideCalendar.icon, sortable: true, width: '11.5rem', value: (r: AlertRow) => r.date, display: (r: AlertRow) => formatDateTime(r.date) },
+    { key: 'date', header: 'Fecha', icon: LucideCalendar.icon, sortable: true, nowrap: true, width: '11.5rem', value: (r: AlertRow) => r.date, display: (r: AlertRow) => formatDateTime(r.date) },
     { key: 'acciones', header: 'Acciones', icon: LucideEllipsis.icon, align: 'end' },
   ]);
 

@@ -19,6 +19,7 @@ import { CatalogOptionsApi, type ProductOption } from '@core/catalog/catalog-opt
 import { formatDateTime, normalizeText } from '@shared/format/format';
 import { inDateRange, optionsFrom } from '@shared/filters/filter-helpers';
 import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
+import { Checkbox } from '@shared/ui/checkbox/checkbox';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { DatePicker } from '@shared/ui/date-picker/date-picker';
@@ -53,6 +54,7 @@ const PRIORITIES: readonly TransferPriority[] = ['HIGH', 'NORMAL', 'LOW'];
 @Component({
   selector: 'app-transfers-page',
   imports: [
+    Checkbox,
     DataTable,
     DataTableCell,
     Badge,
@@ -146,7 +148,7 @@ export class TransfersPage {
     { key: 'route', header: 'Ruta', icon: LucideRoute.icon, sortable: true, primary: true },
     { key: 'products', header: 'Productos', icon: LucidePackage.icon },
     { key: 'priorityLabel', header: 'Prioridad', icon: LucideFlag.icon, sortable: true },
-    { key: 'requestDate', header: 'Solicitado', icon: LucideCalendar.icon, sortable: true, width: '11.5rem', value: (r) => r.requestDate, display: (r) => formatDateTime(r.requestDate) },
+    { key: 'requestDate', header: 'Solicitado', icon: LucideCalendar.icon, sortable: true, nowrap: true, width: '11.5rem', value: (r) => r.requestDate, display: (r) => formatDateTime(r.requestDate) },
     { key: 'acciones', header: 'Acciones', align: 'end' },
   ];
 

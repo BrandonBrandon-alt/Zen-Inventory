@@ -93,7 +93,7 @@ describe('ThemeService', () => {
       delete (window as { matchMedia?: unknown }).matchMedia;
       document.documentElement.removeAttribute('data-theme-switching');
       document.documentElement.style.removeProperty('--theme-x');
-      document.documentElement.style.removeProperty('--theme-y');
+      for (const name of ['--theme-y', '--theme-max', '--theme-feather', '--theme-duration']) document.documentElement.style.removeProperty(name);
     });
 
     it('con origen y navegador compatible anima: el cambio llega dentro de la transición, no antes', async () => {
@@ -115,6 +115,25 @@ describe('ThemeService', () => {
       await vi.waitFor(() => expect(document.documentElement).not.toHaveAttribute('data-theme-switching'));
       expect(document.documentElement.style.getPropertyValue('--theme-x')).toBe('');
       expect(document.documentElement.style.getPropertyValue('--theme-y')).toBe('');
+    });
+
+    it('calcula hasta dónde debe llegar el revelado (la esquina más lejana más el borde difuminado) y cuánto dura', async () => {
+      vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(1000);
+      vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(600);
+      const service = createService();
+      service.toggle({ x: 100, y: 50 });
+      const root = document.documentElement.style;
+      // Esquina más lejana de (100, 50) en 1000×600: (1000, 600) → 900 y 550.
+      const farthest = Math.hypot(900, 550);
+      expect(Number.parseInt(root.getPropertyValue('--theme-max'))).toBe(Math.ceil(farthest + 140));
+      expect(root.getPropertyValue('--theme-feather')).toBe('140px');
+      // Más lejos, más tiempo, pero siempre entre 650 y 950 ms.
+      const duration = Number.parseInt(root.getPropertyValue('--theme-duration'));
+      expect(duration).toBeGreaterThanOrEqual(650);
+      expect(duration).toBeLessThanOrEqual(950);
+      await vi.waitFor(() => expect(document.documentElement).not.toHaveAttribute('data-theme-switching'));
+      expect(root.getPropertyValue('--theme-max')).toBe('');
+      expect(root.getPropertyValue('--theme-duration')).toBe('');
     });
 
     it('guarda la preferencia al instante, sin esperar a la animación', () => {

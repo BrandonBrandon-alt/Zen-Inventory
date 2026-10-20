@@ -6,9 +6,12 @@ const NBSP = String.fromCharCode(160);
 const plain = (text: string) => text.split(NBSP).join(' ');
 
 describe('format', () => {
-  it('formatMoney: pesos con separador de miles, sin decimales innecesarios', () => {
+  it('formatMoney: pesos con separador de miles; con centavos siempre dos decimales, para que las columnas alineen', () => {
     expect(plain(formatMoney(1250))).toBe('$ 1.250');
-    expect(plain(formatMoney(1250.5))).toBe('$ 1.250,5');
+    expect(plain(formatMoney(1250.5))).toBe('$ 1.250,50');
+    expect(plain(formatMoney(19391.6))).toBe('$ 19.391,60');
+    expect(plain(formatMoney(28499.57))).toBe('$ 28.499,57');
+    expect(plain(formatMoney(1250.004))).toBe('$ 1.250');
     expect(plain(formatMoney(0))).toBe('$ 0');
   });
 
@@ -32,6 +35,13 @@ describe('format', () => {
     const text = formatDateTime(new Date(2026, 0, 2, 15, 30));
     expect(text).toContain('2026');
     expect(text).toMatch(/15:30|3:30/);
+  });
+
+  it('formatDateTime: la hora con «a. m.»/«p. m.» no se parte en dos líneas (solo hay espacios que no se parten dentro de la hora)', () => {
+    const text = formatDateTime(new Date(2026, 9, 18, 18, 33));
+    const time = text.slice(text.indexOf(',') + 1).trim();
+    expect(time).not.toMatch(/ /);
+    expect(time).toMatch(/p\.\u00A0m\./i);
   });
 
   it('formatMoneyCompact: completo bajo el millón y en millones desde ahí', () => {

@@ -7,6 +7,7 @@ import { NotificationService } from '@core/notifications/notification.service';
 import { formatMoney, normalizeText } from '@shared/format/format';
 import { inNumberRange, numberFromInput } from '@shared/filters/filter-helpers';
 import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
+import { Checkbox } from '@shared/ui/checkbox/checkbox';
 import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog/confirm-dialog';
@@ -22,7 +23,7 @@ import { type Product, ProductsApi, type ProductSupplier } from '../../data-acce
 
 const COLUMNS: readonly TableColumn<Product>[] = [
   { key: 'sku', header: 'SKU', icon: LucideBarcode.icon, sortable: true },
-  { key: 'nombre', header: 'Producto', icon: LucidePackage.icon, sortable: true, primary: true },
+  { key: 'nombre', header: 'Producto', icon: LucidePackage.icon, sortable: true, nowrap: true, primary: true },
   { key: 'unitAbbreviation', header: 'Unidad', icon: LucideRuler.icon },
   { key: 'cost', header: 'Costo prom.', icon: LucideCoins.icon, sortable: true, align: 'end', display: (p) => formatMoney(p.cost) },
   { key: 'price', header: 'Precio venta', icon: LucideTag.icon, sortable: true, align: 'end', display: (p) => formatMoney(p.price) },
@@ -38,6 +39,7 @@ const rowKey = (product: Product): number => product.id;
 @Component({
   selector: 'app-products-page',
   imports: [
+    Checkbox,
     DataTable,
     DataTableCell,
     Badge,

@@ -6,6 +6,7 @@ import { AuthStore } from '@core/auth/session/auth-store';
 import { formatMoney, formatQuantity, normalizeText } from '@shared/format/format';
 import { inNumberRange, numberFromInput } from '@shared/filters/filter-helpers';
 import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
+import { Checkbox } from '@shared/ui/checkbox/checkbox';
 import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { ActiveFilters, type ActiveFilter } from '@shared/ui/filters/active-filters';
@@ -27,7 +28,7 @@ interface InventoryRow extends InventoryItem {
 
 const BASE_COLUMNS: readonly TableColumn<InventoryRow>[] = [
   { key: 'sku', header: 'SKU', icon: LucideBarcode.icon, sortable: true },
-  { key: 'nombre', header: 'Producto', icon: LucidePackage.icon, sortable: true, primary: true },
+  { key: 'nombre', header: 'Producto', icon: LucidePackage.icon, sortable: true, nowrap: true, primary: true },
   { key: 'unit', header: 'Unidad', icon: LucideRuler.icon },
   { key: 'stock', header: 'Existencias', icon: LucideLayers.icon, sortable: true, align: 'end' },
   { key: 'minimum', header: 'Mínimo', icon: LucideArrowDownToLine.icon, sortable: true, align: 'end', display: (r) => formatQuantity(r.minimum) },
@@ -50,6 +51,7 @@ const rowKey = (row: InventoryRow): number => row.productId;
 @Component({
   selector: 'app-inventory-page',
   imports: [
+    Checkbox,
     DataTable,
     DataTableCell,
     Badge,

@@ -7,7 +7,7 @@ export interface SeriesPoint {
 }
 
 const WIDTH = 720;
-const HEIGHT = 240;
+const HEIGHT = 180;
 const PAD = { top: 18, right: 6, bottom: 6, left: 6 };
 
 /**

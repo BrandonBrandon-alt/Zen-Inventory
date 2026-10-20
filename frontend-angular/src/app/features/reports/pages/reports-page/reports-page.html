@@ -3,16 +3,16 @@
   <p class="mt-1 text-sm text-fg-subtle">Cierre de caja y ventas por vendedor, para imprimir o guardar como PDF.</p>
 </header>
 
-<div class="mb-5 flex animate-enter-delayed flex-wrap items-end gap-3">
-  <div class="w-44"><app-date-picker [(value)]="from" [max]="to()" [clearable]="false" placeholder="Desde" ariaLabel="Desde" /></div>
-  <div class="w-44"><app-date-picker [(value)]="to" [min]="from()" [clearable]="false" placeholder="Hasta" ariaLabel="Hasta" /></div>
-  <button appButton [variant]="isToday() ? 'primary' : 'ghost'" size="sm" type="button" (click)="useToday()">Hoy</button>
-  <button appButton [variant]="isMonth() ? 'primary' : 'ghost'" size="sm" type="button" (click)="useMonth()">Este mes</button>
+<div class="mb-5 flex animate-enter-delayed flex-wrap items-center gap-3">
+  <div class="w-36"><app-date-picker [(value)]="from" [max]="to()" [clearable]="false" placeholder="Desde" ariaLabel="Desde" /></div>
+  <div class="w-36"><app-date-picker [(value)]="to" [min]="from()" [clearable]="false" placeholder="Hasta" ariaLabel="Hasta" /></div>
+  <button appButton class="h-11" [variant]="isToday() ? 'primary' : 'ghost'" type="button" (click)="useToday()">Hoy</button>
+  <button appButton class="h-11" [variant]="isMonth() ? 'primary' : 'ghost'" type="button" (click)="useMonth()">Este mes</button>
   @if (isAdmin()) {
     <div class="w-56"><app-select [value]="branchFilter()" (valueChange)="setBranch($event)" [options]="branchOptions()" [icon]="storeIcon" ariaLabel="Sucursal" /></div>
   }
   <div class="ml-auto">
-    <button appButton type="button" [disabled]="!report() || loading() || !!error()" [loading]="printing()" (click)="download()">
+    <button appButton class="h-11" type="button" [disabled]="!report() || loading() || !!error()" [loading]="printing()" (click)="download()">
       <svg lucideFileDown [size]="16" aria-hidden="true"></svg>
       Descargar PDF
     </button>

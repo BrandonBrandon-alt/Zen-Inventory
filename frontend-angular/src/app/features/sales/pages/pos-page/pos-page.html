@@ -86,7 +86,7 @@
       <div class="flex flex-col lg:max-h-[calc(100dvh-9rem)] lg:overflow-y-auto">
         <ul class="flex flex-col divide-y divide-line lg:min-h-48 lg:flex-1 lg:overflow-y-auto lg:pr-1" aria-label="Productos de la venta">
           @for (row of rows(); track row.productId) {
-            <li class="flex flex-col gap-2 py-3 first:pt-0">
+            <li class="flex animate-line-in flex-col gap-2 rounded-md py-3 first:pt-0">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
                   <p class="truncate text-sm font-medium text-fg">{{ row.product.name }}</p>

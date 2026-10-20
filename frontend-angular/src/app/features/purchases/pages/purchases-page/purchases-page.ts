@@ -20,6 +20,7 @@ import { CatalogOptionsApi, type ProductOption, type SupplierOption } from '@cor
 import { formatDateTime, formatMoney, normalizeText } from '@shared/format/format';
 import { inDateRange, inNumberRange, numberFromInput, optionsFrom } from '@shared/filters/filter-helpers';
 import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
+import { Checkbox } from '@shared/ui/checkbox/checkbox';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { DatePicker } from '@shared/ui/date-picker/date-picker';
@@ -49,7 +50,7 @@ const DAY = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' });
 
 @Component({
   selector: 'app-purchases-page',
-  imports: [DataTable, DataTableCell, Badge, Button, DatePicker, ActiveFilters, AdvancedFilters, FormField, InputDirective, Select, Tooltip, PurchaseDetailModal, PurchaseFormModal, LucideEye, LucidePlus, LucideSearch],
+  imports: [Checkbox, DataTable, DataTableCell, Badge, Button, DatePicker, ActiveFilters, AdvancedFilters, FormField, InputDirective, Select, Tooltip, PurchaseDetailModal, PurchaseFormModal, LucideEye, LucidePlus, LucideSearch],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './purchases-page.html',
@@ -125,7 +126,7 @@ export class PurchasesPage {
     { key: 'total', header: 'Total', icon: LucideCoins.icon, sortable: true, align: 'end' as const, display: (r: PurchaseRow) => formatMoney(r.total) },
     { key: 'balance', header: 'Saldo', icon: LucideCoins.icon, sortable: true, align: 'end' as const, display: (r: PurchaseRow) => formatMoney(r.balance) },
     { key: 'paymentLabel', header: 'Pago', icon: LucideWallet.icon, sortable: true },
-    { key: 'requestDate', header: 'Solicitada', icon: LucideCalendar.icon, sortable: true, width: '11.5rem', value: (r: PurchaseRow) => r.requestDate, display: (r: PurchaseRow) => formatDateTime(r.requestDate) },
+    { key: 'requestDate', header: 'Solicitada', icon: LucideCalendar.icon, sortable: true, nowrap: true, width: '11.5rem', value: (r: PurchaseRow) => r.requestDate, display: (r: PurchaseRow) => formatDateTime(r.requestDate) },
     { key: 'acciones', header: 'Acciones', align: 'end' as const },
   ]);
 

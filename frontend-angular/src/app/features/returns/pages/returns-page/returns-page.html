@@ -9,7 +9,7 @@
 </header>
 
 <div class="mb-3 flex animate-enter-delayed flex-wrap items-center gap-3">
-  <div class="w-64 max-w-full">
+  <div class="min-w-52 max-w-72 flex-1">
     <app-form-field>
       <input appInput type="search" placeholder="Buscar por n.º, venta o producto…" aria-label="Buscar devolución" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
       <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
@@ -18,8 +18,8 @@
   <div class="w-56">
     <app-select [(value)]="statusFilter" [options]="statusOptions" [icon]="filterIcon" ariaLabel="Estado de la devolución" />
   </div>
-  <div class="w-44"><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
-  <div class="w-44"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
+  <div class="w-36"><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
+  <div class="w-36"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
   <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
     <app-form-field label="Producto"><app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" /></app-form-field>
     <app-form-field label="Solicitó"><app-select [(value)]="requesterFilter" [options]="requesterOptions()" ariaLabel="Solicitó" searchable searchPlaceholder="Buscar persona…" /></app-form-field>
@@ -58,7 +58,7 @@
     <span class="inline-flex items-center gap-2">
       <app-badge [variant]="statusVariant(r)" dot>{{ r.statusLabel }}</app-badge>
       @if (r.needsMe) {
-        <span class="rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-semibold text-brand">Te toca</span>
+        <span class="rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-brand">Te toca</span>
       }
     </span>
   </ng-template>

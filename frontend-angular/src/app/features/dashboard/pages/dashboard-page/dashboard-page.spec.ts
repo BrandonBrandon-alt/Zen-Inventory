@@ -1,8 +1,8 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { delay, http, HttpResponse } from 'msw';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { errorInterceptor } from '@core/api/error.interceptor';
 import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
@@ -107,6 +107,60 @@ describe('DashboardPage', () => {
     expect(starts.length).toBe(2);
     expect(starts[1]).toMatch(/T00:00:00$/);
     expect(starts[0]).not.toBe(starts[1]);
+  });
+
+  describe('estado de carga de las gráficas', () => {
+    const card = (name: string) => screen.getByRole('region', { name });
+    const skeleton = (el: HTMLElement) => el.querySelector('app-chart-skeleton');
+
+    it('mientras llegan los datos, cada gráfica muestra su marcador y la tarjeta se anuncia como ocupada; al llegar, lo cambia por la gráfica', async () => {
+      useSession('ADMIN');
+      stub();
+      server.use(http.get(`${TEST_API}/api/v1/analytics/dashboard`, async () => (await delay(150), HttpResponse.json(DASHBOARD))));
+      await renderPage();
+      expect(skeleton(card('Ingresos'))).not.toBeNull();
+      expect(card('Ingresos')).toHaveAttribute('aria-busy', 'true');
+      expect(skeleton(card('Más vendidos'))).not.toBeNull();
+      expect(skeleton(card('Por sede'))).not.toBeNull();
+      await screen.findByText('Unidades vendidas');
+      await vi.waitFor(() => expect(skeleton(card('Ingresos'))).toBeNull());
+      expect(card('Ingresos')).toHaveAttribute('aria-busy', 'false');
+      expect(skeleton(card('Más vendidos'))).toBeNull();
+      expect(card('Ingresos').querySelector('app-area-chart')).not.toBeNull();
+    });
+
+    it('al cambiar de periodo la gráfica anterior se queda atenuada con una barra de progreso, sin volver al marcador', async () => {
+      useSession('ADMIN');
+      stub();
+      let calls = 0;
+      server.use(
+        http.get(`${TEST_API}/api/v1/analytics/dashboard`, async () => {
+          calls++;
+          if (calls > 1) await delay(300);
+          return HttpResponse.json(DASHBOARD);
+        }),
+      );
+      await renderPage();
+      await screen.findByText('Unidades vendidas');
+      await vi.waitFor(() => expect(card('Ingresos').querySelector('app-area-chart')).not.toBeNull());
+      await userEvent.click(screen.getByRole('radio', { name: 'Hoy' }));
+      const ingresos = card('Ingresos');
+      await vi.waitFor(() => expect(ingresos).toHaveAttribute('aria-busy', 'true'));
+      expect(skeleton(ingresos)).toBeNull();
+      expect(ingresos.querySelector('app-area-chart')?.parentElement).toHaveClass('opacity-45');
+      expect(ingresos.querySelector('.animate-progress')).not.toBeNull();
+      await vi.waitFor(() => expect(ingresos).toHaveAttribute('aria-busy', 'false'));
+      expect(ingresos.querySelector('.animate-progress')).toBeNull();
+    });
+
+    it('si falla la carga, la gráfica principal lo dice en lugar de quedarse vacía o cargando', async () => {
+      useSession('ADMIN');
+      stub();
+      server.use(http.get(`${TEST_API}/api/v1/analytics/dashboard`, () => HttpResponse.json(apiErrorBody(500, 'INTERNAL_ERROR', 'Falla del panel'), { status: 500 })));
+      await renderPage();
+      await vi.waitFor(() => expect(card('Ingresos')).toHaveTextContent('No se pudo cargar la gráfica'));
+      expect(skeleton(card('Ingresos'))).toBeNull();
+    });
   });
 
   it('si una sección falla, las demás siguen mostrándose', async () => {

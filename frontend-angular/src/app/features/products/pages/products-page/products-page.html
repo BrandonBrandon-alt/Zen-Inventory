@@ -9,7 +9,7 @@
 </header>
 
 <div class="mb-3 flex animate-enter-delayed flex-wrap items-center gap-3">
-  <div class="w-72 max-w-full">
+  <div class="min-w-52 max-w-80 flex-1">
     <app-form-field>
       <input appInput type="search" placeholder="Buscar por producto o SKU…" aria-label="Buscar producto" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
       <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
@@ -25,10 +25,7 @@
     <app-form-field label="Precio hasta">
       <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="maxPrice() ?? ''" (input)="maxPrice.set(numberFromInput($event))" />
     </app-form-field>
-    <label class="flex min-h-11 items-center gap-2 text-sm text-fg-muted">
-      <input type="checkbox" class="size-4 accent-[var(--brand-500)]" [checked]="noSuppliers()" (change)="noSuppliers.set($any($event.target).checked)" />
-      Solo sin proveedores
-    </label>
+    <div class="flex min-h-11 items-center"><app-checkbox [checked]="noSuppliers()" (checkedChange)="noSuppliers.set($event)">Solo sin proveedores</app-checkbox></div>
   </app-advanced-filters>
 </div>
 <app-active-filters class="mb-4 animate-enter-delayed" [filters]="activeFilters()" (removed)="removeFilter($event)" (cleared)="clearFilters()" />

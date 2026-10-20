@@ -34,7 +34,7 @@ let nextId = 0;
       <svg lucideChevronDown [size]="14" aria-hidden="true" class="transition-transform" [class.rotate-180]="open()"></svg>
     </button>
     @if (open()) {
-      <div [id]="panelId" role="group" aria-label="Más filtros" class="mt-3 grid grid-cols-1 items-end gap-x-3 gap-y-4 rounded-lg border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div [id]="panelId" role="group" aria-label="Más filtros" class="mt-3 grid animate-reveal grid-cols-1 items-end gap-x-3 gap-y-4 rounded-lg border border-line bg-surface p-4 sm:grid-cols-2 lg:grid-cols-4">
         <ng-content />
       </div>
     }

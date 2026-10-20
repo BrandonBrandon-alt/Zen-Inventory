@@ -136,7 +136,7 @@ export class SalesHistoryPage {
 
   protected readonly columns = computed<readonly TableColumn<SaleRow>[]>(() => [
     { key: 'id', header: 'N.º', icon: LucideHash.icon, sortable: true, width: '5rem', display: (r) => `#${r.id}` },
-    { key: 'date', header: 'Fecha', icon: LucideCalendar.icon, sortable: true, width: '11.5rem', value: (r) => r.date, display: (r) => formatDateTime(r.date) },
+    { key: 'date', header: 'Fecha', icon: LucideCalendar.icon, sortable: true, nowrap: true, width: '11.5rem', value: (r) => r.date, display: (r) => formatDateTime(r.date) },
     { key: 'customer', header: 'Cliente', icon: LucideUserRound.icon, sortable: true, primary: true },
     { key: 'seller', header: 'Vendedor', icon: LucideUser.icon, sortable: true },
     ...(this.isAdmin() ? [{ key: 'branchName', header: 'Sucursal', icon: LucideStore.icon, sortable: true }] : []),

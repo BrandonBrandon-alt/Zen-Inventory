@@ -17,7 +17,7 @@ interface MovementRow extends Movement {
 const signed = (row: Movement): number => (row.type === 'INGRESO' ? row.quantity : -row.quantity);
 
 const COLUMNS: readonly TableColumn<MovementRow>[] = [
-  { key: 'date', header: 'Fecha', icon: LucideCalendar.icon, sortable: true, width: '11.5rem', value: (r) => r.date, display: (r) => formatDateTime(r.date) },
+  { key: 'date', header: 'Fecha', icon: LucideCalendar.icon, sortable: true, nowrap: true, width: '11.5rem', value: (r) => r.date, display: (r) => formatDateTime(r.date) },
   { key: 'productName', header: 'Producto', icon: LucidePackage.icon, sortable: true, primary: true },
   { key: 'type', header: 'Tipo', icon: LucideArrowUpDown.icon, sortable: true },
   { key: 'reason', header: 'Motivo', icon: LucideInfo.icon, sortable: true, value: (r) => REASON_LABELS[r.reason] },
