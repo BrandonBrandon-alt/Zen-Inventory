@@ -15,8 +15,8 @@ import { ColumnChart } from '@shared/ui/charts/column-chart';
 import { EmptyState } from '@shared/ui/empty-state/empty-state';
 import { Segmented, type SegmentedOption } from '@shared/ui/segmented/segmented';
 import { Spinner } from '@shared/ui/spinner/spinner';
-import { AlertResolutionModal } from '../../../alerts/components/alert-resolution-modal/alert-resolution-modal';
-import { AlertsApi, type StockAlert } from '../../../alerts/data-access/alerts-api';
+import { AlertResolutionModal } from '@shared/ui/alert-resolution-modal/alert-resolution-modal';
+import { AlertsApi, type StockAlert } from '@core/alerts/alerts-api';
 import { DashboardApi, type Range, type ReplenishmentPriority } from '../../data-access/dashboard-api';
 
 const RANGES: readonly SegmentedOption<Range>[] = [

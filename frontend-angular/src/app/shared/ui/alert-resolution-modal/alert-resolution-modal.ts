@@ -14,7 +14,7 @@ import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Modal } from '@shared/ui/modal/modal';
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { type TabItem, Tabs } from '@shared/ui/tabs/tabs';
-import { AlertsApi, type StockAlert, type TransferPriority } from '../../data-access/alerts-api';
+import { AlertsApi, type StockAlert, type TransferPriority } from '@core/alerts/alerts-api';
 
 type Method = 'transfer' | 'purchase' | 'dismiss';
 
