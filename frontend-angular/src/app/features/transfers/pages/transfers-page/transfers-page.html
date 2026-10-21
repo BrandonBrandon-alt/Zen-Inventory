@@ -5,6 +5,13 @@
       <p class="mt-1 text-sm text-fg-subtle">
         {{ summary() }}@if (pending() > 0) {, {{ pending() === 1 ? '1 espera tu acción' : pending() + ' esperan tu acción' }}}
       </p>
+      @if (freightOwed(); as owed) {
+        @if (owed.count > 0) {
+          <p class="mt-0.5 text-sm text-fg-subtle">
+            Fletes por pagar a transportistas: <span class="font-medium tabular-nums text-fg">{{ formatMoney(owed.total) }}</span> en {{ owed.count === 1 ? '1 traslado' : owed.count + ' traslados' }}
+          </p>
+        }
+      }
     }
   </div>
   <button appButton type="button" (click)="requestOpen.set(true)"><svg lucidePlus [size]="16" />Solicitar traslado</button>
@@ -60,6 +67,18 @@
         <span class="rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-brand">Te toca</span>
       }
     </span>
+  </ng-template>
+  <ng-template appCell="freightLabel" let-t>
+    @if (t.freightStatus === 'SIN_COSTO') {
+      <span class="text-fg-subtle">—</span>
+    } @else {
+      <span class="inline-flex flex-col items-start gap-1">
+        <app-badge [variant]="freightVariant(t)">{{ t.freightLabel }}</app-badge>
+        @if (t.freightBalance > 0) {
+          <span class="text-xs tabular-nums text-fg-subtle">Saldo {{ formatMoney(t.freightBalance) }}</span>
+        }
+      </span>
+    }
   </ng-template>
   <ng-template appCell="priorityLabel" let-t>
     <app-badge [variant]="priorityVariant(t)">{{ t.priorityLabel }}</app-badge>

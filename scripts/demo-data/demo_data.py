@@ -62,7 +62,7 @@ def simulate(args: argparse.Namespace, offsets: dict[str, int]) -> Sim:
 
 
 def summary(container: str) -> None:
-    tables = ["usuario", "sucursal", "producto", "proveedor", "inventario_local", "ventas", "detalles_venta", "ordenes_compra", "pagos_orden_compra", "transferencias",
+    tables = ["usuario", "sucursal", "producto", "proveedor", "inventario_local", "ventas", "detalles_venta", "ordenes_compra", "pagos_orden_compra", "transferencias", "pagos_traslado",
               "solicitudes_devolucion", "movimiento_inventario", "alertas_stock"]
     query = " UNION ALL ".join(f"SELECT '{t}', COUNT(*) FROM public.{t}" for t in tables)
     print("\nFilas en la base ahora:")

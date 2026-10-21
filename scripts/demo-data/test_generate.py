@@ -81,6 +81,18 @@ class DemoDataTest(unittest.TestCase):
             else:
                 self.assertEqual(got, 0, f"orden {o['id']}")
 
+    def test_los_pagos_de_fletes_no_pasan_del_costo_y_solo_hay_donde_hubo_envio(self):
+        paid: dict[int, float] = {}
+        for p in self.sim.rows["pagos_traslado"]:
+            self.assertGreater(p["amount"], 0)
+            paid[p["transfer"]] = round(paid.get(p["transfer"], 0) + p["amount"], 2)
+        self.assertGreater(len(paid), 0)
+        for tid, got in paid.items():
+            t = self.sim.transfers[tid]
+            self.assertIsNotNone(t["dispatch_ts"], f"traslado {tid} pagado sin haberse despachado")
+            self.assertGreater(t["cost"], 0)
+            self.assertLessEqual(got, t["cost"] + 0.001, f"traslado {tid}")
+
     def test_los_traslados_descuentan_y_suman_lo_que_dicen(self):
         out = Counter()
         into = Counter()

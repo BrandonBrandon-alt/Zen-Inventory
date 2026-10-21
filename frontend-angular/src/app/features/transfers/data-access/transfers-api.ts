@@ -4,6 +4,7 @@ import { type Observable, map } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { SKIP_ERROR_NOTIFICATION } from '@core/api/error.interceptor';
 import type { components } from '@core/api/schema';
+import { type PaymentMethod, isPaymentMethod } from '@core/payments/payment-method';
 import { parseDate, toLocalIso } from '@shared/format/format';
 
 type TransferResponse = components['schemas']['TransferResponse'];
@@ -11,6 +12,10 @@ type TransferResponse = components['schemas']['TransferResponse'];
 export const TRANSFER_STATUSES = ['PENDING', 'APPROVED_DEST', 'PREPARING', 'IN_TRANSIT', 'DELIVERED', 'WITH_ISSUE', 'UNDER_CLAIM', 'CANCELLED', 'REJECTED'] as const;
 export type TransferStatus = (typeof TRANSFER_STATUSES)[number];
 export type TransferPriority = 'HIGH' | 'NORMAL' | 'LOW';
+
+export const FREIGHT_STATUSES = ['SIN_COSTO', 'POR_PAGAR', 'PAGO_PARCIAL', 'PAGADO'] as const;
+export type FreightStatus = (typeof FREIGHT_STATUSES)[number];
+const toFreightStatus = (value: unknown): FreightStatus => ((FREIGHT_STATUSES as readonly unknown[]).includes(value) ? (value as FreightStatus) : 'SIN_COSTO');
 
 const isStatus = (value: unknown): value is TransferStatus => (TRANSFER_STATUSES as readonly unknown[]).includes(value);
 const toPriority = (value: unknown): TransferPriority => (value === 'HIGH' || value === 'LOW' ? value : 'NORMAL');
@@ -26,6 +31,25 @@ export interface TransferLine {
   readonly missing: number;
 }
 
+/** Un pago o abono del flete al transportista. */
+export interface FreightPayment {
+  readonly id: number;
+  readonly amount: number;
+  readonly date: Date | null;
+  readonly userName: string;
+  readonly method: PaymentMethod;
+  readonly reference: string;
+  readonly notes: string;
+}
+
+/** Lo que se envía para registrar un pago del flete; sin `amount` se paga todo el saldo. */
+export interface FreightPaymentInput {
+  readonly amount: number | null;
+  readonly method: PaymentMethod;
+  readonly reference: string;
+  readonly notes: string;
+}
+
 export interface Transfer {
   readonly id: number;
   readonly status: TransferStatus;
@@ -39,6 +63,12 @@ export interface Transfer {
   readonly carrier: string;
   readonly trackingNumber: string;
   readonly shippingCost: number | null;
+  /** Lo ya pagado del flete. */
+  readonly freightPaid: number;
+  /** Lo que aún se le debe al transportista. */
+  readonly freightBalance: number;
+  readonly freightStatus: FreightStatus;
+  readonly payments: readonly FreightPayment[];
   readonly receiptNotes: string;
   readonly resolutionReason: string;
   readonly parentId: number | null;
@@ -88,6 +118,14 @@ function toTransfer(raw: TransferResponse): Transfer | null {
     carrier: raw.carrier?.trim() ?? '',
     trackingNumber: raw.trackingNumber?.trim() ?? '',
     shippingCost: raw.shippingCost ?? null,
+    freightPaid: raw.freightPaid ?? 0,
+    freightBalance: raw.freightBalance ?? 0,
+    freightStatus: toFreightStatus(raw.freightStatus),
+    payments: (raw.payments ?? []).flatMap((p) =>
+      typeof p.id === 'number'
+        ? [{ id: p.id, amount: p.amount ?? 0, date: parseDate(p.date), userName: p.userName?.trim() || 'Desconocido', method: isPaymentMethod(p.method) ? p.method : 'OTRO', reference: p.reference?.trim() ?? '', notes: p.notes?.trim() ?? '' }]
+        : [],
+    ),
     receiptNotes: raw.receiptNotes?.trim() ?? '',
     resolutionReason: raw.reasonResolution?.trim() ?? '',
     parentId: raw.parentTransferId ?? null,
@@ -202,6 +240,17 @@ export class TransfersApi {
         this.options,
       )
       .pipe(map(requireTransfer));
+  }
+
+  /** Registra un pago o abono del flete: queda con pago parcial mientras haya saldo y pagado al cubrir el costo. */
+  payFreight(id: number, input: FreightPaymentInput): Observable<Transfer> {
+    const body = {
+      ...(input.amount !== null ? { amount: input.amount } : {}),
+      method: input.method,
+      ...(input.reference.trim() ? { reference: input.reference.trim() } : {}),
+      ...(input.notes.trim() ? { notes: input.notes.trim() } : {}),
+    };
+    return this.http.post<TransferResponse>(`${this.url}/${id}/pay-freight`, body, this.options).pipe(map(requireTransfer));
   }
 
   cancel(id: number, reason: string): Observable<void> {

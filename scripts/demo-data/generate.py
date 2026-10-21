@@ -27,6 +27,7 @@ TABLES_WITH_OFFSETS = (
     "pagos_orden_compra",
     "transferencias",
     "detalles_transferencia",
+    "pagos_traslado",
     "solicitudes_devolucion",
     "detalles_devolucion_solicitud",
     "alertas_stock",
@@ -585,6 +586,25 @@ class Sim:
             order["paid_ts"] = ts
 
     # ------------------------------------------------------------------ traslados
+    def do_pay_freight(self, ts: datetime, tid: int, partial: bool) -> None:
+        """Pago (o abono) del flete al transportista; el gerente de la sucursal de origen lo registra."""
+        rng = self.rng
+        t = self.transfers[tid]
+        paid = sum(p["amount"] for p in self.rows["pagos_traslado"] if p["transfer"] == tid)
+        pending = money(t["cost"] - paid)
+        if t["status"] not in ("IN_TRANSIT", "DELIVERED", "WITH_ISSUE", "UNDER_CLAIM", "CANCELLED") or pending <= 0:
+            return
+        amount = money(pending * rng.uniform(0.3, 0.7)) if partial else pending
+        if amount <= 0:
+            return
+        method = rng.choices(["TRANSFERENCIA", "EFECTIVO", "CHEQUE"], weights=[60, 30, 10])[0]
+        self.rows["pagos_traslado"].append({
+            "id": self.next_id("pagos_traslado"), "transfer": tid, "amount": amount, "ts": ts,
+            "user": rng.choice(self.staff[t["origin"]]["manager"]).id, "method": method,
+            "ref": {"TRANSFERENCIA": f"TR-{rng.randint(1000000, 9999999)}", "CHEQUE": f"CH-{rng.randint(10000, 99999)}"}.get(method),
+            "note": "Abono" if partial else None,
+        })
+
     def create_transfer(self, ts: datetime, origin: int, dest: int, lines: list[tuple[int, float]]) -> None:
         rng = self.rng
         tid = self.next_id("transferencias")
@@ -649,6 +669,9 @@ class Sim:
                     self.move(ts, "RETIRO", "TRASLADO", sent, line["prod"], t["origin"], by.id, tid, "TRANSFERENCIA_OUT")
                     self.check_low_stock(ts, t["origin"], line["prod"])
             self.resolve_alert(t["alert"], ts, None)
+            # El flete suele pagarse días después; los más recientes quedan por pagar.
+            if t["cost"] > 0 and rng.random() < 0.7:
+                self.schedule(ts + timedelta(days=rng.randint(2, 20), hours=rng.randint(0, 8)), "pay_freight", transfer=tid, partial=rng.random() < 0.15)
         elif kind == "receive_transfer" and t["status"] == "IN_TRANSIT":
             t.update(arrived=ts, receiver=by)
             issue = False
@@ -774,6 +797,8 @@ class Sim:
             self.do_close_short(ts, p["order"])
         elif kind == "pay_order":
             self.do_pay_order(ts, p["order"], p["partial"])
+        elif kind == "pay_freight":
+            self.do_pay_freight(ts, p["transfer"], p["partial"])
         elif kind in ("approve_transfer", "prepare_transfer", "reject_transfer", "dispatch_transfer", "receive_transfer"):
             self.do_transfer_step(ts, kind, p["transfer"], p.get("by"), p.get("missing", False))
         elif kind == "resolve_issue":

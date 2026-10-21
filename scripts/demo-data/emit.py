@@ -10,7 +10,7 @@ from generate import Sim
 
 SERIAL_TABLES = (
     "unidad_medida", "sucursal", "usuario", "proveedor", "producto", "producto_proveedor", "producto_unidad", "precio_por_lista",
-    "rutas_logisticas", "inventario_local", "ventas", "detalles_venta", "ordenes_compra", "detalles_orden_compra", "pagos_orden_compra", "transferencias",
+    "rutas_logisticas", "inventario_local", "ventas", "detalles_venta", "ordenes_compra", "detalles_orden_compra", "pagos_orden_compra", "transferencias", "pagos_traslado",
     "detalles_transferencia", "solicitudes_devolucion", "detalles_devolucion_solicitud", "movimiento_inventario", "alertas_stock",
 )
 
@@ -121,6 +121,8 @@ def load_sql(sim: Sim) -> str:
     w.copy("transferencias", "id, estado, fecha_solicitud, fecha_estimada_llegada, fecha_real_llegada, sucursal_origen_id, sucursal_destino_id, transportista, notas_recepcion, parent_transfer_id, version, motivo_resolucion, resuelto_por_id, fecha_resolucion, prioridad, costo_envio, numero_guia, fecha_despacho, solicitante_id, solicitante_nombre, autorizador_id, autorizador_nombre, despachador_id, despachador_nombre, recibidor_id, recibidor_nombre, resolutor_id, resolutor_nombre", rows)
     w.copy("detalles_transferencia", "id, transferencia_id, producto_id, cantidad_solicitada, cantidad_enviada, cantidad_recibida, faltantes, producto_nombre",
            [(l["id"], l["transfer"], l["prod"], l["req"], l["sent"], l["got"], l["missing"], products[l["prod"]].name) for l in sim.rows["detalles_transferencia"]])
+    w.copy("pagos_traslado", "id, traslado_id, monto, fecha, usuario_id, usuario_nombre, metodo, referencia, notas",
+           [(p["id"], p["transfer"], p["amount"], p["ts"], p["user"], sellers[p["user"]].name, p["method"], p["ref"], p["note"]) for p in sim.rows["pagos_traslado"]])
 
     w.copy("solicitudes_devolucion", "id, venta_id, sucursal_id, solicitante_id, aprobador_id, estado, fecha_solicitud, fecha_procesamiento, motivo_general, comentario_aprobador, created_at",
            [(r["id"], r["sale"], r["branch"], r["requester"], r["approver"], r["status"], r["ts"], r["done"], r["reason"], r["comment"], r["ts"]) for r in sim.rows["solicitudes_devolucion"]])
@@ -154,6 +156,7 @@ DELETE FROM public.detalles_venta WHERE venta_id IN (SELECT id FROM d_sales);
 DELETE FROM public.ventas WHERE id IN (SELECT id FROM d_sales);
 CREATE TEMP TABLE d_transfers ON COMMIT DROP AS SELECT id FROM public.transferencias WHERE solicitante_id IN (SELECT id FROM d_users) OR sucursal_origen_id IN ({branches}) OR sucursal_destino_id IN ({branches});
 UPDATE public.transferencias SET parent_transfer_id = NULL WHERE parent_transfer_id IN (SELECT id FROM d_transfers);
+DELETE FROM public.pagos_traslado WHERE traslado_id IN (SELECT id FROM d_transfers);
 DELETE FROM public.detalles_transferencia WHERE transferencia_id IN (SELECT id FROM d_transfers);
 DELETE FROM public.transferencias WHERE id IN (SELECT id FROM d_transfers);
 CREATE TEMP TABLE d_orders ON COMMIT DROP AS SELECT id FROM public.ordenes_compra WHERE usuario_id IN (SELECT id FROM d_users) OR sucursal_id IN ({branches});

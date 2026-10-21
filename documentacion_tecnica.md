@@ -147,6 +147,8 @@ erDiagram
     PRODUCTO ||--o{ DETALLES_ORDEN_COMPRA : "se pide en"
     ORDENES_COMPRA ||--o{ DETALLES_ORDEN_COMPRA : "contiene"
     ORDENES_COMPRA ||--o{ PAGOS_ORDEN_COMPRA : "se paga con"
+    TRANSFERENCIAS ||--o{ PAGOS_TRASLADO : "flete pagado con"
+    USUARIO ||--o{ PAGOS_TRASLADO : "registra"
     USUARIO ||--o{ PAGOS_ORDEN_COMPRA : "registra"
     PRODUCTO ||--o{ MOVIMIENTO_INVENTARIO : "registra"
     SUCURSAL ||--o{ MOVIMIENTO_INVENTARIO : "sucede en"
@@ -179,6 +181,17 @@ erDiagram
         string referencia_pago
     }
 
+    PAGOS_TRASLADO {
+        bigint id PK
+        bigint traslado_id FK
+        decimal monto
+        timestamp fecha
+        bigint usuario_id FK
+        varchar usuario_nombre
+        varchar metodo
+        varchar referencia
+        text notas
+    }
     PAGOS_ORDEN_COMPRA {
         bigint id PK
         bigint orden_id FK
@@ -356,6 +369,25 @@ classDiagram
         +resolveAsShrinkage()
         +resolveAsClaim()
         +resend() Transfer
+        +registerFreightPayment(monto, método, referencia)
+        +freightPaid() BigDecimal
+        +freightBalance() BigDecimal
+        +freightPaymentStatus() FreightPaymentStatus
+    }
+    class TransferPayment {
+        +BigDecimal amount
+        +LocalDateTime date
+        +String userName
+        +TransferPaymentMethod method
+        +String reference
+        +String notes
+    }
+    class FreightPaymentStatus {
+        <<enumeration>>
+        SIN_COSTO
+        POR_PAGAR
+        PAGO_PARCIAL
+        PAGADO
     }
     class TransferDetail {
         +Long productId
@@ -426,6 +458,8 @@ classDiagram
     }
     Transfer "1" *-- "1..*" TransferDetail
     Transfer --> TransferStatus
+    Transfer "1" *-- "0..*" TransferPayment : pagos del flete
+    Transfer --> FreightPaymentStatus
     Transfer "0..1" --> "*" Transfer : reenvío (padre)
     PurchaseOrder "1" *-- "1..*" PurchaseOrderDetail
     PurchaseOrder "1" *-- "0..*" PurchasePayment : pagos y abonos

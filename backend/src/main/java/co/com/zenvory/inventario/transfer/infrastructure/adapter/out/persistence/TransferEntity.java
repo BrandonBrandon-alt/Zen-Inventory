@@ -95,7 +95,19 @@ public class TransferEntity {
     @OneToMany(mappedBy = "transfer", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TransferDetailEntity> details = new ArrayList<>();
 
+    /** Pagos del flete; se conservan siempre (no se borran huérfanos). */
+    @OneToMany(mappedBy = "transfer", cascade = CascadeType.ALL)
+    @OrderBy("date ASC, id ASC")
+    private List<TransferPaymentEntity> payments = new ArrayList<>();
+
     public TransferEntity() {}
+
+    public void addPayment(TransferPaymentEntity payment) {
+        payments.add(payment);
+        payment.setTransfer(this);
+    }
+
+    public List<TransferPaymentEntity> getPayments() { return payments; }
 
     public void addDetail(TransferDetailEntity detail) {
         details.add(detail);

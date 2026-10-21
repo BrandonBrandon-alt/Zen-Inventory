@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { type Observable, map } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { SKIP_ERROR_NOTIFICATION } from '@core/api/error.interceptor';
+import { PAYMENT_METHODS, type PaymentMethod, isPaymentMethod } from '@core/payments/payment-method';
 import type { components } from '@core/api/schema';
 import { parseDate } from '@shared/format/format';
 
@@ -14,9 +15,8 @@ export type ReceptionStatus = (typeof RECEPTION_STATUSES)[number];
 export const PAYMENT_STATUSES = ['POR_PAGAR', 'PAGO_PARCIAL', 'PAGADO'] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
-export const PAYMENT_METHODS = ['EFECTIVO', 'TRANSFERENCIA', 'CHEQUE', 'TARJETA', 'OTRO'] as const;
-export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
-const isMethod = (value: unknown): value is PaymentMethod => (PAYMENT_METHODS as readonly unknown[]).includes(value);
+export { PAYMENT_METHODS, type PaymentMethod };
+const isMethod = isPaymentMethod;
 
 const isReception = (value: unknown): value is ReceptionStatus => (RECEPTION_STATUSES as readonly unknown[]).includes(value);
 const isPayment = (value: unknown): value is PaymentStatus => (PAYMENT_STATUSES as readonly unknown[]).includes(value);

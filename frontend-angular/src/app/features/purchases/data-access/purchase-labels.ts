@@ -8,7 +8,7 @@ import {
   type LucideIconData,
 } from '@lucide/angular';
 import type { BadgeVariant } from '@shared/ui/badge/badge';
-import type { PaymentMethod, PaymentStatus, ReceptionStatus } from './purchases-api';
+import type { PaymentStatus, ReceptionStatus } from './purchases-api';
 
 export interface StatusInfo {
   readonly label: string;
@@ -33,13 +33,7 @@ export const PAYMENT_INFO: Readonly<Record<PaymentStatus, { label: string; varia
   PAGADO: { label: 'Pagada', variant: 'success', icon: LucideWallet.icon },
 };
 
-export const PAYMENT_METHOD_LABELS: Readonly<Record<PaymentMethod, string>> = {
-  EFECTIVO: 'Efectivo',
-  TRANSFERENCIA: 'Transferencia',
-  CHEQUE: 'Cheque',
-  TARJETA: 'Tarjeta',
-  OTRO: 'Otro',
-};
+export { PAYMENT_METHOD_LABELS } from '@core/payments/payment-method';
 
 /** Órdenes que todavía se están moviendo (no recibidas del todo ni canceladas). */
 export const OPEN_RECEPTIONS: readonly ReceptionStatus[] = ['AWAITING_APPROVAL', 'PENDING', 'IN_TRANSIT', 'RECEIVED_PARTIAL'];

@@ -177,6 +177,18 @@ public class TransferService implements TransferUseCase {
 
     @Override
     @Transactional
+    public Transfer registerFreightPayment(Long transferId, java.math.BigDecimal amount,
+            co.com.zenvory.inventario.transfer.domain.model.TransferPaymentMethod method, String reference, String notes) {
+        Transfer transfer = getTransferById(transferId);
+        User user = getCurrentUser();
+        // Paga el flete quien contrató el envío: la sucursal de origen (la que despacha).
+        requireSide(transfer, user, Side.ORIGIN);
+        transfer.registerFreightPayment(amount, method, reference, notes, user.getId(), user.getNombre());
+        return transferRepositoryPort.save(transfer);
+    }
+
+    @Override
+    @Transactional
     public Transfer dispatchTransfer(Long transferId, DispatchTransferCommand command) {
         Transfer transfer = getTransferById(transferId);
         User user = getCurrentUser();

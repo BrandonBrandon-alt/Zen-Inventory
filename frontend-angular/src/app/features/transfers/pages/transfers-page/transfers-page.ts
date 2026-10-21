@@ -11,12 +11,13 @@ import {
   LucidePlus,
   LucideRoute,
   LucideSearch,
+  LucideWallet,
 } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { CatalogOptionsApi, type ProductOption } from '@core/catalog/catalog-options-api';
-import { formatDateTime, normalizeText } from '@shared/format/format';
+import { formatDateTime, formatMoney, normalizeText } from '@shared/format/format';
 import { inDateRange, optionsFrom } from '@shared/filters/filter-helpers';
 import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
 import { Checkbox } from '@shared/ui/checkbox/checkbox';
@@ -32,7 +33,7 @@ import { Select, type SelectOption } from '@shared/ui/select/select';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { TransferDetailModal } from '../../components/transfer-detail-modal/transfer-detail-modal';
 import { TransferRequestModal } from '../../components/transfer-request-modal/transfer-request-modal';
-import { OPEN_STATUSES, PRIORITY_INFO, STATUS_INFO } from '../../data-access/transfer-labels';
+import { FREIGHT_INFO, OPEN_STATUSES, PRIORITY_INFO, STATUS_INFO } from '../../data-access/transfer-labels';
 import { type Actor, transferActions } from '../../data-access/transfer-permissions';
 import { type Transfer, TRANSFER_STATUSES, type TransferPriority, type TransferStatus, TransfersApi } from '../../data-access/transfers-api';
 
@@ -43,6 +44,7 @@ interface TransferRow extends Transfer {
   readonly route: string;
   readonly statusLabel: string;
   readonly priorityLabel: string;
+  readonly freightLabel: string;
   readonly products: string;
   readonly needsMe: boolean;
 }
@@ -148,6 +150,7 @@ export class TransfersPage {
     { key: 'route', header: 'Ruta', icon: LucideRoute.icon, sortable: true, primary: true },
     { key: 'products', header: 'Productos', icon: LucidePackage.icon },
     { key: 'priorityLabel', header: 'Prioridad', icon: LucideFlag.icon, sortable: true },
+    { key: 'freightLabel', header: 'Flete', icon: LucideWallet.icon, sortable: true },
     { key: 'requestDate', header: 'Solicitado', icon: LucideCalendar.icon, sortable: true, nowrap: true, width: '11.5rem', value: (r) => r.requestDate, display: (r) => formatDateTime(r.requestDate) },
     { key: 'acciones', header: 'Acciones', align: 'end' },
   ];
@@ -187,6 +190,7 @@ export class TransfersPage {
           route: `${name(t.originBranchId)} → ${name(t.destinationBranchId)}`,
           statusLabel: STATUS_INFO[t.status].label,
           priorityLabel: PRIORITY_INFO[t.priority].label,
+          freightLabel: FREIGHT_INFO[t.freightStatus].label,
           products: this.productsLabel(t),
           // Le toca a quien mira: hay un paso que solo él puede dar.
           needsMe: actions.approve || actions.prepare || actions.dispatch || actions.receive || actions.resolve,
@@ -221,6 +225,13 @@ export class TransfersPage {
   protected readonly selected = computed(() => this.transfers().find((t) => t.id === this.selectedId()) ?? null);
 
   protected readonly pending = computed(() => this.rows().filter((r) => r.needsMe).length);
+
+  /** Lo que se le debe a los transportistas en los traslados visibles. */
+  protected readonly freightOwed = computed(() => {
+    const owed = this.transfers().filter((t) => t.freightBalance > 0);
+    return { total: owed.reduce((sum, t) => sum + t.freightBalance, 0), count: owed.length };
+  });
+  protected readonly formatMoney = formatMoney;
 
   protected readonly summary = computed(() => {
     const open = this.transfers().filter((t) => OPEN_STATUSES.includes(t.status)).length;
@@ -292,5 +303,9 @@ export class TransfersPage {
     if (!first) return '—';
     const others = transfer.lines.length - 1;
     return others > 0 ? `${first.productName} +${others}` : first.productName;
+  }
+
+  protected freightVariant(row: TransferRow): BadgeVariant {
+    return FREIGHT_INFO[row.freightStatus].variant;
   }
 }

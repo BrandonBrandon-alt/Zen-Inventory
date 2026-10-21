@@ -92,7 +92,25 @@ describe('TransfersPage', () => {
       expect(screen.getByText(/5 traslados en curso/)).toBeInTheDocument();
     });
 
-    it('resume varios productos como "Tornillo +1"', async () => {
+    it('el encabezado resume lo que se debe a transportistas y la tabla muestra el estado del flete de cada traslado', async () => {
+  useSession('ADMIN');
+  stub([
+    { ...T.transit, shippingCost: 90000, freightPaid: 30000, freightBalance: 60000, freightStatus: 'PAGO_PARCIAL' },
+    { ...T.issue, shippingCost: 40000, freightPaid: 0, freightBalance: 40000, freightStatus: 'POR_PAGAR' },
+    { ...T.done, shippingCost: 25000, freightPaid: 25000, freightBalance: 0, freightStatus: 'PAGADO' },
+    T.pending,
+  ]);
+  await renderPage();
+  expect(await screen.findByText(/en 2 traslados/)).toBeInTheDocument();
+  expect(screen.getByText('$ 100.000')).toBeInTheDocument();
+  expect(screen.getByText('Flete con abono')).toBeInTheDocument();
+  expect(screen.getByText('Flete por pagar')).toBeInTheDocument();
+  expect(screen.getByText('Saldo $ 60.000')).toBeInTheDocument();
+  // Un traslado sin envío no muestra flete.
+  expect(screen.queryByText('Sin flete')).not.toBeInTheDocument();
+});
+
+it('resume varios productos como "Tornillo +1"', async () => {
       useSession('ADMIN');
       stub();
       await renderPage();

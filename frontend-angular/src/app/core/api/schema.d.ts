@@ -1417,6 +1417,19 @@ export interface components {
             /** Format: int32 */
             unsentQuantity?: number;
         };
+        FreightPaymentResponse: {
+            /** Format: int64 */
+            id?: number;
+            amount?: number;
+            /** Format: date-time */
+            date?: string;
+            /** Format: int64 */
+            userId?: number;
+            userName?: string;
+            method?: string;
+            reference?: string;
+            notes?: string;
+        };
         TransferResponse: {
             /** Format: int64 */
             id?: number;
@@ -1439,6 +1452,10 @@ export interface components {
             parentTransferId?: number;
             priority?: string;
             shippingCost?: number;
+            freightPaid?: number;
+            freightBalance?: number;
+            freightStatus?: string;
+            payments?: components["schemas"]["FreightPaymentResponse"][];
             trackingNumber?: string;
             reasonResolution?: string;
             /** Format: int64 */

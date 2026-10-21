@@ -111,6 +111,8 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 | RF-33 | Cancelar o rechazar un traslado con motivo; si ya iba en tránsito, la mercancía vuelve al origen | ADMIN, MANAGER | M | Implementado |
 | RF-34 | Registrar quién ejecutó cada paso del traslado | Sistema | M | Implementado |
 | RF-35 | Reporte de cumplimiento y analítica logística de traslados | ADMIN, MANAGER, OPERADOR | B | Implementado |
+| RF-59 | Registrar cada pago o abono del flete al transportista con monto, fecha, usuario, método y referencia, sin poder exceder el saldo, y conservar su historial; solo hay flete que pagar si el traslado ya se despachó con un costo de envío mayor que cero | ADMIN, MANAGER (sucursal de origen) | A | Implementado |
+| RF-60 | Mostrar el estado del flete de cada traslado (sin flete, por pagar, con abono, pagado) con su saldo, y resumir cuánto se debe a transportistas | Quienes ven traslados | M | Implementado |
 
 ### 3.7 Compras a proveedores
 
@@ -170,6 +172,7 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 | RN-10 | Despachar un traslado exige la cantidad enviada de cada producto; si todo es cero se rechaza. |
 | RN-11 | Un pago a proveedor es inmutable y no puede exceder el saldo de la orden; el estado de pago se deduce de lo pagado y una orden cancelada no genera deuda. |
 | RN-12 | Una venta no se registra sin forma de pago. Las ventas anteriores a su registro quedan «Sin registrar»: no se inventa cómo se pagaron. |
+| RN-13 | El flete de un traslado es el costo de envío anotado al despachar. Se paga a quien contrata el envío (la sucursal de origen); un pago es inmutable y no puede exceder el saldo. Un traslado cancelado en tránsito conserva su deuda: el transportista ya hizo el viaje. Los traslados anteriores al registro de pagos quedan «por pagar»: no se inventan pagos. |
 
 ## 5. Requisitos no funcionales
 
@@ -215,7 +218,7 @@ Se declara para no presentar como hecho lo que no lo está:
   inventario), el kardex por producto y Reportes descargan todas sus filas; la auditoría las pagina en el navegador.
 - No hay tablas virtualizadas.
 - Los pagos de compras no se pueden anular ni editar (son inmutables); un pago equivocado no tiene todavía un contra-asiento.
-- El costo de envío de los traslados se registra al despachar, pero no tiene un pago asociado.
+- Los pagos del flete no se pueden anular ni editar (son inmutables), igual que los de compras.
 - La exportación a CSV del historial de ventas no está disponible (se retiró al paginar en el servidor).
 - No hay mecanismo que mantenga despierta la API gratuita de Render.
 - La auditoría solo registra movimientos de inventario, no cualquier acción del sistema (por ejemplo, no registra inicios de sesión).
@@ -227,7 +230,7 @@ Se declara para no presentar como hecho lo que no lo está:
 | Panel (`/dashboard`) | Todos | RF-47, RF-48 |
 | Inventario (`/inventory`) | Todos | RF-12 a RF-18 |
 | Alertas (`/alerts`) | ADMIN, MANAGER, OPERADOR | RF-43 a RF-46 |
-| Traslados (`/transfers`) | ADMIN, MANAGER, OPERADOR | RF-28 a RF-35 |
+| Traslados (`/transfers`) | ADMIN, MANAGER, OPERADOR | RF-28 a RF-35, RF-59, RF-60 |
 | Compras (`/purchases`) | ADMIN, MANAGER, OPERADOR | RF-36 a RF-42, RF-56, RF-57 |
 | Ventas (`/sales/pos`) | Todos | RF-19 a RF-22, RF-25, RF-58 |
 | Historial Ventas (`/sales/history`) | Todos | RF-23, RF-24, RF-58 |

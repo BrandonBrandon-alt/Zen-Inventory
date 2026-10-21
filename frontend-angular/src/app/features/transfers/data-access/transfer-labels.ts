@@ -11,7 +11,7 @@ import {
   type LucideIconData,
 } from '@lucide/angular';
 import type { BadgeVariant } from '@shared/ui/badge/badge';
-import type { TransferPriority, TransferStatus } from './transfers-api';
+import type { FreightStatus, TransferPriority, TransferStatus } from './transfers-api';
 
 export interface StatusInfo {
   readonly label: string;
@@ -37,6 +37,13 @@ export const PRIORITY_INFO: Readonly<Record<TransferPriority, { label: string; v
   HIGH: { label: 'Alta', variant: 'danger' },
   NORMAL: { label: 'Normal', variant: 'neutral' },
   LOW: { label: 'Baja', variant: 'neutral' },
+};
+
+export const FREIGHT_INFO: Readonly<Record<FreightStatus, { label: string; variant: BadgeVariant }>> = {
+  SIN_COSTO: { label: 'Sin flete', variant: 'neutral' },
+  POR_PAGAR: { label: 'Flete por pagar', variant: 'warning' },
+  PAGO_PARCIAL: { label: 'Flete con abono', variant: 'warning' },
+  PAGADO: { label: 'Flete pagado', variant: 'success' },
 };
 
 /** Estados en los que el traslado todavía se está moviendo. */

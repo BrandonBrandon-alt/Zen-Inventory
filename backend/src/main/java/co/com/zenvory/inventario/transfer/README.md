@@ -15,6 +15,7 @@ luego se **despacha** (sale de verdad) y por último se **recibe** (entra al des
 | Tabla | Qué guarda |
 |---|---|
 | `transferencias` | `estado`, `prioridad` (HIGH/NORMAL/LOW), `sucursal_origen_id`, `sucursal_destino_id`, `transportista`, `numero_guia`, `costo_envio`, fechas (solicitud, despacho, estimada y real de llegada), `notas_recepcion`, `parent_transfer_id` (traslado del que viene un reenvío), `version`, y la auditoría de **quién hizo cada paso**: solicitante, autorizador, despachador, recibidor, resolutor (id + nombre) |
+| `pagos_traslado` | **Un pago o abono del flete por fila** (migración V7): `traslado_id`, `monto`, `fecha`, `usuario_id` + `usuario_nombre`, `metodo`, `referencia`, `notas`. Inmutable. Los traslados anteriores quedan «por pagar» |
 | `detalles_transferencia` | `producto_id`, `producto_nombre`, `cantidad_solicitada`, `cantidad_enviada`, `cantidad_recibida`, `faltantes` |
 
 FKs: origen y destino → `sucursal`; `parent_transfer_id` → `transferencias` (auto-referencia); líneas → `producto` y
@@ -74,6 +75,12 @@ transfer/
 | **Cancelar / rechazar** | Si aún no salió: libera la reserva. Si ya iba en tránsito: la mercancía **vuelve al origen** |
 | **Resolver con reenvío** | Crea un traslado nuevo (hijo) por los faltantes y **reserva de nuevo** en el origen; el original queda `DELIVERED` |
 
+### El flete al transportista
+El costo de envío se anota al despachar y **se paga aparte**, en uno o varios abonos. El estado del flete se **deduce de los pagos**:
+`SIN_COSTO` (aún no se despacha o salió sin costo) → `POR_PAGAR` → `PAGO_PARCIAL` → `PAGADO`. Reglas (`Transfer.registerFreightPayment`):
+solo hay flete si ya se despachó con un costo mayor que cero; el monto no puede exceder el saldo (sin monto se paga todo el saldo);
+un traslado cancelado en tránsito conserva su deuda; cada pago guarda quién, cuándo, método y referencia, y no se edita.
+
 ### Quién puede ejecutar cada paso
 `requireSide` distingue lados: la sucursal **origen** da el stock (prepara, despacha), la **destino** lo recibe
 (aprueba, recibe), o **cualquiera de las dos** (cancelar, resolver). El **ADMIN** actúa sobre cualquier traslado.
@@ -91,6 +98,7 @@ Además `requireSide` limita por sucursal (ver arriba).
 | `POST /{id}/dispatch` | Despachar (la sucursal de origen) |
 | `POST /{id}/receive` | Recibir (la sucursal de destino) |
 | `POST /{id}/resolve-shrinkage` · `resolve-resend` · `resolve-claim` | Resolver novedades (ADMIN, MANAGER) |
+| `POST /{id}/pay-freight` | Registrar un pago o abono del flete: `{amount?, method?, reference?, notes?}` (sin cuerpo paga todo el saldo). La respuesta trae `freightPaid`, `freightBalance`, `freightStatus` y `payments` (ADMIN, MANAGER de la sucursal de origen) |
 | `POST /{id}/cancel` · `reject` | Cancelar / rechazar con motivo (ADMIN, MANAGER) |
 | `GET /`, `GET /{id}` | Consultar (cada sucursal ve los suyos) |
 | `GET /fulfillment-report` | Reporte de cumplimiento (ADMIN, MANAGER, OPERADOR) |

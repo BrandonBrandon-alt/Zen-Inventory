@@ -4,6 +4,7 @@ import co.com.zenvory.inventario.transfer.domain.exception.InvalidTransferStateE
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -19,6 +20,7 @@ public class Transfer {
     private String receiptNotes;
     private Long parentTransferId;
     private List<TransferDetail> details;
+    private final List<TransferPayment> payments = new ArrayList<>();
 
     // Campos de Logística Avanzada
     private TransferPriority priority;
@@ -50,6 +52,20 @@ public class Transfer {
                     Long solicitanteId, String solicitanteNombre, Long autorizadorId, String autorizadorNombre,
                     Long despachadorId, String despachadorNombre, Long recibidorId, String recibidorNombre,
                     Long resolutorId, String resolutorNombre) {
+        this(id, status, requestDate, estimatedArrivalDate, actualArrivalDate, originBranchId, destinationBranchId, carrier,
+                receiptNotes, details, parentTransferId, priority, shippingCost, trackingNumber, reasonResolution,
+                resolutionDate, dispatchDate, version, solicitanteId, solicitanteNombre, autorizadorId, autorizadorNombre,
+                despachadorId, despachadorNombre, recibidorId, recibidorNombre, resolutorId, resolutorNombre, List.of());
+    }
+
+    public Transfer(Long id, TransferStatus status, LocalDateTime requestDate, LocalDateTime estimatedArrivalDate,
+                    LocalDateTime actualArrivalDate, Long originBranchId, Long destinationBranchId,
+                    String carrier, String receiptNotes, List<TransferDetail> details, Long parentTransferId,
+                    TransferPriority priority, BigDecimal shippingCost, String trackingNumber,
+                    String reasonResolution, LocalDateTime resolutionDate, LocalDateTime dispatchDate, Integer version,
+                    Long solicitanteId, String solicitanteNombre, Long autorizadorId, String autorizadorNombre,
+                    Long despachadorId, String despachadorNombre, Long recibidorId, String recibidorNombre,
+                    Long resolutorId, String resolutorNombre, List<TransferPayment> payments) {
         if (originBranchId == null || destinationBranchId == null) {
             throw new IllegalArgumentException("Las sucursales de origen y destino son obligatorias.");
         }
@@ -89,6 +105,9 @@ public class Transfer {
         this.recibidorNombre = recibidorNombre;
         this.resolutorId = resolutorId;
         this.resolutorNombre = resolutorNombre;
+        if (payments != null) {
+            this.payments.addAll(payments);
+        }
     }
 
     public static Transfer create(Long originBranchId, Long destinationBranchId, LocalDateTime estimatedArrival, 
@@ -140,6 +159,63 @@ public class Transfer {
         this.estimatedArrivalDate = estimatedArrivalDate;
         this.despachadorId = userId;
         this.despachadorNombre = userName;
+    }
+
+    /**
+     * Registra un pago o abono del flete al transportista. Solo hay flete que pagar si el traslado ya se despachó con un
+     * costo de envío mayor que cero, y el monto no puede exceder el saldo. Un traslado cancelado o rechazado después de
+     * despachado conserva su deuda: el transportista ya hizo el viaje.
+     *
+     * @param amount monto del pago; si es {@code null} se paga todo el saldo pendiente
+     * @return el pago registrado (aún sin id)
+     */
+    public TransferPayment registerFreightPayment(BigDecimal amount, TransferPaymentMethod method, String reference,
+            String notes, Long userId, String userName) {
+        if (this.dispatchDate == null || this.shippingCost == null || this.shippingCost.signum() <= 0) {
+            throw new InvalidTransferStateException("Este traslado no tiene un flete por pagar: aún no se despacha o salió sin costo de envío.");
+        }
+        BigDecimal pending = freightBalance();
+        if (pending.signum() <= 0) {
+            throw new InvalidTransferStateException("El flete de este traslado ya está pagado.");
+        }
+        BigDecimal paying = (amount != null) ? amount : pending;
+        if (paying.signum() <= 0) {
+            throw new IllegalArgumentException("El monto del pago debe ser mayor que cero.");
+        }
+        if (paying.compareTo(pending) > 0) {
+            throw new InvalidTransferStateException(
+                    "El pago (" + paying.toPlainString() + ") excede el saldo del flete (" + pending.toPlainString() + ").");
+        }
+        TransferPayment payment = new TransferPayment(null, paying, LocalDateTime.now(), userId, userName, method, reference, notes);
+        this.payments.add(payment);
+        return payment;
+    }
+
+    /** Lo ya pagado del flete. */
+    public BigDecimal freightPaid() {
+        return payments.stream().map(TransferPayment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /** Lo que aún se le debe al transportista; cero si no hay costo de envío o ya se pagó. */
+    public BigDecimal freightBalance() {
+        if (this.dispatchDate == null || this.shippingCost == null || this.shippingCost.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return this.shippingCost.subtract(freightPaid()).max(BigDecimal.ZERO);
+    }
+
+    public FreightPaymentStatus freightPaymentStatus() {
+        if (this.dispatchDate == null || this.shippingCost == null || this.shippingCost.signum() <= 0) {
+            return FreightPaymentStatus.SIN_COSTO;
+        }
+        if (freightBalance().signum() == 0) {
+            return FreightPaymentStatus.PAGADO;
+        }
+        return payments.isEmpty() ? FreightPaymentStatus.POR_PAGAR : FreightPaymentStatus.PAGO_PARCIAL;
+    }
+
+    public List<TransferPayment> getPayments() {
+        return Collections.unmodifiableList(payments);
     }
 
     public void receive(String notes, boolean hasIssues, Long userId, String userName) {
