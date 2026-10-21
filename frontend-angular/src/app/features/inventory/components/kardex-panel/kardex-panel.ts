@@ -4,7 +4,8 @@ import { toApiError } from '@core/api/api-error';
 import { formatDateTime, formatQuantity } from '@shared/format/format';
 import { Badge } from '@shared/ui/badge/badge';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
-import { Select, type SelectOption } from '@shared/ui/select/select';
+import { MultiSelect } from '@shared/ui/multi-select/multi-select';
+import type { SelectOption } from '@shared/ui/select/select';
 import { type InventoryItem, InventoryApi, type Movement } from '../../data-access/inventory-api';
 import { REASON_LABELS, subReasonLabel } from '../../data-access/inventory-labels';
 
@@ -31,15 +32,14 @@ const rowKey = (row: MovementRow): number => row.id;
 /** Historial de movimientos (kardex) de una sucursal, de un producto o de todos. */
 @Component({
   selector: 'app-kardex-panel',
-  imports: [DataTable, DataTableCell, Badge, Select],
+  imports: [DataTable, DataTableCell, Badge, MultiSelect],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="mb-4 max-w-sm">
-      <app-select
-        [(value)]="productId"
+      <app-multi-select
+        [(values)]="productIds"
         [options]="productOptions()"
         [icon]="packageIcon"
-        searchable
         searchPlaceholder="Buscar producto…"
         ariaLabel="Filtrar por producto"
         placeholder="Todos los productos"
@@ -89,19 +89,23 @@ export class KardexPanel {
   protected readonly packageIcon = LucidePackage.icon;
   protected readonly formatQuantity = formatQuantity;
 
-  protected readonly productId = signal<number | null>(null);
+  protected readonly productIds = signal<readonly number[]>([]);
+  /** Con un solo producto se pide su kardex al servidor; con ninguno o con varios se pide el general y se filtra aquí. */
+  private readonly serverProductId = computed(() => (this.productIds().length === 1 ? this.productIds()[0] : null));
   private readonly movements = signal<readonly Movement[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
-  protected readonly productOptions = computed<SelectOption<number | null>[]>(() => [
-    { value: null, label: 'Todos los productos' },
-    ...this.products().map((product) => ({ value: product.productId, label: product.nombre, description: product.sku || undefined })),
-  ]);
+  protected readonly productOptions = computed<SelectOption<number>[]>(() =>
+    this.products().map((product) => ({ value: product.productId, label: product.nombre, description: product.sku || undefined })),
+  );
 
   protected readonly rows = computed<MovementRow[]>(() => {
     const names = new Map(this.products().map((product) => [product.productId, product.nombre]));
-    return this.movements().map((movement) => ({ ...movement, productName: names.get(movement.productId) ?? `Producto ${movement.productId}` }));
+    const chosen = new Set(this.productIds());
+    return this.movements()
+      .filter((movement) => chosen.size < 2 || chosen.has(movement.productId))
+      .map((movement) => ({ ...movement, productName: names.get(movement.productId) ?? `Producto ${movement.productId}` }));
   });
 
   /** Para descartar la respuesta de una consulta anterior si el usuario cambió de sucursal o de producto mientras llegaba. */
@@ -110,7 +114,7 @@ export class KardexPanel {
   constructor() {
     effect(() => {
       this.branchId();
-      this.productId();
+      this.serverProductId();
       untracked(() => this.load());
     });
   }
@@ -124,7 +128,7 @@ export class KardexPanel {
     const id = ++this.requestId;
     this.loading.set(true);
     this.error.set(null);
-    this.api.movements(this.branchId(), this.productId()).subscribe({
+    this.api.movements(this.branchId(), this.serverProductId()).subscribe({
       next: (movements) => {
         if (id !== this.requestId) return;
         this.movements.set(movements);

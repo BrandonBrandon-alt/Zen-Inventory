@@ -181,6 +181,16 @@ export class TransfersApi {
     );
   }
 
+  /**
+   * Existencia disponible por producto en la sucursal que enviaría la mercancía, solo de los que tienen algo que enviar.
+   * No trae precios ni costos, por eso se puede consultar la de otra sucursal.
+   */
+  availability(branchId: number): Observable<ReadonlyMap<number, number>> {
+    return this.http.get<{ productId?: number; available?: number }[]>(`${this.baseUrl}/api/v1/inventory/branches/${branchId}/availability`, this.options).pipe(
+      map((rows) => new Map(rows.flatMap((row) => (typeof row.productId === 'number' && typeof row.available === 'number' && row.available > 0 ? [[row.productId, row.available] as const] : [])))),
+    );
+  }
+
   request(input: TransferRequestInput): Observable<Transfer> {
     return this.http
       .post<TransferResponse>(

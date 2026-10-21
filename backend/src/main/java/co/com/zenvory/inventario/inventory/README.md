@@ -98,6 +98,7 @@ SaleService.execute
 |---|---|---|
 | `GET branches/{b}` | Inventario de una sucursal | ADMIN, MANAGER, SELLER, OPERADOR |
 | `GET branches/{b}/products/{p}` | Saldo puntual | ADMIN, MANAGER, OPERADOR |
+| `GET branches/{b}/availability` | Productos con existencia disponible (existencia − comprometido) y su cantidad, **sin precios ni costos**; se puede consultar la de otra sucursal. Lo usa la solicitud de traslado | ADMIN, MANAGER, OPERADOR |
 | `PUT branches/{b}/products/{p}/config` | Cambiar stock mínimo | ADMIN, MANAGER |
 | `GET branches/{b}/products/{p}/kardex` | Historial del producto | ADMIN, MANAGER, SELLER, OPERADOR |
 | `POST …/withdraw` y `POST …/add` | Ajustes manuales de salida / entrada | ADMIN, MANAGER, OPERADOR |

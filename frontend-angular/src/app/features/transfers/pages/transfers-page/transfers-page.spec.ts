@@ -43,6 +43,7 @@ const PRODUCTS = [
   { id: 101, sku: 'TUE-2', nombre: 'Tuerca' },
 ];
 const URL_T = `${TEST_API}/api/v1/transfers`;
+const stockUrl = (branch: number) => `${TEST_API}/api/v1/inventory/branches/${branch}/availability`;
 
 function useSession(rol: string, sucursalId?: number) {
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token: 't', email: 'e@z.co', nombre: 'Yo', rol, id: 1, sucursalId }));
@@ -53,6 +54,9 @@ function stub(transfers: unknown[] = ALL) {
     http.get(URL_T, () => HttpResponse.json(transfers)),
     http.get(`${TEST_API}/api/branches`, () => HttpResponse.json(BRANCHES)),
     http.get(`${TEST_API}/api/catalog/products`, () => HttpResponse.json(PRODUCTS)),
+    // Lo que cada sucursal tiene disponible para enviar: la Sede Central tiene Tornillo (50) y Tuerca (8); la Sur nada.
+    http.get(stockUrl(10), () => HttpResponse.json([{ productId: 100, available: 50 }, { productId: 101, available: 8 }])),
+    http.get(stockUrl(30), () => HttpResponse.json([])),
   );
 }
 
@@ -535,6 +539,7 @@ it('resume varios productos como "Tornillo +1"', async () => {
       expect(screen.queryByRole('option', { name: 'Sucursal Norte' })).not.toBeInTheDocument(); // el destino no es origen
       expect(screen.queryByRole('option', { name: 'Sucursal Cerrada' })).not.toBeInTheDocument(); // inactiva
       await userEvent.click(screen.getByRole('option', { name: 'Sede Central' }));
+      await vi.waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Producto' })).toBeEnabled());
       await chooseOption('Producto', 'Tornillo');
       await userEvent.type(within(dialog).getByLabelText('Cantidad'), '6');
       await userEvent.click(within(dialog).getByRole('button', { name: /Agregar producto/ }));
@@ -565,6 +570,100 @@ it('resume varios productos como "Tornillo +1"', async () => {
       await chooseOption('Sucursal que lo recibe', 'Sucursal Sur');
     });
 
+    it('sin origen no se puede elegir producto; al elegirlo solo salen los que tiene disponibles, con su cantidad', async () => {
+      useSession('MANAGER', 20);
+      server.use(
+        http.get(URL_T, () => HttpResponse.json(ALL)),
+        http.get(`${TEST_API}/api/branches`, () => HttpResponse.json(BRANCHES)),
+        http.get(`${TEST_API}/api/catalog/products`, () => HttpResponse.json([...PRODUCTS, { id: 102, sku: 'ARA-3', nombre: 'Arandela' }])),
+        http.get(stockUrl(10), () => HttpResponse.json([{ productId: 100, available: 50 }, { productId: 101, available: 8 }])), // Arandela no tiene
+      );
+      await renderPage();
+      await screen.findByText('#5');
+      await userEvent.click(screen.getByRole('button', { name: /Solicitar traslado/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Solicitar traslado' });
+      const product = within(dialog).getByRole('combobox', { name: 'Producto' });
+      expect(product).toBeDisabled();
+      expect(product).toHaveTextContent('Elige primero la sucursal que lo envía');
+      await chooseOption('Sucursal que lo envía', 'Sede Central');
+      await vi.waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Producto' })).toBeEnabled());
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Producto' }));
+      const options = screen.getAllByRole('option').map((o) => o.textContent?.replace(/\s+/g, ' ').trim());
+      expect(options).toHaveLength(2);
+      expect(options[0]).toContain('Tornillo');
+      expect(options[0]).toContain('50 disponibles');
+      expect(options[1]).toContain('Tuerca');
+      expect(options[1]).toContain('8 disponibles');
+      expect(screen.queryByRole('option', { name: /Arandela/ })).not.toBeInTheDocument();
+    });
+
+    it('un origen sin existencias lo avisa y no ofrece productos', async () => {
+      useSession('MANAGER', 20);
+      stub();
+      await renderPage();
+      await screen.findByText('#5');
+      await userEvent.click(screen.getByRole('button', { name: /Solicitar traslado/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Solicitar traslado' });
+      await chooseOption('Sucursal que lo envía', 'Sucursal Sur');
+      expect(await within(dialog).findByText('Esa sucursal no tiene productos disponibles para enviar.')).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Producto' }));
+      expect(screen.queryAllByRole('option')).toHaveLength(0);
+    });
+
+    it('al cambiar de origen se suelta el producto que el nuevo origen no tiene', async () => {
+      useSession('ADMIN');
+      server.use(
+        http.get(URL_T, () => HttpResponse.json(ALL)),
+        http.get(`${TEST_API}/api/branches`, () => HttpResponse.json(BRANCHES)),
+        http.get(`${TEST_API}/api/catalog/products`, () => HttpResponse.json(PRODUCTS)),
+        http.get(stockUrl(10), () => HttpResponse.json([{ productId: 100, available: 50 }, { productId: 101, available: 8 }])),
+        http.get(stockUrl(30), () => HttpResponse.json([{ productId: 101, available: 3 }])),
+      );
+      await renderPage();
+      await screen.findByText('#5');
+      await userEvent.click(screen.getByRole('button', { name: /Solicitar traslado/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Solicitar traslado' });
+      await chooseOption('Sucursal que lo recibe', 'Sucursal Norte');
+      await chooseOption('Sucursal que lo envía', 'Sede Central');
+      await vi.waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Producto' })).toBeEnabled());
+      await chooseOption('Producto', 'Tornillo');
+      expect(within(dialog).getByRole('combobox', { name: 'Producto' })).toHaveTextContent('Tornillo');
+      await chooseOption('Sucursal que lo envía', 'Sucursal Sur');
+      await vi.waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Producto' })).not.toHaveTextContent('Tornillo'));
+    });
+
+    it('no deja pedir más de lo disponible en el origen y lo dice', async () => {
+      useSession('MANAGER', 20);
+      stub();
+      let called = false;
+      server.use(http.post(URL_T, () => ((called = true), HttpResponse.json({}))));
+      await renderPage();
+      await screen.findByText('#5');
+      await userEvent.click(screen.getByRole('button', { name: /Solicitar traslado/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Solicitar traslado' });
+      await chooseOption('Sucursal que lo envía', 'Sede Central');
+      await vi.waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Producto' })).toBeEnabled());
+      await chooseOption('Producto', 'Tuerca');
+      await userEvent.type(within(dialog).getByLabelText('Cantidad'), '9');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Solicitar traslado' }));
+      expect(await within(dialog).findByText('Solo hay 8 disponibles en el origen.')).toBeInTheDocument();
+      expect(called).toBe(false);
+    });
+
+    it('si no se puede consultar la existencia del origen, ofrece todos los productos y avisa', async () => {
+      useSession('MANAGER', 20);
+      stub();
+      server.use(http.get(stockUrl(10), () => HttpResponse.json(apiErrorBody(500, 'INTERNAL_ERROR', 'Falla'), { status: 500 })));
+      await renderPage();
+      await screen.findByText('#5');
+      await userEvent.click(screen.getByRole('button', { name: /Solicitar traslado/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Solicitar traslado' });
+      await chooseOption('Sucursal que lo envía', 'Sede Central');
+      expect(await within(dialog).findByText(/No se pudo consultar lo disponible en el origen/)).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Producto' }));
+      expect(screen.getAllByRole('option')).toHaveLength(2);
+    });
+
     it('sin sucursal, producto ni cantidad no envía y señala cada dato', async () => {
       useSession('MANAGER', 20);
       stub();
@@ -590,8 +689,9 @@ it('resume varios productos como "Tornillo +1"', async () => {
       await userEvent.click(screen.getByRole('button', { name: /Solicitar traslado/ }));
       const dialog = screen.getByRole('dialog', { name: 'Solicitar traslado' });
       await chooseOption('Sucursal que lo envía', 'Sede Central');
+      await vi.waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Producto' })).toBeEnabled());
       await chooseOption('Producto', 'Tornillo');
-      await userEvent.type(within(dialog).getByLabelText('Cantidad'), '999');
+      await userEvent.type(within(dialog).getByLabelText('Cantidad'), '49'); // dentro de lo disponible (50): el rechazo lo decide el servidor
       await userEvent.click(within(dialog).getByRole('button', { name: 'Solicitar traslado' }));
       expect(await within(dialog).findByRole('alert')).toHaveTextContent('Stock insuficiente');
       expect(screen.getByRole('dialog', { name: 'Solicitar traslado' })).toBeInTheDocument();

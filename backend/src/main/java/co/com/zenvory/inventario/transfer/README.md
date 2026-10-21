@@ -93,6 +93,7 @@ Además `requireSide` limita por sucursal (ver arriba).
 | Ruta | Para qué |
 |---|---|
 | `POST /` | Solicitar traslado |
+| `GET /inventory/branches/{origen}/availability` | (módulo `inventory`) Lo que el origen tiene disponible: la pantalla de solicitud solo ofrece esos productos y limita la cantidad |
 | `POST /{id}/approve-destination` | Aprobar en destino (ADMIN, MANAGER) |
 | `POST /{id}/prepare` | Autorizar salida (ADMIN, MANAGER) |
 | `POST /{id}/dispatch` | Despachar (la sucursal de origen) |

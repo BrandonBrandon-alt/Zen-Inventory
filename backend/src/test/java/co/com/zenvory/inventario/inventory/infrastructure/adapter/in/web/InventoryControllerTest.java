@@ -68,6 +68,22 @@ class InventoryControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/v1/inventory/branches/2/availability: solo productos con existencia disponible, sin precios")
+    void getAvailability_onlyProductsWithAvailableStock() throws Exception {
+        when(inventoryUseCase.getInventoryByBranch(2L)).thenReturn(java.util.List.of(
+                LocalInventory.builder().branchId(2L).productId(10L).currentQuantity(new BigDecimal("50")).committedQuantity(new BigDecimal("20")).build(),
+                LocalInventory.builder().branchId(2L).productId(11L).currentQuantity(new BigDecimal("5")).committedQuantity(new BigDecimal("5")).build(),
+                LocalInventory.builder().branchId(2L).productId(12L).currentQuantity(BigDecimal.ZERO).build()));
+
+        mockMvc.perform(get("/api/v1/inventory/branches/2/availability"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].productId").value(10))
+                .andExpect(jsonPath("$[0].available").value(30))
+                .andExpect(jsonPath("$[0].precioVenta").doesNotExist());
+    }
+
+    @Test
     @DisplayName("GET /api/v1/inventory/branches/1/products/1: returns 200")
     void getInventory_returns200() throws Exception {
         LocalInventory inventory = LocalInventory.builder()

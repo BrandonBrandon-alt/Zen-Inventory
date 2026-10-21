@@ -38,10 +38,13 @@
           Agregar producto
         </button>
       </div>
+      @if (stockHint(); as hint) {
+        <p class="text-sm text-fg-muted" role="status">{{ hint }}</p>
+      }
       @for (row of form.controls.items.controls; track row; let i = $index) {
         <div class="grid items-start gap-3 sm:grid-cols-[3fr_1fr_auto]" [formGroupName]="i">
           <app-form-field [label]="i === 0 ? 'Producto' : 'Producto ' + (i + 1)" [error]="itemError(row, 'productId')">
-            <app-select formControlName="productId" [options]="productOptions(row)" [icon]="productIcon" searchable searchPlaceholder="Buscar por nombre o SKU…" placeholder="Selecciona un producto" />
+            <app-select formControlName="productId" [options]="productOptions(row)" [icon]="productIcon" [disabled]="productsDisabled()" searchable searchPlaceholder="Buscar por nombre o SKU…" [placeholder]="productPlaceholder()" />
           </app-form-field>
           <app-form-field label="Cantidad" [error]="itemError(row, 'quantity')">
             <input appInput type="number" min="1" step="1" inputmode="numeric" formControlName="quantity" />

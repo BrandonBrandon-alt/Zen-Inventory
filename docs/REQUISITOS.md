@@ -79,6 +79,7 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 | RF-12 | Consultar las existencias de cada producto por sucursal (cantidad actual, comprometida y disponible) | Todos | A | Implementado |
 | RF-13 | Registrar cada entrada o salida de stock como movimiento (kardex) con tipo, motivo, cantidad, saldo resultante, usuario y documento de origen | Sistema | A | Implementado |
 | RF-14 | Consultar el kardex de un producto en una sucursal | Todos | A | Implementado |
+| RF-62 | Poder filtrar el historial de movimientos (kardex) por uno o varios productos con un selector de varias opciones que incluye búsqueda dentro del propio campo | Todos | B | Implementado |
 | RF-15 | Permitir ajustes manuales de entrada o salida (merma, ajuste positivo o negativo) | ADMIN, MANAGER, OPERADOR | M | Implementado |
 | RF-16 | Definir el stock mínimo de un producto por sucursal | ADMIN, MANAGER | A | Implementado |
 | RF-17 | Convertir automáticamente a la unidad base los movimientos hechos en otra presentación | Sistema | M | Implementado |
@@ -113,6 +114,7 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 | RF-35 | Reporte de cumplimiento y analítica logística de traslados | ADMIN, MANAGER, OPERADOR | B | Implementado |
 | RF-59 | Registrar cada pago o abono del flete al transportista con monto, fecha, usuario, método y referencia, sin poder exceder el saldo, y conservar su historial; solo hay flete que pagar si el traslado ya se despachó con un costo de envío mayor que cero | ADMIN, MANAGER (sucursal de origen) | A | Implementado |
 | RF-60 | Mostrar el estado del flete de cada traslado (sin flete, por pagar, con abono, pagado) con su saldo, y resumir cuánto se debe a transportistas | Quienes ven traslados | M | Implementado |
+| RF-61 | Al pedir un traslado, ofrecer solo los productos que la sucursal de origen tiene disponibles (existencia menos lo comprometido), mostrando la cantidad, y no dejar pedir más de lo disponible; el consumo no revela precios ni costos del origen | ADMIN, MANAGER, OPERADOR | M | Implementado |
 
 ### 3.7 Compras a proveedores
 
@@ -228,9 +230,9 @@ Se declara para no presentar como hecho lo que no lo está:
 | Pantalla (ruta) | Roles | Requisitos |
 |---|---|---|
 | Panel (`/dashboard`) | Todos | RF-47, RF-48 |
-| Inventario (`/inventory`) | Todos | RF-12 a RF-18 |
+| Inventario (`/inventory`) | Todos | RF-12 a RF-18, RF-62 |
 | Alertas (`/alerts`) | ADMIN, MANAGER, OPERADOR | RF-43 a RF-46 |
-| Traslados (`/transfers`) | ADMIN, MANAGER, OPERADOR | RF-28 a RF-35, RF-59, RF-60 |
+| Traslados (`/transfers`) | ADMIN, MANAGER, OPERADOR | RF-28 a RF-35, RF-59 a RF-61 |
 | Compras (`/purchases`) | ADMIN, MANAGER, OPERADOR | RF-36 a RF-42, RF-56, RF-57 |
 | Ventas (`/sales/pos`) | Todos | RF-19 a RF-22, RF-25, RF-58 |
 | Historial Ventas (`/sales/history`) | Todos | RF-23, RF-24, RF-58 |

@@ -1,13 +1,15 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, model, output, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormArray, FormControl, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { type AbstractControl, FormArray, FormControl, NonNullableFormBuilder, ReactiveFormsModule, type ValidationErrors, Validators } from '@angular/forms';
 import { LucidePackage, LucidePlus, LucideStore, LucideTrash2 } from '@lucide/angular';
+import { type Observable, catchError, map, of, switchMap, tap } from 'rxjs';
 import { toApiError } from '@core/api/api-error';
 import type { BranchOption } from '@core/branches/branch-options-api';
 import type { ProductOption } from '@core/catalog/catalog-options-api';
 import { NotificationService } from '@core/notifications/notification.service';
 import { applyServerErrors } from '@shared/forms/apply-server-errors';
 import { controlError } from '@shared/forms/control-error';
+import { formatQuantity } from '@shared/format/format';
 import { Alert } from '@shared/ui/alert/alert';
 import { Button } from '@shared/ui/button/button';
 import { DatePicker } from '@shared/ui/date-picker/date-picker';
@@ -29,13 +31,35 @@ const PRIORITIES: readonly SelectOption<TransferPriority>[] = (['HIGH', 'NORMAL'
 
 let nextId = 0;
 
-function itemGroup(fb: NonNullableFormBuilder) {
-  return fb.group({
-    productId: new FormControl<number | null>(null, Validators.required),
-    quantity: new FormControl<number | null>(null, [Validators.required, Validators.min(1), Validators.pattern(/^\d+$/)]),
-  });
+/** Existencia disponible en el origen elegido: `idle` sin origen, `loading` mientras se consulta, `error` si falló. */
+type StockState =
+  | { readonly status: 'idle' | 'loading' | 'error' }
+  | { readonly status: 'ready'; readonly byProduct: ReadonlyMap<number, number> };
+
+/** La cantidad pedida no puede pasar de lo disponible en el origen (el servidor también lo valida). */
+function withinStock(stock: () => StockState) {
+  return (group: AbstractControl): ValidationErrors | null => {
+    const state = stock();
+    const productId = group.get('productId')?.value as number | null;
+    const quantity = group.get('quantity')?.value as number | null;
+    if (state.status !== 'ready' || productId === null || quantity === null) return null;
+    const available = state.byProduct.get(productId);
+    return available !== undefined && quantity > available ? { exceedsStock: { available } } : null;
+  };
+}
+
+function itemGroup(fb: NonNullableFormBuilder, stock: () => StockState) {
+  return fb.group(
+    {
+      productId: new FormControl<number | null>(null, Validators.required),
+      quantity: new FormControl<number | null>(null, [Validators.required, Validators.min(1), Validators.pattern(/^\d+$/)]),
+    },
+    { validators: withinStock(stock) },
+  );
 }
 type ItemGroup = ReturnType<typeof itemGroup>;
+
+const HINT_NO_STOCK = 'Esa sucursal no tiene productos disponibles para enviar.';
 
 /**
  * Solicitud de traslado: se pide mercancía de otra sucursal (origen) hacia la propia (destino).
@@ -79,6 +103,29 @@ export class TransferRequestModal {
 
   private readonly destination = signal<number | null>(null);
   private readonly origin = signal<number | null>(null);
+  protected readonly stock = signal<StockState>({ status: 'idle' });
+
+  /** Mientras no hay un origen con su existencia a la vista no se puede elegir producto. */
+  protected readonly productsDisabled = computed(() => {
+    const status = this.stock().status;
+    return status === 'idle' || status === 'loading';
+  });
+  protected readonly productPlaceholder = computed(() => {
+    switch (this.stock().status) {
+      case 'idle':
+        return 'Elige primero la sucursal que lo envía';
+      case 'loading':
+        return 'Consultando existencias…';
+      default:
+        return 'Selecciona un producto';
+    }
+  });
+  /** Aviso bajo la lista de productos: el origen no tiene qué enviar, o no se pudo consultar. */
+  protected readonly stockHint = computed<string | null>(() => {
+    const state = this.stock();
+    if (state.status === 'error') return 'No se pudo consultar lo disponible en el origen; se muestran todos los productos y el servidor validará la cantidad.';
+    return state.status === 'ready' && state.byProduct.size === 0 ? HINT_NO_STOCK : null;
+  });
 
   protected readonly destinationLocked = computed(() => this.ownBranchId() !== null);
 
@@ -93,16 +140,21 @@ export class TransferRequestModal {
       .map((b) => ({ value: b.id, label: b.nombre })),
   );
 
-  /** Un producto ya pedido en otra fila no se ofrece otra vez. */
+  /**
+   * Solo los productos que el origen tiene disponibles, con su cantidad. Un producto ya pedido en otra fila no se ofrece
+   * otra vez. Si no se pudo consultar la existencia se ofrecen todos (el servidor valida igualmente).
+   */
   protected productOptions(row: ItemGroup): SelectOption<number>[] {
+    const state = this.stock();
+    if (state.status === 'idle' || state.status === 'loading') return [];
     const own = row.controls.productId.value;
     const taken = new Set(this.form.controls.items.controls.map((g) => g.controls.productId.value));
-    return this.products().map((p) => ({
-      value: p.id,
-      label: p.nombre,
-      description: p.sku || undefined,
-      disabled: p.id !== own && taken.has(p.id),
-    }));
+    return this.products().flatMap((p): SelectOption<number>[] => {
+      const available = state.status === 'ready' ? state.byProduct.get(p.id) : undefined;
+      if (state.status === 'ready' && available === undefined) return [];
+      const stockText = available === undefined ? '' : `${formatQuantity(available)} ${p.unit}`.trim() + ' disponibles';
+      return [{ value: p.id, label: p.nombre, description: [p.sku, stockText].filter(Boolean).join(' · ') || undefined, disabled: p.id !== own && taken.has(p.id) }];
+    });
   }
 
   /** Mínimo de la fecha estimada: el momento en que se abre el formulario (el servidor no acepta fechas pasadas). */
@@ -118,11 +170,36 @@ export class TransferRequestModal {
         this.now.set(new Date());
         this.destination.set(own);
         this.origin.set(null);
+        this.stock.set({ status: 'idle' });
         this.addItem();
         this.serverError.set(null);
       });
     });
-    this.form.controls.originBranchId.valueChanges.pipe(takeUntilDestroyed()).subscribe((id) => this.origin.set(id));
+    // Al cambiar el origen se consulta lo que tiene disponible y se sueltan los productos que ya no se pueden pedir.
+    this.form.controls.originBranchId.valueChanges
+      .pipe(
+        tap((id) => {
+          this.origin.set(id);
+          this.stock.set({ status: id === null ? 'idle' : 'loading' });
+        }),
+        switchMap((id): Observable<StockState> =>
+          id === null
+            ? of({ status: 'idle' })
+            : this.api.availability(id).pipe(
+                map((byProduct): StockState => ({ status: 'ready', byProduct })),
+                catchError((): Observable<StockState> => of({ status: 'error' })),
+              ),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((state) => {
+        this.stock.set(state);
+        for (const row of this.form.controls.items.controls) {
+          const chosen = row.controls.productId.value;
+          if (state.status === 'ready' && chosen !== null && !state.byProduct.has(chosen)) row.controls.productId.reset(null);
+          row.updateValueAndValidity({ emitEvent: false });
+        }
+      });
     this.form.controls.destinationBranchId.valueChanges.pipe(takeUntilDestroyed()).subscribe((id) => this.destination.set(id));
     this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.serverError.set(null));
   }
@@ -132,11 +209,14 @@ export class TransferRequestModal {
   }
 
   protected itemError(row: ItemGroup, field: 'productId' | 'quantity'): string | null {
-    return controlError(row.controls[field], field === 'productId' ? REQUIRED_PRODUCT : QUANTITY);
+    const own = controlError(row.controls[field], field === 'productId' ? REQUIRED_PRODUCT : QUANTITY);
+    if (own || field !== 'quantity') return own;
+    const exceeds = row.errors?.['exceedsStock'] as { available: number } | undefined;
+    return exceeds && row.controls.quantity.touched ? `Solo hay ${formatQuantity(exceeds.available)} disponibles en el origen.` : null;
   }
 
   protected addItem(): void {
-    this.form.controls.items.push(itemGroup(this.fb));
+    this.form.controls.items.push(itemGroup(this.fb, () => this.stock()));
   }
 
   protected removeItem(index: number): void {
