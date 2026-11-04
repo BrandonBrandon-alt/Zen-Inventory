@@ -13,7 +13,8 @@ import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
 import { expectAccessible } from '@testing/a11y';
 import { ReturnsPage } from './returns-page';
 
-const item = (id: number, productoId: number, cantidad: number, precio: number, motivo = '') => ({ id, productoId, cantidad, motivoEspecifico: motivo, precioUnidadVenta: precio });
+// En la venta #60 de los datos de prueba, el id de cada línea coincide con el de su producto.
+const item = (id: number, productoId: number, cantidad: number, precio: number, motivo = '') => ({ id, detalleVentaId: productoId, productoId, cantidad, motivoEspecifico: motivo, precioUnidadVenta: precio });
 const request = (id: number, estado: string, extra: object = {}) => ({
   id,
   saleId: 50 + id,
@@ -55,8 +56,8 @@ const SALES = [
     totalFinal: 1000,
     globalDiscountPercentage: 20,
     details: [
-      { id: 3, productId: 1, productName: 'Tornillo', quantity: 1, unitPriceApplied: 1000, discountPercentage: 10, subtotalLine: 900 },
       { id: 4, productId: 1, productName: 'Tornillo', quantity: 1, unitPriceApplied: 800, discountPercentage: 0, subtotalLine: 800 },
+      { id: 3, productId: 1, productName: 'Tornillo', quantity: 1, unitPriceApplied: 1000, discountPercentage: 10, subtotalLine: 900 },
     ],
   },
   { id: 61, date: '2026-10-14T10:00:00', status: 'CANCELED', branchId: 10, customerName: 'Anulada', totalFinal: 100, details: [] },
@@ -420,24 +421,26 @@ describe('ReturnsPage', () => {
       expect(await within(dialog).findByText('Es más de lo que queda por devolver.')).toBeInTheDocument();
     });
 
-    it('el precio pagado incluye los descuentos (de la línea y el general) y promedia las líneas repetidas del producto', async () => {
+    it('un producto repetido en la venta se devuelve por línea, cada una al precio que se pagó en ella', async () => {
       useSession('SELLER', 10);
       stub();
-      let body: { items?: { unitPricePaid: number }[] } = {};
+      let body: { items?: unknown[] } = {};
       server.use(http.post(URL_R, async ({ request: req }) => ((body = (await req.json()) as typeof body), HttpResponse.json(request(20, 'PENDIENTE'), { status: 201 }))));
       await renderPage();
       const dialog = await open();
       await chooseOption('Venta', 'Venta #62');
-      await userEvent.clear(within(dialog).getByLabelText('Unidades a devolver de Tornillo'));
-      await userEvent.type(within(dialog).getByLabelText('Unidades a devolver de Tornillo'), '1');
-      await userEvent.type(within(dialog).getByLabelText('Motivo de la devolución de Tornillo'), 'Rayado');
+      expect(within(dialog).getByLabelText('Unidades a devolver de Tornillo · línea 1')).toHaveValue(0);
+      // Línea 2: 800 × (1 − 20 % de descuento general) = 640. El promedio con la otra línea daría 680.
+      expect(within(dialog).getByText(/640 c\/u/)).toBeInTheDocument();
+      await userEvent.clear(within(dialog).getByLabelText('Unidades a devolver de Tornillo · línea 2'));
+      await userEvent.type(within(dialog).getByLabelText('Unidades a devolver de Tornillo · línea 2'), '1');
       await userEvent.type(within(dialog).getByLabelText('Motivo general'), 'Defecto');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Solicitar devolución' }));
-      // (900 + 800) × (1 − 20 %) = 1.360 por 2 unidades.
-      await vi.waitFor(() => expect(body.items?.[0]?.unitPricePaid).toBe(680));
+      // Las líneas se numeran por su id, en cualquier orden que las traiga la API. El precio lo fija el servidor.
+      await vi.waitFor(() => expect(body.items).toEqual([{ saleDetailId: 4, quantity: 1 }]));
     });
 
-    it('envía la solicitud con solo los productos que se devuelven, el motivo y el precio pagado', async () => {
+    it('envía la solicitud con solo los productos que se devuelven y el motivo', async () => {
       useSession('SELLER', 10);
       stub();
       let body: Record<string, unknown> = {};
@@ -456,7 +459,7 @@ describe('ReturnsPage', () => {
           branchId: 10,
           requesterId: 9,
           generalReason: 'Producto defectuoso',
-          items: [{ productId: 1, quantity: 2, reasonSpecific: 'Rayado', unitPricePaid: 1000 }],
+          items: [{ saleDetailId: 1, quantity: 2, reasonSpecific: 'Rayado' }],
         }),
       );
       expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ message: 'Devolución #20 solicitada: espera la decisión de un gerente.' });

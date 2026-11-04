@@ -32,12 +32,6 @@ public class ProductUnit {
      */
     private BigDecimal conversionFactor;
 
-    /**
-     * Determina si esta presentación es la referencia base para el control de inventario.
-     * Solo debe existir una unidad base por producto.
-     */
-    private Boolean isBase;
-
     /** Nombre de la unidad (enriquecido para visualización). */
     private String unitName;
     

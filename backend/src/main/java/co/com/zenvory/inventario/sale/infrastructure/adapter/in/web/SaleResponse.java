@@ -33,7 +33,8 @@ public record SaleResponse(
             Integer quantity,
             BigDecimal unitPriceApplied,
             BigDecimal discountPercentage,
-            BigDecimal subtotalLine
+            BigDecimal subtotalLine,
+            Long priceListId
     ) {}
 
     public static SaleResponse fromDomain(Sale sale) {
@@ -61,7 +62,8 @@ public record SaleResponse(
                         d.getQuantity(),
                         d.getUnitPriceApplied(),
                         d.getDiscountPercentage(),
-                        d.getSubtotalLine()
+                        d.getSubtotalLine(),
+                        d.getPriceListId()
                 )).toList()
         );
     }

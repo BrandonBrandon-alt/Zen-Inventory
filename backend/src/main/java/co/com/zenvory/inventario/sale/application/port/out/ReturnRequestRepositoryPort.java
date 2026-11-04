@@ -11,6 +11,8 @@ import java.util.Optional;
 public interface ReturnRequestRepositoryPort {
     ReturnRequest save(ReturnRequest request);
     Optional<ReturnRequest> findById(Long id);
+    /** Lee la solicitud bloqueando su fila hasta el fin de la transacción: serializa quienes la aprueban o rechazan. */
+    Optional<ReturnRequest> findByIdForUpdate(Long id);
     List<ReturnRequest> findByBranchId(Long branchId);
     List<ReturnRequest> findBySaleId(Long saleId);
     List<ReturnRequest> findBySaleIdAndStatus(Long saleId, ReturnRequestStatus status);

@@ -16,7 +16,6 @@ import java.math.BigDecimal;
  * @param nombreUnidad Nombre descriptivo de la unidad.
  * @param abreviaturaUnidad Símbolo técnico de la unidad.
  * @param factorConversion Coeficiente respecto a la unidad base.
- * @param esBase Indica si es la unidad principal de inventario.
  */
 @Builder
 public record ProductUnitResponse(
@@ -25,7 +24,6 @@ public record ProductUnitResponse(
         Long unidadId,
         String nombreUnidad,
         String abreviaturaUnidad,
-        BigDecimal factorConversion,
-        Boolean esBase
+        BigDecimal factorConversion
 ) {}
 

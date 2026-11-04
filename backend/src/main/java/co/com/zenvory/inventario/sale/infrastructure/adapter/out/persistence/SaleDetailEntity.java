@@ -22,6 +22,9 @@ public class SaleDetailEntity {
     @Column(name = "producto_nombre")
     private String productName;
 
+    @Column(name = "lista_precios_id")
+    private Long priceListId;
+
     @Column(name = "cantidad", nullable = false)
     private Integer quantity;
 
@@ -44,6 +47,9 @@ public class SaleDetailEntity {
 
     public Long getProductId() { return productId; }
     public void setProductId(Long productId) { this.productId = productId; }
+
+    public Long getPriceListId() { return priceListId; }
+    public void setPriceListId(Long priceListId) { this.priceListId = priceListId; }
 
     public String getProductName() { return productName; }
     public void setProductName(String productName) { this.productName = productName; }

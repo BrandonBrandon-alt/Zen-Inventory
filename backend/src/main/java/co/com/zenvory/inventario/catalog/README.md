@@ -20,7 +20,7 @@ Agrupa tres sub-áreas, cada una con su controller/use case/service:
 |---|---|
 | `producto` | `sku` (único), `nombre`, `costo_promedio`, `precio_venta`, `unidad_id` (unidad base), `activa` |
 | `unidad_medida` | `nombre`, `abreviatura` |
-| `producto_unidad` | Presentaciones de un producto: `factor_conversion`, `es_base`. Único por (producto, unidad). Ej.: base «unidad» y «caja» con factor 12 → 1 caja = 12 unidades |
+| `producto_unidad` | Presentaciones **alternas** de un producto: `factor_conversion`. Único por (producto, unidad). Ej.: base «unidad» y «caja» con factor 12 → 1 caja = 12 unidades. La unidad base no va aquí: es `producto.unidad_id` |
 | `proveedor` | `nombre`, `contacto`, `tiempo_entrega_dias` |
 | `producto_proveedor` | Qué proveedor vende qué producto: `sku_proveedor`, `precio_pactado`, `tiempo_entrega_dias`, `preferido`. Único por (producto, proveedor) |
 
@@ -72,7 +72,9 @@ el costo**: evita pisar ediciones simultáneas de precio o nombre.
 
 ### Unidad base y presentaciones
 El stock siempre se guarda en la **unidad base** del producto. Si se mueve mercancía reportada en otra unidad
-(«cajas»), `InventoryService` la convierte con el `factor_conversion` de `producto_unidad`.
+(«cajas»), `InventoryService` la convierte con el `factor_conversion` de `producto_unidad`. La unidad base es solo
+`producto.unidad_id`: `UnitOfMeasureService` rechaza agregarla como presentación, y `ProductService` no deja cambiarla
+si el producto ya tiene presentaciones, stock, movimientos o compras en esa unidad.
 
 ### Borrado lógico
 Un producto con historial (ventas, kardex) no se borra: se marca `activa=false`.

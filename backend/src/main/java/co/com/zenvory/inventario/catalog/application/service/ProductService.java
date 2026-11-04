@@ -100,6 +100,11 @@ public class ProductService implements ProductUseCase {
             throw new DuplicateSkuException(newSku);
         }
 
+        // Las presentaciones, el stock y los movimientos están expresados en la unidad base: cambiarla los reinterpretaría.
+        if (product.getUnitId() != null && !product.getUnitId().equals(existing.getUnitId()) && productRepositoryPort.isBaseUnitInUse(id)) {
+            throw new IllegalArgumentException("No se puede cambiar la unidad base: el producto ya tiene presentaciones, stock o movimientos en esa unidad.");
+        }
+
         existing.setSku(newSku);
         existing.setName(product.getName());
         // El costo promedio lo calcula el sistema con cada compra: editar el producto sin enviarlo (o con otro

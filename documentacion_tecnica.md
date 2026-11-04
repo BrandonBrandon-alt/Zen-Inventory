@@ -237,8 +237,8 @@ classDiagram
         +create() Sale
         +cancel(reason)
         +markAsReturned()
-        +effectiveUnitPaid(productId) BigDecimal
-        +soldUnits(productId) int
+        +effectiveUnitPaid(line) BigDecimal
+        +findLine(saleDetailId) Optional~SaleDetail~
     }
     class SaleDetail {
         +Long productId

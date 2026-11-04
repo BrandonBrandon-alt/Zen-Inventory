@@ -200,6 +200,7 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
                 detailEntity.setId(detail.getId());
                 detailEntity.setProductId(detail.getProductId());
                 detailEntity.setProductName(detail.getProductName());
+                detailEntity.setPriceListId(detail.getPriceListId());
                 detailEntity.setQuantity(detail.getQuantity());
                 detailEntity.setUnitPriceApplied(detail.getUnitPriceApplied());
                 detailEntity.setDiscountPercentage(detail.getDiscountPercentage());
@@ -232,7 +233,8 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
                         d.getProductName(),
                         d.getQuantity(),
                         d.getUnitPriceApplied(),
-                        d.getDiscountPercentage()
+                        d.getDiscountPercentage(),
+                        d.getPriceListId()
                 )).collect(Collectors.toList())
         );
     }

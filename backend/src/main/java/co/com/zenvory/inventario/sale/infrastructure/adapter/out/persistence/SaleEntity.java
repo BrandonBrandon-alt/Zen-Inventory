@@ -62,6 +62,8 @@ public class SaleEntity {
     @Column(name = "vendedor_nombre")
     private String userName;
 
+    // Orden estable: las devoluciones nombran las líneas por su posición en la venta.
+    @OrderBy("id")
     @OneToMany(mappedBy = "sale", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SaleDetailEntity> details = new ArrayList<>();
 

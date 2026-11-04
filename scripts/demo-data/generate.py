@@ -36,7 +36,6 @@ TABLES_WITH_OFFSETS = (
     "producto_proveedor",
     "producto_unidad",
     "precio_por_lista",
-    "rutas_logisticas",
 )
 
 REASONS_CANCEL = [
@@ -125,6 +124,7 @@ class Sim:
         self.branches = list(C.BRANCH_SIZE)
         self.total_stock: dict[int, float] = defaultdict(float)
         self.suppliers_of: dict[int, list[tuple[int, float, bool]]] = {}
+        self.line_requested: dict[int, int] = defaultdict(int)  # línea de venta -> unidades devueltas o pendientes
         self.open_orders: dict[tuple[int, int], int] = {}
         self.customers: list[tuple[str, str]] = []
         self._build_people()
@@ -389,20 +389,25 @@ class Sim:
         if sale["status"] != "COMPLETED":
             return
         rng = self.rng
-        lines = rng.sample(sale["lines"], k=min(len(sale["lines"]), rng.choice([1, 1, 2])))
+        # Como en la aplicación, de cada línea solo se puede pedir lo que no se devolvió ni espera decisión.
+        returnable = [line for line in sale["lines"] if line[3] > self.line_requested[line[0]]]
+        if not returnable:
+            return
+        lines = rng.sample(returnable, k=min(len(returnable), rng.choice([1, 1, 2])))
         rid = self.next_id("solicitudes_devolucion")
         requester = rng.choice(self.staff[sale["branch"]]["seller"])
         detail = []
-        for _id, _sid, p, qty, price, disc, line_total, _nm in lines:
-            units = rng.randint(1, max(1, min(qty, 5)))
+        for line_id, _sid, p, qty, price, disc, line_total, _nm in lines:
+            units = rng.randint(1, min(qty - self.line_requested[line_id], 5))
+            self.line_requested[line_id] += units
             paid = money(line_total / qty * (1 - sale["global"] / 100))
-            detail.append((self.next_id("detalles_devolucion_solicitud"), rid, p, units, rng.choice(REASONS_RETURN), paid))
+            detail.append((self.next_id("detalles_devolucion_solicitud"), rid, line_id, p, units, rng.choice(REASONS_RETURN), paid))
         req = {"id": rid, "sale": sale_id, "branch": sale["branch"], "requester": requester.id, "approver": None, "status": "PENDIENTE", "ts": ts,
                "done": None, "reason": rng.choice(REASONS_RETURN), "comment": None, "lines": detail, "alert": None}
         self.returns[rid] = req
         self.rows["solicitudes_devolucion"].append(req)
         self.rows["detalles_devolucion_solicitud"].extend(detail)
-        req["alert"] = self.alert(ts, sale["branch"], detail[0][2], f"Devolución solicitada de la venta #{sale_id}: {req['reason']}", "RETURN_REQUEST", rid)
+        req["alert"] = self.alert(ts, sale["branch"], detail[0][3], f"Devolución solicitada de la venta #{sale_id}: {req['reason']}", "RETURN_REQUEST", rid)
         self.schedule(ts + timedelta(hours=rng.randint(2, 120)), "decide_return", req=rid)
 
     def do_decide_return(self, ts: datetime, rid: int) -> None:
@@ -415,8 +420,11 @@ class Sim:
                    comment="Todo en orden, se devuelve al inventario" if approved else rng.choice(["Fuera del plazo de devolución", "El producto no tiene defecto", "Sin factura ni empaque original"]))
         if approved:
             sale["status"] = "RETURNED"
-            for _id, _rid, p, units, why, _paid in req["lines"]:
+            for _id, _rid, _line, p, units, why, _paid in req["lines"]:
                 self.move(ts, "INGRESO", "DEVOLUCION", units, p, req["branch"], manager.id, sale["id"], "DEVOLUCION", f"Devolución Aprobada Solicitud #{rid}: {why}")
+        else:
+            for _id, _rid, line_id, _p, units, _why, _paid in req["lines"]:
+                self.line_requested[line_id] -= units
         self.resolve_alert(req["alert"], ts, None)
 
     # ------------------------------------------------------------------ reposición

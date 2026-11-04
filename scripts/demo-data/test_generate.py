@@ -60,6 +60,28 @@ class DemoDataTest(unittest.TestCase):
         returned = {s["id"] for s in self.sim.rows["ventas"] if s["status"] == "RETURNED"}
         self.assertEqual(approved, returned)
 
+    def test_cada_devolucion_apunta_a_una_linea_de_su_venta_con_ese_producto(self):
+        lineas = {d[0]: d for d in self.sim.rows["detalles_venta"]}
+        ventas = {r["id"]: r["sale"] for r in self.sim.rows["solicitudes_devolucion"]}
+        self.assertTrue(self.sim.rows["detalles_devolucion_solicitud"])
+        for _id, solicitud, linea, producto, *_resto in self.sim.rows["detalles_devolucion_solicitud"]:
+            self.assertEqual(lineas[linea][1], ventas[solicitud])
+            self.assertEqual(lineas[linea][2], producto)
+
+    def test_no_se_devuelve_mas_de_lo_vendido_en_cada_linea(self):
+        cantidades = {d[0]: d[3] for d in self.sim.rows["detalles_venta"]}
+        rechazadas = {r["id"] for r in self.sim.rows["solicitudes_devolucion"] if r["status"] == "RECHAZADA"}
+        devueltas = Counter()
+        for _id, solicitud, linea, _producto, unidades, *_resto in self.sim.rows["detalles_devolucion_solicitud"]:
+            if solicitud not in rechazadas:
+                devueltas[linea] += unidades
+        for linea, unidades in devueltas.items():
+            self.assertLessEqual(unidades, cantidades[linea])
+
+    def test_cada_alerta_apunta_a_un_producto_que_existe(self):
+        for alerta in self.sim.rows["alertas_stock"]:
+            self.assertIn(alerta["prod"], self.sim.products)
+
     def test_cada_venta_trae_su_forma_de_pago(self):
         sales = self.sim.rows["ventas"]
         self.assertEqual({s["pay_method"] for s in sales} - {"EFECTIVO", "TARJETA", "TRANSFERENCIA", "OTRO"}, set())

@@ -41,6 +41,7 @@ class SaleServiceTest {
     private SaleRepositoryPort repo;
     private InventoryUseCase inventory;
     private ProductUseCase products;
+    private PriceListUseCase priceLists;
     private SaleService service;
     private Sale sale;
 
@@ -49,12 +50,13 @@ class SaleServiceTest {
         repo = mock(SaleRepositoryPort.class);
         inventory = mock(InventoryUseCase.class);
         products = mock(ProductUseCase.class);
+        priceLists = mock(PriceListUseCase.class);
         BranchUseCase branches = mock(BranchUseCase.class);
         UserRepositoryPort users = mock(UserRepositoryPort.class);
-        service = new SaleService(repo, products, inventory, branches, users, mock(PriceListUseCase.class), mock(AlertUseCase.class));
+        service = new SaleService(repo, products, inventory, branches, users, priceLists, mock(AlertUseCase.class));
 
         sale = Sale.create(1L, "Sede", 2L, "Vendedora", "C", "1", SalePaymentMethod.EFECTIVO, null, BigDecimal.ZERO,
-                List.of(SaleDetail.create(5L, "P", 2, new BigDecimal("10"), BigDecimal.ZERO)));
+                List.of(SaleDetail.create(5L, "P", 2, new BigDecimal("10"), BigDecimal.ZERO, null)));
         when(repo.findByIdForUpdate(7L)).thenReturn(Optional.of(sale));
         when(repo.save(any())).thenAnswer(i -> i.getArgument(0));
         when(branches.getBranchById(1L)).thenReturn(Branch.builder().id(1L).name("Sede").build());
@@ -90,6 +92,38 @@ class SaleServiceTest {
     void canceledCannotBeReturned() {
         service.cancelSale(7L, "x", null, 9L);
         assertThatThrownBy(() -> service.updateSaleStatus(7L, SaleStatus.RETURNED)).isInstanceOf(InvalidSaleStateException.class);
+    }
+
+    private CreateSaleCommand commandWithList(Long globalList, Long lineList) {
+        when(products.getProductById(5L)).thenReturn(Product.builder().id(5L).name("P").salePrice(new BigDecimal("100")).active(true).build());
+        return new CreateSaleCommand(1L, 9L, "C", "1", SalePaymentMethod.EFECTIVO, null, null, globalList,
+                List.of(new CreateSaleCommand.Detail(5L, 1, null, lineList)));
+    }
+
+    @Test
+    @DisplayName("la línea guarda la lista de la que salió su precio (la de la línea manda sobre la global)")
+    void lineRemembersItsPriceList() {
+        when(priceLists.getPriceForProduct(3L, 5L)).thenReturn(Optional.of(new BigDecimal("80")));
+        SaleDetail line = service.execute(commandWithList(2L, 3L)).getDetails().get(0);
+        assertThat(line.getUnitPriceApplied()).isEqualByComparingTo("80");
+        assertThat(line.getPriceListId()).isEqualTo(3L);
+    }
+
+    @Test
+    @DisplayName("sin precio en la lista se vende al precio base y la línea no queda atribuida a esa lista")
+    void basePriceHasNoPriceList() {
+        when(priceLists.getPriceForProduct(2L, 5L)).thenReturn(Optional.empty());
+        SaleDetail line = service.execute(commandWithList(2L, null)).getDetails().get(0);
+        assertThat(line.getUnitPriceApplied()).isEqualByComparingTo("100");
+        assertThat(line.getPriceListId()).isNull();
+    }
+
+    @Test
+    @DisplayName("la respuesta de la venta informa la lista de cada línea")
+    void responseExposesPriceList() {
+        when(priceLists.getPriceForProduct(2L, 5L)).thenReturn(Optional.of(new BigDecimal("80")));
+        var response = co.com.zenvory.inventario.sale.infrastructure.adapter.in.web.SaleResponse.fromDomain(service.execute(commandWithList(2L, null)));
+        assertThat(response.details().get(0).priceListId()).isEqualTo(2L);
     }
 
     @Test

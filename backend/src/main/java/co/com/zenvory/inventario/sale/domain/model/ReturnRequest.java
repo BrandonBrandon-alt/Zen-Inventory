@@ -1,5 +1,6 @@
 package co.com.zenvory.inventario.sale.domain.model;
 
+import co.com.zenvory.inventario.sale.domain.exception.InvalidReturnOperationException;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -62,7 +63,7 @@ public class ReturnRequest {
      */
     public void approve(Long managerId, String comment) {
         if (this.status != ReturnRequestStatus.PENDIENTE) {
-            throw new IllegalStateException("Solo se pueden aprobar solicitudes en estado PENDIENTE.");
+            throw new InvalidReturnOperationException("Solo se pueden aprobar solicitudes en estado PENDIENTE.");
         }
         this.status = ReturnRequestStatus.APROBADA;
         this.approverId = managerId;
@@ -75,7 +76,7 @@ public class ReturnRequest {
      */
     public void reject(Long managerId, String reason) {
         if (this.status != ReturnRequestStatus.PENDIENTE) {
-            throw new IllegalStateException("Solo se pueden rechazar solicitudes en estado PENDIENTE.");
+            throw new InvalidReturnOperationException("Solo se pueden rechazar solicitudes en estado PENDIENTE.");
         }
         if (reason == null || reason.isBlank()) {
             throw new IllegalArgumentException("Debe proporcionar un motivo para el rechazo.");

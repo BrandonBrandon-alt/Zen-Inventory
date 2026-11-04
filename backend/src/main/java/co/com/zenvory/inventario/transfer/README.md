@@ -18,8 +18,9 @@ luego se **despacha** (sale de verdad) y por último se **recibe** (entra al des
 | `pagos_traslado` | **Un pago o abono del flete por fila** (migración V7): `traslado_id`, `monto`, `fecha`, `usuario_id` + `usuario_nombre`, `metodo`, `referencia`, `notas`. Inmutable. Los traslados anteriores quedan «por pagar» |
 | `detalles_transferencia` | `producto_id`, `producto_nombre`, `cantidad_solicitada`, `cantidad_enviada`, `cantidad_recibida`, `faltantes` |
 
-FKs: origen y destino → `sucursal`; `parent_transfer_id` → `transferencias` (auto-referencia); líneas → `producto` y
-`transferencias` (cascada).
+FKs: origen y destino → `sucursal` (la base exige que sean distintas); `parent_transfer_id` → `transferencias`
+(auto-referencia); `solicitante_id`, `autorizador_id`, `despachador_id`, `recibidor_id` y `resolutor_id` → `usuario`;
+líneas → `producto` y `transferencias` (cascada).
 
 ## Máquina de estados (`TransferStatus`)
 

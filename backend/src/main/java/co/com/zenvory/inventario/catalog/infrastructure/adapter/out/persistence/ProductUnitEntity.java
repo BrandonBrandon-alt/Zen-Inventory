@@ -45,11 +45,6 @@ public class ProductUnitEntity {
     @Builder.Default
     private BigDecimal conversionFactor = BigDecimal.ONE;
 
-    /** Indica si esta unidad específica es la referencia base para el inventario. */
-    @Column(name = "es_base")
-    @Builder.Default
-    private Boolean isBase = false;
-
     /** 
      * Mapea esta entidad de persistencia al modelo de dominio puro {@link ProductUnit}.
      * 
@@ -61,7 +56,6 @@ public class ProductUnitEntity {
                 .productId(this.productId)
                 .unitId(this.unitId)
                 .conversionFactor(this.conversionFactor)
-                .isBase(this.isBase)
                 .build();
     }
 
@@ -77,7 +71,6 @@ public class ProductUnitEntity {
                 .productId(productUnit.getProductId())
                 .unitId(productUnit.getUnitId())
                 .conversionFactor(productUnit.getConversionFactor())
-                .isBase(productUnit.getIsBase())
                 .build();
     }
 }

@@ -179,7 +179,6 @@ public class UnitOfMeasureController {
                 .productId(productId)
                 .unitId(req.unidadId())
                 .conversionFactor(req.factorConversion())
-                .isBase(req.esBase())
                 .build();
     }
 
@@ -194,7 +193,6 @@ public class UnitOfMeasureController {
                 .nombreUnidad(pu.getUnitName())
                 .abreviaturaUnidad(pu.getUnitAbbreviation())
                 .factorConversion(pu.getConversionFactor())
-                .esBase(pu.getIsBase())
                 .build();
     }
 }

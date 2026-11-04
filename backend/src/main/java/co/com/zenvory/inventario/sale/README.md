@@ -16,9 +16,9 @@ Dos áreas en un mismo módulo:
 | Tabla | Qué guarda |
 |---|---|
 | `ventas` | Cabecera: `fecha`, `sucursal_id`, `usuario_id`, `subtotal`, `descuento_total`, `total_final`, `estado`, `motivo_anulacion`, `cliente_nombre`/`cliente_documento`, `metodo_pago` (EFECTIVO, TARJETA, TRANSFERENCIA, OTRO) y `referencia_pago` (migración V6; **nulos en las ventas anteriores**, que se muestran como «Sin registrar»), `global_discount_percentage`, y la "foto" `sucursal_nombre` + `vendedor_nombre` |
-| `detalles_venta` | Líneas: `producto_id`, `producto_nombre` (foto), `cantidad`, `precio_unitario_aplicado`, `porcentaje_descuento`, `subtotal_linea` |
+| `detalles_venta` | Líneas: `producto_id`, `lista_precios_id` (de qué lista salió el precio; vacío si fue el precio base), `producto_nombre` (foto), `cantidad`, `precio_unitario_aplicado`, `porcentaje_descuento`, `subtotal_linea` |
 | `solicitudes_devolucion` | `venta_id`, `sucursal_id`, `solicitante_id`, `aprobador_id`, `estado`, `motivo_general`, `comentario_aprobador`, fechas |
-| `detalles_devolucion_solicitud` | Líneas: `producto_id`, `cantidad`, `motivo_especifico`, `precio_unidad_venta` |
+| `detalles_devolucion_solicitud` | Líneas: `detalle_venta_id` (la línea vendida que se devuelve; una FK compuesta exige que `producto_id` sea el de esa línea), `producto_id`, `cantidad`, `motivo_especifico`, `precio_unidad_venta` |
 
 Las líneas se borran en cascada con su cabecera. El «nombre» del producto, sucursal y vendedor se guarda como *foto*
 para que el historial no cambie si luego se renombran.
@@ -30,9 +30,9 @@ sale/
 ├── domain/
 │   ├── model/
 │   │   ├── Sale                 Venta. Sale.create(...) CALCULA subtotal, descuentos de línea, descuento global y
-│   │   │                        total. Métodos: cancel(motivo), markAsReturned(), effectiveUnitPaid(producto)
-│   │   │                        (lo realmente pagado por unidad, para devolver al precio correcto), soldUnits()
-│   │   ├── SaleDetail           Línea de venta (cantidad, precio aplicado, % descuento, subtotal)
+│   │   │                        total. Métodos: cancel(motivo), markAsReturned(), effectiveUnitPaid(línea)
+│   │   │                        (lo realmente pagado por unidad, para devolver al precio correcto), findLine(id)
+│   │   ├── SaleDetail           Línea de venta (cantidad, precio aplicado, lista de precios, % descuento, subtotal)
 │   │   ├── SaleStatus           COMPLETED | CANCELED | RETURNED
 │   │   ├── ReturnRequest        Solicitud de devolución (create / approve / reject)
 │   │   ├── ReturnRequestDetail  Línea de la solicitud
@@ -87,12 +87,14 @@ Si cualquier paso falla, **todo se revierte** (no queda una venta sin descontar 
 
 ## Flujo 3: devolución
 
-1. **Solicitar** (`createRequest`): bloquea la venta; verifica que sea de la sucursal indicada; suma lo ya devuelto o
-   pendiente por producto y comprueba que no se devuelva más de lo vendido (une líneas repetidas); fija el precio
-   con lo **realmente pagado** (con descuentos), no el de lista. Estado `PENDIENTE`.
-2. **Aprobar** (`approveRequest`, MANAGER/ADMIN): no permite aprobar sobre una venta anulada (repondría el stock dos
+1. **Solicitar** (`createRequest`): bloquea la venta; verifica que sea de la sucursal indicada; cada ítem indica la línea de
+   la venta que se devuelve (`saleDetailId`): suma lo ya devuelto o pendiente de esa línea y comprueba que no se devuelva
+   más de lo vendido en ella (une ítems repetidos); fija el precio con lo **realmente pagado** en esa línea (con
+   descuentos), no el de lista. Estado `PENDIENTE`.
+2. **Aprobar** (`approveRequest`, MANAGER/ADMIN): lee la solicitud con su fila bloqueada, así que de dos aprobaciones
+   simultáneas solo una repone stock; no permite aprobar sobre una venta anulada (repondría el stock dos
    veces); pasa a `APROBADA`, repone stock (sin costo, motivo DEVOLUCION) y marca la venta como `RETURNED`.
-3. **Rechazar**: pasa a `RECHAZADA` con motivo.
+3. **Rechazar**: también con la fila bloqueada; pasa a `RECHAZADA` con motivo.
 
 ## Historial paginado: `GET /api/v1/sales/search`
 

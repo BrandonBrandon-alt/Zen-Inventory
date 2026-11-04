@@ -11,7 +11,7 @@ Los requisitos se **dedujeron y verificaron contra las fuentes del propio proyec
 | Fuente | Qué aportó |
 |---|---|
 | Código del backend (`backend/src/main/java/.../inventario/*`) y su `README.md` por módulo | Reglas de negocio, estados, permisos por rol y endpoints |
-| Migraciones Flyway (`V1`–`V4`) | Modelo de datos |
+| Migraciones Flyway (`V1`–`V8`) | Modelo de datos |
 | Menú y rutas del frontend (`frontend-angular/src/app/layout/nav-items.ts`) | Pantallas y qué rol accede a cada una |
 | `README.md`, `documentacion_tecnica.md`, `backend/ARQUITECTURA.md` | Visión general, flujos y arquitectura |
 | Pruebas automatizadas (backend, Vitest, MSW, Playwright) | Comportamientos comprobados |

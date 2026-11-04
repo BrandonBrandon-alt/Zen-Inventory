@@ -15,7 +15,7 @@ class SaleTest {
 
     private Sale sale() {
         return Sale.create(1L, "Sede", 2L, "Ana", "Cliente", "123", SalePaymentMethod.EFECTIVO, null, BigDecimal.ZERO,
-                List.of(SaleDetail.create(5L, "P", 2, new BigDecimal("10"), BigDecimal.ZERO)));
+                List.of(SaleDetail.create(5L, "P", 2, new BigDecimal("10"), BigDecimal.ZERO, null)));
     }
 
     @Test
@@ -60,7 +60,7 @@ class SaleTest {
     @Test
     @DisplayName("una venta nueva exige la forma de pago y guarda la referencia sin espacios sobrantes")
     void paymentMethodIsRequired() {
-        List<SaleDetail> items = List.of(SaleDetail.create(5L, "P", 1, new BigDecimal("10"), BigDecimal.ZERO));
+        List<SaleDetail> items = List.of(SaleDetail.create(5L, "P", 1, new BigDecimal("10"), BigDecimal.ZERO, null));
         assertThatThrownBy(() -> Sale.create(1L, "Sede", 2L, "Ana", "C", "1", null, null, BigDecimal.ZERO, items))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("forma de pago");
 
@@ -74,7 +74,7 @@ class SaleTest {
     @DisplayName("una venta anterior al registro de la forma de pago se puede leer, anular y devolver con la forma de pago vacía")
     void legacySaleHasNoPaymentMethod() {
         Sale legacy = new Sale(1L, null, 1L, "Sede", 2L, "Ana", SaleStatus.COMPLETED, null, "C", "1", BigDecimal.ZERO,
-                List.of(SaleDetail.create(5L, "P", 1, new BigDecimal("10"), BigDecimal.ZERO)));
+                List.of(SaleDetail.create(5L, "P", 1, new BigDecimal("10"), BigDecimal.ZERO, null)));
         assertThat(legacy.getPaymentMethod()).isNull();
         legacy.cancel("x");
         assertThat(legacy.getStatus()).isEqualTo(SaleStatus.CANCELED);

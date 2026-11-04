@@ -97,24 +97,17 @@ public class Sale {
     }
 
     /**
-     * Precio unitario realmente pagado de un producto: total de sus líneas con el descuento de línea y el global,
-     * dividido entre las unidades. Es el valor que debe usarse al devolver (el precio de lista lo sobrestimaría).
-     * Si el producto aparece en varias líneas (p. ej. con distinto descuento) devuelve el promedio ponderado.
+     * Precio unitario realmente pagado en una línea: su total con el descuento de línea y el global, dividido entre
+     * sus unidades. Es el valor que debe usarse al devolver (el precio de lista lo sobrestimaría).
      */
-    public BigDecimal effectiveUnitPaid(Long productId) {
-        List<SaleDetail> lines = this.details.stream().filter(d -> d.getProductId().equals(productId)).toList();
-        int units = lines.stream().mapToInt(SaleDetail::getQuantity).sum();
-        if (units == 0) {
-            throw new IllegalArgumentException("El producto " + productId + " no pertenece a la venta.");
-        }
-        BigDecimal linesTotal = lines.stream().map(SaleDetail::getSubtotalLine).reduce(BigDecimal.ZERO, BigDecimal::add);
+    public BigDecimal effectiveUnitPaid(SaleDetail line) {
         BigDecimal globalFactor = BigDecimal.ONE.subtract(this.globalDiscountPercentage.divide(new BigDecimal("100")));
-        return linesTotal.multiply(globalFactor).divide(BigDecimal.valueOf(units), 4, java.math.RoundingMode.HALF_UP);
+        return line.getSubtotalLine().multiply(globalFactor).divide(BigDecimal.valueOf(line.getQuantity()), 4, java.math.RoundingMode.HALF_UP);
     }
 
-    /** Unidades vendidas de un producto sumando todas sus líneas. */
-    public int soldUnits(Long productId) {
-        return this.details.stream().filter(d -> d.getProductId().equals(productId)).mapToInt(SaleDetail::getQuantity).sum();
+    /** La línea de esta venta con ese id, si existe. */
+    public java.util.Optional<SaleDetail> findLine(Long saleDetailId) {
+        return this.details.stream().filter(d -> saleDetailId.equals(d.getId())).findFirst();
     }
 
     private void calculateFinancials() {

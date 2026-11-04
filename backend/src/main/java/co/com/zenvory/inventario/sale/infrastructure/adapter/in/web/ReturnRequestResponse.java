@@ -23,6 +23,7 @@ public record ReturnRequestResponse(
     @io.swagger.v3.oas.annotations.media.Schema(name = "ReturnItemResponse")
     public record Detail(
         Long id,
+        Long detalleVentaId,
         Long productoId,
         Integer cantidad,
         String motivoEspecifico,
@@ -42,7 +43,7 @@ public record ReturnRequestResponse(
             domain.getGeneralReason(),
             domain.getApproverComment(),
             domain.getDetails().stream()
-                .map(d -> new Detail(d.getId(), d.getProductId(), d.getQuantity(), d.getReasonSpecific(), d.getUnitPricePaid()))
+                .map(d -> new Detail(d.getId(), d.getSaleDetailId(), d.getProductId(), d.getQuantity(), d.getReasonSpecific(), d.getUnitPricePaid()))
                 .toList()
         );
     }
