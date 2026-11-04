@@ -38,6 +38,7 @@ igual que hace nginx en Docker. Los límites de los planes gratuitos cambian: co
 | `SPRING_PROFILES_ACTIVE` | `prod` (**nunca** `dev`: abre Swagger y registra SQL) |
 | `SPRING_DATASOURCE_URL` | la URL JDBC de Neon |
 | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | los de Neon |
+| `TZ` | `America/Bogota`: la zona de la empresa. En UTC, las ventas de la noche quedan con fecha del día siguiente |
 | `SECURITY_JWT_SECRET` | una cadena aleatoria larga (≥ 48 caracteres; p. ej. `openssl rand -base64 48`) |
 | `CORS_ALLOWED_ORIGINS` | la URL de tu sitio en Netlify, p. ej. `https://tu-sitio.netlify.app` |
 | `INITIAL_ADMIN_EMAIL` / `INITIAL_ADMIN_PASSWORD` | tu administrador (contraseña de ≥ 12 caracteres) |
