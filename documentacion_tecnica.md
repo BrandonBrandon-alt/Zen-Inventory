@@ -681,13 +681,22 @@ Los datos de demostración se reconocen por su dominio de correo y sus ids fijos
 
 ### 8.1 Pruebas
 
-| Capa | Herramienta | Dónde | Qué cubre | Cantidad |
-|---|---|---|---|---|
-| Unitarias backend | JUnit 5, Mockito | `backend/src/test` | Servicios de dominio y reglas de negocio (stock, costo promedio, traslados, pagos, login) | 334 pruebas |
-| Integración backend | Spring `@WebMvcTest`, `@JdbcTest` + Testcontainers | `backend/src/test` | Controladores con seguridad y roles; consultas SQL de analítica contra un PostgreSQL 16 real con las migraciones de Flyway | (incluidas arriba) |
-| Unitarias y componentes frontend | Vitest, Testing Library | `*.spec.ts` junto a cada archivo | Componentes, páginas y servicios de Angular | 1.340 pruebas en 105 archivos (con las de MSW) |
-| Integración HTTP frontend | MSW | `frontend-angular/src/testing/integration` | El cliente HTTP contra respuestas simuladas de la API | (incluidas arriba) |
-| E2E | Playwright | `frontend-angular/e2e` | Navegación, login, roles, diseño adaptable, y flujos de negocio contra el backend real: venta, compra, analítica, kardex y auditoría | 43 pruebas en 11 archivos |
+En total: **334 pruebas de backend** (41 archivos), **1.367 de frontend** (107 archivos) y **45 E2E** (12 archivos).
+De la más aislada a la más completa:
+
+| Tipo | Qué prueba | Herramienta | En el proyecto |
+|---|---|---|---|
+| Unitaria de dominio | Reglas de negocio puras, sin base de datos ni framework: venta, traslado, pagos, bloqueo de login | JUnit 5 | 11 archivos |
+| Unitaria de servicio | Un servicio aislado; sus dependencias (repositorios) se reemplazan por objetos simulados | JUnit 5 + Mockito | 12 archivos |
+| Integración web | Solo la capa web de Spring: rutas, JSON, seguridad y permisos por rol | `@WebMvcTest` | 17 controladores |
+| Integración con base real | El SQL de analítica contra un PostgreSQL 16 en Docker con las migraciones de Flyway | `@JdbcTest` + Testcontainers | Consultas de analítica |
+| Componentes (frontend) | Cada pantalla usada como una persona: busca por etiqueta y rol, hace clic, escribe | Vitest + Testing Library | 107 archivos |
+| Integración HTTP (frontend) | El cliente HTTP real contra respuestas simuladas de la API | MSW | 9 archivos |
+| Accesibilidad | Contraste, etiquetas y roles de cada pantalla | axe | 20 archivos |
+| End-to-end | Flujos completos en un navegador real contra el backend real: venta, compra, ajuste de stock, analítica, kardex y auditoría, además de login, roles y diseño adaptable | Playwright | 45 pruebas |
+
+**Regla:** no se escribe una prueba que no pueda fallar por un error real. Cada prueba nueva se comprueba rompiendo el
+código a propósito: sin el arreglo debe fallar (p. ej. la de rotación recibía 110 unidades en vez de 3).
 
 ```bash
 cd backend && ./mvnw test                     # requiere Java 21; con Docker corre también Testcontainers

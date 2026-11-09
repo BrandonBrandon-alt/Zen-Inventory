@@ -1,0 +1,4 @@
+# Versiones de las herramientas del proyecto (las mismas de la integración continua). Con mise: `mise install`.
+[tools]
+java = "temurin-21"
+node = "24"

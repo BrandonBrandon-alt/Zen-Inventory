@@ -35,4 +35,12 @@ describe('App', () => {
     expect(await screen.findByRole('dialog', { name: 'Orden #12 creada' })).toBeInTheDocument();
     expect(screen.getByText('Espera la aprobación de un gerente.')).toBeInTheDocument();
   });
+
+  it('al destruirse la app, el modal de confirmación no queda suelto en el documento', async () => {
+    const { fixture } = await render(App, { providers: [provideRouter([])] });
+    TestBed.inject(NotificationService).confirm({ title: 'Orden #1 aprobada', summary: 'La orden de compra se aprobó correctamente.' });
+    await screen.findByRole('dialog', { name: 'Orden #1 aprobada' });
+    fixture.destroy();
+    expect(document.body.querySelector('app-success-dialog')).toBeNull();
+  });
 });
