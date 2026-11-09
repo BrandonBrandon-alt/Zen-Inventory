@@ -10,6 +10,8 @@ export interface PurchaseActions {
   readonly cancel: boolean;
   /** Dar por completa una orden recibida a medias, aceptando el faltante. */
   readonly closeShortfall: boolean;
+  /** Anular un pago equivocado (lo puede hacer quien puede pagar). */
+  readonly voidPayment: boolean;
 }
 
 /**
@@ -30,5 +32,6 @@ export function purchaseActions(purchase: Purchase, role: Role | null): Purchase
     pay: received && purchase.payment !== 'PAGADO' && purchase.balance > 0 && manager,
     cancel: (status === 'AWAITING_APPROVAL' || status === 'PENDING' || status === 'IN_TRANSIT') && manager,
     closeShortfall: status === 'RECEIVED_PARTIAL' && admin,
+    voidPayment: manager,
   };
 }

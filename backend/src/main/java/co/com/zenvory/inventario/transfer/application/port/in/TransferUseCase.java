@@ -19,6 +19,9 @@ public interface TransferUseCase {
      */
     Transfer registerFreightPayment(Long transferId, java.math.BigDecimal amount,
             co.com.zenvory.inventario.transfer.domain.model.TransferPaymentMethod method, String reference, String notes);
+
+    /** Anula un pago del flete equivocado (contra-asiento); lo hace quien puede pagarlo (la sucursal de origen). */
+    Transfer voidFreightPayment(Long transferId, Long paymentId, String reason);
     void rejectTransfer(Long id, String reason);
     void resolveAsShrinkage(Long transferId);
     void resolveAsResend(Long transferId);

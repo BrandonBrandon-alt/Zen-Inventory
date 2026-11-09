@@ -1,10 +1,12 @@
 import { provideHttpClient } from '@angular/common/http';
 import { inputBinding, signal, twoWayBinding } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
 import { render, screen, within } from '@testing-library/angular';
 import { http, HttpResponse } from 'msw';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { API_BASE_URL } from '@core/api/api-base-url';
+import { NotificationService } from '@core/notifications/notification.service';
 import { server, TEST_API } from '@testing/msw-server';
 import type { Transfer } from '../../data-access/transfers-api';
 import { TransferDetailModal } from './transfer-detail-modal';
@@ -85,7 +87,7 @@ describe('TransferDetailModal', () => {
       freightPaid: 30000,
       freightBalance: 60000,
       freightStatus: 'PAGO_PARCIAL',
-      payments: [{ id: 1, amount: 30000, date: new Date(2026, 9, 15, 10), userName: 'Gerente Central', method: 'TRANSFERENCIA', reference: 'TR-7', notes: '' }],
+      payments: [{ id: 1, amount: 30000, date: new Date(2026, 9, 15, 10), userName: 'Gerente Central', method: 'TRANSFERENCIA', reference: 'TR-7', notes: '', voided: null }],
       lines: [{ ...preparing.lines[0], sent: 6 }],
     };
 
@@ -129,6 +131,39 @@ describe('TransferDetailModal', () => {
       await userEvent.type(within(dialog).getByLabelText(/Referencia/), 'TR-8');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar pago' }));
       await vi.waitFor(() => expect(body).toEqual({ amount: 60000, method: 'TRANSFERENCIA', reference: 'TR-8' }));
+    });
+
+    it('anular un pago pide el motivo, lo envía y confirma con el saldo que vuelve a quedar', async () => {
+      let body: Record<string, unknown> | null = null;
+      server.use(
+        http.post(`${TEST_API}/api/v1/transfers/3/freight-payments/1/void`, async ({ request }) => {
+          body = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json({ id: 3, status: 'IN_TRANSIT', originBranchId: 10, destinationBranchId: 20, priority: 'NORMAL', details: [], freightStatus: 'POR_PAGAR', freightBalance: 90000, freightPaid: 0, shippingCost: 90000 });
+        }),
+      );
+      await renderModal(inTransit);
+      const dialog = screen.getByRole('dialog');
+      await userEvent.click(within(dialog).getByRole('button', { name: /^Anular pago de \$\s30\.000$/ }));
+      expect(dialog).toHaveTextContent('Vas a anular el pago del flete de $ 30.000');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Anular pago' }));
+      expect(body).toBeNull(); // sin motivo no se anula
+      await userEvent.type(within(dialog).getByLabelText('Motivo de la anulación'), '  Se registró dos veces ');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Anular pago' }));
+      await vi.waitFor(() => expect(body).toEqual({ reason: 'Se registró dos veces' }));
+      expect(TestBed.inject(NotificationService).confirmation()).toMatchObject({
+        title: 'Pago del flete anulado (traslado #3)',
+        summary: expect.stringMatching(/^El pago de \$\s30\.000 se anuló correctamente\.$/),
+        detail: expect.stringMatching(/vuelve a ser \$\s90\.000\.$/),
+      });
+    });
+
+    it('un pago anulado se ve tachado con quién, cuándo y por qué, y no se ofrece anularlo otra vez', async () => {
+      const voided = { ...inTransit.payments[0], voided: { date: new Date(2026, 9, 16, 11), by: 'Ana Ruiz', reason: 'Duplicado' } };
+      await renderModal({ ...inTransit, freightPaid: 0, freightBalance: 90000, freightStatus: 'POR_PAGAR', payments: [voided] });
+      const section = within(screen.getByRole('dialog')).getByRole('region', { name: 'Flete al transportista' });
+      expect(within(section).getByText('Anulado')).toBeInTheDocument();
+      expect(section).toHaveTextContent('por Ana Ruiz: «Duplicado». No cuenta en lo pagado.');
+      expect(within(section).queryByRole('button', { name: /Anular pago/ })).not.toBeInTheDocument();
     });
 
     it('sin saldo no ofrece pagar', async () => {

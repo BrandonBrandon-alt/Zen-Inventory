@@ -16,9 +16,9 @@ import { Modal } from '@shared/ui/modal/modal';
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { FREIGHT_INFO, PRIORITY_INFO, STATUS_INFO } from '../../data-access/transfer-labels';
 import { type Actor, transferActions } from '../../data-access/transfer-permissions';
-import { type Transfer, type TransferLine, TransfersApi } from '../../data-access/transfers-api';
+import { type FreightPayment, type Transfer, type TransferLine, TransfersApi } from '../../data-access/transfers-api';
 
-type Mode = 'view' | 'dispatch' | 'receive' | 'cancel' | 'reject' | 'payFreight';
+type Mode = 'view' | 'dispatch' | 'receive' | 'cancel' | 'reject' | 'payFreight' | 'voidFreight';
 
 const CARRIER = { required: 'Escribe el nombre del transportista.' };
 const COST = { required: 'Escribe el costo (0 si no tiene).', min: 'No puede ser negativo.' };
@@ -138,6 +138,7 @@ export class TransferDetailModal {
       cancel: 'Cancelar traslado',
       reject: 'Rechazar traslado',
       payFreight: 'Registrar pago',
+      voidFreight: 'Anular pago',
     };
     return labels[this.mode()] ?? '';
   }
@@ -170,6 +171,15 @@ export class TransferDetailModal {
   protected goto(mode: Mode): void {
     this.error.set(null);
     this.mode.set(mode);
+  }
+
+  /** El pago del flete que se está por anular. */
+  protected readonly voiding = signal<FreightPayment | null>(null);
+
+  protected startVoid(payment: FreightPayment): void {
+    this.voiding.set(payment);
+    this.reasonForm.reset({ reason: '' }, { emitEvent: false });
+    this.goto('voidFreight');
   }
 
   // ---- Acciones directas ----
@@ -290,8 +300,19 @@ export class TransferDetailModal {
     const t = this.transfer();
     const mode = this.mode();
     this.reasonForm.markAllAsTouched();
-    if (!t || this.reasonForm.invalid || this.busy() || (mode !== 'cancel' && mode !== 'reject')) return;
+    if (!t || this.reasonForm.invalid || this.busy()) return;
     const reason = this.reasonForm.getRawValue().reason;
+    if (mode === 'voidFreight') {
+      const payment = this.voiding();
+      if (!payment) return;
+      void this.run(this.api.voidFreightPayment(t.id, payment.id, reason), {
+        title: `Pago del flete anulado (traslado #${t.id})`,
+        summary: `El pago de ${formatMoney(payment.amount)} se anuló correctamente.`,
+        detail: `Queda en el historial como anulado y ya no cuenta en lo pagado: el saldo con el transportista vuelve a ser ${formatMoney(Math.min(t.shippingCost ?? Number.POSITIVE_INFINITY, t.freightBalance + payment.amount))}.`,
+      });
+      return;
+    }
+    if (mode !== 'cancel' && mode !== 'reject') return;
     void this.run(
       mode === 'cancel' ? this.api.cancel(t.id, reason) : this.api.reject(t.id, reason),
       {

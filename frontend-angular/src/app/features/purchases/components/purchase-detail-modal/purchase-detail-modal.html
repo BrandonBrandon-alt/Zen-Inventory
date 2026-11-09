@@ -97,17 +97,35 @@
                       <th scope="col" class="px-3 py-2 text-left font-medium">Referencia</th>
                       <th scope="col" class="px-3 py-2 text-left font-medium">Registró</th>
                       <th scope="col" class="px-3 py-2 text-right font-medium">Monto</th>
+                      @if (actions()?.voidPayment) {
+                        <th scope="col" class="px-3 py-2 text-right font-medium"><span class="sr-only">Acciones</span></th>
+                      }
                     </tr>
                   </thead>
                   <tbody>
                     @for (pay of p.payments; track pay.id) {
-                      <tr class="border-t border-line-subtle">
+                      <tr class="border-t border-line-subtle" [class.bg-surface]="pay.voided">
                         <td class="px-3 py-2 text-fg-muted">{{ formatDateTime(pay.date) }}</td>
                         <td class="px-3 py-2 text-fg-muted">{{ methodLabels[pay.method] }}</td>
                         <td class="px-3 py-2 text-fg-muted" [title]="pay.notes">{{ pay.reference || '—' }}</td>
                         <td class="px-3 py-2 text-fg-muted">{{ pay.userName }}</td>
-                        <td class="px-3 py-2 text-right tabular-nums text-fg">{{ formatMoney(pay.amount) }}</td>
+                        <td class="px-3 py-2 text-right tabular-nums" [class]="pay.voided ? 'text-fg-subtle line-through' : 'text-fg'">{{ formatMoney(pay.amount) }}</td>
+                        @if (actions()?.voidPayment) {
+                          <td class="px-3 py-2 text-right">
+                            @if (!pay.voided) {
+                              <button appButton variant="ghost-danger" size="sm" type="button" [disabled]="busy()" [attr.aria-label]="'Anular pago de ' + formatMoney(pay.amount)" (click)="startVoid(pay)">Anular</button>
+                            }
+                          </td>
+                        }
                       </tr>
+                      @if (pay.voided; as v) {
+                        <tr>
+                          <td [attr.colspan]="actions()?.voidPayment ? 6 : 5" class="px-3 pb-2 text-xs text-fg-subtle">
+                            <app-badge variant="danger">Anulado</app-badge>
+                            {{ formatDateTime(v.date) }} por {{ v.by }}: «{{ v.reason }}». No cuenta en lo pagado.
+                          </td>
+                        </tr>
+                      }
                     }
                   </tbody>
                 </table>
@@ -158,6 +176,21 @@
             }
           </fieldset>
         </form>
+      }
+
+      @case ('void') {
+        @if (voiding(); as pay) {
+          <form id="purchase-action-form" class="flex flex-col gap-4" [formGroup]="reasonForm" novalidate (ngSubmit)="submit()">
+            <p class="text-sm text-fg-muted">
+              Vas a anular el pago de <strong class="text-fg">{{ formatMoney(pay.amount) }}</strong> del {{ formatDateTime(pay.date) }}
+              ({{ methodLabels[pay.method] }}{{ pay.reference ? ', ' + pay.reference : '' }}). No se borra: queda en el historial como anulado y
+              deja de contar en lo pagado, así que el saldo con el proveedor sube en ese monto.
+            </p>
+            <app-form-field label="Motivo de la anulación" [error]="reasonError()">
+              <textarea appInput rows="3" formControlName="reason" placeholder="Por ejemplo: se registró dos veces"></textarea>
+            </app-form-field>
+          </form>
+        }
       }
 
       @case ('cancel') {
@@ -233,7 +266,7 @@
         }
         @default {
           <button appButton variant="ghost" type="button" [disabled]="busy()" (click)="goto('view')">Volver</button>
-          <button appButton type="submit" form="purchase-action-form" [variant]="mode() === 'cancel' ? 'danger' : 'primary'" [loading]="busy()">{{ submitLabel() }}</button>
+          <button appButton type="submit" form="purchase-action-form" [variant]="mode() === 'cancel' || mode() === 'void' ? 'danger' : 'primary'" [loading]="busy()">{{ submitLabel() }}</button>
         }
       }
     }

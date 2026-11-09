@@ -243,9 +243,32 @@ public class PurchaseOrder {
         return payment;
     }
 
-    /** Suma de lo pagado hasta ahora. */
+    /**
+     * Anula un pago equivocado (contra-asiento): queda en el historial, marcado con quién, cuándo y por qué, y deja de
+     * contar en lo pagado, así que el saldo y el estado de pago vuelven a calcularse.
+     *
+     * @return el pago ya anulado
+     */
+    public PurchasePayment voidPayment(Long paymentId, String reason, Long userId, String userName) {
+        for (int i = 0; i < payments.size(); i++) {
+            PurchasePayment payment = payments.get(i);
+            if (!paymentId.equals(payment.getId())) continue;
+            if (payment.isVoided()) {
+                throw new InvalidPurchaseStateException("Este pago ya está anulado.");
+            }
+            PurchasePayment voided = payment.voided(reason, userId, userName);
+            payments.set(i, voided);
+            BigDecimal paid = paidAmount();
+            this.paymentStatus = paid.signum() == 0 ? PaymentStatus.POR_PAGAR
+                    : balance().signum() == 0 ? PaymentStatus.PAGADO : PaymentStatus.PAGO_PARCIAL;
+            return voided;
+        }
+        throw new IllegalArgumentException("Pago no encontrado en esta orden: " + paymentId);
+    }
+
+    /** Suma de lo pagado hasta ahora (los pagos anulados no cuentan). */
     public BigDecimal paidAmount() {
-        return payments.stream().map(PurchasePayment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return payments.stream().filter(p -> !p.isVoided()).map(PurchasePayment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     /** Lo que aún se le debe al proveedor por esta orden; una orden cancelada no genera deuda. */

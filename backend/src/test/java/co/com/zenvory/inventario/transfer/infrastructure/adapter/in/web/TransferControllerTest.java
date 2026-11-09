@@ -153,4 +153,22 @@ class TransferControllerTest {
                 .andExpect(status().isBadRequest());
         verify(transferUseCase, never()).registerFreightPayment(any(), any(), any(), any(), any());
     }
+
+    @Test
+    @DisplayName("POST /transfers/{id}/freight-payments/{paymentId}/void: anula el pago con el motivo")
+    void voidFreightPayment_forwardsReason() throws Exception {
+        Transfer transfer = mockForFreight();
+        when(transferUseCase.voidFreightPayment(4L, 2L, "Duplicado")).thenReturn(transfer);
+        mockMvc.perform(post("/api/v1/transfers/4/freight-payments/2/void").contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Duplicado\"}"))
+                .andExpect(status().isOk());
+        verify(transferUseCase).voidFreightPayment(4L, 2L, "Duplicado");
+    }
+
+    @Test
+    @DisplayName("anular un pago del flete sin motivo es 400")
+    void voidFreightPayment_requiresReason() throws Exception {
+        mockMvc.perform(post("/api/v1/transfers/4/freight-payments/2/void").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+        verify(transferUseCase, org.mockito.Mockito.never()).voidFreightPayment(any(), any(), any());
+    }
 }

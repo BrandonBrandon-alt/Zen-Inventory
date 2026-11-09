@@ -191,9 +191,29 @@ public class Transfer {
         return payment;
     }
 
-    /** Lo ya pagado del flete. */
+    /**
+     * Anula un pago del flete equivocado (contra-asiento): queda en el historial con quién, cuándo y por qué, y deja de
+     * contar en lo pagado.
+     *
+     * @return el pago ya anulado
+     */
+    public TransferPayment voidFreightPayment(Long paymentId, String reason, Long userId, String userName) {
+        for (int i = 0; i < payments.size(); i++) {
+            TransferPayment payment = payments.get(i);
+            if (!paymentId.equals(payment.getId())) continue;
+            if (payment.isVoided()) {
+                throw new InvalidTransferStateException("Este pago ya está anulado.");
+            }
+            TransferPayment voided = payment.voided(reason, userId, userName);
+            payments.set(i, voided);
+            return voided;
+        }
+        throw new IllegalArgumentException("Pago no encontrado en este traslado: " + paymentId);
+    }
+
+    /** Lo ya pagado del flete (los pagos anulados no cuentan). */
     public BigDecimal freightPaid() {
-        return payments.stream().map(TransferPayment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return payments.stream().filter(p -> !p.isVoided()).map(TransferPayment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     /** Lo que aún se le debe al transportista; cero si no hay costo de envío o ya se pagó. */
@@ -211,7 +231,7 @@ public class Transfer {
         if (freightBalance().signum() == 0) {
             return FreightPaymentStatus.PAGADO;
         }
-        return payments.isEmpty() ? FreightPaymentStatus.POR_PAGAR : FreightPaymentStatus.PAGO_PARCIAL;
+        return freightPaid().signum() == 0 ? FreightPaymentStatus.POR_PAGAR : FreightPaymentStatus.PAGO_PARCIAL;
     }
 
     public List<TransferPayment> getPayments() {

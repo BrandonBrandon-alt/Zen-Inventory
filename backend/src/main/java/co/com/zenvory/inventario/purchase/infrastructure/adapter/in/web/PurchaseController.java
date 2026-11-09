@@ -139,6 +139,18 @@ public class PurchaseController {
         return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
     }
 
+    /** Anula un pago equivocado: queda en el historial marcado como anulado y deja de contar en lo pagado. */
+    @PostMapping("/{id}/payments/{paymentId}/void")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<PurchaseResponse> voidPayment(
+            @PathVariable Long id,
+            @PathVariable Long paymentId,
+            @Valid @RequestBody ResolutionRequest request) {
+        CurrentUser current = requireOrderAccess(id);
+        PurchaseOrder order = purchaseUseCase.voidPayment(id, paymentId, request.reason(), current.id(), current.user().getNombre());
+        return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
+    }
+
     @PostMapping("/{id}/cancel")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<Void> cancelPurchase(

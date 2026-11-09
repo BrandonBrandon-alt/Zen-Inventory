@@ -41,6 +41,8 @@ export interface FreightPayment {
   readonly method: PaymentMethod;
   readonly reference: string;
   readonly notes: string;
+  /** Si se anuló (contra-asiento): cuándo, quién y por qué. Un pago anulado no cuenta en lo pagado. */
+  readonly voided: { readonly date: Date | null; readonly by: string; readonly reason: string } | null;
 }
 
 /** Lo que se envía para registrar un pago del flete; sin `amount` se paga todo el saldo. */
@@ -124,7 +126,18 @@ function toTransfer(raw: TransferResponse): Transfer | null {
     freightStatus: toFreightStatus(raw.freightStatus),
     payments: (raw.payments ?? []).flatMap((p) =>
       typeof p.id === 'number'
-        ? [{ id: p.id, amount: p.amount ?? 0, date: parseDate(p.date), userName: p.userName?.trim() || 'Desconocido', method: isPaymentMethod(p.method) ? p.method : 'OTRO', reference: p.reference?.trim() ?? '', notes: p.notes?.trim() ?? '' }]
+        ? [
+            {
+              id: p.id,
+              amount: p.amount ?? 0,
+              date: parseDate(p.date),
+              userName: p.userName?.trim() || 'Desconocido',
+              method: isPaymentMethod(p.method) ? p.method : 'OTRO',
+              reference: p.reference?.trim() ?? '',
+              notes: p.notes?.trim() ?? '',
+              voided: p.voidedAt ? { date: parseDate(p.voidedAt), by: p.voidedByUserName?.trim() || 'Desconocido', reason: p.voidReason?.trim() ?? '' } : null,
+            },
+          ]
         : [],
     ),
     receiptNotes: raw.receiptNotes?.trim() ?? '',
@@ -250,6 +263,11 @@ export class TransfersApi {
   }
 
   /** Registra un pago o abono del flete: queda con pago parcial mientras haya saldo y pagado al cubrir el costo. */
+  /** Anula un pago del flete equivocado (queda en el historial, deja de contar en lo pagado). */
+  voidFreightPayment(id: number, paymentId: number, reason: string): Observable<Transfer> {
+    return this.http.post<TransferResponse>(`${this.url}/${id}/freight-payments/${paymentId}/void`, { reason: reason.trim() }, this.options).pipe(map(requireTransfer));
+  }
+
   payFreight(id: number, input: FreightPaymentInput): Observable<Transfer> {
     const body = {
       ...(input.amount !== null ? { amount: input.amount } : {}),

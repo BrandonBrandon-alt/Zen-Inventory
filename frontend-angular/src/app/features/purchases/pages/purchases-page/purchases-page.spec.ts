@@ -342,6 +342,59 @@ describe('PurchasesPage', () => {
       expect(within(dialog).getByText('CH-12')).toBeInTheDocument();
     });
 
+    it('anular un pago pide el motivo, lo envía y confirma cuánto vuelve a deberse', async () => {
+      useSession('MANAGER', 10);
+      const paid = order(5, 'RECEIVED_TOTAL', {
+        paymentStatus: 'PAGADO',
+        paidAmount: 1000,
+        balance: 0,
+        payments: [{ id: 1, amount: 1000, date: '2026-10-20T09:30:00', userId: 5, userName: 'Gerente Central', method: 'CHEQUE', reference: 'CH-12', notes: '' }],
+      });
+      stub([paid]);
+      let request: { id: string; paymentId: string; body: unknown } | null = null;
+      server.use(
+        http.post(`${URL_P}/:id/payments/:paymentId/void`, async ({ params, request: r }) => {
+          request = { id: String(params['id']), paymentId: String(params['paymentId']), body: await r.json() };
+          return HttpResponse.json({ ...paid, paymentStatus: 'POR_PAGAR', paidAmount: 0, balance: 1000 });
+        }),
+      );
+      await renderPage();
+      await userEvent.click(screen.getByRole('combobox', { name: 'Estado de la orden' }));
+      await userEvent.click(screen.getByRole('option', { name: 'Recibida' }));
+      const dialog = await openDetail(5);
+      await userEvent.click(within(dialog).getByRole('button', { name: /^Anular pago de \$\s1\.000$/ }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Anular pago' }));
+      expect(request).toBeNull(); // sin motivo no se anula
+      await userEvent.type(within(dialog).getByLabelText('Motivo de la anulación'), 'Cheque devuelto');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Anular pago' }));
+      await vi.waitFor(() => expect(request).toEqual({ id: '5', paymentId: '1', body: { reason: 'Cheque devuelto' } }));
+      expect(TestBed.inject(NotificationService).confirmation()).toMatchObject({
+        title: 'Pago anulado en la orden #5',
+        detail: expect.stringMatching(/vuelve a ser \$\s1\.000\.$/),
+      });
+    });
+
+    it('un pago anulado se ve como tal y solo la gerencia puede anular', async () => {
+      useSession('OPERADOR_INVENTARIO', 10);
+      stub([
+        order(5, 'RECEIVED_TOTAL', {
+          paymentStatus: 'POR_PAGAR',
+          paidAmount: 0,
+          balance: 1000,
+          payments: [
+            { id: 1, amount: 1000, date: '2026-10-20T09:30:00', userId: 5, userName: 'Gerente Central', method: 'CHEQUE', reference: 'CH-12', notes: '', voidedAt: '2026-10-21T10:00:00', voidedByUserName: 'Ana Ruiz', voidReason: 'Cheque devuelto' },
+          ],
+        }),
+      ]);
+      await renderPage();
+      await userEvent.click(screen.getByRole('combobox', { name: 'Estado de la orden' }));
+      await userEvent.click(screen.getByRole('option', { name: 'Recibida' }));
+      const dialog = await openDetail(5);
+      expect(within(dialog).getByText('Anulado')).toBeInTheDocument();
+      expect(dialog).toHaveTextContent('por Ana Ruiz: «Cheque devuelto». No cuenta en lo pagado.');
+      expect(within(dialog).queryByRole('button', { name: /Anular pago/ })).not.toBeInTheDocument();
+    });
+
     it('el encabezado resume lo que se debe a proveedores y cuántas órdenes están vencidas', async () => {
       useSession('MANAGER', 10);
       stub([

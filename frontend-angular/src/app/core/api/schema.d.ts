@@ -292,6 +292,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/transfers/{id}/freight-payments/{paymentId}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["voidFreightPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/transfers/{id}/dispatch": {
         parameters: {
             query?: never;
@@ -430,6 +446,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["receiveOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/purchases/{id}/payments/{paymentId}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["voidPayment"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1508,6 +1540,10 @@ export interface components {
             method?: string;
             reference?: string;
             notes?: string;
+            /** Format: date-time */
+            voidedAt?: string;
+            voidedByUserName?: string;
+            voidReason?: string;
         };
         TransferDetailResponse: {
             /** Format: int64 */
@@ -1759,6 +1795,10 @@ export interface components {
             method?: string;
             reference?: string;
             notes?: string;
+            /** Format: date-time */
+            voidedAt?: string;
+            voidedByUserName?: string;
+            voidReason?: string;
         };
         PurchaseDetailResponse: {
             /** Format: int64 */
@@ -2927,6 +2967,33 @@ export interface operations {
             };
         };
     };
+    voidFreightPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                paymentId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolutionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransferResponse"];
+                };
+            };
+        };
+    };
     dispatchTransfer: {
         parameters: {
             query?: never;
@@ -3202,6 +3269,33 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["PurchaseReceiptResponse"];
+                };
+            };
+        };
+    };
+    voidPayment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                paymentId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolutionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PurchaseResponse"];
                 };
             };
         };

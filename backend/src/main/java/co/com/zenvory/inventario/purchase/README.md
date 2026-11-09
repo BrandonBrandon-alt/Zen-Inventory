@@ -16,7 +16,7 @@ Maneja **dos estados independientes** en la misma orden: el de **recepción** (�
 |---|---|
 | `ordenes_compra` | `proveedor_id`, `sucursal_id` (destino), `usuario_id` (quien la creó), `usuario_recepcion_id`, `estado_recepcion`, `estado_pago`, `total`, `fecha_solicitud`, `fecha_estimada_llegada`, `fecha_real_llegada`, `tiempo_entrega_dias`, `plazo_pago_dias`, `fecha_vencimiento_pago`, `excepcion_aprobada`, datos de resolución (`motivo_resolucion`, `resuelto_por_id`, `fecha_resolucion`) y `version` (control de concurrencia optimista) |
 | `detalles_orden_compra` | `producto_id`, `cantidad`, `precio_unitario_pactado`, `descuento_pct`, `subtotal`, `cantidad_recibida` |
-| `pagos_orden_compra` | **Un pago o abono por fila** (migración V5): `orden_id`, `monto`, `fecha`, `usuario_id` + `usuario_nombre` (quién lo registró), `metodo`, `referencia` (n.º de transferencia, cheque o comprobante) y `notas`. Es inmutable: un pago equivocado no se edita |
+| `pagos_orden_compra` | **Un pago o abono por fila** (migración V5): `orden_id`, `monto`, `fecha`, `usuario_id` + `usuario_nombre` (quién lo registró), `metodo`, `referencia` (n.º de transferencia, cheque o comprobante) y `notas`. No se edita ni se borra: un pago equivocado se anula (V9: `anulado_en`, `anulado_por_*`, `motivo_anulacion`) y deja de contar |
 
 FKs: `ordenes_compra → proveedor, sucursal, usuario (×3)`; `detalles_orden_compra → ordenes_compra (cascada), producto`; `pagos_orden_compra → ordenes_compra, usuario`.
 

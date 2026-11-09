@@ -93,6 +93,14 @@ public interface PurchaseUseCase {
             Long userId, String userName);
 
     /**
+     * Anula un pago equivocado (contra-asiento): queda en el historial con quién, cuándo y por qué, y deja de contar en
+     * lo pagado.
+     *
+     * @return La orden con el pago ya anulado y el saldo recalculado.
+     */
+    PurchaseOrder voidPayment(Long orderId, Long paymentId, String reason, Long userId, String userName);
+
+    /**
      * Anula definitivamente una orden de compra.
      * 
      * @param orderId ID de la orden.

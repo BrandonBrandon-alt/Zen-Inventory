@@ -189,6 +189,17 @@ public class TransferService implements TransferUseCase {
 
     @Override
     @Transactional
+    public Transfer voidFreightPayment(Long transferId, Long paymentId, String reason) {
+        Transfer transfer = getTransferById(transferId);
+        User user = getCurrentUser();
+        // Anula quien puede pagar: la sucursal de origen.
+        requireSide(transfer, user, Side.ORIGIN);
+        transfer.voidFreightPayment(paymentId, reason, user.getId(), user.getNombre());
+        return transferRepositoryPort.save(transfer);
+    }
+
+    @Override
+    @Transactional
     public Transfer dispatchTransfer(Long transferId, DispatchTransferCommand command) {
         Transfer transfer = getTransferById(transferId);
         User user = getCurrentUser();

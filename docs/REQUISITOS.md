@@ -173,9 +173,9 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 | RN-08 | Una venta con devoluciones aprobadas no puede anularse, ni una anulada puede devolverse: se repondría el stock dos veces. |
 | RN-09 | Reponer stock por anulación o devolución no es una compra y no modifica el costo promedio. |
 | RN-10 | Despachar un traslado exige la cantidad enviada de cada producto; si todo es cero se rechaza. |
-| RN-11 | Un pago a proveedor es inmutable y no puede exceder el saldo de la orden; el estado de pago se deduce de lo pagado y una orden cancelada no genera deuda. |
+| RN-11 | Un pago a proveedor no se edita ni se borra y no puede exceder el saldo de la orden; un pago equivocado se anula con motivo (contra-asiento): queda en el historial con quién y cuándo, y deja de contar en lo pagado; el estado de pago se deduce de lo pagado y una orden cancelada no genera deuda. |
 | RN-12 | Una venta no se registra sin forma de pago. Las ventas anteriores a su registro quedan «Sin registrar»: no se inventa cómo se pagaron. |
-| RN-13 | El flete de un traslado es el costo de envío anotado al despachar. Se paga a quien contrata el envío (la sucursal de origen); un pago es inmutable y no puede exceder el saldo. Un traslado cancelado en tránsito conserva su deuda: el transportista ya hizo el viaje. Los traslados anteriores al registro de pagos quedan «por pagar»: no se inventan pagos. |
+| RN-13 | El flete de un traslado es el costo de envío anotado al despachar. Se paga a quien contrata el envío (la sucursal de origen); un pago no se edita ni se borra, se anula con motivo, y no puede exceder el saldo. Un traslado cancelado en tránsito conserva su deuda: el transportista ya hizo el viaje. Los traslados anteriores al registro de pagos quedan «por pagar»: no se inventan pagos. |
 
 ## 5. Requisitos no funcionales
 
@@ -220,8 +220,6 @@ Se declara para no presentar como hecho lo que no lo está:
 - La paginación en el servidor existe en el historial de ventas y en Auditoría Global. El kardex por producto, Reportes
   y las listas de compras y traslados descargan todas sus filas y las paginan en el navegador.
 - No hay tablas virtualizadas.
-- Los pagos de compras no se pueden anular ni editar (son inmutables); un pago equivocado no tiene todavía un contra-asiento.
-- Los pagos del flete no se pueden anular ni editar (son inmutables), igual que los de compras.
 - La exportación a CSV del historial de ventas no está disponible (se retiró al paginar en el servidor).
 - La API gratuita de Render se mantiene despierta con llamadas periódicas (monitor externo y `keep-alive.yml`); si fallan, el primer request tras una pausa tarda 30–90 s.
 - La auditoría solo registra movimientos de inventario, no cualquier acción del sistema (por ejemplo, no registra inicios de sesión).

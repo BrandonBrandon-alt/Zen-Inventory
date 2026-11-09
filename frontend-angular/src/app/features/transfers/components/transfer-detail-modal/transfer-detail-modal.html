@@ -87,17 +87,35 @@
                       <th scope="col" class="px-3 py-2 text-left font-medium">Referencia</th>
                       <th scope="col" class="px-3 py-2 text-left font-medium">Registró</th>
                       <th scope="col" class="px-3 py-2 text-right font-medium">Monto</th>
+                      @if (actions()?.voidFreightPayment) {
+                        <th scope="col" class="px-3 py-2 text-right font-medium"><span class="sr-only">Acciones</span></th>
+                      }
                     </tr>
                   </thead>
                   <tbody>
                     @for (pay of t.payments; track pay.id) {
-                      <tr class="border-t border-line-subtle">
+                      <tr class="border-t border-line-subtle" [class.bg-surface]="pay.voided">
                         <td class="px-3 py-2 whitespace-nowrap text-fg-muted">{{ formatDateTime(pay.date) }}</td>
                         <td class="px-3 py-2 text-fg-muted">{{ methodLabels[pay.method] }}</td>
                         <td class="px-3 py-2 text-fg-muted" [title]="pay.notes">{{ pay.reference || '—' }}</td>
                         <td class="px-3 py-2 text-fg-muted">{{ pay.userName }}</td>
-                        <td class="px-3 py-2 text-right tabular-nums text-fg">{{ formatMoney(pay.amount) }}</td>
+                        <td class="px-3 py-2 text-right tabular-nums" [class]="pay.voided ? 'text-fg-subtle line-through' : 'text-fg'">{{ formatMoney(pay.amount) }}</td>
+                        @if (actions()?.voidFreightPayment) {
+                          <td class="px-3 py-2 text-right">
+                            @if (!pay.voided) {
+                              <button appButton variant="ghost-danger" size="sm" type="button" [disabled]="busy()" [attr.aria-label]="'Anular pago de ' + formatMoney(pay.amount)" (click)="startVoid(pay)">Anular</button>
+                            }
+                          </td>
+                        }
                       </tr>
+                      @if (pay.voided; as v) {
+                        <tr>
+                          <td [attr.colspan]="actions()?.voidFreightPayment ? 6 : 5" class="px-3 pb-2 text-xs text-fg-subtle">
+                            <app-badge variant="danger">Anulado</app-badge>
+                            {{ formatDateTime(v.date) }} por {{ v.by }}: «{{ v.reason }}». No cuenta en lo pagado.
+                          </td>
+                        </tr>
+                      }
                     }
                   </tbody>
                 </table>
@@ -179,6 +197,21 @@
         </form>
       }
 
+      @case ('voidFreight') {
+        @if (voiding(); as pay) {
+          <form id="transfer-action-form" class="flex flex-col gap-4" [formGroup]="reasonForm" novalidate (ngSubmit)="submitReason()">
+            <p class="text-sm text-fg-muted">
+              Vas a anular el pago del flete de <strong class="text-fg">{{ formatMoney(pay.amount) }}</strong> del {{ formatDateTime(pay.date) }}
+              ({{ methodLabels[pay.method] }}{{ pay.reference ? ', ' + pay.reference : '' }}). No se borra: queda en el historial como anulado y
+              deja de contar en lo pagado, así que el saldo con el transportista sube en ese monto.
+            </p>
+            <app-form-field label="Motivo de la anulación" [error]="fieldError('reason', 'reason')">
+              <textarea appInput rows="3" formControlName="reason" placeholder="Por ejemplo: se registró dos veces"></textarea>
+            </app-form-field>
+          </form>
+        }
+      }
+
       @default {
         <form id="transfer-action-form" class="flex flex-col gap-4" [formGroup]="reasonForm" novalidate (ngSubmit)="submitReason()">
           <p class="text-sm text-fg-muted">
@@ -236,7 +269,7 @@
           appButton
           type="submit"
           form="transfer-action-form"
-          [variant]="mode() === 'cancel' || mode() === 'reject' ? 'danger' : 'primary'"
+          [variant]="mode() === 'cancel' || mode() === 'reject' || mode() === 'voidFreight' ? 'danger' : 'primary'"
           [loading]="busy()"
         >
           {{ submitLabel() }}

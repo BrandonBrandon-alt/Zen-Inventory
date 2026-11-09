@@ -41,6 +41,8 @@ export interface PurchasePayment {
   readonly method: PaymentMethod;
   readonly reference: string;
   readonly notes: string;
+  /** Si se anuló (contra-asiento): cuándo, quién y por qué. Un pago anulado no cuenta en lo pagado. */
+  readonly voided: { readonly date: Date | null; readonly by: string; readonly reason: string } | null;
 }
 
 /** Lo que se envía para registrar un pago; sin `amount` se paga todo el saldo. */
@@ -118,7 +120,18 @@ function toPurchase(raw: PurchaseResponse): Purchase | null {
     overdue: raw.overdue ?? false,
     payments: (raw.payments ?? []).flatMap((p) =>
       typeof p.id === 'number'
-        ? [{ id: p.id, amount: p.amount ?? 0, date: parseDate(p.date), userName: p.userName?.trim() || 'Desconocido', method: isMethod(p.method) ? p.method : 'OTRO', reference: p.reference?.trim() ?? '', notes: p.notes?.trim() ?? '' }]
+        ? [
+            {
+              id: p.id,
+              amount: p.amount ?? 0,
+              date: parseDate(p.date),
+              userName: p.userName?.trim() || 'Desconocido',
+              method: isMethod(p.method) ? p.method : 'OTRO',
+              reference: p.reference?.trim() ?? '',
+              notes: p.notes?.trim() ?? '',
+              voided: p.voidedAt ? { date: parseDate(p.voidedAt), by: p.voidedByUserName?.trim() || 'Desconocido', reason: p.voidReason?.trim() ?? '' } : null,
+            },
+          ]
         : [],
     ),
     reason: raw.reasonResolution?.trim() ?? '',
@@ -209,6 +222,11 @@ export class PurchasesApi {
   }
 
   /** Registra un pago o abono: la orden queda con pago parcial mientras haya saldo y pagada al cubrir el total. */
+  /** Anula un pago equivocado (queda en el historial, deja de contar en lo pagado). */
+  voidPayment(id: number, paymentId: number, reason: string): Observable<Purchase> {
+    return this.http.post<PurchaseResponse>(`${this.url}/${id}/payments/${paymentId}/void`, { reason: reason.trim() }, this.options).pipe(map(requirePurchase));
+  }
+
   pay(id: number, input: PaymentInput): Observable<Purchase> {
     const body = {
       ...(input.amount !== null ? { amount: input.amount } : {}),

@@ -210,6 +210,14 @@ public class PurchaseService implements PurchaseUseCase {
 
     @Override
     @Transactional
+    public PurchaseOrder voidPayment(Long orderId, Long paymentId, String reason, Long userId, String userName) {
+        PurchaseOrder order = getOrderById(orderId);
+        order.voidPayment(paymentId, reason, userId, userName);
+        return repository.save(order);
+    }
+
+    @Override
+    @Transactional
     public void cancelPurchase(Long orderId, String reason, Long userId) {
         PurchaseOrder order = getOrderById(orderId);
         order.cancel(reason, userId);

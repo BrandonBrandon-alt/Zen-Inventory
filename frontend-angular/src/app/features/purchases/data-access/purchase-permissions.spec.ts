@@ -22,12 +22,20 @@ const purchase = (reception: ReceptionStatus, payment: PaymentStatus = 'POR_PAGA
   lines: [],
 });
 
+/** Las acciones sobre la orden según su estado (anular un pago es por pago, no por estado: se prueba aparte). */
 const allowed = (p: Purchase, role: Parameters<typeof purchaseActions>[1]) =>
   Object.entries(purchaseActions(p, role))
-    .filter(([, on]) => on)
+    .filter(([name, on]) => on && name !== 'voidPayment')
     .map(([name]) => name);
 
 describe('purchaseActions', () => {
+  it('anular un pago es de gerencia (ADMIN y MANAGER), como pagar; el operador no', () => {
+    expect(purchaseActions(purchase('RECEIVED_TOTAL', 'PAGADO'), 'ADMIN').voidPayment).toBe(true);
+    expect(purchaseActions(purchase('RECEIVED_TOTAL', 'PAGADO'), 'MANAGER').voidPayment).toBe(true);
+    expect(purchaseActions(purchase('RECEIVED_TOTAL', 'PAGADO'), 'OPERADOR_INVENTARIO').voidPayment).toBe(false);
+    expect(purchaseActions(purchase('RECEIVED_TOTAL', 'PAGADO'), 'SELLER').voidPayment).toBe(false);
+  });
+
   it('una orden por aprobar la aprueban o cancelan ADMIN y MANAGER; el operador no hace nada', () => {
     expect(allowed(purchase('AWAITING_APPROVAL'), 'MANAGER')).toEqual(['approve', 'cancel']);
     expect(allowed(purchase('AWAITING_APPROVAL'), 'ADMIN')).toEqual(['approve', 'cancel']);

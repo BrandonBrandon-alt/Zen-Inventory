@@ -20,6 +20,8 @@ export interface TransferActions {
   readonly resolve: boolean;
   /** Registrar un pago del flete al transportista (la sucursal de origen, que contrata el envío). */
   readonly payFreight: boolean;
+  /** Anular un pago del flete equivocado (quien puede pagarlo). */
+  readonly voidFreightPayment: boolean;
 }
 
 /**
@@ -44,5 +46,6 @@ export function transferActions(transfer: Transfer, actor: Actor): TransferActio
     reject: ['PENDING', 'IN_TRANSIT'].includes(status) && manager && either,
     resolve: status === 'WITH_ISSUE' && manager && either,
     payFreight: transfer.freightBalance > 0 && manager && origin,
+    voidFreightPayment: manager && origin,
   };
 }

@@ -40,7 +40,11 @@ public record PurchaseResponse(
             String userName,
             String method,
             String reference,
-            String notes
+            String notes,
+            /** Anulación: todos nulos si el pago está vigente; un pago anulado no cuenta en lo pagado. */
+            LocalDateTime voidedAt,
+            String voidedByUserName,
+            String voidReason
     ) {}
 
     public record PurchaseDetailResponse(
@@ -76,7 +80,8 @@ public record PurchaseResponse(
                 order.balance(),
                 order.isOverdue(LocalDateTime.now()),
                 order.getPayments().stream().map(p -> new PaymentResponse(p.getId(), p.getAmount(), p.getDate(),
-                        p.getUserId(), p.getUserName(), p.getMethod().name(), p.getReference(), p.getNotes())).toList(),
+                        p.getUserId(), p.getUserName(), p.getMethod().name(), p.getReference(), p.getNotes(),
+                        p.getVoidedAt(), p.getVoidedByUserName(), p.getVoidReason())).toList(),
                 order.getDetails().stream().map(d -> new PurchaseDetailResponse(
                         d.getId(),
                         d.getProductId(),

@@ -132,6 +132,16 @@ public class TransferController {
         return ResponseEntity.ok(TransferResponse.fromDomain(transfer));
     }
 
+    /** Anula un pago del flete equivocado: queda en el historial marcado como anulado y deja de contar en lo pagado. */
+    @PostMapping("/{id}/freight-payments/{paymentId}/void")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<TransferResponse> voidFreightPayment(
+            @PathVariable Long id,
+            @PathVariable Long paymentId,
+            @Valid @RequestBody ResolutionRequest request) {
+        return ResponseEntity.ok(TransferResponse.fromDomain(transferUseCase.voidFreightPayment(id, paymentId, request.reason())));
+    }
+
     @PostMapping("/{id}/cancel")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<Void> cancelTransfer(

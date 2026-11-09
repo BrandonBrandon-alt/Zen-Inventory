@@ -234,4 +234,35 @@ class PurchaseControllerTest {
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any());
     }
+
+    @Test
+    @DisplayName("anular un pago lo hace a nombre del usuario de la sesión, con el motivo, y devuelve el pago anulado")
+    void voidPayment_forwardsReasonAndShowsVoid() throws Exception {
+        actAsManagerOfBranch(1L);
+        PurchaseOrder order = orderForPayment();
+        co.com.zenvory.inventario.purchase.domain.model.PurchasePayment voided = new co.com.zenvory.inventario.purchase.domain.model.PurchasePayment(
+                3L, new java.math.BigDecimal("400"), java.time.LocalDateTime.of(2026, 10, 1, 9, 0), 2L, "Ana",
+                co.com.zenvory.inventario.purchase.domain.model.PaymentMethod.TRANSFERENCIA, "TR-1", null,
+                java.time.LocalDateTime.of(2026, 10, 2, 9, 0), 5L, "Gerente", "Duplicado");
+        when(order.getPayments()).thenReturn(List.of(voided));
+        when(purchaseUseCase.voidPayment(1L, 3L, "Duplicado", 5L, "Gerente")).thenReturn(order);
+
+        mockMvc.perform(post("/api/v1/purchases/1/payments/3/void").contentType("application/json").content("{\"reason\":\"Duplicado\",\"userId\":99}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.payments[0].voidReason").value("Duplicado"))
+                .andExpect(jsonPath("$.payments[0].voidedByUserName").value("Gerente"));
+        org.mockito.Mockito.verify(purchaseUseCase).voidPayment(1L, 3L, "Duplicado", 5L, "Gerente");
+    }
+
+    @Test
+    @DisplayName("anular un pago sin motivo es 400 y no anula nada")
+    void voidPayment_requiresReason() throws Exception {
+        actAsManagerOfBranch(1L);
+        orderForPayment();
+        mockMvc.perform(post("/api/v1/purchases/1/payments/3/void").contentType("application/json").content("{\"reason\":\" \"}"))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verify(purchaseUseCase, org.mockito.Mockito.never()).voidPayment(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
 }

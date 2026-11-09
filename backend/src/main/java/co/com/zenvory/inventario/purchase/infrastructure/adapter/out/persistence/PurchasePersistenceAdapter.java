@@ -91,6 +91,10 @@ public class PurchasePersistenceAdapter implements PurchaseRepositoryPort {
             pEntity.setMethod(p.getMethod().name());
             pEntity.setReference(p.getReference());
             pEntity.setNotes(p.getNotes());
+            pEntity.setVoidedAt(p.getVoidedAt());
+            pEntity.setVoidedByUserId(p.getVoidedByUserId());
+            pEntity.setVoidedByUserName(p.getVoidedByUserName());
+            pEntity.setVoidReason(p.getVoidReason());
             entity.addPayment(pEntity);
         });
 
@@ -104,7 +108,8 @@ public class PurchasePersistenceAdapter implements PurchaseRepositoryPort {
                 .toList();
         List<PurchasePayment> payments = entity.getPayments().stream()
                 .map(p -> new PurchasePayment(p.getId(), p.getAmount(), p.getDate(), p.getUserId(), p.getUserName(),
-                        PaymentMethod.valueOf(p.getMethod()), p.getReference(), p.getNotes()))
+                        PaymentMethod.valueOf(p.getMethod()), p.getReference(), p.getNotes(), p.getVoidedAt(),
+                        p.getVoidedByUserId(), p.getVoidedByUserName(), p.getVoidReason()))
                 .toList();
 
         return new PurchaseOrder(

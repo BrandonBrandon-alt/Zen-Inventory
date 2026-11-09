@@ -14,9 +14,9 @@ import { Modal } from '@shared/ui/modal/modal';
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { PAYMENT_INFO, PAYMENT_METHOD_LABELS, RECEPTION_INFO } from '../../data-access/purchase-labels';
 import { purchaseActions } from '../../data-access/purchase-permissions';
-import { PAYMENT_METHODS, type PaymentMethod, type Purchase, type PurchaseLine, PurchasesApi, type Receipt } from '../../data-access/purchases-api';
+import { PAYMENT_METHODS, type PaymentMethod, type Purchase, type PurchaseLine, type PurchasePayment, PurchasesApi, type Receipt } from '../../data-access/purchases-api';
 
-type Mode = 'view' | 'receive' | 'cancel' | 'receipt' | 'pay';
+type Mode = 'view' | 'receive' | 'cancel' | 'receipt' | 'pay' | 'void';
 
 /** Lo que falta por recibir de una línea (una orden parcialmente recibida ya trae parte). */
 export const pendingOf = (line: PurchaseLine): number => Math.max(0, line.quantity - line.received);
@@ -133,9 +133,18 @@ export class PurchaseDetailModal {
     this.mode.set(mode);
   }
 
+  /** El pago que se está por anular (en el modo `void`). */
+  protected readonly voiding = signal<PurchasePayment | null>(null);
+
+  protected startVoid(payment: PurchasePayment): void {
+    this.voiding.set(payment);
+    this.reasonForm.reset({ reason: '' }, { emitEvent: false });
+    this.goto('void');
+  }
+
   protected submitLabel(): string {
     const mode = this.mode();
-    return mode === 'receive' ? 'Registrar recepción' : mode === 'pay' ? 'Registrar pago' : 'Cancelar orden';
+    return mode === 'receive' ? 'Registrar recepción' : mode === 'pay' ? 'Registrar pago' : mode === 'void' ? 'Anular pago' : 'Cancelar orden';
   }
 
   // ---- Acciones directas ----
@@ -199,6 +208,16 @@ export class PurchaseDetailModal {
               detail: `Queda un saldo de ${formatMoney(p.balance - paid)} por pagar al proveedor.`,
             },
       );
+    } else if (this.mode() === 'void') {
+      const payment = this.voiding();
+      this.reasonForm.markAllAsTouched();
+      if (!payment || this.reasonForm.invalid) return;
+      const balance = p.reception === 'CANCELLED' ? p.balance : Math.min(p.total, p.balance + payment.amount);
+      void this.run(this.api.voidPayment(p.id, payment.id, this.reasonForm.getRawValue().reason), {
+        title: `Pago anulado en la orden #${p.id}`,
+        summary: `El pago de ${formatMoney(payment.amount)} se anuló correctamente.`,
+        detail: `Queda en el historial como anulado y ya no cuenta en lo pagado: el saldo con el proveedor vuelve a ser ${formatMoney(balance)}.`,
+      });
     } else if (this.mode() === 'cancel') {
       this.reasonForm.markAllAsTouched();
       if (this.reasonForm.invalid) return;
