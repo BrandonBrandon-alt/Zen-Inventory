@@ -22,6 +22,9 @@ public class ReturnRequestDetailEntity {
     @JoinColumn(name = "solicitud_id")
     private ReturnRequestEntity request;
     
+    @Column(name = "detalle_venta_id", nullable = false)
+    private Long saleDetailId;
+
     @Column(name = "producto_id", nullable = false)
     private Long productId;
     

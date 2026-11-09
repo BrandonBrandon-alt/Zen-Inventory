@@ -1,10 +1,12 @@
-const MONEY = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const MONEY = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const MONEY_CENTS = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const QUANTITY = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 4 });
 const DATE_TIME = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
 
-/** Pesos colombianos: `$ 1.250,5`. `null` o no numérico se muestra como guion. */
+/** Pesos colombianos: `$ 1.250` o, si tiene centavos, siempre con dos decimales (`$ 1.250,50`). `null` o no numérico se muestra como guion. */
 export function formatMoney(value: number | null | undefined): string {
-  return typeof value === 'number' && Number.isFinite(value) ? MONEY.format(value) : '—';
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  return Math.round(value * 100) % 100 === 0 ? MONEY.format(Math.round(value)) : MONEY_CENTS.format(value);
 }
 
 /** Cantidades con separador de miles y hasta 4 decimales (las unidades pueden ser fraccionarias). */
@@ -13,7 +15,8 @@ export function formatQuantity(value: number | null | undefined): string {
 }
 
 export function formatDateTime(value: Date | null | undefined): string {
-  return value instanceof Date && !Number.isNaN(value.getTime()) ? DATE_TIME.format(value) : '—';
+  // «6:33 a. m.» no debe partirse en dos líneas dentro de una tabla: se une con espacios que no se parten.
+  return value instanceof Date && !Number.isNaN(value.getTime()) ? DATE_TIME.format(value).replace(/\s(?=[ap]\. ?m\.)/i, '\u00A0').replace(/([ap]\.) (m\.)/i, '$1\u00A0$2') : '—';
 }
 
 const COMPACT = new Intl.NumberFormat('es-CO', { maximumFractionDigits: 1 });

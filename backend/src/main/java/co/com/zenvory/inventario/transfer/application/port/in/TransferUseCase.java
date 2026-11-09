@@ -10,6 +10,15 @@ public interface TransferUseCase {
     Transfer receiveTransfer(Long transferId, ReceiveTransferCommand command);
     Transfer approveDestination(Long transferId);
     void cancelTransfer(Long id, String reason);
+
+    /**
+     * Registra un pago o abono del flete al transportista. El ADMIN lo hace sobre cualquier traslado; el gerente, solo
+     * en los que despachó su sucursal (la que contrata el envío).
+     *
+     * @param amount monto pagado; {@code null} paga todo el saldo pendiente
+     */
+    Transfer registerFreightPayment(Long transferId, java.math.BigDecimal amount,
+            co.com.zenvory.inventario.transfer.domain.model.TransferPaymentMethod method, String reference, String notes);
     void rejectTransfer(Long id, String reason);
     void resolveAsShrinkage(Long transferId);
     void resolveAsResend(Long transferId);

@@ -14,6 +14,8 @@ export interface ReportSale {
   /** `CANCELED` no suma a lo vendido; cualquier otro estado sí. */
   readonly canceled: boolean;
   readonly seller: string;
+  /** Forma de pago; las ventas anteriores a su registro no la tienen. */
+  readonly paymentMethod: string | null;
   readonly branchName: string;
   readonly subtotal: number;
   readonly discount: number;
@@ -28,6 +30,7 @@ function toReportSale(raw: SaleResponse): ReportSale | null {
     date: parseDate(raw.date),
     canceled: raw.status === 'CANCELED',
     seller: raw.userName?.trim() ?? '',
+    paymentMethod: raw.paymentMethod?.trim() || null,
     branchName: raw.branchName?.trim() ?? '',
     subtotal: raw.subtotal ?? 0,
     discount: raw.totalDiscount ?? 0,

@@ -8,6 +8,7 @@ import { NotificationService } from '@core/notifications/notification.service';
 import { formatMoney } from '@shared/format/format';
 import { applyServerErrors } from '@shared/forms/apply-server-errors';
 import { controlError } from '@shared/forms/control-error';
+import { Checkbox } from '@shared/ui/checkbox/checkbox';
 import { Alert } from '@shared/ui/alert/alert';
 import { Button } from '@shared/ui/button/button';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
@@ -54,7 +55,7 @@ type SupplierGroup = ReturnType<typeof supplierGroup>;
  */
 @Component({
   selector: 'app-product-form-modal',
-  imports: [ReactiveFormsModule, Modal, Button, Alert, FormField, InputDirective, Select, Tooltip, LucidePlus, LucideTrash2],
+  imports: [Checkbox, ReactiveFormsModule, Modal, Button, Alert, FormField, InputDirective, Select, Tooltip, LucidePlus, LucideTrash2],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './product-form-modal.html',
 })

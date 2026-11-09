@@ -145,12 +145,12 @@ describe('ReportsPage', () => {
     expect(asked[0]).toBe('20');
   });
 
-  it('sin ventas en el periodo lo dice en las dos tablas', async () => {
+  it('sin ventas en el periodo lo dice en las tres tablas', async () => {
     useSession('MANAGER', 10);
     stub([]);
     await renderPage();
     await screen.findByRole('region', { name: 'Cierre de caja' });
-    expect(screen.getAllByText('No hubo ventas en este periodo')).toHaveLength(2);
+    expect(screen.getAllByText('No hubo ventas en este periodo')).toHaveLength(3);
   });
 
   it('si falla la carga muestra el error y reintentar lo recupera; no se puede descargar mientras tanto', async () => {

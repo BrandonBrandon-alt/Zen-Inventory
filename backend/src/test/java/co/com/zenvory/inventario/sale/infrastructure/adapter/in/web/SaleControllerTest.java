@@ -106,7 +106,7 @@ class SaleControllerTest {
         org.mockito.Mockito.when(userRepositoryPort.findByEmail("test@example.com")).thenReturn(java.util.Optional.of(manager));
     }
 
-    private static final String SALE_BODY = "{\"branchId\": %d, \"userId\": 99, \"items\": [{\"productId\": 1, \"quantity\": 1}]}";
+    private static final String SALE_BODY = "{\"branchId\": %d, \"userId\": 99, \"paymentMethod\": \"TARJETA\", \"paymentReference\": \"V-123\", \"items\": [{\"productId\": 1, \"quantity\": 1}]}";
 
     @Test
     @DisplayName("POST /sales: el vendedor y la sucursal salen de la sesión, no del cuerpo (userId falso se ignora)")
@@ -125,6 +125,20 @@ class SaleControllerTest {
         org.mockito.Mockito.verify(createSaleUseCase).execute(captor.capture());
         org.assertj.core.api.Assertions.assertThat(captor.getValue().userId()).isEqualTo(5L);
         org.assertj.core.api.Assertions.assertThat(captor.getValue().branchId()).isEqualTo(1L);
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().paymentMethod())
+                .isEqualTo(co.com.zenvory.inventario.sale.domain.model.SalePaymentMethod.TARJETA);
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().paymentReference()).isEqualTo("V-123");
+    }
+
+    @Test
+    @DisplayName("POST /sales: sin forma de pago o con una desconocida es 400 y no registra nada")
+    void create_withoutPaymentMethod_returns400() throws Exception {
+        actAsManagerOfBranch(1L);
+        String noMethod = "{\"branchId\": 1, \"items\": [{\"productId\": 1, \"quantity\": 1}]}";
+        String unknown = "{\"branchId\": 1, \"paymentMethod\": \"BITCOIN\", \"items\": [{\"productId\": 1, \"quantity\": 1}]}";
+        mockMvc.perform(post("/api/v1/sales").contentType("application/json").content(noMethod)).andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/sales").contentType("application/json").content(unknown)).andExpect(status().isBadRequest());
+        org.mockito.Mockito.verify(createSaleUseCase, org.mockito.Mockito.never()).execute(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -186,7 +200,7 @@ class SaleControllerTest {
                 org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean()))
                 .thenReturn(emptyPage());
 
-        mockMvc.perform(get("/api/v1/sales/search?branchId=3&status=CANCELED&from=2026-01-01&to=2026-01-31&seller=Ana&product=Cafe&minTotal=10&maxTotal=99.5&q=perez&supplierId=7&withDiscount=true&registeredCustomer=false"))
+        mockMvc.perform(get("/api/v1/sales/search?branchId=3&status=CANCELED&from=2026-01-01&to=2026-01-31&seller=Ana&product=Cafe&minTotal=10&maxTotal=99.5&q=perez&supplierId=7&withDiscount=true&registeredCustomer=false&paymentMethod=EFECTIVO"))
                 .andExpect(status().isOk());
 
         var c = searchedCriteria(10);
@@ -202,6 +216,7 @@ class SaleControllerTest {
         org.assertj.core.api.Assertions.assertThat(c.supplierId()).isEqualTo(7L);
         org.assertj.core.api.Assertions.assertThat(c.withDiscount()).isTrue();
         org.assertj.core.api.Assertions.assertThat(c.registeredCustomer()).isFalse();
+        org.assertj.core.api.Assertions.assertThat(c.paymentMethod()).isEqualTo(co.com.zenvory.inventario.sale.domain.model.SalePaymentMethod.EFECTIVO);
     }
 
     @Test

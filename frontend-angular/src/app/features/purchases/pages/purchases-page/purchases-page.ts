@@ -20,6 +20,7 @@ import { CatalogOptionsApi, type ProductOption, type SupplierOption } from '@cor
 import { formatDateTime, formatMoney, normalizeText } from '@shared/format/format';
 import { inDateRange, inNumberRange, numberFromInput, optionsFrom } from '@shared/filters/filter-helpers';
 import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
+import { Checkbox } from '@shared/ui/checkbox/checkbox';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { DatePicker } from '@shared/ui/date-picker/date-picker';
@@ -30,7 +31,8 @@ import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-tabl
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { PurchaseDetailModal } from '../../components/purchase-detail-modal/purchase-detail-modal';
-import { PurchaseFormModal } from '../../components/purchase-form-modal/purchase-form-modal';
+import { PurchaseFormModal, type PurchasePreset } from '../../components/purchase-form-modal/purchase-form-modal';
+import { takeNewDocumentRequest } from '@core/navigation/new-document-link';
 import { OPEN_RECEPTIONS, PAYMENT_INFO, RECEPTION_INFO } from '../../data-access/purchase-labels';
 import { purchaseActions } from '../../data-access/purchase-permissions';
 import { PAYMENT_STATUSES, type PaymentStatus, type Purchase, PurchasesApi, RECEPTION_STATUSES, type ReceptionStatus } from '../../data-access/purchases-api';
@@ -49,7 +51,7 @@ const DAY = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' });
 
 @Component({
   selector: 'app-purchases-page',
-  imports: [DataTable, DataTableCell, Badge, Button, DatePicker, ActiveFilters, AdvancedFilters, FormField, InputDirective, Select, Tooltip, PurchaseDetailModal, PurchaseFormModal, LucideEye, LucidePlus, LucideSearch],
+  imports: [Checkbox, DataTable, DataTableCell, Badge, Button, DatePicker, ActiveFilters, AdvancedFilters, FormField, InputDirective, Select, Tooltip, PurchaseDetailModal, PurchaseFormModal, LucideEye, LucidePlus, LucideSearch],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './purchases-page.html',
@@ -90,6 +92,8 @@ export class PurchasesPage {
   protected readonly numberFromInput = numberFromInput;
 
   protected readonly formOpen = signal(false);
+  /** Lo que llega ya elegido al formulario cuando se viene de otra pantalla (el ajuste de stock). */
+  protected readonly formPreset = signal<PurchasePreset | null>(null);
   protected readonly detailOpen = signal(false);
   protected readonly selectedId = signal<number | null>(null);
 
@@ -123,8 +127,9 @@ export class PurchasesPage {
     { key: 'supplier', header: 'Proveedor', icon: LucideTruck.icon, sortable: true, primary: true },
     ...(this.isAdmin() ? [{ key: 'branch', header: 'Sucursal', icon: LucideStore.icon, sortable: true }] : []),
     { key: 'total', header: 'Total', icon: LucideCoins.icon, sortable: true, align: 'end' as const, display: (r: PurchaseRow) => formatMoney(r.total) },
+    { key: 'balance', header: 'Saldo', icon: LucideCoins.icon, sortable: true, align: 'end' as const, display: (r: PurchaseRow) => formatMoney(r.balance) },
     { key: 'paymentLabel', header: 'Pago', icon: LucideWallet.icon, sortable: true },
-    { key: 'requestDate', header: 'Solicitada', icon: LucideCalendar.icon, sortable: true, width: '11.5rem', value: (r: PurchaseRow) => r.requestDate, display: (r: PurchaseRow) => formatDateTime(r.requestDate) },
+    { key: 'requestDate', header: 'Solicitada', icon: LucideCalendar.icon, sortable: true, nowrap: true, width: '11.5rem', value: (r: PurchaseRow) => r.requestDate, display: (r: PurchaseRow) => formatDateTime(r.requestDate) },
     { key: 'acciones', header: 'Acciones', align: 'end' as const },
   ]);
 
@@ -191,10 +196,18 @@ export class PurchasesPage {
     return list;
   });
 
+  /** Lo que se le debe a los proveedores en las órdenes visibles y cuántas ya vencieron. */
+  protected readonly payables = computed(() => {
+    const owed = this.purchases().filter((p) => p.balance > 0);
+    return { total: owed.reduce((sum, p) => sum + p.balance, 0), count: owed.length, overdue: owed.filter((p) => p.overdue).length };
+  });
+
   protected readonly selected = computed(() => this.purchases().find((p) => p.id === this.selectedId()) ?? null);
   protected readonly pending = computed(() => this.rows().filter((r) => r.needsMe).length);
   protected readonly selectedSupplier = computed(() => this.supplierNames().get(this.selected()?.supplierId ?? -1) ?? '');
   protected readonly selectedBranch = computed(() => (this.isAdmin() ? (this.branchNames().get(this.selected()?.branchId ?? -1) ?? '') : ''));
+
+  protected readonly formatMoney = formatMoney;
 
   protected readonly summary = computed(() => {
     const open = this.purchases().filter((p) => OPEN_RECEPTIONS.includes(p.reception)).length;
@@ -202,6 +215,9 @@ export class PurchasesPage {
   });
 
   constructor() {
+    // Desde «Compra a proveedor» en el ajuste de stock: se abre la orden nueva con ese producto (y su sucursal).
+    const request = takeNewDocumentRequest();
+    if (request) this.openForm({ productId: request.productId, branchId: request.branchId });
     void this.load();
     // Los nombres de proveedor, producto y sucursal adornan la tabla y el formulario: si fallan, se muestran los códigos.
     forkJoin({
@@ -249,6 +265,11 @@ export class PurchasesPage {
 
   protected clearFilters(): void {
     for (const filter of this.activeFilters()) this.removeFilter(filter.id);
+  }
+
+  protected openForm(preset: PurchasePreset | null = null): void {
+    this.formPreset.set(preset);
+    this.formOpen.set(true);
   }
 
   protected openDetail(row: PurchaseRow): void {

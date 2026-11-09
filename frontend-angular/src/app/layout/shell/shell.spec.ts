@@ -41,6 +41,22 @@ describe('Shell', () => {
       await expectAccessible();
     });
 
+    it('el primer elemento al tabular es «Saltar al contenido», que pasa el foco al contenido sin cambiar la URL', async () => {
+      await renderShell(true);
+      const router = TestBed.inject(Router);
+      const url = router.url;
+      const scrollIntoView = vi.fn(); // jsdom no lo implementa
+      Element.prototype.scrollIntoView = scrollIntoView;
+      await userEvent.tab();
+      const skip = screen.getByRole('link', { name: 'Saltar al contenido' });
+      expect(skip).toHaveFocus();
+      await userEvent.keyboard('{Enter}');
+      expect(document.getElementById('contenido')).toHaveFocus();
+      expect(scrollIntoView).toHaveBeenCalled();
+      expect(router.url).toBe(url);
+      delete (Element.prototype as Partial<Element>).scrollIntoView;
+    });
+
     it('muestra el menú siempre y no hay barra superior ni botón de menú', async () => {
       const { sidebar } = await renderShell(true);
       expect(sidebar).not.toHaveAttribute('inert');

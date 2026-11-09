@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { Hint } from '../hint/hint';
 
 export type CardVariant = 'surface' | 'plain';
 
@@ -11,7 +12,7 @@ let nextId = 0;
  * - `plain`: solo una línea superior; para gráficas y datos de lectura, que no necesitan marco.
  *
  * ```html
- * <app-card title="Más vendidos" description="Unidades en el periodo">
+ * <app-card title="Más vendidos" description="Unidades en el periodo" hint="Los productos con más unidades vendidas.">
  *   <button data-slot="actions">Ver todo</button>
  *   …contenido…
  * </app-card>
@@ -19,13 +20,19 @@ let nextId = 0;
  */
 @Component({
   selector: 'app-card',
+  imports: [Hint],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block', role: 'region', '[attr.aria-labelledby]': 'titleId' },
   template: `
     <div [class]="frame()">
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
-          <h2 [id]="titleId" class="font-title text-xl font-bold tracking-tight text-fg">{{ title() }}</h2>
+          <div class="flex items-center gap-1.5">
+            <h2 [id]="titleId" class="font-title text-xl font-bold tracking-tight text-fg">{{ title() }}</h2>
+            @if (hint(); as text) {
+              <app-hint [label]="title()" [text]="text" />
+            }
+          </div>
           @if (description(); as text) {
             <p class="mt-0.5 text-sm text-fg-subtle">{{ text }}</p>
           }
@@ -39,6 +46,8 @@ let nextId = 0;
 export class Card {
   readonly title = input.required<string>();
   readonly description = input<string>();
+  /** Explicación del contenido de la tarjeta: aparece como un icono de ayuda junto al título. */
+  readonly hint = input<string>();
   readonly variant = input<CardVariant>('surface');
 
   protected readonly titleId = `app-card-title-${nextId++}`;

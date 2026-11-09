@@ -77,7 +77,7 @@ public class InventoryMovementEntity {
     private String subReason;
 
     /** Cantidad neta resultante tras el movimiento para fines de auditoría. */
-    @Column(name = "saldo_final", precision = 12, scale = 2)
+    @Column(name = "saldo_final", precision = 12, scale = 4)
     private BigDecimal finalBalance;
 
     /**

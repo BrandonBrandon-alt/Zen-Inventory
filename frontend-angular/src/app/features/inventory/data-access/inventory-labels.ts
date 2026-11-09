@@ -46,6 +46,11 @@ export interface GuidedReason extends SelectOption<MovementReason> {
   readonly path: string;
   /** Texto del botón que lleva allí. */
   readonly action: string;
+  /**
+   * Si está, la pantalla se abre con el formulario del documento nuevo y el producto ya elegido; `side` dice qué papel
+   * cumple la sucursal actual en un traslado (la que recibe o la que envía).
+   */
+  readonly opensForm?: { readonly side: 'origen' | 'destino' | null };
   readonly explanation: string;
 }
 
@@ -61,7 +66,8 @@ export const GUIDED_REASONS: Record<MovementType, readonly GuidedReason[]> = {
       description: 'Se registra en Compras',
       icon: LucideShoppingCart.icon,
       path: '/purchases',
-      action: 'Ir a Compras',
+      action: 'Crear orden de compra',
+      opensForm: { side: null },
       explanation: 'El ingreso por compra se registra con una orden de compra: así queda el documento, se actualiza el costo promedio y se controla lo que falta por recibir.',
     },
     {
@@ -70,7 +76,8 @@ export const GUIDED_REASONS: Record<MovementType, readonly GuidedReason[]> = {
       description: 'Se registra en Traslados',
       icon: LucideTruck.icon,
       path: '/transfers',
-      action: 'Ir a Traslados',
+      action: 'Solicitar traslado',
+      opensForm: { side: 'destino' },
       explanation: 'El movimiento entre sucursales se gestiona desde Traslados: así se descuenta del origen, se sigue en tránsito y se confirma lo recibido.',
     },
   ],
@@ -90,7 +97,8 @@ export const GUIDED_REASONS: Record<MovementType, readonly GuidedReason[]> = {
       description: 'Se registra en Traslados',
       icon: LucideTruck.icon,
       path: '/transfers',
-      action: 'Ir a Traslados',
+      action: 'Crear traslado',
+      opensForm: { side: 'origen' },
       explanation: 'El movimiento entre sucursales se gestiona desde Traslados: así se descuenta del origen, se sigue en tránsito y se confirma lo recibido.',
     },
   ],

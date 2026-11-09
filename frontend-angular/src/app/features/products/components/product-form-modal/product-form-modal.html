@@ -38,10 +38,7 @@
     </div>
 
     @if (product()) {
-      <label class="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
-        <input type="checkbox" formControlName="activo" class="size-4 accent-(--brand-500)" />
-        Producto activo
-      </label>
+      <app-checkbox formControlName="activo">Producto activo</app-checkbox>
     }
 
     <fieldset class="flex flex-col gap-3 border-t border-line pt-4" formArrayName="suppliers">
@@ -68,10 +65,7 @@
             <input appInput type="number" min="0" step="1" inputmode="numeric" formControlName="deliveryDays" />
           </app-form-field>
           <div class="flex items-center gap-3 sm:pt-7">
-            <label class="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
-              <input type="checkbox" class="size-4 accent-(--brand-500)" [checked]="row.controls.preferred.value" (change)="setPreferred(row, $any($event.target).checked)" />
-              Preferido
-            </label>
+            <app-checkbox [checked]="row.controls.preferred.value" (checkedChange)="setPreferred(row, $event)">Preferido</app-checkbox>
             <button appButton variant="ghost-danger" size="sm" type="button" appTooltip="Quitar proveedor" [attr.aria-label]="'Quitar proveedor ' + (i + 1)" (click)="removeSupplier(i)">
               <svg lucideTrash2 [size]="16" aria-hidden="true"></svg>
             </button>

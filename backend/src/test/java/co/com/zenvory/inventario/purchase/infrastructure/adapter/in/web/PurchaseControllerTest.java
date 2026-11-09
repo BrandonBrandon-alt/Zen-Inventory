@@ -176,4 +176,62 @@ class PurchaseControllerTest {
         mockMvc.perform(post("/api/v1/purchases").contentType("application/json").content(String.format(bad, -5, 10))).andExpect(status().isBadRequest());
         org.mockito.Mockito.verify(purchaseUseCase, org.mockito.Mockito.never()).createOrder(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean());
     }
+
+    private PurchaseOrder orderForPayment() {
+        PurchaseOrder order = mock(PurchaseOrder.class);
+        when(order.getBranchId()).thenReturn(1L);
+        when(order.getReceptionStatus()).thenReturn(co.com.zenvory.inventario.purchase.domain.model.ReceptionStatus.RECEIVED_TOTAL);
+        when(order.getPaymentStatus()).thenReturn(co.com.zenvory.inventario.purchase.domain.model.PaymentStatus.PAGO_PARCIAL);
+        when(order.getDetails()).thenReturn(List.of());
+        when(order.getPayments()).thenReturn(List.of());
+        when(purchaseUseCase.getOrderById(1L)).thenReturn(order);
+        return order;
+    }
+
+    @Test
+    @DisplayName("un abono se registra a nombre del usuario de la sesión, con su monto, método y referencia")
+    void payRecordsPaymentWithSessionUser() throws Exception {
+        actAsManagerOfBranch(1L);
+        PurchaseOrder order = orderForPayment();
+        when(purchaseUseCase.registerPayment(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(5L), org.mockito.ArgumentMatchers.any())).thenReturn(order);
+
+        mockMvc.perform(post("/api/v1/purchases/1/pay").contentType("application/json")
+                .content("{\"amount\":400.50,\"method\":\"TRANSFERENCIA\",\"reference\":\"TR-1\",\"notes\":\"abono\",\"userId\":99}"))
+                .andExpect(status().isOk());
+        org.mockito.Mockito.verify(purchaseUseCase).registerPayment(org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.eq(new java.math.BigDecimal("400.50")),
+                org.mockito.ArgumentMatchers.eq(co.com.zenvory.inventario.purchase.domain.model.PaymentMethod.TRANSFERENCIA),
+                org.mockito.ArgumentMatchers.eq("TR-1"), org.mockito.ArgumentMatchers.eq("abono"),
+                org.mockito.ArgumentMatchers.eq(5L), org.mockito.ArgumentMatchers.eq("Gerente"));
+    }
+
+    @Test
+    @DisplayName("pagar sin cuerpo sigue funcionando y paga todo el saldo")
+    void payWithoutBodyPaysBalance() throws Exception {
+        actAsManagerOfBranch(1L);
+        PurchaseOrder order = orderForPayment();
+        when(purchaseUseCase.registerPayment(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq(5L), org.mockito.ArgumentMatchers.any())).thenReturn(order);
+
+        mockMvc.perform(post("/api/v1/purchases/1/pay")).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("un monto en cero o negativo es 400 y no se registra nada")
+    void payRejectsInvalidAmount() throws Exception {
+        actAsManagerOfBranch(1L);
+        orderForPayment();
+
+        mockMvc.perform(post("/api/v1/purchases/1/pay").contentType("application/json").content("{\"amount\":0}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/purchases/1/pay").contentType("application/json").content("{\"amount\":-5}"))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verify(purchaseUseCase, org.mockito.Mockito.never()).registerPayment(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
 }

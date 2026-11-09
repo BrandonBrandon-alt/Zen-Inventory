@@ -62,9 +62,10 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
                     // Jerarquía de Precios: Detalle -> Global -> Base
                     Long effectiveListId = (item.priceListId() != null) ? item.priceListId() : command.priceListId();
 
-                    BigDecimal price = (effectiveListId != null) 
-                            ? priceListUseCase.getPriceForProduct(effectiveListId, item.productId()).orElse(product.getSalePrice())
-                            : product.getSalePrice();
+                    java.util.Optional<BigDecimal> listed = (effectiveListId != null)
+                            ? priceListUseCase.getPriceForProduct(effectiveListId, item.productId())
+                            : java.util.Optional.empty();
+                    BigDecimal price = listed.orElse(product.getSalePrice());
 
                     if (price == null) {
                         throw new IllegalArgumentException("El producto \"" + product.getName() + "\" no tiene precio de venta.");
@@ -75,7 +76,9 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
                             product.getName(),
                             item.quantity(),
                             price,
-                            item.discountPercentage()
+                            item.discountPercentage(),
+                            // La lista solo queda registrada si de verdad dio el precio: si no, se vendió al precio base.
+                            listed.isPresent() ? effectiveListId : null
                     );
                 }).toList();
 
@@ -106,6 +109,8 @@ public class SaleService implements CreateSaleUseCase, SaleManagementUseCase {
                 userName,
                 command.customerName(),
                 command.customerDocument(),
+                command.paymentMethod(),
+                command.paymentReference(),
                 command.globalDiscountPercentage(),
                 details
         );

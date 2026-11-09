@@ -6,7 +6,7 @@
 </header>
 
 <div class="mb-3 flex animate-enter-delayed flex-wrap items-center gap-3">
-  <div class="w-64 max-w-full">
+  <div class="min-w-52 max-w-72 flex-1">
     <app-form-field>
       <input appInput type="search" placeholder="Buscar por n.º, cliente, documento o vendedor…" aria-label="Buscar venta" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
       <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
@@ -20,14 +20,15 @@
       <app-select [(value)]="branchFilter" [options]="branchOptions()" [icon]="storeIcon" ariaLabel="Sucursal" />
     </div>
   }
-  <div class="w-40"><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
-  <div class="w-40"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
+  <div class="w-36"><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
+  <div class="w-36"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
   <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
     <app-form-field label="Vendedor"><app-select [(value)]="sellerFilter" [options]="sellerOptions()" ariaLabel="Vendedor" /></app-form-field>
     <app-form-field label="Producto"><app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" /></app-form-field>
     <app-form-field label="Proveedor"><app-select [(value)]="supplierFilter" [options]="supplierOptions()" ariaLabel="Proveedor" searchable searchPlaceholder="Buscar proveedor…" /></app-form-field>
     <app-form-field label="Descuento"><app-select [(value)]="discountFilter" [options]="discountOptions" ariaLabel="Descuento" /></app-form-field>
     <app-form-field label="Cliente"><app-select [(value)]="customerFilter" [options]="customerOptions" ariaLabel="Cliente" /></app-form-field>
+    <app-form-field label="Forma de pago"><app-select [(value)]="paymentFilter" [options]="paymentOptions" ariaLabel="Forma de pago" /></app-form-field>
     <app-form-field label="Total desde">
       <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="minTotal() ?? ''" (input)="minTotal.set(numberFromInput($event))" />
     </app-form-field>

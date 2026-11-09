@@ -15,6 +15,8 @@ const isStatus = (value: unknown): value is ReturnStatus => (RETURN_STATUSES as 
 
 export interface ReturnLine {
   readonly id: number;
+  /** La línea de la venta que se devuelve. */
+  readonly saleDetailId: number;
   readonly productId: number;
   readonly quantity: number;
   readonly reason: string;
@@ -46,7 +48,7 @@ export interface ReturnableSale {
   readonly customerName: string;
   readonly total: number;
   /** `paid` es lo cobrado por la línea, ya con su descuento y el descuento general de la venta. */
-  readonly lines: readonly { productId: number; productName: string; quantity: number; paid: number }[];
+  readonly lines: readonly { saleDetailId: number; productId: number; productName: string; quantity: number; paid: number }[];
 }
 
 export interface ReturnInput {
@@ -55,14 +57,14 @@ export interface ReturnInput {
   /** El contrato lo exige aunque el servidor toma al solicitante de la sesión. */
   readonly userId: number;
   readonly reason: string;
-  readonly items: readonly { productId: number; quantity: number; reason: string; unitPrice: number }[];
+  readonly items: readonly { saleDetailId: number; quantity: number; reason: string }[];
 }
 
 function toReturn(raw: ReturnResponse): ReturnRequest | null {
   if (typeof raw.id !== 'number' || typeof raw.saleId !== 'number' || typeof raw.sucursalId !== 'number' || !isStatus(raw.estado)) return null;
   const lines = (raw.items ?? []).flatMap((d): ReturnLine[] =>
-    typeof d.id === 'number' && typeof d.productoId === 'number'
-      ? [{ id: d.id, productId: d.productoId, quantity: d.cantidad ?? 0, reason: d.motivoEspecifico?.trim() ?? '', unitPrice: d.precioUnidadVenta ?? 0 }]
+    typeof d.id === 'number' && typeof d.detalleVentaId === 'number' && typeof d.productoId === 'number'
+      ? [{ id: d.id, saleDetailId: d.detalleVentaId, productId: d.productoId, quantity: d.cantidad ?? 0, reason: d.motivoEspecifico?.trim() ?? '', unitPrice: d.precioUnidadVenta ?? 0 }]
       : [],
   );
   return {
@@ -126,9 +128,10 @@ export class ReturnsApi {
                 customerName: s.customerName?.trim() ?? '',
                 total: s.totalFinal ?? 0,
                 lines: (s.details ?? []).flatMap((d) =>
-                  typeof d.productId === 'number'
+                  typeof d.id === 'number' && typeof d.productId === 'number'
                     ? [
                         {
+                          saleDetailId: d.id,
                           productId: d.productId,
                           productName: d.productName?.trim() || `Producto ${d.productId}`,
                           quantity: d.quantity ?? 0,
@@ -156,10 +159,9 @@ export class ReturnsApi {
           requesterId: input.userId,
           generalReason: input.reason.trim(),
           items: input.items.map((i) => ({
-            productId: i.productId,
+            saleDetailId: i.saleDetailId,
             quantity: i.quantity,
             ...(i.reason.trim() ? { reasonSpecific: i.reason.trim() } : {}),
-            unitPricePaid: i.unitPrice,
           })),
         },
         this.options,

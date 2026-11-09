@@ -15,6 +15,14 @@ import java.util.Optional;
  */
 public interface JpaProductRepository extends JpaRepository<ProductEntity, Long> {
 
+    @Query(value = """
+            SELECT EXISTS (SELECT 1 FROM producto_unidad WHERE producto_id = :id)
+                OR EXISTS (SELECT 1 FROM movimiento_inventario WHERE producto_id = :id)
+                OR EXISTS (SELECT 1 FROM detalles_orden_compra WHERE producto_id = :id)
+                OR EXISTS (SELECT 1 FROM inventario_local WHERE producto_id = :id AND (cantidad_actual <> 0 OR stock_comprometido <> 0))
+            """, nativeQuery = true)
+    boolean isBaseUnitInUse(@org.springframework.data.repository.query.Param("id") Long id);
+
     /**
      * Verifica la existencia de un producto basado en su código SKU.
      * 

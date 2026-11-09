@@ -10,6 +10,7 @@ import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
 import { NotificationService } from '@core/notifications/notification.service';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
 import { expectAccessible } from '@testing/a11y';
+import { chooseOption } from '@testing/select-helpers';
 import { UsersPage } from './users-page';
 
 const URL = `${TEST_API}/api/users`;
@@ -59,6 +60,9 @@ async function choose(label: 'Rol' | 'Sucursal', option: string) {
   await userEvent.click(screen.getByRole('combobox', { name: label }));
   await userEvent.click(screen.getByRole('option', { name: new RegExp(`^${option}`) }));
 }
+
+/** Nombres de las filas visibles (sin las iniciales del avatar, que van en la misma celda). */
+const names = () => screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0].querySelector('.truncate')?.textContent?.trim());
 
 const row = (name: string) => screen.getByRole('row', { name: new RegExp(name) });
 
@@ -287,6 +291,93 @@ describe('UsersPage', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('propia sucursal');
       expect(screen.getByRole('dialog', { name: 'Desactivar usuario' })).toBeInTheDocument();
       expect(TestBed.inject(NotificationService).items()).toEqual([]);
+    });
+  });
+
+  describe('filtros', () => {
+    const STORE = 'zen:filters:1:users';
+
+    it('busca por nombre o correo sin distinguir mayúsculas ni acentos', async () => {
+      useSession('ADMIN', 1);
+      stub();
+      await renderPage();
+      await screen.findByText('Sofia Vendedora');
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar usuario' }), 'SOFÍA');
+      expect(names()).toEqual(['Sofia Vendedora']);
+      await userEvent.clear(screen.getByRole('searchbox', { name: 'Buscar usuario' }));
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar usuario' }), 'omar@');
+      expect(names()).toEqual(['Omar Operador']);
+    });
+
+    it('filtra por rol, estado y sucursal, y se combinan', async () => {
+      useSession('ADMIN', 1);
+      stub();
+      await renderPage();
+      await screen.findByText('Sofia Vendedora');
+      await chooseOption('Rol del usuario', 'SELLER');
+      expect(names()).toEqual(['Sofia Vendedora']);
+      await chooseOption('Rol del usuario', 'Todos los roles');
+      await chooseOption('Estado del usuario', 'Solo inactivos');
+      expect(names()).toEqual(['Omar Operador']);
+      await chooseOption('Estado del usuario', 'Solo activos');
+      await vi.waitFor(() => expect(screen.getByRole('combobox', { name: 'Sucursal del usuario' })).toBeEnabled());
+      await chooseOption('Sucursal del usuario', 'Sede Central');
+      expect(names()).toEqual(['Mario Gerente', 'Sofia Vendedora']);
+      await chooseOption('Sucursal del usuario', 'Sucursal Norte');
+      expect(screen.getByText('Ningún usuario coincide')).toBeInTheDocument();
+    });
+
+    it('las etiquetas se quitan una a una y todas juntas', async () => {
+      useSession('ADMIN', 1);
+      stub();
+      await renderPage();
+      await screen.findByText('Sofia Vendedora');
+      await chooseOption('Estado del usuario', 'Solo activos');
+      await userEvent.type(screen.getByLabelText('Buscar usuario'), 'mario');
+      expect(names()).toEqual(['Mario Gerente']);
+      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro Estado: Activos' }));
+      expect(screen.getByRole('combobox', { name: 'Estado del usuario' })).toHaveTextContent('Activos e inactivos');
+      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+      expect(screen.getByLabelText('Buscar usuario')).toHaveValue('');
+      expect(names()).toHaveLength(4);
+    });
+
+    it('recuerda los filtros la próxima vez que se entra, pero no la búsqueda', async () => {
+      useSession('ADMIN', 1);
+      stub();
+      const first = await renderPage();
+      await screen.findByText('Sofia Vendedora');
+      await chooseOption('Rol del usuario', 'OPERADOR_INVENTARIO');
+      await userEvent.type(screen.getByLabelText('Buscar usuario'), 'zzz');
+      await vi.waitFor(() => expect(JSON.parse(localStorage.getItem(STORE) ?? '{}')).toEqual({ role: 'OPERADOR_INVENTARIO' }));
+      first.fixture.destroy();
+      TestBed.resetTestingModule(); // otra visita
+
+      await renderPage();
+      await screen.findByText('Omar Operador');
+      expect(screen.getByLabelText('Buscar usuario')).toHaveValue('');
+      expect(names()).toEqual(['Omar Operador']);
+    });
+
+    it('un valor guardado dañado se ignora', async () => {
+      useSession('ADMIN', 1);
+      localStorage.setItem(STORE, JSON.stringify({ role: 'SUPERUSER', status: 'x', branch: 'abc' }));
+      stub();
+      await renderPage();
+      await screen.findByText('Sofia Vendedora');
+      expect(names()).toHaveLength(4);
+      expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
+    });
+
+    it('un MANAGER no ve el filtro de sucursal, y uno guardado no le esconde usuarios', async () => {
+      useSession('MANAGER', 2, 10);
+      localStorage.setItem('zen:filters:2:users', JSON.stringify({ branch: 20 }));
+      stub([USERS[1], USERS[2]], ROLES.slice(2));
+      await renderPage();
+      await screen.findByText('Sofia Vendedora');
+      expect(screen.queryByRole('combobox', { name: 'Sucursal del usuario' })).not.toBeInTheDocument();
+      expect(names()).toEqual(['Mario Gerente', 'Sofia Vendedora']);
+      expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
     });
   });
 });

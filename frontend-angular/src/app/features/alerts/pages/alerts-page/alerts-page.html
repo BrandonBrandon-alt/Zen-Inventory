@@ -21,7 +21,7 @@
 </header>
 
 <div class="mb-3 flex animate-enter-delayed flex-wrap items-center gap-3">
-  <div class="w-64 max-w-full">
+  <div class="min-w-52 max-w-72 flex-1">
     <app-form-field>
       <input appInput type="search" placeholder="Buscar producto o detalle…" aria-label="Buscar alerta" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
       <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
@@ -37,8 +37,8 @@
       <app-select [(value)]="typeFilter" [options]="typeOptions()" [icon]="tagIcon" ariaLabel="Tipo de alerta" />
     </div>
   }
-  <div class="w-44"><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
-  <div class="w-44"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
+  <div class="w-36"><app-date-picker [(value)]="from" [max]="to()" placeholder="Desde" ariaLabel="Desde" /></div>
+  <div class="w-36"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
   <app-advanced-filters [(open)]="advancedOpen" [activeCount]="advancedCount()" class="basis-full">
     <app-form-field label="Producto"><app-select [(value)]="productFilter" [options]="productOptions()" ariaLabel="Producto" searchable searchPlaceholder="Buscar producto…" /></app-form-field>
   </app-advanced-filters>

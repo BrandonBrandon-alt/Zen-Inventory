@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
-import { computeTooltipPosition, Tooltip } from './tooltip';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { computeTooltipPosition, resetTooltipGroup, Tooltip } from './tooltip';
 
 const HOST = '<button [appTooltip]="text" tooltipDelay="0" aria-label="Ajustar">i</button><button>otro</button>';
 
@@ -11,6 +11,22 @@ async function setup(text = 'Ajustar existencias') {
 }
 
 describe('Tooltip', () => {
+  beforeEach(() => resetTooltipGroup());
+
+  it('la primera descripción de un recorrido entra animada; la que sigue enseguida sale al instante y sin animación', async () => {
+    await render('<button [appTooltip]="\'Uno\'" tooltipDelay="0" aria-label="A">a</button><button [appTooltip]="\'Dos\'" tooltipDelay="400" aria-label="B">b</button>', { imports: [Tooltip] });
+    const a = screen.getByRole('button', { name: 'A' });
+    const b = screen.getByRole('button', { name: 'B' });
+    await userEvent.hover(a);
+    const first = await screen.findByRole('tooltip');
+    expect(first).toHaveClass('animate-error-in');
+    await userEvent.unhover(a);
+    await userEvent.hover(b); // su espera propia es de 400 ms, pero vienes de otra descripción: sin espera
+    const second = await screen.findByRole('tooltip', undefined, { timeout: 200 });
+    expect(second).toHaveTextContent('Dos');
+    expect(second).not.toHaveClass('animate-error-in');
+  });
+
   it('al pasar el cursor muestra la descripción y al salir la oculta', async () => {
     const button = await setup();
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();

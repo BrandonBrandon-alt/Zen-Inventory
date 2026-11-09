@@ -40,8 +40,12 @@ function stub(alerts: unknown[] = ALERTS) {
         { id: 10, nombre: 'Sede Central', activa: true },
         { id: 20, nombre: 'Sucursal Norte', activa: true },
         { id: 30, nombre: 'Sucursal Sur', activa: false },
+        { id: 40, nombre: 'Sucursal Este', activa: true },
       ]),
     ),
+    // Disponible para enviar: Norte tiene 12 Tornillos; Este tiene Tuercas pero ningún Tornillo.
+    http.get(`${TEST_API}/api/v1/inventory/branches/20/availability`, () => HttpResponse.json([{ productId: 100, available: 12 }])),
+    http.get(`${TEST_API}/api/v1/inventory/branches/40/availability`, () => HttpResponse.json([{ productId: 101, available: 30 }])),
     http.get(`${TEST_API}/api/catalog/suppliers/search`, () =>
       HttpResponse.json([
         { id: 7, nombre: 'Aceros del Sur', tiempoEntregaDias: 4 },
@@ -363,7 +367,10 @@ describe('AlertsPage', () => {
       await userEvent.click(within(dialog).getByRole('combobox', { name: 'Sucursal que lo envía' }));
       expect(screen.queryByRole('option', { name: 'Sede Central' })).not.toBeInTheDocument(); // la propia
       expect(screen.queryByRole('option', { name: /Sucursal Sur/ })).not.toBeInTheDocument(); // inactiva
-      await userEvent.click(screen.getByRole('option', { name: 'Sucursal Norte' }));
+      expect(screen.queryByRole('option', { name: /Sucursal Este/ })).not.toBeInTheDocument(); // no tiene Tornillo
+      const north = await screen.findByRole('option', { name: /^Sucursal Norte/ });
+      expect(north).toHaveTextContent('12 disponibles');
+      await userEvent.click(north);
       await userEvent.type(within(dialog).getByLabelText('Cantidad'), '5');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Solicitar traslado' }));
       await vi.waitFor(() => expect(body).toEqual({ originBranchId: 20, quantity: 5, priority: 'NORMAL' }));
@@ -453,6 +460,29 @@ describe('AlertsPage', () => {
       expect(await within(dialog).findByRole('alert')).toHaveTextContent('no tiene stock suficiente');
       expect(screen.getByRole('dialog', { name: 'Resolver alerta' })).toBeInTheDocument();
       expect(TestBed.inject(NotificationService).items()).toEqual([]);
+    });
+
+    it('pidiendo a otra sucursal: no deja pedir más de lo que esa sucursal tiene disponible', async () => {
+      useSession('MANAGER');
+      stub();
+      let posted = false;
+      server.use(http.post(`${ALERTS_URL}/1/resolve/transfer`, () => ((posted = true), HttpResponse.json({}))));
+      await renderPage();
+      const dialog = await open('Resolver alerta de Tornillo');
+      await chooseOption('Sucursal que lo envía', 'Sucursal Norte');
+      await userEvent.type(within(dialog).getByLabelText('Cantidad'), '13');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Solicitar traslado' }));
+      expect(await within(dialog).findByText('Esa sucursal solo tiene 12 disponibles.')).toBeInTheDocument();
+      expect(posted).toBe(false);
+    });
+
+    it('si ninguna otra sucursal tiene el producto disponible, lo dice en vez de ofrecerlas', async () => {
+      useSession('MANAGER');
+      stub();
+      server.use(http.get(`${TEST_API}/api/v1/inventory/branches/20/availability`, () => HttpResponse.json([])));
+      await renderPage();
+      const dialog = await open('Resolver alerta de Tornillo');
+      await vi.waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Sucursal que lo envía' })).toHaveTextContent('Ninguna otra sucursal lo tiene disponible'));
     });
 
     it('al reabrir otra alerta el formulario parte de cero', async () => {

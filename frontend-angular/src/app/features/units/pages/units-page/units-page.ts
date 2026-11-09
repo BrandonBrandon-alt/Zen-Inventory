@@ -1,11 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { LucideEllipsis, LucidePencil, LucidePlus, LucideRuler, LucideTrash2, LucideType } from '@lucide/angular';
+import { LucideEllipsis, LucidePencil, LucidePlus, LucideRuler, LucideSearch, LucideTrash2, LucideType } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { NotificationService } from '@core/notifications/notification.service';
+import { normalizeText } from '@shared/format/format';
 import { Button } from '@shared/ui/button/button';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog/confirm-dialog';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
+import { ActiveFilters, type ActiveFilter } from '@shared/ui/filters/active-filters';
+import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { UnitFormModal } from '../../components/unit-form-modal/unit-form-modal';
 import { type Unit, UnitsApi } from '../../data-access/units-api';
@@ -20,7 +23,7 @@ const rowKey = (unit: Unit): number => unit.id;
 
 @Component({
   selector: 'app-units-page',
-  imports: [DataTable, DataTableCell, Button, ConfirmDialog, UnitFormModal, Tooltip, LucidePencil, LucidePlus, LucideTrash2],
+  imports: [DataTable, DataTableCell, Button, ConfirmDialog, ActiveFilters, FormField, InputDirective, UnitFormModal, Tooltip, LucidePencil, LucidePlus, LucideSearch, LucideTrash2],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './units-page.html',
@@ -35,6 +38,19 @@ export class UnitsPage {
   protected readonly units = signal<readonly Unit[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+
+  protected readonly search = signal('');
+
+  protected readonly rows = computed(() => {
+    const term = normalizeText(this.search().trim());
+    return this.units().filter((u) => !term || normalizeText(u.nombre).includes(term) || normalizeText(u.abreviatura).includes(term));
+  });
+
+  /** La búsqueda aplicada, como etiqueta que se quita. */
+  protected readonly activeFilters = computed<ActiveFilter[]>(() => {
+    const term = this.search().trim();
+    return term ? [{ id: 'search', label: 'Búsqueda', text: term }] : [];
+  });
 
   protected readonly formOpen = signal(false);
   protected readonly editing = signal<Unit | null>(null);
@@ -63,6 +79,14 @@ export class UnitsPage {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  protected onSearch(event: Event): void {
+    this.search.set((event.target as HTMLInputElement).value);
+  }
+
+  protected clearSearch(): void {
+    this.search.set('');
   }
 
   protected openCreate(): void {

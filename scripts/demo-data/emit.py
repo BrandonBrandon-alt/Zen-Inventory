@@ -10,7 +10,7 @@ from generate import Sim
 
 SERIAL_TABLES = (
     "unidad_medida", "sucursal", "usuario", "proveedor", "producto", "producto_proveedor", "producto_unidad", "precio_por_lista",
-    "rutas_logisticas", "inventario_local", "ventas", "detalles_venta", "ordenes_compra", "detalles_orden_compra", "transferencias",
+    "inventario_local", "ventas", "detalles_venta", "ordenes_compra", "detalles_orden_compra", "pagos_orden_compra", "transferencias", "pagos_traslado",
     "detalles_transferencia", "solicitudes_devolucion", "detalles_devolucion_solicitud", "movimiento_inventario", "alertas_stock",
 )
 
@@ -73,32 +73,24 @@ def load_sql(sim: Sim) -> str:
     w.copy("producto_proveedor", "id, producto_id, proveedor_id, sku_proveedor, precio_pactado, tiempo_entrega_dias, preferido", rows)
     rows = []
     for p in products.values():
-        rows.append((sim.next_id("producto_unidad"), p.id, C.UNIT_IDS[p.unit], 1.0, True))
+        # La unidad base está en producto.unidad_id: aquí solo van las presentaciones alternas.
         m = re.search(r"(\d+(?:,\d+)?)Kg", p.name)
         if m and p.unit == "BTO":
-            rows.append((sim.next_id("producto_unidad"), p.id, C.UNIT_IDS["KG"], round(1 / float(m.group(1).replace(",", ".")), 4), False))
-    w.copy("producto_unidad", "id, producto_id, unidad_id, factor_conversion, es_base", rows)
+            rows.append((sim.next_id("producto_unidad"), p.id, C.UNIT_IDS["KG"], round(1 / float(m.group(1).replace(",", ".")), 4)))
+    w.copy("producto_unidad", "id, producto_id, unidad_id, factor_conversion", rows)
     rows = []
     for p in products.values():
         if p.active:
             for list_id, factor in ((1, 1.0), (2, 0.92), (3, 0.95)):
                 rows.append((sim.next_id("precio_por_lista"), list_id, p.id, round(p.price * factor / 50) * 50.0))
     w.copy("precio_por_lista", "id, lista_id, producto_id, precio", rows)
-    rows = []
-    for a in sim.branches:
-        for b in sim.branches:
-            # Las rutas entre las tres sucursales de siempre ya existen en la base.
-            if a != b and not (a in C.EXISTING_BRANCHES and b in C.EXISTING_BRANCHES):
-                rows.append((sim.next_id("rutas_logisticas"), a, b, 2 + (abs(a - b) * 3) % 9, float(12000 + (abs(a - b) * 7000) % 60000)))
-    w.copy("rutas_logisticas", "id, sucursal_origen_id, sucursal_destino_id, tiempo_estimado_horas, costo_flete_estimado", rows)
-
     w.copy("inventario_local", "id, sucursal_id, producto_id, cantidad_actual, stock_minimo, last_updated, stock_comprometido",
            [(sim.next_id("inventario_local"), b, p, round(i.stock, 4), i.minimum, i.last_update or start, i.reserved) for (b, p), i in sorted(sim.items.items())])
 
     sellers = sim.by_id
-    w.copy("ventas", "id, sucursal_id, usuario_id, fecha, subtotal, descuento_total, total_final, created_at, estado, motivo_anulacion, cliente_nombre, cliente_documento, sucursal_nombre, vendedor_nombre, global_discount_percentage",
+    w.copy("ventas", "id, sucursal_id, usuario_id, fecha, subtotal, descuento_total, total_final, created_at, estado, motivo_anulacion, cliente_nombre, cliente_documento, sucursal_nombre, vendedor_nombre, global_discount_percentage, metodo_pago, referencia_pago",
            [(s["id"], s["branch"], s["user"], s["ts"], s["subtotal"], s["discount"], s["total"], s["ts"], s["status"], s["reason"], s["customer"], s["doc"],
-             names[s["branch"]], sellers[s["user"]].name, float(s["global"])) for s in sim.rows["ventas"]])
+             names[s["branch"]], sellers[s["user"]].name, float(s["global"]), s["pay_method"], s["pay_ref"]) for s in sim.rows["ventas"]])
     w.copy("detalles_venta", "id, venta_id, producto_id, cantidad, precio_unitario_aplicado, porcentaje_descuento, subtotal_linea, producto_nombre",
            [(d[0], d[1], d[2], d[3], d[4], float(d[5]), d[6], d[7]) for d in sim.rows["detalles_venta"]])
 
@@ -107,6 +99,8 @@ def load_sql(sim: Sim) -> str:
              o["due"] or (o["ts"] + timedelta(days=o["plazo"])), o["plazo"], 0, o["note"], o["resolver"], o["resolved_ts"], False, o["lead"]) for o in sim.rows["ordenes_compra"]])
     w.copy("detalles_orden_compra", "id, orden_id, producto_id, cantidad, precio_unitario_pactado, subtotal, descuento_pct, cantidad_recibida",
            [(l["id"], l["order"], l["prod"], l["qty"], l["price"], l["sub"], float(l["disc"]), l["got"]) for l in sim.rows["detalles_orden_compra"]])
+    w.copy("pagos_orden_compra", "id, orden_id, monto, fecha, usuario_id, usuario_nombre, metodo, referencia, notas",
+           [(p["id"], p["order"], p["amount"], p["ts"], p["user"], sellers[p["user"]].name, p["method"], p["ref"], p["note"]) for p in sim.rows["pagos_orden_compra"]])
 
     def p(person):
         return person_ref(person)
@@ -114,15 +108,17 @@ def load_sql(sim: Sim) -> str:
     rows = []
     for t in sim.rows["transferencias"]:
         rows.append((t["id"], t["status"], t["ts"], t["eta"], t["arrived"], t["origin"], t["dest"], t["carrier"], t["notes"], t["parent"], 0, t["reason"],
-                     p(t["resolver"])[0], t["resolved_ts"], t["priority"], t["cost"], t["guide"], t["dispatch_ts"], *p(t["requester"]), *p(t["authorizer"]),
+                     t["resolved_ts"], t["priority"], t["cost"], t["guide"], t["dispatch_ts"], *p(t["requester"]), *p(t["authorizer"]),
                      *p(t["dispatcher"]), *p(t["receiver"]), *p(t["resolver"])))
-    w.copy("transferencias", "id, estado, fecha_solicitud, fecha_estimada_llegada, fecha_real_llegada, sucursal_origen_id, sucursal_destino_id, transportista, notas_recepcion, parent_transfer_id, version, motivo_resolucion, resuelto_por_id, fecha_resolucion, prioridad, costo_envio, numero_guia, fecha_despacho, solicitante_id, solicitante_nombre, autorizador_id, autorizador_nombre, despachador_id, despachador_nombre, recibidor_id, recibidor_nombre, resolutor_id, resolutor_nombre", rows)
+    w.copy("transferencias", "id, estado, fecha_solicitud, fecha_estimada_llegada, fecha_real_llegada, sucursal_origen_id, sucursal_destino_id, transportista, notas_recepcion, parent_transfer_id, version, motivo_resolucion, fecha_resolucion, prioridad, costo_envio, numero_guia, fecha_despacho, solicitante_id, solicitante_nombre, autorizador_id, autorizador_nombre, despachador_id, despachador_nombre, recibidor_id, recibidor_nombre, resolutor_id, resolutor_nombre", rows)
     w.copy("detalles_transferencia", "id, transferencia_id, producto_id, cantidad_solicitada, cantidad_enviada, cantidad_recibida, faltantes, producto_nombre",
            [(l["id"], l["transfer"], l["prod"], l["req"], l["sent"], l["got"], l["missing"], products[l["prod"]].name) for l in sim.rows["detalles_transferencia"]])
+    w.copy("pagos_traslado", "id, traslado_id, monto, fecha, usuario_id, usuario_nombre, metodo, referencia, notas",
+           [(p["id"], p["transfer"], p["amount"], p["ts"], p["user"], sellers[p["user"]].name, p["method"], p["ref"], p["note"]) for p in sim.rows["pagos_traslado"]])
 
     w.copy("solicitudes_devolucion", "id, venta_id, sucursal_id, solicitante_id, aprobador_id, estado, fecha_solicitud, fecha_procesamiento, motivo_general, comentario_aprobador, created_at",
            [(r["id"], r["sale"], r["branch"], r["requester"], r["approver"], r["status"], r["ts"], r["done"], r["reason"], r["comment"], r["ts"]) for r in sim.rows["solicitudes_devolucion"]])
-    w.copy("detalles_devolucion_solicitud", "id, solicitud_id, producto_id, cantidad, motivo_especifico, precio_unidad_venta", list(sim.rows["detalles_devolucion_solicitud"]))
+    w.copy("detalles_devolucion_solicitud", "id, solicitud_id, detalle_venta_id, producto_id, cantidad, motivo_especifico, precio_unidad_venta", list(sim.rows["detalles_devolucion_solicitud"]))
 
     moves = sorted(sim.rows["movimiento_inventario"], key=lambda m: (m[0], m[1]))
     w.copy("movimiento_inventario", "id, tipo, motivo, cantidad, fecha, producto_id, sucursal_id, usuario_id, referencia_id, tipo_referencia, saldo_final, observaciones, sub_motivo",
@@ -148,15 +144,27 @@ CREATE TEMP TABLE d_sales ON COMMIT DROP AS SELECT id FROM public.ventas WHERE u
 CREATE TEMP TABLE d_returns ON COMMIT DROP AS SELECT id FROM public.solicitudes_devolucion WHERE venta_id IN (SELECT id FROM d_sales) OR solicitante_id IN (SELECT id FROM d_users);
 DELETE FROM public.detalles_devolucion_solicitud WHERE solicitud_id IN (SELECT id FROM d_returns);
 DELETE FROM public.solicitudes_devolucion WHERE id IN (SELECT id FROM d_returns);
+-- Los datos reales en los que actuó un usuario demo se conservan: pierden el vínculo con él, no su nombre ni su historial.
+UPDATE public.solicitudes_devolucion SET aprobador_id = NULL WHERE aprobador_id IN (SELECT id FROM d_users);
 DELETE FROM public.detalles_venta WHERE venta_id IN (SELECT id FROM d_sales);
 DELETE FROM public.ventas WHERE id IN (SELECT id FROM d_sales);
 CREATE TEMP TABLE d_transfers ON COMMIT DROP AS SELECT id FROM public.transferencias WHERE solicitante_id IN (SELECT id FROM d_users) OR sucursal_origen_id IN ({branches}) OR sucursal_destino_id IN ({branches});
 UPDATE public.transferencias SET parent_transfer_id = NULL WHERE parent_transfer_id IN (SELECT id FROM d_transfers);
+DELETE FROM public.pagos_traslado WHERE traslado_id IN (SELECT id FROM d_transfers);
 DELETE FROM public.detalles_transferencia WHERE transferencia_id IN (SELECT id FROM d_transfers);
 DELETE FROM public.transferencias WHERE id IN (SELECT id FROM d_transfers);
+UPDATE public.transferencias SET autorizador_id = NULL WHERE autorizador_id IN (SELECT id FROM d_users);
+UPDATE public.transferencias SET despachador_id = NULL WHERE despachador_id IN (SELECT id FROM d_users);
+UPDATE public.transferencias SET recibidor_id = NULL WHERE recibidor_id IN (SELECT id FROM d_users);
+UPDATE public.transferencias SET resolutor_id = NULL WHERE resolutor_id IN (SELECT id FROM d_users);
+UPDATE public.pagos_traslado p SET usuario_id = t.solicitante_id FROM public.transferencias t WHERE p.traslado_id = t.id AND p.usuario_id IN (SELECT id FROM d_users);
 CREATE TEMP TABLE d_orders ON COMMIT DROP AS SELECT id FROM public.ordenes_compra WHERE usuario_id IN (SELECT id FROM d_users) OR sucursal_id IN ({branches});
+DELETE FROM public.pagos_orden_compra WHERE orden_id IN (SELECT id FROM d_orders);
 DELETE FROM public.detalles_orden_compra WHERE orden_id IN (SELECT id FROM d_orders);
 DELETE FROM public.ordenes_compra WHERE id IN (SELECT id FROM d_orders);
+UPDATE public.ordenes_compra SET usuario_recepcion_id = NULL WHERE usuario_recepcion_id IN (SELECT id FROM d_users);
+UPDATE public.ordenes_compra SET resuelto_por_id = NULL WHERE resuelto_por_id IN (SELECT id FROM d_users);
+UPDATE public.pagos_orden_compra p SET usuario_id = o.usuario_id FROM public.ordenes_compra o WHERE p.orden_id = o.id AND p.usuario_id IN (SELECT id FROM d_users);
 DELETE FROM public.alertas_stock WHERE producto_id BETWEEN {first} AND {last} OR sucursal_id IN ({branches});
 DELETE FROM public.movimiento_inventario WHERE usuario_id IN (SELECT id FROM d_users) OR producto_id BETWEEN {first} AND {last};
 DELETE FROM public.inventario_local WHERE producto_id BETWEEN {first} AND {last} OR sucursal_id IN ({branches});
@@ -166,7 +174,6 @@ DELETE FROM public.producto_unidad WHERE producto_id BETWEEN {first} AND {last};
 DELETE FROM public.producto WHERE id BETWEEN {first} AND {last};
 DELETE FROM public.proveedor WHERE id BETWEEN {suppliers};
 DELETE FROM public.unidad_medida WHERE id IN ({unit_ids});
-DELETE FROM public.rutas_logisticas WHERE sucursal_origen_id IN ({branches}) OR sucursal_destino_id IN ({branches});
 DELETE FROM public.usuario_avatar WHERE usuario_id IN (SELECT id FROM d_users);
 DELETE FROM public.usuario WHERE id IN (SELECT id FROM d_users);
 DELETE FROM public.sucursal WHERE id IN ({branches});

@@ -8,7 +8,7 @@ import java.time.LocalDate;
 /**
  * Filtros del historial de ventas; todos opcionales. {@code from} y {@code to} incluyen el día completo.
  * {@code supplierId}: ventas con algún producto que ese proveedor surte; {@code withDiscount}: con/sin descuento;
- * {@code registeredCustomer}: con/sin nombre de cliente.
+ * {@code registeredCustomer}: con/sin nombre de cliente; {@code paymentMethod}: forma de pago.
  */
 public record SaleSearchCriteria(
         Long branchId,
@@ -22,6 +22,7 @@ public record SaleSearchCriteria(
         String text,
         Long supplierId,
         Boolean withDiscount,
-        Boolean registeredCustomer
+        Boolean registeredCustomer,
+        co.com.zenvory.inventario.sale.domain.model.SalePaymentMethod paymentMethod
 ) {
 }

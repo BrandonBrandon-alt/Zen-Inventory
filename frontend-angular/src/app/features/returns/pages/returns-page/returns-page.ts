@@ -112,7 +112,7 @@ export class ReturnsPage {
     ...(this.isAdmin() ? [{ key: 'branch', header: 'Sucursal', icon: LucideStore.icon, sortable: true }] : []),
     { key: 'total', header: 'Valor', icon: LucideCoins.icon, sortable: true, align: 'end' as const, display: (r: ReturnRow) => formatMoney(r.total) },
     { key: 'requester', header: 'Solicitó', icon: LucideUser.icon, sortable: true },
-    { key: 'requestDate', header: 'Fecha', icon: LucideCalendar.icon, sortable: true, width: '11.5rem', value: (r: ReturnRow) => r.requestDate, display: (r: ReturnRow) => formatDateTime(r.requestDate) },
+    { key: 'requestDate', header: 'Fecha', icon: LucideCalendar.icon, sortable: true, nowrap: true, width: '11.5rem', value: (r: ReturnRow) => r.requestDate, display: (r: ReturnRow) => formatDateTime(r.requestDate) },
     { key: 'acciones', header: 'Acciones', align: 'end' as const },
   ]);
 

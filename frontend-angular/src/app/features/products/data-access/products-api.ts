@@ -44,13 +44,12 @@ export interface ProductInput {
   readonly activo?: boolean;
 }
 
-/** Unidad en la que se puede manejar un producto, con su equivalencia respecto a la unidad base. */
+/** Unidad alterna en la que se puede manejar un producto, con su equivalencia respecto a la unidad base. */
 export interface ProductUnit {
   readonly unitId: number;
   readonly nombre: string;
   readonly abreviatura: string;
   readonly factor: number;
-  readonly isBase: boolean;
 }
 
 function toProduct(raw: ProductResponse): Product | null {
@@ -102,7 +101,6 @@ function toProductUnit(raw: ProductUnitResponse): ProductUnit | null {
     nombre: raw.nombreUnidad?.trim() ?? '',
     abreviatura: raw.abreviaturaUnidad?.trim() ?? '',
     factor: raw.factorConversion,
-    isBase: raw.esBase === true,
   };
 }
 
@@ -146,7 +144,7 @@ export class ProductsApi {
     return this.http
       .post<ProductUnitResponse>(
         `${this.baseUrl}/api/catalog/products/${productId}/units`,
-        { productoId: productId, unidadId: unitId, factorConversion: factor, esBase: false },
+        { productoId: productId, unidadId: unitId, factorConversion: factor },
         this.options,
       )
       .pipe(

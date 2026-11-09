@@ -1,16 +1,22 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { LucideBan, LucideCircleCheck, LucideEllipsis, LucideMail, LucidePencil, LucidePlus, LucideShield, LucideStore, LucideUser } from '@lucide/angular';
+import { LucideBan, LucideCircleCheck, LucideEllipsis, LucideMail, LucidePencil, LucidePlus, LucideSearch, LucideShield, LucideStore, LucideUser } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
+import { ROLES, type Role } from '@core/auth/roles/role';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { NotificationService } from '@core/notifications/notification.service';
+import { normalizeText } from '@shared/format/format';
+import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
 import { UserAvatar } from '@shared/ui/avatar/user-avatar';
 import { type BadgeVariant, Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog/confirm-dialog';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
+import { ActiveFilters, type ActiveFilter } from '@shared/ui/filters/active-filters';
+import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
+import { Select, type SelectOption } from '@shared/ui/select/select';
 import { UserFormModal } from '../../components/user-form-modal/user-form-modal';
 import { type AppUser, type RoleOption, UsersApi } from '../../data-access/users-api';
 
@@ -35,9 +41,29 @@ const MANAGER_MANAGEABLE: readonly string[] = ['SELLER', 'OPERADOR_INVENTARIO'];
 
 const rowKey = (user: UserRow): number => user.id;
 
+type StatusFilter = 'all' | 'active' | 'inactive';
+const SCREEN = 'users';
+
 @Component({
   selector: 'app-users-page',
-  imports: [DataTable, DataTableCell, UserAvatar, Badge, Button, ConfirmDialog, UserFormModal, Tooltip, LucideBan, LucidePencil, LucidePlus],
+  imports: [
+    DataTable,
+    DataTableCell,
+    UserAvatar,
+    Badge,
+    Button,
+    ConfirmDialog,
+    ActiveFilters,
+    FormField,
+    InputDirective,
+    Select,
+    UserFormModal,
+    Tooltip,
+    LucideBan,
+    LucidePencil,
+    LucidePlus,
+    LucideSearch,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './users-page.html',
@@ -57,18 +83,61 @@ export class UsersPage {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
+  // Los filtros se recuerdan por persona (la búsqueda de texto no: se escribe cada vez).
+  protected readonly search = signal('');
+  protected readonly roleFilter = persistedFilter(SCREEN, 'role', null as Role | null, codecs.nullable(codecs.oneOf(ROLES)));
+  protected readonly statusFilter = persistedFilter(SCREEN, 'status', 'all' as StatusFilter, codecs.oneOf(['all', 'active', 'inactive'] as const));
+  protected readonly branchFilter = persistedFilter(SCREEN, 'branch', null as number | null, codecs.nullable(codecs.number()));
+  protected readonly roleOptions: readonly SelectOption<Role | null>[] = [{ value: null, label: 'Todos los roles' }, ...ROLES.map((rol) => ({ value: rol, label: rol }))];
+  protected readonly statusOptions: readonly SelectOption<StatusFilter>[] = [
+    { value: 'all', label: 'Activos e inactivos' },
+    { value: 'active', label: 'Solo activos' },
+    { value: 'inactive', label: 'Solo inactivos' },
+  ];
+  protected readonly branchFilterOptions = computed<SelectOption<number | null>[]>(() => [
+    { value: null, label: 'Todas las sucursales' },
+    ...this.branches().map((branch) => ({ value: branch.id, label: branch.nombre })),
+  ]);
+
   /** Un MANAGER siempre opera en su sucursal: no elige sucursal al crear o editar. */
   protected readonly isManager = computed(() => this.session()?.rol === 'MANAGER');
   protected readonly currentUserId = computed(() => this.session()?.id);
   /** El formulario necesita los roles; hasta que lleguen no se ofrece crear ni editar. */
   protected readonly canOpenForm = computed(() => this.roles().length > 0);
 
-  protected readonly rows = computed<UserRow[]>(() => {
+  private readonly allRows = computed<UserRow[]>(() => {
     const names = new Map(this.branches().map((branch) => [branch.id, branch.nombre]));
     return this.users().map((user) => ({
       ...user,
       sucursal: user.sucursalId === null ? '' : (names.get(user.sucursalId) ?? `Sucursal ${user.sucursalId}`),
     }));
+  });
+
+  protected readonly rows = computed<UserRow[]>(() => {
+    const term = normalizeText(this.search().trim());
+    const role = this.roleFilter();
+    const status = this.statusFilter();
+    // Un MANAGER solo ve su sucursal: un filtro de sucursal guardado (de cuando era ADMIN) no debe esconderle nada.
+    const branch = this.isManager() ? null : this.branchFilter();
+    return this.allRows()
+      .filter((user) => role === null || user.rol === role)
+      .filter((user) => status === 'all' || (status === 'active') === user.activo)
+      .filter((user) => branch === null || user.sucursalId === branch)
+      .filter((user) => !term || normalizeText(user.nombre).includes(term) || normalizeText(user.email).includes(term));
+  });
+
+  /** Todos los filtros aplicados, para mostrarlos como etiquetas que se quitan. */
+  protected readonly activeFilters = computed<ActiveFilter[]>(() => {
+    const list: ActiveFilter[] = [];
+    const role = this.roleFilter();
+    if (role !== null) list.push({ id: 'role', label: 'Rol', text: role });
+    if (this.statusFilter() !== 'all') list.push({ id: 'status', label: 'Estado', text: this.statusFilter() === 'active' ? 'Activos' : 'Inactivos' });
+    const branch = this.branchFilter();
+    if (branch !== null && !this.isManager()) {
+      list.push({ id: 'branch', label: 'Sucursal', text: this.branches().find((b) => b.id === branch)?.nombre ?? `Sucursal ${branch}` });
+    }
+    if (this.search().trim()) list.push({ id: 'search', label: 'Búsqueda', text: this.search().trim() });
+    return list;
   });
 
   protected readonly summary = computed(() => {
@@ -90,6 +159,23 @@ export class UsersPage {
   constructor() {
     void this.load();
     void this.loadOptions();
+  }
+
+  protected onSearch(event: Event): void {
+    this.search.set((event.target as HTMLInputElement).value);
+  }
+
+  protected removeFilter(id: string): void {
+    switch (id) {
+      case 'role': this.roleFilter.set(null); break;
+      case 'status': this.statusFilter.set('all'); break;
+      case 'branch': this.branchFilter.set(null); break;
+      case 'search': this.search.set(''); break;
+    }
+  }
+
+  protected clearFilters(): void {
+    for (const filter of this.activeFilters()) this.removeFilter(filter.id);
   }
 
   protected roleVariant(user: AppUser): BadgeVariant {

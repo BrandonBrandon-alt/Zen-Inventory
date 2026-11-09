@@ -3,6 +3,9 @@ package co.com.zenvory.inventario.catalog.application.service;
 import co.com.zenvory.inventario.catalog.application.port.in.UnitOfMeasureUseCase;
 import co.com.zenvory.inventario.catalog.application.port.out.UnitOfMeasureRepositoryPort;
 import co.com.zenvory.inventario.catalog.domain.exception.UnitOfMeasureNotFoundException;
+import co.com.zenvory.inventario.catalog.application.port.out.ProductRepositoryPort;
+import co.com.zenvory.inventario.catalog.domain.exception.ProductNotFoundException;
+import co.com.zenvory.inventario.catalog.domain.model.Product;
 import co.com.zenvory.inventario.catalog.domain.model.ProductUnit;
 import co.com.zenvory.inventario.catalog.domain.model.UnitOfMeasure;
 import org.springframework.stereotype.Service;
@@ -21,13 +24,16 @@ import java.util.List;
 public class UnitOfMeasureService implements UnitOfMeasureUseCase {
 
     private final UnitOfMeasureRepositoryPort unitRepositoryPort;
+    private final ProductRepositoryPort productRepositoryPort;
 
     /**
      * Constructor para inyección de dependencias.
      * @param unitRepositoryPort Puerto de salida para persistencia de unidades.
+     * @param productRepositoryPort Puerto de salida para consultar la unidad base del producto.
      */
-    public UnitOfMeasureService(UnitOfMeasureRepositoryPort unitRepositoryPort) {
+    public UnitOfMeasureService(UnitOfMeasureRepositoryPort unitRepositoryPort, ProductRepositoryPort productRepositoryPort) {
         this.unitRepositoryPort = unitRepositoryPort;
+        this.productRepositoryPort = productRepositoryPort;
     }
 
     /** {@inheritDoc} */
@@ -72,6 +78,12 @@ public class UnitOfMeasureService implements UnitOfMeasureUseCase {
     /** {@inheritDoc} */
     @Override
     public ProductUnit assignUnitToProduct(ProductUnit productUnit) {
+        Product product = productRepositoryPort.findById(productUnit.getProductId())
+                .orElseThrow(() -> new ProductNotFoundException(productUnit.getProductId()));
+        // La unidad base vive en producto.unidad_id; aquí solo van las presentaciones alternas.
+        if (productUnit.getUnitId().equals(product.getUnitId())) {
+            throw new IllegalArgumentException("Esa unidad ya es la unidad base del producto.");
+        }
         // Verificar que la unidad existe antes de asociarla para mantener consistencia
         unitRepositoryPort.findById(productUnit.getUnitId())
                 .orElseThrow(() -> new UnitOfMeasureNotFoundException(productUnit.getUnitId()));

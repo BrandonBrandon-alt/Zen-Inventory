@@ -2,7 +2,6 @@ import { Injectable, signal } from '@angular/core';
 
 export const SIDEBAR_STORAGE_KEY = 'zen_inventory_sidebar_collapsed';
 export const SIDEBAR_WIDTH_STORAGE_KEY = 'zen_inventory_sidebar_width';
-export const SIDEBAR_AUTOHIDE_STORAGE_KEY = 'zen_inventory_sidebar_autohide';
 
 /** Ancho (px) del sidebar expandido: estándar y límites al arrastrar. */
 export const SIDEBAR_DEFAULT_WIDTH = 240;
@@ -19,14 +18,6 @@ function clampWidth(value: number): number {
 function readCollapsed(): boolean {
   try {
     return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
-  } catch {
-    return false;
-  }
-}
-
-function readAutoHide(): boolean {
-  try {
-    return localStorage.getItem(SIDEBAR_AUTOHIDE_STORAGE_KEY) === 'true';
   } catch {
     return false;
   }
@@ -57,14 +48,8 @@ function write(key: string, value: string): void {
 export class SidebarState {
   private readonly collapsedState = signal(readCollapsed());
   private readonly widthState = signal(readWidth());
-  private readonly autoHideState = signal(readAutoHide());
 
   readonly collapsed = this.collapsedState.asReadonly();
-  /**
-   * Menú oculto por defecto: aparece sobre el contenido al acercar el puntero al borde izquierdo y se esconde al
-   * alejarse. Solo escritorio; en móvil el menú ya es un cajón.
-   */
-  readonly autoHide = this.autoHideState.asReadonly();
   /** Ancho del sidebar expandido, en px. Colapsado se ignora (ver `SIDEBAR_COLLAPSED_WIDTH`). */
   readonly width = this.widthState.asReadonly();
 
@@ -72,12 +57,6 @@ export class SidebarState {
     const next = !this.collapsedState();
     this.collapsedState.set(next);
     write(SIDEBAR_STORAGE_KEY, String(next));
-  }
-
-  toggleAutoHide(): void {
-    const next = !this.autoHideState();
-    this.autoHideState.set(next);
-    write(SIDEBAR_AUTOHIDE_STORAGE_KEY, String(next));
   }
 
   setWidth(px: number): void {

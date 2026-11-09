@@ -10,7 +10,8 @@ describe('Badge', () => {
 
   it.each([
     ['success', 'text-success'],
-    ['danger', 'text-brand-soft'],
+    // Peligro es rojo por intención, no el color de marca: "Agotado" o "Urgente" no pueden verse como la marca.
+    ['danger', 'text-danger'],
     ['warning', 'text-warning'],
     ['info', 'text-info'],
     ['neutral', 'text-fg-subtle'],

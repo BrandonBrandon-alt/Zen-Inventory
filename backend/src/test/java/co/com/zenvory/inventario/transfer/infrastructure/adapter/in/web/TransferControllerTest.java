@@ -24,6 +24,10 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -75,6 +79,7 @@ class TransferControllerTest {
         Transfer transfer = mock(Transfer.class);
         when(transfer.getStatus()).thenReturn(co.com.zenvory.inventario.transfer.domain.model.TransferStatus.PENDING);
         when(transfer.getDetails()).thenReturn(List.of());
+        when(transfer.freightPaymentStatus()).thenReturn(co.com.zenvory.inventario.transfer.domain.model.FreightPaymentStatus.SIN_COSTO);
         when(transferUseCase.getAllTransfers()).thenReturn(List.of(transfer));
 
         mockMvc.perform(get("/api/v1/transfers"))
@@ -91,6 +96,7 @@ class TransferControllerTest {
         when(transfer.getId()).thenReturn(1L);
         when(transfer.getStatus()).thenReturn(co.com.zenvory.inventario.transfer.domain.model.TransferStatus.PENDING);
         when(transfer.getDetails()).thenReturn(List.of());
+        when(transfer.freightPaymentStatus()).thenReturn(co.com.zenvory.inventario.transfer.domain.model.FreightPaymentStatus.SIN_COSTO);
         when(transferUseCase.requestTransfer(any())).thenReturn(transfer);
 
         mockMvc.perform(post("/api/v1/transfers")
@@ -105,5 +111,46 @@ class TransferControllerTest {
         mockMvc.perform(get("/api/v1/transfers/fulfillment-report"))
                 .andExpect(status().isOk());
     }
-}
 
+    private Transfer mockForFreight() {
+        Transfer transfer = mock(Transfer.class);
+        when(transfer.getStatus()).thenReturn(co.com.zenvory.inventario.transfer.domain.model.TransferStatus.IN_TRANSIT);
+        when(transfer.getDetails()).thenReturn(List.of());
+        when(transfer.getPayments()).thenReturn(List.of());
+        when(transfer.freightPaymentStatus()).thenReturn(co.com.zenvory.inventario.transfer.domain.model.FreightPaymentStatus.PAGO_PARCIAL);
+        return transfer;
+    }
+
+    @Test
+    @DisplayName("POST /transfers/{id}/pay-freight: registra el abono con su monto, método y referencia")
+    void payFreight_forwardsPayment() throws Exception {
+        Transfer transfer = mockForFreight();
+        when(transferUseCase.registerFreightPayment(eq(4L), any(), any(), any(), any())).thenReturn(transfer);
+
+        mockMvc.perform(post("/api/v1/transfers/4/pay-freight")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\":150000.50,\"method\":\"TRANSFERENCIA\",\"reference\":\"TR-9\",\"notes\":\"abono\"}"))
+                .andExpect(status().isOk());
+
+        verify(transferUseCase).registerFreightPayment(4L, new java.math.BigDecimal("150000.50"),
+                co.com.zenvory.inventario.transfer.domain.model.TransferPaymentMethod.TRANSFERENCIA, "TR-9", "abono");
+    }
+
+    @Test
+    @DisplayName("POST /transfers/{id}/pay-freight sin cuerpo paga todo el saldo")
+    void payFreight_withoutBody() throws Exception {
+        Transfer transfer = mockForFreight();
+        when(transferUseCase.registerFreightPayment(eq(4L), isNull(), isNull(), isNull(), isNull())).thenReturn(transfer);
+        mockMvc.perform(post("/api/v1/transfers/4/pay-freight")).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("POST /transfers/{id}/pay-freight: monto en cero o negativo es 400 y no registra nada")
+    void payFreight_rejectsInvalidAmount() throws Exception {
+        mockMvc.perform(post("/api/v1/transfers/4/pay-freight").contentType(MediaType.APPLICATION_JSON).content("{\"amount\":0}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/transfers/4/pay-freight").contentType(MediaType.APPLICATION_JSON).content("{\"amount\":-5}"))
+                .andExpect(status().isBadRequest());
+        verify(transferUseCase, never()).registerFreightPayment(any(), any(), any(), any(), any());
+    }
+}

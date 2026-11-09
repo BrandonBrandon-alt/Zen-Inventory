@@ -19,6 +19,13 @@ public record TransferResponse(
         Long parentTransferId,
         String priority,
         java.math.BigDecimal shippingCost,
+        /** Lo ya pagado del flete (suma de los pagos). */
+        java.math.BigDecimal freightPaid,
+        /** Lo que aún se le debe al transportista. */
+        java.math.BigDecimal freightBalance,
+        /** SIN_COSTO, POR_PAGAR, PAGO_PARCIAL o PAGADO. */
+        String freightStatus,
+        List<FreightPaymentResponse> payments,
         String trackingNumber,
         String reasonResolution,
         Long solicitanteId,
@@ -33,6 +40,17 @@ public record TransferResponse(
         String resolutorNombre,
         List<TransferDetailResponse> details
 ) {
+    public record FreightPaymentResponse(
+            Long id,
+            java.math.BigDecimal amount,
+            LocalDateTime date,
+            Long userId,
+            String userName,
+            String method,
+            String reference,
+            String notes
+    ) {}
+
     public record TransferDetailResponse(
             Long id,
             Long productId,
@@ -60,6 +78,11 @@ public record TransferResponse(
                 transfer.getParentTransferId(),
                 transfer.getPriority() != null ? transfer.getPriority().name() : null,
                 transfer.getShippingCost(),
+                transfer.freightPaid(),
+                transfer.freightBalance(),
+                transfer.freightPaymentStatus().name(),
+                transfer.getPayments().stream().map(p -> new FreightPaymentResponse(p.getId(), p.getAmount(), p.getDate(),
+                        p.getUserId(), p.getUserName(), p.getMethod().name(), p.getReference(), p.getNotes())).toList(),
                 transfer.getTrackingNumber(),
                 transfer.getReasonResolution(),
                 transfer.getSolicitanteId(),

@@ -113,6 +113,41 @@ class ProductServiceTest {
     }
 
     @Test
+    @DisplayName("updateProduct: no cambia la unidad base si el producto ya tiene presentaciones o historial")
+    void updateProduct_rejectsBaseUnitChange_whenProductHasDependencies() {
+        when(productRepositoryPort.findById(1L)).thenReturn(Optional.of(existingProduct));
+        when(productRepositoryPort.isBaseUnitInUse(1L)).thenReturn(true);
+        Product updateData = Product.builder().sku("SKU-001").name("N").unitId(2L).build();
+
+        assertThatThrownBy(() -> productService.updateProduct(1L, updateData)).isInstanceOf(IllegalArgumentException.class);
+
+        verify(productRepositoryPort, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateProduct: cambia la unidad base de un producto sin presentaciones ni historial")
+    void updateProduct_allowsBaseUnitChange_whenProductIsUnused() {
+        when(productRepositoryPort.findById(1L)).thenReturn(Optional.of(existingProduct));
+        when(productRepositoryPort.isBaseUnitInUse(1L)).thenReturn(false);
+        when(productRepositoryPort.save(any(Product.class))).thenAnswer(i -> i.getArgument(0));
+
+        Product result = productService.updateProduct(1L, Product.builder().sku("SKU-001").name("N").unitId(2L).build());
+
+        assertThat(result.getUnitId()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("updateProduct: editar otros datos de un producto con historial sigue permitido")
+    void updateProduct_allowsOtherEdits_whenBaseUnitIsUnchanged() {
+        when(productRepositoryPort.findById(1L)).thenReturn(Optional.of(existingProduct));
+        when(productRepositoryPort.save(any(Product.class))).thenAnswer(i -> i.getArgument(0));
+
+        Product result = productService.updateProduct(1L, Product.builder().sku("SKU-001").name("Nuevo").unitId(1L).build());
+
+        assertThat(result.getName()).isEqualTo("Nuevo");
+    }
+
+    @Test
     @DisplayName("updateProduct: lanza ProductNotFoundException si el ID no existe")
     void updateProduct_throwsNotFoundException() {
         // Arrange

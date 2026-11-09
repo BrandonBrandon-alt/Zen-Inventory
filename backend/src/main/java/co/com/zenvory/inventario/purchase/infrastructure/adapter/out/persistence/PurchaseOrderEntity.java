@@ -97,6 +97,11 @@ public class PurchaseOrderEntity {
     @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PurchaseDetailEntity> details = new ArrayList<>();
 
+    /** Pagos y abonos registrados; se conservan siempre (no se borran huérfanos). */
+    @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL)
+    @OrderBy("date ASC, id ASC")
+    private List<PurchasePaymentEntity> payments = new ArrayList<>();
+
     /** Constructor por defecto requerido por JPA. */
     public PurchaseOrderEntity() {}
 
@@ -105,6 +110,13 @@ public class PurchaseOrderEntity {
         details.add(detail);
         detail.setPurchaseOrder(this);
     }
+
+    public void addPayment(PurchasePaymentEntity payment) {
+        payments.add(payment);
+        payment.setPurchaseOrder(this);
+    }
+
+    public List<PurchasePaymentEntity> getPayments() { return payments; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }

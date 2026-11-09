@@ -21,6 +21,7 @@ import { type UserName, UserOptionsApi } from '@core/users/user-options-api';
 import { formatDateTime, formatQuantity, normalizeText } from '@shared/format/format';
 import { inDateRange, inNumberRange, numberFromInput, optionsFrom } from '@shared/filters/filter-helpers';
 import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
+import { Checkbox } from '@shared/ui/checkbox/checkbox';
 import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
@@ -39,7 +40,7 @@ const DAY = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' });
 
 @Component({
   selector: 'app-audit-page',
-  imports: [DataTable, DataTableCell, Badge, Button, DatePicker, ActiveFilters, AdvancedFilters, FormField, InputDirective, Select, Tooltip, AuditDetailModal, LucideEye, LucideSearch],
+  imports: [Checkbox, DataTable, DataTableCell, Badge, Button, DatePicker, ActiveFilters, AdvancedFilters, FormField, InputDirective, Select, Tooltip, AuditDetailModal, LucideEye, LucideSearch],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './audit-page.html',
@@ -117,7 +118,7 @@ export class AuditPage {
   ];
 
   protected readonly columns: readonly TableColumn<AuditRow>[] = [
-    { key: 'date', header: 'Fecha', icon: LucideCalendar.icon, sortable: true, width: '11.5rem', value: (r) => r.date, display: (r) => formatDateTime(r.date) },
+    { key: 'date', header: 'Fecha', icon: LucideCalendar.icon, sortable: true, nowrap: true, width: '11.5rem', value: (r) => r.date, display: (r) => formatDateTime(r.date) },
     { key: 'branch', header: 'Sucursal', icon: LucideStore.icon, sortable: true },
     { key: 'product', header: 'Producto', icon: LucidePackage.icon, sortable: true, primary: true },
     { key: 'typeLabel', header: 'Tipo', icon: LucideArrowUpDown.icon, sortable: true },

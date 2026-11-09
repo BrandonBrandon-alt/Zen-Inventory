@@ -2,14 +2,14 @@
   <app-theme-toggle class="absolute top-4 right-4 z-10" />
 
   <section
-    class="hidden flex-1 flex-col items-center justify-center gap-6 border-r border-line bg-surface p-12 text-center md:flex"
+    class="brand-panel hidden flex-1 flex-col items-center justify-center gap-6 border-r border-line bg-base p-12 text-center md:flex"
   >
     <div class="flex flex-col items-center gap-6 animate-fade-in-up motion-reduce:animate-none">
       <app-logo [size]="120" />
       <!-- El título se anima letra por letra; el nombre accesible es el texto completo. -->
       <h1
         aria-label="Zen Inventory"
-        class="flex flex-wrap justify-center gap-[0.15em] font-title text-[clamp(48px,5.5vw,76px)] leading-[1.05] font-bold tracking-[-0.04em] text-fg"
+        class="flex flex-wrap justify-center gap-0 font-title text-[clamp(48px,5.5vw,76px)] leading-[1.05] font-bold tracking-[-0.01em] text-fg"
       >
         @for (letter of titleLetters; track $index) {
           <span
@@ -21,7 +21,7 @@
           >
         }
       </h1>
-      <p class="font-serif text-2xl font-medium text-brand-soft italic">
+      <p class="font-title text-2xl font-semibold text-brand-soft">
         Gestiona tu inventario con inteligencia.
       </p>
     </div>
@@ -32,7 +32,7 @@
     <div class="w-full max-w-[380px] animate-form-in motion-reduce:animate-none">
       <div class="mb-8 flex items-center gap-3 md:hidden">
         <app-logo [size]="32" />
-        <span class="font-serif text-xl font-bold text-fg">Zen Inventory</span>
+        <span class="font-title text-xl font-bold text-fg">Zen Inventory</span>
       </div>
 
       <h2 class="mb-2 font-title text-[28px] leading-tight font-bold tracking-tight text-fg">

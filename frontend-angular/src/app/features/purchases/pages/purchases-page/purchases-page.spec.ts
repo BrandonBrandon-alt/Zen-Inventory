@@ -1,5 +1,6 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -32,6 +33,10 @@ const order = (id: number, receptionStatus: string, extra: object = {}) => ({
   branchId: 10,
   paymentDueDays: 30,
   total: 1000,
+  paidAmount: 0,
+  balance: 1000,
+  overdue: false,
+  payments: [],
   details: [detail(id * 10, 1, 10, 100)],
   ...extra,
 });
@@ -40,7 +45,7 @@ const ORDERS = [
   order(1, 'AWAITING_APPROVAL', { supplierId: 101 }),
   order(2, 'PENDING'),
   order(3, 'IN_TRANSIT'),
-  order(4, 'RECEIVED_PARTIAL', { details: [detail(41, 1, 10, 100, 0, 6), detail(42, 2, 4, 50)], total: 1200 }),
+  order(4, 'RECEIVED_PARTIAL', { details: [detail(41, 1, 10, 100, 0, 6), detail(42, 2, 4, 50)], total: 1200, balance: 1200 }),
   order(5, 'RECEIVED_TOTAL'),
   order(6, 'CANCELLED', { reasonResolution: 'Ya no se necesita' }),
 ];
@@ -48,10 +53,14 @@ const ORDERS = [
 const SUPPLIERS = [
   { id: 100, nombre: 'Ferretería Central', tiempoEntregaDias: 3 },
   { id: 101, nombre: 'Aceros del Sur', tiempoEntregaDias: 5 },
+  { id: 102, nombre: 'Proveedor Nuevo', tiempoEntregaDias: 2 }, // sin productos asociados
 ];
 const PRODUCTS = [
   { id: 1, sku: 'TOR-1', nombre: 'Tornillo', precioVenta: 500, unitAbbreviation: 'UND', activo: true, proveedores: [{ id: 100, nombre: 'Ferretería Central', precioPactado: 80, tiempoEntregaDias: 3 }] },
-  { id: 2, sku: 'TUE-2', nombre: 'Tuerca', precioVenta: 300, unitAbbreviation: 'UND', activo: true, proveedores: [] },
+  // Ferretería Central vende Tuerca, pero sin precio pactado.
+  { id: 2, sku: 'TUE-2', nombre: 'Tuerca', precioVenta: 300, unitAbbreviation: 'UND', activo: true, proveedores: [{ id: 100, nombre: 'Ferretería Central', precioPactado: 0, tiempoEntregaDias: 0 }] },
+  // Clavo: lo venden Aceros del Sur (preferido, entrega pactada en 7 días) y Ferretería Central no.
+  { id: 4, sku: 'CLA-4', nombre: 'Clavo', precioVenta: 50, unitAbbreviation: 'UND', activo: true, proveedores: [{ id: 101, nombre: 'Aceros del Sur', precioPactado: 20, tiempoEntregaDias: 7, preferido: true }] },
   { id: 3, sku: 'OLD-3', nombre: 'Descontinuado', precioVenta: 1, unitAbbreviation: 'UND', activo: false, proveedores: [] },
 ];
 const BRANCHES = [
@@ -73,8 +82,18 @@ function stub(orders: unknown[] = ORDERS) {
   );
 }
 
-const renderPage = () =>
-  render(PurchasesPage, { providers: [provideHttpClient(withInterceptors([errorInterceptor])), { provide: API_BASE_URL, useValue: TEST_API }] });
+const navigate = vi.fn(async () => true);
+
+/** `query`: los parámetros con los que se llega a la pantalla (p. ej. desde el ajuste de stock). */
+const renderPage = (query: Record<string, string> = {}) =>
+  render(PurchasesPage, {
+    providers: [
+      provideHttpClient(withInterceptors([errorInterceptor])),
+      { provide: API_BASE_URL, useValue: TEST_API },
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(query) } } },
+      { provide: Router, useValue: { navigate } },
+    ],
+  });
 
 const ids = () => screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0]?.textContent?.trim());
 
@@ -225,17 +244,110 @@ describe('PurchasesPage', () => {
       await vi.waitFor(() => expect(hit).toBe('2'));
     });
 
-    it('una orden recibida del todo se paga; una pagada ya no ofrece pagar', async () => {
+    it('una orden aún sin recibir no ofrece pagar y explica que primero se recibe la mercancía', async () => {
       useSession('MANAGER', 10);
       stub();
+      await renderPage();
+      const dialog = await openDetail(2);
+      expect(within(dialog).queryByRole('button', { name: 'Registrar pago' })).not.toBeInTheDocument();
+      expect(dialog).toHaveTextContent('Los pagos se registran una vez que la mercancía se recibe');
+    });
+
+    it('registrar un pago envía monto, método y referencia, y ofrece el saldo completo por defecto', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      let body: Record<string, unknown> | null = null;
       let paid = '';
-      server.use(http.post(`${URL_P}/:id/pay`, ({ params }) => ((paid = String(params['id'])), HttpResponse.json(order(5, 'RECEIVED_TOTAL', { paymentStatus: 'PAGADO' })))));
+      server.use(
+        http.post(`${URL_P}/:id/pay`, async ({ params, request }) => {
+          paid = String(params['id']);
+          body = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(order(5, 'RECEIVED_TOTAL', { paymentStatus: 'PAGADO', paidAmount: 1000, balance: 0 }));
+        }),
+      );
       await renderPage();
       await userEvent.click(screen.getByRole('combobox', { name: 'Estado de la orden' }));
       await userEvent.click(screen.getByRole('option', { name: 'Recibida' })); // exacto: "Recibida parcial" también existe
       const dialog = await openDetail(5);
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Marcar como pagada' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar pago' }));
+      expect(within(dialog).getByLabelText('Monto')).toHaveValue(1000);
+      await userEvent.type(within(dialog).getByLabelText(/Referencia/), 'TR-77');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar pago' }));
       await vi.waitFor(() => expect(paid).toBe('5'));
+      expect(body).toEqual({ amount: 1000, method: 'TRANSFERENCIA', reference: 'TR-77' });
+    });
+
+    it('un abono menor al saldo se envía con su monto', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      let body: Record<string, unknown> | null = null;
+      server.use(
+        http.post(`${URL_P}/:id/pay`, async ({ request }) => {
+          body = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(order(5, 'RECEIVED_TOTAL', { paymentStatus: 'PAGO_PARCIAL', paidAmount: 250, balance: 750 }));
+        }),
+      );
+      await renderPage();
+      await userEvent.click(screen.getByRole('combobox', { name: 'Estado de la orden' }));
+      await userEvent.click(screen.getByRole('option', { name: 'Recibida' }));
+      const dialog = await openDetail(5);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar pago' }));
+      const amount = within(dialog).getByLabelText('Monto');
+      await userEvent.clear(amount);
+      await userEvent.type(amount, '250');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar pago' }));
+      await vi.waitFor(() => expect(body).not.toBeNull());
+      expect(body).toMatchObject({ amount: 250 });
+    });
+
+    it('no deja pagar más que el saldo: muestra el error y no envía nada', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      let calls = 0;
+      server.use(http.post(`${URL_P}/:id/pay`, () => (calls++, HttpResponse.json(order(5, 'RECEIVED_TOTAL')))));
+      await renderPage();
+      await userEvent.click(screen.getByRole('combobox', { name: 'Estado de la orden' }));
+      await userEvent.click(screen.getByRole('option', { name: 'Recibida' }));
+      const dialog = await openDetail(5);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar pago' }));
+      const amount = within(dialog).getByLabelText('Monto');
+      await userEvent.clear(amount);
+      await userEvent.type(amount, '1500');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar pago' }));
+      expect(await within(dialog).findByText('Es más de lo que se debe.')).toBeInTheDocument();
+      expect(calls).toBe(0);
+    });
+
+    it('una orden ya pagada no ofrece pagar y muestra su historial de pagos', async () => {
+      useSession('MANAGER', 10);
+      stub([
+        order(5, 'RECEIVED_TOTAL', {
+          paymentStatus: 'PAGADO',
+          paidAmount: 1000,
+          balance: 0,
+          payments: [{ id: 1, amount: 1000, date: '2026-10-20T09:30:00', userId: 5, userName: 'Gerente Central', method: 'CHEQUE', reference: 'CH-12', notes: '' }],
+        }),
+      ]);
+      await renderPage();
+      await userEvent.click(screen.getByRole('combobox', { name: 'Estado de la orden' }));
+      await userEvent.click(screen.getByRole('option', { name: 'Recibida' }));
+      const dialog = await openDetail(5);
+      expect(within(dialog).queryByRole('button', { name: 'Registrar pago' })).not.toBeInTheDocument();
+      expect(within(dialog).getByText('Gerente Central')).toBeInTheDocument();
+      expect(within(dialog).getByText('Cheque')).toBeInTheDocument();
+      expect(within(dialog).getByText('CH-12')).toBeInTheDocument();
+    });
+
+    it('el encabezado resume lo que se debe a proveedores y cuántas órdenes están vencidas', async () => {
+      useSession('MANAGER', 10);
+      stub([
+        order(5, 'RECEIVED_TOTAL', { balance: 700, paidAmount: 300, paymentStatus: 'PAGO_PARCIAL', overdue: true }),
+        order(6, 'RECEIVED_TOTAL', { balance: 500 }),
+        order(7, 'RECEIVED_TOTAL', { paymentStatus: 'PAGADO', balance: 0, paidAmount: 1000 }),
+      ]);
+      await renderPage();
+      expect(await screen.findByText(/en 2 órdenes/)).toBeInTheDocument();
+      expect(screen.getByText('1 vencida')).toBeInTheDocument();
     });
 
     it('cerrar con faltante es solo del administrador', async () => {
@@ -286,6 +398,42 @@ describe('PurchasesPage', () => {
   });
 
   describe('recibir', () => {
+    it('si la lista llega tarde tras reabrir la orden, la recepción se rehace con lo que falta ahora', async () => {
+      useSession('OPERADOR_INVENTARIO', 10);
+      stub();
+      // Tras recibir 3 Tornillos (ya iban 6 de 10) y las 4 Tuercas, la lista nueva tarda en llegar.
+      const after = ORDERS.map((o) => (o.id === 4 ? { ...o, details: [detail(41, 1, 10, 100, 0, 9), detail(42, 2, 4, 50, 0, 4)] } : o));
+      let release: () => void = () => undefined;
+      const late = new Promise<void>((resolve) => (release = resolve));
+      let lists = 0;
+      server.use(
+        http.get(URL_P, async () => {
+          lists++;
+          if (lists === 1) return HttpResponse.json(ORDERS);
+          await late;
+          return HttpResponse.json(after);
+        }),
+        http.post(`${URL_P}/4/receive`, () => HttpResponse.json({ orderId: 4, status: 'RECEIVED_PARTIAL', impacts: [] })),
+      );
+      await renderPage();
+      let dialog = await openDetail(4);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Recibir mercancía' }));
+      const first = within(dialog).getByLabelText('Tornillo (faltan 4 de 10)');
+      await userEvent.clear(first);
+      await userEvent.type(first, '3');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar recepción' }));
+      await within(dialog).findByText(/Recepción registrada/);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Listo' }));
+
+      // Se reabre antes de que llegue la lista: todavía se ve lo de antes.
+      dialog = await openDetail(4);
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Recibir mercancía' }));
+      expect(within(dialog).getByLabelText('Tornillo (faltan 4 de 10)')).toHaveValue(4);
+      release();
+      // Al llegar, propone lo que falta de verdad (1), no lo de antes (4).
+      await vi.waitFor(() => expect(within(dialog).getByLabelText('Tornillo (faltan 1 de 10)')).toHaveValue(1));
+    });
+
     it('propone todo lo pedido, envía las cantidades y muestra cómo cambió el costo promedio', async () => {
       useSession('OPERADOR_INVENTARIO', 10);
       stub();
@@ -467,6 +615,39 @@ describe('PurchasesPage', () => {
   });
 
   describe('nueva orden', () => {
+    it('al llegar desde el ajuste de stock abre la orden con ese producto y esa sucursal, y limpia la URL', async () => {
+      useSession('ADMIN');
+      stub();
+      navigate.mockClear();
+      await renderPage({ nuevo: '1', producto: '2', sucursal: '20' });
+      const dialog = await screen.findByRole('dialog', { name: 'Nueva orden de compra' });
+      await vi.waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Producto' })).toHaveTextContent('Tuerca'));
+      expect(within(dialog).getByRole('combobox', { name: 'Sucursal que recibe' })).toHaveTextContent('Sucursal Norte');
+      await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: expect.objectContaining({ nuevo: null, producto: null }), replaceUrl: true })));
+    });
+
+    it('quien no es ADMIN recibe el producto, pero compra para su propia sucursal', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      await renderPage({ nuevo: '1', producto: '1', sucursal: '20' });
+      const dialog = await screen.findByRole('dialog', { name: 'Nueva orden de compra' });
+      await vi.waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Producto' })).toHaveTextContent('Tornillo'));
+      expect(within(dialog).queryByRole('combobox', { name: 'Sucursal que recibe' })).not.toBeInTheDocument();
+    });
+
+    it('sin la petición en la URL no abre nada, y el botón abre la orden vacía', async () => {
+      useSession('ADMIN');
+      stub();
+      navigate.mockClear();
+      await renderPage();
+      await screen.findByText('#1');
+      expect(screen.queryByRole('dialog', { name: 'Nueva orden de compra' })).not.toBeInTheDocument();
+      expect(navigate).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByRole('button', { name: /Nueva orden de compra/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Nueva orden de compra' });
+      expect(within(dialog).getByRole('combobox', { name: 'Producto' })).not.toHaveTextContent('Tuerca');
+    });
+
     it('propone el plazo del proveedor y el precio pactado, calcula el total y envía la orden', async () => {
       useSession('MANAGER', 10);
       stub();
@@ -532,7 +713,7 @@ describe('PurchasesPage', () => {
       await screen.findByText('#1');
       await userEvent.click(screen.getByRole('button', { name: /Nueva orden de compra/ }));
       const dialog = screen.getByRole('dialog', { name: 'Nueva orden de compra' });
-      await chooseOption('Proveedor', 'Aceros del Sur');
+      await chooseOption('Proveedor', 'Ferretería Central'); // vende Tuerca, sin precio pactado
       await chooseOption('Producto', 'Tuerca');
       await userEvent.type(within(dialog).getByLabelText('Cantidad'), '2');
       await userEvent.type(within(dialog).getByLabelText('Precio unitario'), '50');
@@ -558,6 +739,67 @@ describe('PurchasesPage', () => {
       await screen.findByText('#1');
       await userEvent.click(screen.getByRole('button', { name: /Nueva orden de compra/ }));
       expect(screen.queryByRole('combobox', { name: 'Sucursal que recibe' })).not.toBeInTheDocument();
+    });
+
+    it('con un proveedor elegido solo ofrece lo que vende, y cambiar a otro suelta lo que ese no vende', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      await renderPage();
+      await screen.findByText('#1');
+      await userEvent.click(screen.getByRole('button', { name: /Nueva orden de compra/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Nueva orden de compra' });
+      await chooseOption('Proveedor', 'Ferretería Central');
+      expect(within(dialog).getByText('Solo se muestran los productos que vende este proveedor.')).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Producto' }));
+      expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([expect.stringContaining('Tornillo'), expect.stringContaining('Tuerca')]);
+      await userEvent.keyboard('{Escape}');
+      await chooseOption('Producto', 'Tornillo');
+      await chooseOption('Proveedor', 'Aceros del Sur');
+      expect(within(dialog).getByRole('combobox', { name: 'Producto' })).not.toHaveTextContent('Tornillo');
+      expect(within(dialog).getByLabelText('Precio unitario')).toHaveValue(null);
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Producto' }));
+      expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([expect.stringContaining('Clavo')]);
+    });
+
+    it('un proveedor sin productos asociados no filtra la lista y lo avisa', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      await renderPage();
+      await screen.findByText('#1');
+      await userEvent.click(screen.getByRole('button', { name: /Nueva orden de compra/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Nueva orden de compra' });
+      await chooseOption('Proveedor', 'Proveedor Nuevo');
+      expect(within(dialog).getByRole('status')).toHaveTextContent('no tiene productos asociados');
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Producto' }));
+      expect(screen.getAllByRole('option')).toHaveLength(3); // Tornillo, Tuerca y Clavo (el inactivo no)
+    });
+
+    it('con el producto elegido primero, los proveedores que lo venden van arriba y se usa el plazo pactado', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      await renderPage();
+      await screen.findByText('#1');
+      await userEvent.click(screen.getByRole('button', { name: /Nueva orden de compra/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Nueva orden de compra' });
+      await chooseOption('Producto', 'Clavo');
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Proveedor' }));
+      const first = screen.getAllByRole('option')[0];
+      expect(first).toHaveTextContent('Aceros del Sur');
+      expect(first).toHaveTextContent('Vende este producto · Preferido');
+      await userEvent.click(first);
+      expect(within(dialog).getByLabelText('Tiempo de entrega (días)')).toHaveValue(7); // el pactado, no los 5 habituales
+      expect(within(dialog).getByLabelText('Precio unitario')).toHaveValue(20);
+    });
+
+    it('al llegar con un producto se propone solo su proveedor preferido, con precio y plazo pactados', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      await renderPage({ nuevo: '1', producto: '4' });
+      const dialog = await screen.findByRole('dialog', { name: 'Nueva orden de compra' });
+      await vi.waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Proveedor' })).toHaveTextContent('Aceros del Sur'));
+      expect(within(dialog).getByRole('combobox', { name: 'Producto' })).toHaveTextContent('Clavo');
+      expect(within(dialog).getByLabelText('Precio unitario')).toHaveValue(20);
+      expect(within(dialog).getByLabelText('Tiempo de entrega (días)')).toHaveValue(7);
     });
 
     it('no ofrece productos inactivos ni repite un producto ya agregado', async () => {

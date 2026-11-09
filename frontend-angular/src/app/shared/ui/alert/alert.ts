@@ -15,7 +15,8 @@ const STYLES: Record<AlertVariant, string> = {
   selector: 'app-alert',
   imports: [LucideCircleAlert],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'block' },
+  // Todo mensaje entra con un breve deslizamiento y fundido, sin que cada pantalla lo pida.
+  host: { class: 'block animate-alert-in' },
   template: `
     <div
       class="flex items-center gap-2.5 rounded-md border px-4 py-3 text-[13px]"

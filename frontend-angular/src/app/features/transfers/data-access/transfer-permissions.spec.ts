@@ -15,6 +15,10 @@ const transfer = (status: TransferStatus): Transfer => ({
   carrier: '',
   trackingNumber: '',
   shippingCost: null,
+  freightPaid: 0,
+  freightBalance: 0,
+  freightStatus: 'SIN_COSTO',
+  payments: [],
   receiptNotes: '',
   resolutionReason: '',
   parentId: null,
@@ -75,6 +79,17 @@ describe('transferActions', () => {
     expect(allowed('WITH_ISSUE', origin('MANAGER'))).toEqual(['resolve']);
     expect(allowed('WITH_ISSUE', destination('MANAGER'))).toEqual(['resolve']);
     expect(allowed('WITH_ISSUE', origin('OPERADOR_INVENTARIO'))).toEqual([]);
+  });
+
+  it('el flete se paga desde la sucursal de origen (gerencia) y solo mientras haya saldo', () => {
+    const owing = (status: TransferStatus): Transfer => ({ ...transfer(status), shippingCost: 90000, freightBalance: 90000, freightStatus: 'POR_PAGAR' });
+    expect(Object.entries(transferActions(owing('IN_TRANSIT'), origin('MANAGER'))).filter(([, on]) => on).map(([n]) => n)).toContain('payFreight');
+    expect(transferActions(owing('DELIVERED'), admin).payFreight).toBe(true);
+    // El destino y el operador no pagan el flete, y sin saldo no hay nada que pagar.
+    expect(transferActions(owing('DELIVERED'), destination('MANAGER')).payFreight).toBe(false);
+    expect(transferActions(owing('DELIVERED'), origin('OPERADOR_INVENTARIO')).payFreight).toBe(false);
+    expect(transferActions({ ...owing('DELIVERED'), freightBalance: 0, freightStatus: 'PAGADO' }, admin).payFreight).toBe(false);
+    expect(transferActions(transfer('DELIVERED'), admin).payFreight).toBe(false);
   });
 
   it('una sucursal que no participa no puede actuar', () => {

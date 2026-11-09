@@ -16,8 +16,8 @@ import { Select, type SelectOption } from '@shared/ui/select/select';
 import { type ReturnRequest, type ReturnableSale, ReturnsApi } from '../../data-access/returns-api';
 
 interface SaleLine {
-  readonly productId: number;
-  readonly name: string;
+  readonly saleDetailId: number;
+  readonly label: string;
   readonly sold: number;
   /** Lo que ya se devolvió o está pendiente de decidir en otras solicitudes de esta venta. */
   readonly processed: number;
@@ -29,7 +29,7 @@ const SALE = { required: 'Elige la venta.' };
 const REASON = { required: 'Cuéntanos por qué se devuelve.' };
 
 /**
- * Solicitud de devolución sobre una venta. Cada producto muestra cuánto se vendió, cuánto ya se devolvió (o espera
+ * Solicitud de devolución sobre una venta. Cada línea muestra cuánto se vendió, cuánto ya se devolvió (o espera
  * decisión) y cuánto queda por devolver: no se puede pedir más. Una solicitud queda pendiente hasta que un gerente la decide.
  */
 @Component({
@@ -75,25 +75,31 @@ export class ReturnFormModal {
     })),
   );
 
-  /** Los productos de la venta elegida, con lo que queda por devolver de cada uno. */
+  /** Las líneas de la venta elegida, con lo que queda por devolver de cada una. */
   protected readonly lines = computed<SaleLine[]>(() => {
     const sale = this.sale();
     if (!sale) return [];
     const processed = new Map<number, number>();
     for (const request of this.existing()) {
       if (request.saleId !== sale.id || request.status === 'RECHAZADA') continue;
-      for (const line of request.lines) processed.set(line.productId, (processed.get(line.productId) ?? 0) + line.quantity);
+      for (const line of request.lines) processed.set(line.saleDetailId, (processed.get(line.saleDetailId) ?? 0) + line.quantity);
     }
-    // Una venta puede repetir un producto en varias líneas: se unen, como hace el servidor.
-    // El precio pagado por unidad es el promedio ponderado: dos líneas del mismo producto pueden haberse cobrado distinto.
-    const merged = new Map<number, { name: string; sold: number; paid: number }>();
-    for (const line of sale.lines) {
-      const current = merged.get(line.productId);
-      merged.set(line.productId, { name: line.productName, sold: (current?.sold ?? 0) + line.quantity, paid: (current?.paid ?? 0) + line.paid });
-    }
-    return [...merged].map(([productId, m]) => {
-      const done = processed.get(productId) ?? 0;
-      return { productId, name: m.name, sold: m.sold, processed: done, available: Math.max(0, m.sold - done), unitPrice: m.sold > 0 ? Math.round((m.paid / m.sold) * 100) / 100 : 0 };
+    // Una venta puede repetir un producto con distinto precio: cada línea se devuelve por separado, a lo que se pagó en ella.
+    // Se ordenan por id para que «línea 1» sea siempre la misma, en cualquier orden que las traiga la API.
+    const seen = new Map<number, number>();
+    return [...sale.lines].sort((a, b) => a.saleDetailId - b.saleDetailId).map((line) => {
+      const occurrence = (seen.get(line.productId) ?? 0) + 1;
+      seen.set(line.productId, occurrence);
+      const repeated = sale.lines.filter((other) => other.productId === line.productId).length > 1;
+      const done = processed.get(line.saleDetailId) ?? 0;
+      return {
+        saleDetailId: line.saleDetailId,
+        label: repeated ? `${line.productName} · línea ${occurrence}` : line.productName,
+        sold: line.quantity,
+        processed: done,
+        available: Math.max(0, line.quantity - done),
+        unitPrice: line.quantity > 0 ? Math.round((line.paid / line.quantity) * 100) / 100 : 0,
+      };
     });
   });
 
@@ -133,7 +139,7 @@ export class ReturnFormModal {
     const lines = this.lines();
     const quantities = this.form.controls.quantities.getRawValue();
     const reasons = this.form.controls.reasons.getRawValue();
-    const items = lines.flatMap((line, i) => ((quantities[i] ?? 0) > 0 ? [{ productId: line.productId, quantity: quantities[i] as number, reason: reasons[i] ?? '', unitPrice: line.unitPrice }] : []));
+    const items = lines.flatMap((line, i) => ((quantities[i] ?? 0) > 0 ? [{ saleDetailId: line.saleDetailId, quantity: quantities[i] as number, reason: reasons[i] ?? '' }] : []));
     if (items.length === 0) {
       this.serverError.set('Indica cuántas unidades se devuelven de al menos un producto.');
       return;

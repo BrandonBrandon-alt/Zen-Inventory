@@ -12,7 +12,6 @@ import java.math.BigDecimal;
  * @param productoId Identificador único del producto.
  * @param unidadId Identificador único de la unidad de medida.
  * @param factorConversion Relación numérica respecto a la unidad base.
- * @param esBase Indica si esta configuración define la unidad maestra de inventario.
  */
 public record ProductUnitRequest(
 
@@ -25,10 +24,7 @@ public record ProductUnitRequest(
         @NotNull(message = "El factor de conversión es obligatorio")
         @DecimalMin(value = "0.0001", message = "El factor de conversión debe ser mayor a 0")
         @Digits(integer = 6, fraction = 4, message = "El factor debe tener máximo 6 enteros y 4 decimales")
-        BigDecimal factorConversion,
-
-        @NotNull(message = "Debe indicar si es la unidad base")
-        Boolean esBase
+        BigDecimal factorConversion
 
 ) {}
 

@@ -22,6 +22,7 @@ services:
       -c maintenance_work_mem=32MB
       -c max_connections=30
       -c synchronous_commit=off
+      -c timezone=${APP_TIMEZONE:-America/Bogota}
     mem_limit: 256m
     cpus: 1.0
     logging: *default-logging
@@ -86,6 +87,9 @@ services:
         - action: rebuild
           path: ./backend/pom.xml
     environment:
+      # Las fechas se guardan sin zona con la hora de este proceso; el navegador filtra por su día local. En UTC, una venta
+      # hecha desde las 7 p. m. en Colombia quedaba con fecha del día siguiente y no salía en «Hoy».
+      - TZ=${APP_TIMEZONE:-America/Bogota}
       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${DB_NAME}
       - SPRING_DATASOURCE_USERNAME=${DB_USER}
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}

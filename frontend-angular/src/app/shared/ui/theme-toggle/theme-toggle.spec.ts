@@ -8,6 +8,8 @@ import { ThemeToggle } from './theme-toggle';
 describe('ThemeToggle', () => {
   beforeEach(() => {
     localStorage.clear();
+    // Salvo que el caso diga otra cosa, se parte del tema oscuro.
+    localStorage.setItem(THEME_STORAGE_KEY, 'dark');
     delete document.documentElement.dataset['theme'];
   });
 

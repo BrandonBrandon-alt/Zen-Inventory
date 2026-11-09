@@ -7,6 +7,7 @@ import type { BranchOption } from '@core/branches/branch-options-api';
 import { NotificationService } from '@core/notifications/notification.service';
 import { applyServerErrors } from '@shared/forms/apply-server-errors';
 import { controlError } from '@shared/forms/control-error';
+import { Checkbox } from '@shared/ui/checkbox/checkbox';
 import { Alert } from '@shared/ui/alert/alert';
 import { Button } from '@shared/ui/button/button';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
@@ -49,7 +50,7 @@ let nextId = 0;
  */
 @Component({
   selector: 'app-user-form-modal',
-  imports: [ReactiveFormsModule, Modal, Button, Alert, FormField, InputDirective, Select],
+  imports: [Checkbox, ReactiveFormsModule, Modal, Button, Alert, FormField, InputDirective, Select],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-modal
@@ -87,10 +88,7 @@ let nextId = 0;
           </app-form-field>
         }
         @if (user() && !self()) {
-          <label class="flex cursor-pointer items-center gap-2 text-sm text-fg-muted">
-            <input type="checkbox" formControlName="activo" class="size-4 accent-(--brand-500)" />
-            Usuario activo
-          </label>
+          <app-checkbox formControlName="activo">Usuario activo</app-checkbox>
         }
       </form>
       <div data-slot="footer">

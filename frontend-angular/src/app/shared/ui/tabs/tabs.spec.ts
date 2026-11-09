@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import { LucidePackage } from '@lucide/angular';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type TabItem, Tabs } from './tabs';
 
 const TABS: TabItem[] = [
@@ -80,5 +80,41 @@ describe('Tabs', () => {
     await setup();
     expect(tab('Existencias').querySelector('svg')).not.toBeNull();
     expect(tab('Kardex').querySelector('svg')).toBeNull();
+  });
+
+  describe('línea de la pestaña activa', () => {
+    const LEFT: Record<string, number> = { 'inv-tab-stock': 0, 'inv-tab-kardex': 120, 'inv-tab-otros': 240 };
+    afterEach(() => vi.restoreAllMocks());
+
+    function measureLikeALayout() {
+      vi.spyOn(HTMLElement.prototype, 'offsetLeft', 'get').mockImplementation(function (this: HTMLElement) {
+        return LEFT[this.id] ?? 0;
+      });
+      vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+        return this.getAttribute('role') === 'tab' ? 100 : 0;
+      });
+    }
+    const line = (container: Element) => container.querySelector('[role="tablist"] > span[aria-hidden="true"]') as HTMLElement;
+
+    it('se coloca bajo la pestaña activa y se desliza a la que se elige', async () => {
+      measureLikeALayout();
+      const { container } = await setup();
+      expect(line(container).style.transform).toBe('translateX(0px)');
+      expect(line(container).style.width).toBe('100px');
+      await userEvent.click(tab('Kardex'));
+      expect(line(container).style.transform).toBe('translateX(120px)');
+    });
+
+    it('la primera colocación no se anima (no cruza desde el borde); las siguientes sí', async () => {
+      measureLikeALayout();
+      const { container } = await setup();
+      await vi.waitFor(() => expect(line(container).className).toContain('transition-[transform,width]'));
+    });
+
+    it('no estorba al teclado ni a los lectores de pantalla', async () => {
+      const { container } = await setup();
+      expect(line(container)).toHaveAttribute('aria-hidden', 'true');
+      expect(line(container)).toHaveClass('pointer-events-none');
+    });
   });
 });

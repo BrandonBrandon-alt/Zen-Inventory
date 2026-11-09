@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Card } from './card';
 
@@ -14,6 +15,18 @@ describe('Card', () => {
     await render('<app-card title="A" description="Unidades en el periodo">x</app-card><app-card title="B">y</app-card>', { imports: [Card] });
     expect(screen.getByText('Unidades en el periodo')).toBeInTheDocument();
     expect(screen.getAllByRole('region')).toHaveLength(2);
+  });
+
+  it('con `hint` muestra un icono de ayuda que explica la tarjeta sin cambiar el nombre de la región', async () => {
+    await render('<app-card title="Más vendidos" hint="Los productos con más unidades vendidas.">x</app-card>', { imports: [Card] });
+    expect(screen.getByRole('region', { name: 'Más vendidos' })).toBeInTheDocument();
+    await userEvent.hover(screen.getByRole('button', { name: 'Qué significa: Más vendidos' }));
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Los productos con más unidades vendidas.');
+  });
+
+  it('sin `hint` no hay icono de ayuda', async () => {
+    await render('<app-card title="A">x</app-card>', { imports: [Card] });
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('proyecta las acciones del encabezado', async () => {

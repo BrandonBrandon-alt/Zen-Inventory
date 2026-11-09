@@ -14,6 +14,23 @@
   </button>
 </header>
 
+<div class="mb-3 flex animate-enter-delayed flex-wrap items-center gap-3">
+  <div class="min-w-52 max-w-80 flex-1">
+    <app-form-field>
+      <input appInput type="search" placeholder="Buscar por nombre o correo…" aria-label="Buscar usuario" autocomplete="off" [value]="search()" (input)="onSearch($event)" />
+      <svg data-slot="prefix" lucideSearch [size]="16" aria-hidden="true"></svg>
+    </app-form-field>
+  </div>
+  <div class="w-56"><app-select [(value)]="roleFilter" [options]="roleOptions" ariaLabel="Rol del usuario" /></div>
+  <div class="w-52"><app-select [(value)]="statusFilter" [options]="statusOptions" ariaLabel="Estado del usuario" /></div>
+  @if (!isManager()) {
+    <div class="w-56">
+      <app-select [(value)]="branchFilter" [options]="branchFilterOptions()" ariaLabel="Sucursal del usuario" searchable searchPlaceholder="Buscar sucursal…" />
+    </div>
+  }
+</div>
+<app-active-filters class="mb-4 animate-enter-delayed" [filters]="activeFilters()" (removed)="removeFilter($event)" (cleared)="clearFilters()" />
+
 <app-data-table
   exportName="usuarios"
   persistKey="usuarios"
@@ -26,8 +43,8 @@
   [error]="error()"
   [pageSize]="10"
   minWidth="52rem"
-  emptyTitle="Todavía no hay usuarios"
-  emptyDescription="Los usuarios que se registren aparecerán aquí."
+  [emptyTitle]="activeFilters().length > 0 ? 'Ningún usuario coincide' : 'Todavía no hay usuarios'"
+  [emptyDescription]="activeFilters().length > 0 ? 'Prueba quitando algún filtro.' : 'Los usuarios que se registren aparecerán aquí.'"
   (retry)="load()"
 >
   <ng-template appCell="nombre" let-user>

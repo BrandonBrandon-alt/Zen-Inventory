@@ -8,8 +8,11 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.Month;
+import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Adaptador de salida (Secondary Adapter) que implementa la persistencia de analítica.
@@ -21,6 +24,8 @@ import java.util.List;
  */
 @Component
 public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
+
+    private static final Locale SPANISH = Locale.forLanguageTag("es-CO");
 
     private final JdbcTemplate jdbcTemplate;
     private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
@@ -167,8 +172,10 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
 
     /**
      * {@inheritDoc}
-     * <p>Consulta SQL: Realiza LEFT JOINs entre sucursales y ventas para asegurar que incluso 
-     * las sucursales sin ventas aparezcan en el reporte (con valor cero).</p>
+     * <p>Consulta SQL: Realiza LEFT JOINs entre sucursales y ventas para asegurar que incluso
+     * las sucursales sin ventas aparezcan en el reporte (con valor cero). El periodo se aplica sobre
+     * las ventas y las unidades se suman por venta antes del JOIN, para no repetir el total de una
+     * venta por cada una de sus líneas.</p>
      */
     @Override
     public List<BranchPerformance> findBranchPerformance(LocalDateTime startDate, LocalDateTime endDate, Long branchId) {
@@ -177,33 +184,26 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
                     s.id as branch_id,
                     s.nombre as branch_name,
                     COALESCE(SUM(v.total_final), 0) as revenue,
-                    COALESCE(SUM(dv.cantidad), 0) as units_sold,
-                    COUNT(DISTINCT v.id) as sales_count
+                    COALESCE(SUM(dv.units), 0) as units_sold,
+                    COUNT(v.id) as sales_count
                 FROM sucursal s
                 LEFT JOIN ventas v ON s.id = v.sucursal_id AND v.estado = 'COMPLETED'
-                LEFT JOIN detalles_venta dv ON v.id = dv.venta_id
                 """);
 
         List<Object> args = new ArrayList<>();
 
-        if (startDate != null || endDate != null || branchId != null) {
-            query.append(" AND (1=1 ");
-            if (branchId != null) {
-                query.append(" AND s.id = ? ");
-                args.add(branchId);
-            }
-            if (startDate != null) {
-                query.append(" AND v.fecha >= ? ");
-                args.add(startDate);
-            }
-            if (endDate != null) {
-                query.append(" AND v.fecha <= ? ");
-                args.add(endDate);
-            }
-            query.append(") ");
+        if (startDate != null) {
+            query.append(" AND v.fecha >= ? ");
+            args.add(startDate);
+        }
+        if (endDate != null) {
+            query.append(" AND v.fecha <= ? ");
+            args.add(endDate);
         }
 
         query.append("""
+                LEFT JOIN (SELECT venta_id, SUM(cantidad) as units FROM detalles_venta GROUP BY venta_id) dv
+                    ON v.id = dv.venta_id
                 WHERE s.activa = true
                 """);
 
@@ -261,13 +261,14 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
     @Override
     public List<MonthlySales> findMonthlySales(Long branchId) {
         StringBuilder query = new StringBuilder("""
-                SELECT 
-                    TO_CHAR(v.fecha, 'Month') as month_name,
+                SELECT
+                    EXTRACT(MONTH FROM v.fecha) as month_val,
                     EXTRACT(YEAR FROM v.fecha) as year_val,
                     SUM(v.total_final) as revenue,
-                    SUM(dv.cantidad) as volume
+                    SUM(dv.units) as volume
                 FROM ventas v
-                JOIN detalles_venta dv ON v.id = dv.venta_id
+                JOIN (SELECT venta_id, SUM(cantidad) as units FROM detalles_venta GROUP BY venta_id) dv
+                    ON v.id = dv.venta_id
                 WHERE v.estado = 'COMPLETED'
                   AND v.fecha >= CURRENT_DATE - INTERVAL '6 months'
                 """);
@@ -278,11 +279,12 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
             args.add(branchId);
         }
 
-        query.append(" GROUP BY year_val, month_name, EXTRACT(MONTH FROM v.fecha) ");
-        query.append(" ORDER BY year_val DESC, EXTRACT(MONTH FROM v.fecha) DESC ");
+        // Del más antiguo al más reciente: el panel toma los últimos meses de la lista.
+        query.append(" GROUP BY year_val, month_val ");
+        query.append(" ORDER BY year_val, month_val ");
 
         return jdbcTemplate.query(query.toString(), (rs, rowNum) -> new MonthlySales(
-                rs.getString("month_name").trim(),
+                spanishMonthName(rs.getInt("month_val")),
                 rs.getInt("year_val"),
                 rs.getBigDecimal("revenue"),
                 rs.getBigDecimal("volume")
@@ -302,8 +304,10 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
                     EXTRACT(DAY FROM (CURRENT_TIMESTAMP - COALESCE(MAX(v.fecha), i.last_updated)))::INT as inactive_days
                 FROM producto p
                 JOIN inventario_local i ON p.id = i.producto_id
-                LEFT JOIN detalles_venta dv ON p.id = dv.producto_id
-                LEFT JOIN ventas v ON dv.venta_id = v.id AND v.estado = 'COMPLETED'
+                -- Una línea cuenta solo si su venta está completada y es de la misma sucursal que la fila de stock:
+                -- unir las líneas por producto a secas sumaba las ventas de todas las sedes y las anuladas.
+                LEFT JOIN (detalles_venta dv JOIN ventas v ON v.id = dv.venta_id)
+                       ON dv.producto_id = p.id AND v.sucursal_id = i.sucursal_id AND v.estado = 'COMPLETED'
                 WHERE 1=1
                 """);
         List<Object> args = new ArrayList<>();
@@ -313,7 +317,8 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
             args.add(branchId);
         }
 
-        query.append(" GROUP BY p.id, p.nombre, i.cantidad_actual, i.last_updated ");
+        // i.sucursal_id: sin filtro de sucursal, dos sedes con el mismo stock no deben fundirse en una fila.
+        query.append(" GROUP BY p.id, p.nombre, i.sucursal_id, i.cantidad_actual, i.last_updated ");
         query.append(" ORDER BY rotation DESC ");
 
         return jdbcTemplate.query(query.toString(), (rs, rowNum) -> new InventoryRotation(
@@ -393,5 +398,11 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
                 rs.getBigDecimal("total_items"),
                 rs.getBigDecimal("total_valuation")
         ), args.toArray());
+    }
+
+    /** "Septiembre" para 9: en Java y no con TO_CHAR, que depende del locale de PostgreSQL (inglés en la imagen alpine). */
+    private static String spanishMonthName(int month) {
+        String name = Month.of(month).getDisplayName(TextStyle.FULL, SPANISH);
+        return name.substring(0, 1).toUpperCase(SPANISH) + name.substring(1);
     }
 }

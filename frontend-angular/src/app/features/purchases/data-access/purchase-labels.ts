@@ -33,5 +33,7 @@ export const PAYMENT_INFO: Readonly<Record<PaymentStatus, { label: string; varia
   PAGADO: { label: 'Pagada', variant: 'success', icon: LucideWallet.icon },
 };
 
+export { PAYMENT_METHOD_LABELS } from '@core/payments/payment-method';
+
 /** Órdenes que todavía se están moviendo (no recibidas del todo ni canceladas). */
 export const OPEN_RECEPTIONS: readonly ReceptionStatus[] = ['AWAITING_APPROVAL', 'PENDING', 'IN_TRANSIT', 'RECEIVED_PARTIAL'];

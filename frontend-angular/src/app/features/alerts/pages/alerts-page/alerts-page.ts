@@ -36,8 +36,8 @@ import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
-import { AlertResolutionModal } from '../../components/alert-resolution-modal/alert-resolution-modal';
-import { ALERT_TYPES, type AlertType, AlertsApi, type StockAlert } from '../../data-access/alerts-api';
+import { AlertResolutionModal } from '@shared/ui/alert-resolution-modal/alert-resolution-modal';
+import { ALERT_TYPES, type AlertType, AlertsApi, type StockAlert } from '@core/alerts/alerts-api';
 
 interface TypeInfo {
   readonly label: string;
@@ -116,7 +116,7 @@ export class AlertsPage {
     { key: 'product', header: 'Producto', icon: LucidePackage.icon, sortable: true, primary: true },
     ...(this.isAdmin() ? [{ key: 'branch', header: 'Sucursal', icon: LucideStore.icon, sortable: true }] : []),
     { key: 'message', header: 'Detalle', icon: LucideMessageSquareText.icon },
-    { key: 'date', header: 'Fecha', icon: LucideCalendar.icon, sortable: true, width: '11.5rem', value: (r: AlertRow) => r.date, display: (r: AlertRow) => formatDateTime(r.date) },
+    { key: 'date', header: 'Fecha', icon: LucideCalendar.icon, sortable: true, nowrap: true, width: '11.5rem', value: (r: AlertRow) => r.date, display: (r: AlertRow) => formatDateTime(r.date) },
     { key: 'acciones', header: 'Acciones', icon: LucideEllipsis.icon, align: 'end' },
   ]);
 

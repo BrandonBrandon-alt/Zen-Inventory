@@ -1,4 +1,5 @@
 import type { Company } from '@core/company/company-info';
+import { paymentLabel } from '@core/sales/payment-method';
 import { formatMoney, formatQuantity } from '@shared/format/format';
 import { type SalesReport, isSameDay } from './sales-report';
 
@@ -51,6 +52,9 @@ export function buildSalesReportHtml(report: SalesReport, company: Company, bran
   const productRows = report.topProducts
     .map((p) => `<tr><td>${escapeHtml(p.name)}</td><td class="num">${escapeHtml(formatQuantity(p.units))}</td><td class="num">${escapeHtml(formatMoney(p.total))}</td></tr>`)
     .join('');
+  const paymentRows = report.byPayment
+    .map((p) => `<tr><td>${escapeHtml(paymentLabel(p.method))}</td><td class="num">${p.sales}</td><td class="num">${escapeHtml(formatMoney(p.total))}</td></tr>`)
+    .join('');
   const kpi = (label: string, value: string): string => `<div class="kpi"><span class="muted">${escapeHtml(label)}</span><b>${escapeHtml(value)}</b></div>`;
   const contact = [company.taxId ? `NIT ${company.taxId}` : '', company.address, company.phone ? `Tel. ${company.phone}` : ''].filter(Boolean).join(' · ');
 
@@ -64,7 +68,7 @@ export function buildSalesReportHtml(report: SalesReport, company: Company, bran
   <div class="kpis">
     ${kpi('Total vendido', formatMoney(report.total))}
     ${kpi('Ventas', String(report.sales))}
-    ${kpi('Ticket promedio', formatMoney(report.average))}
+    ${kpi('Valor promedio por venta', formatMoney(report.average))}
     ${kpi('Unidades', formatQuantity(report.units))}
   </div>
   <table style="margin-top:12px">
@@ -75,10 +79,17 @@ export function buildSalesReportHtml(report: SalesReport, company: Company, bran
       <tr><td class="muted">Ventas anuladas (no suman)</td><td class="num muted">${report.canceledCount} · ${escapeHtml(formatMoney(report.canceledTotal))}</td></tr>
     </tbody>
   </table>
+  <h2>Cobrado por forma de pago</h2>
+  ${
+    report.byPayment.length
+      ? `<table><thead><tr><th>Forma de pago</th><th class="num">Ventas</th><th class="num">Total</th></tr></thead><tbody>${paymentRows}</tbody>
+         <tfoot><tr><td>Total</td><td class="num">${report.sales}</td><td class="num">${escapeHtml(formatMoney(report.total))}</td></tr></tfoot></table>`
+      : '<p class="muted">No hubo ventas en este periodo.</p>'
+  }
   <h2>Ventas por vendedor</h2>
   ${
     report.bySeller.length
-      ? `<table><thead><tr><th>Vendedor</th><th class="num">Ventas</th><th class="num">Unidades</th><th class="num">Ticket promedio</th><th class="num">Total</th></tr></thead><tbody>${sellerRows}</tbody>
+      ? `<table><thead><tr><th>Vendedor</th><th class="num">Ventas</th><th class="num">Unidades</th><th class="num">Valor promedio por venta</th><th class="num">Total</th></tr></thead><tbody>${sellerRows}</tbody>
          <tfoot><tr><td>Total</td><td class="num">${report.sales}</td><td class="num">${escapeHtml(formatQuantity(report.units))}</td><td></td><td class="num">${escapeHtml(formatMoney(report.total))}</td></tr></tfoot></table>`
       : '<p class="muted">No hubo ventas en este periodo.</p>'
   }

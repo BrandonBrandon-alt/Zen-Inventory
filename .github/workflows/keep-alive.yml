@@ -1,0 +1,40 @@
+name: Mantener despierta la API
+
+# El plan gratuito de Render duerme la API tras ~15 minutos sin tráfico y el primer request después tarda 30–90 s.
+# Este workflow la llama cada 10 minutos para que no se duerma. GitHub puede retrasar las ejecuciones programadas
+# (a veces más de 10 minutos), así que es un respaldo: lo más puntual es un monitor externo (ver DEPLOY.md).
+#
+# Llama a GET /api/auth/login: responde 401 desde el filtro de seguridad sin consultar la base, así que despierta
+# a Render sin mantener encendida la base de Neon (que se apaga sola y gasta horas de cómputo mientras está activa).
+# Solo corre desde la rama por defecto (master). La URL se puede cambiar con la variable de repositorio RENDER_API_URL.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    name: Llamar a la API
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      API_URL: ${{ vars.RENDER_API_URL || 'https://zen-inventory-api.onrender.com' }}
+    steps:
+      - name: Ping
+        run: |
+          # Cualquier respuesta HTTP (también 401) significa que la API está despierta; 000 es que no respondió.
+          for attempt in 1 2 3; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 120 "$API_URL/api/auth/login" || true)
+            echo "Intento $attempt: HTTP $code"
+            if [ "$code" != "000" ]; then exit 0; fi
+            sleep 10
+          done
+          echo "::warning::La API no respondió en 3 intentos ($API_URL)"
+          exit 1

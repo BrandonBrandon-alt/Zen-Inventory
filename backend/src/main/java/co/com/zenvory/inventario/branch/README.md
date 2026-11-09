@@ -17,7 +17,7 @@ pertenece a una sucursal. **No depende de ningún otro módulo.**
 | `sucursal` | `id`, `nombre`, `direccion`, `telefono`, `activa`, `created_at` |
 
 Referenciada por: `usuario`, `inventario_local`, `movimiento_inventario`, `ventas`, `solicitudes_devolucion`,
-`ordenes_compra`, `transferencias` (origen y destino), `alertas_stock`, `rutas_logisticas`.
+`ordenes_compra`, `transferencias` (origen y destino), `alertas_stock`.
 
 ## Qué hace cada carpeta
 

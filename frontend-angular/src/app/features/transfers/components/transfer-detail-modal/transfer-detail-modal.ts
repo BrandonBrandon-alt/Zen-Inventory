@@ -4,6 +4,7 @@ import { firstValueFrom, type Observable } from 'rxjs';
 import { LucideArrowRight } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { NotificationService } from '@core/notifications/notification.service';
+import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS, type PaymentMethod } from '@core/payments/payment-method';
 import { formatDateTime, formatMoney } from '@shared/format/format';
 import { controlError } from '@shared/forms/control-error';
 import { Alert } from '@shared/ui/alert/alert';
@@ -12,15 +13,17 @@ import { Button } from '@shared/ui/button/button';
 import { DatePicker } from '@shared/ui/date-picker/date-picker';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Modal } from '@shared/ui/modal/modal';
-import { PRIORITY_INFO, STATUS_INFO } from '../../data-access/transfer-labels';
+import { Select, type SelectOption } from '@shared/ui/select/select';
+import { FREIGHT_INFO, PRIORITY_INFO, STATUS_INFO } from '../../data-access/transfer-labels';
 import { type Actor, transferActions } from '../../data-access/transfer-permissions';
 import { type Transfer, type TransferLine, TransfersApi } from '../../data-access/transfers-api';
 
-type Mode = 'view' | 'dispatch' | 'receive' | 'cancel' | 'reject';
+type Mode = 'view' | 'dispatch' | 'receive' | 'cancel' | 'reject' | 'payFreight';
 
 const CARRIER = { required: 'Escribe el nombre del transportista.' };
 const COST = { required: 'Escribe el costo (0 si no tiene).', min: 'No puede ser negativo.' };
 const REASON = { required: 'Cuéntanos el motivo.' };
+const AMOUNT = { required: 'Escribe cuánto se pagó.', min: 'Debe ser mayor que cero.', max: 'Es más de lo que se debe.' };
 const QUANTITY = { required: 'Escribe la cantidad.', min: 'No puede ser negativa.', max: 'Es más de lo permitido.', pattern: 'Debe ser un número entero.' };
 
 interface Step {
@@ -35,7 +38,7 @@ interface Step {
  */
 @Component({
   selector: 'app-transfer-detail-modal',
-  imports: [ReactiveFormsModule, Modal, Button, Alert, Badge, DatePicker, FormField, InputDirective, LucideArrowRight],
+  imports: [ReactiveFormsModule, Modal, Button, Alert, Badge, DatePicker, FormField, InputDirective, Select, LucideArrowRight],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './transfer-detail-modal.html',
 })
@@ -59,10 +62,13 @@ export class TransferDetailModal {
   protected readonly formatMoney = formatMoney;
   protected readonly statusInfo = STATUS_INFO;
   protected readonly priorityInfo = PRIORITY_INFO;
+  protected readonly freightInfo = FREIGHT_INFO;
+  protected readonly methodLabels = PAYMENT_METHOD_LABELS;
+  protected readonly methodOptions: readonly SelectOption<PaymentMethod>[] = PAYMENT_METHODS.map((value) => ({ value, label: PAYMENT_METHOD_LABELS[value] }));
 
   private readonly formKey = computed(() => {
     const transfer = this.transfer();
-    return transfer ? `${transfer.id}:${transfer.status}` : null;
+    return transfer ? `${transfer.id}:${transfer.status}:${transfer.freightBalance}` : null;
   });
 
   protected readonly actions = computed(() => {
@@ -84,6 +90,13 @@ export class TransferDetailModal {
   });
 
   protected readonly reasonForm = this.fb.group({ reason: ['', Validators.required] });
+
+  protected readonly payForm = this.fb.group({
+    amount: new FormControl<number | null>(null, [Validators.required, Validators.min(0.01)]),
+    method: this.fb.control<PaymentMethod>('TRANSFERENCIA'),
+    reference: ['', Validators.maxLength(100)],
+    notes: ['', Validators.maxLength(500)],
+  });
 
   /** Recorrido del traslado: quién hizo cada paso y, si aplica, el dato que lo acompaña. */
   protected readonly steps = computed<Step[]>(() => {
@@ -124,6 +137,7 @@ export class TransferDetailModal {
       receive: 'Confirmar recepción',
       cancel: 'Cancelar traslado',
       reject: 'Rechazar traslado',
+      payFreight: 'Registrar pago',
     };
     return labels[this.mode()] ?? '';
   }
@@ -142,6 +156,10 @@ export class TransferDetailModal {
       form === 'dispatch' ? this.dispatchForm.get(field) : form === 'receive' ? this.receiveForm.get(field) : this.reasonForm.get(field);
     const messages = { carrier: CARRIER, shippingCost: COST, reason: REASON }[field] ?? REASON;
     return control ? controlError(control, messages) : null;
+  }
+
+  protected amountError(): string | null {
+    return controlError(this.payForm.controls.amount, AMOUNT);
   }
 
   protected lineError(kind: 'sent' | 'received', index: number): string | null {
@@ -213,6 +231,18 @@ export class TransferDetailModal {
     );
   }
 
+  protected submitPayFreight(): void {
+    const t = this.transfer();
+    this.payForm.markAllAsTouched();
+    if (!t || this.payForm.invalid || this.busy()) return;
+    const { amount, method, reference, notes } = this.payForm.getRawValue();
+    const paid = amount ?? 0;
+    void this.run(
+      this.api.payFreight(t.id, { amount: paid, method, reference, notes }),
+      paid >= t.freightBalance ? `Flete del traslado #${t.id} pagado por completo.` : `Abono de ${formatMoney(paid)} registrado en el flete del traslado #${t.id}.`,
+    );
+  }
+
   protected submitReason(): void {
     const t = this.transfer();
     const mode = this.mode();
@@ -253,6 +283,10 @@ export class TransferDetailModal {
     this.receiveForm.reset({ notes: '', received: transfer.lines.map((l) => l.sent ?? l.requested) }, { emitEvent: false });
 
     this.reasonForm.reset({ reason: '' }, { emitEvent: false });
+
+    this.payForm.reset({ amount: transfer.freightBalance, method: 'TRANSFERENCIA', reference: '', notes: '' }, { emitEvent: false });
+    this.payForm.controls.amount.setValidators([Validators.required, Validators.min(0.01), Validators.max(Math.max(transfer.freightBalance, 0.01))]);
+    this.payForm.controls.amount.updateValueAndValidity({ emitEvent: false });
   }
 
   /** Mínimo de la llegada estimada: el momento en que se abre el detalle (no puede estar en el pasado). */

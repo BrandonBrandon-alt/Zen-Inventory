@@ -24,6 +24,12 @@ const QUANTITY = { required: 'Escribe la cantidad.', min: 'Debe ser mayor que 0.
 const PRICE = { required: 'Escribe el precio.', min: 'Debe ser mayor que 0.' };
 const DISCOUNT = { min: 'No puede ser negativo.', max: 'No puede superar 100.' };
 
+/** Valores con los que se abre el formulario en vez de vacío. */
+export interface PurchasePreset {
+  readonly productId: number | null;
+  readonly branchId: number | null;
+}
+
 let nextId = 0;
 
 function itemGroup(fb: NonNullableFormBuilder) {
@@ -58,6 +64,8 @@ export class PurchaseFormModal {
   readonly branches = input<readonly BranchOption[]>([]);
   /** Solo el ADMIN elige la sucursal de la orden; los demás compran para la suya. */
   readonly chooseBranch = input(false);
+  /** Lo que llega ya elegido al abrir (p. ej. desde el ajuste de stock): el producto de la primera fila y la sucursal. */
+  readonly preset = input<PurchasePreset | null>(null);
   /** La orden ya creada en el servidor. */
   readonly saved = output<Purchase>();
 
@@ -80,20 +88,60 @@ export class PurchaseFormModal {
   /** Total de la orden, recalculado mientras se escribe. */
   protected readonly total = signal(0);
 
-  protected readonly supplierOptions = computed<SelectOption<number>[]>(() =>
-    this.suppliers().map((s) => ({ value: s.id, label: s.nombre })),
+  /** El proveedor y los productos elegidos, como señales: de ellos dependen las opciones de cada selector. */
+  private readonly supplierValue = signal<number | null>(null);
+  private readonly chosenProducts = signal<readonly number[]>([]);
+  /** Producto que llegó ya elegido y cuyo proveedor preferido falta proponer (cuando cargue el catálogo). */
+  private readonly pendingSupplierFor = signal<number | null>(null);
+
+  /**
+   * Los productos que vende el proveedor elegido (su asociación en el catálogo). `null` si no hay proveedor o si no tiene
+   * ninguno asociado: entonces se ofrecen todos, para no bloquear la compra a un proveedor nuevo.
+   */
+  private readonly supplierCatalog = computed<ReadonlySet<number> | null>(() => {
+    const supplier = this.supplierValue();
+    if (supplier === null) return null;
+    const ids = this.products().filter((p) => p.suppliers.some((s) => s.supplierId === supplier)).map((p) => p.id);
+    return ids.length > 0 ? new Set(ids) : null;
+  });
+  /** El proveedor elegido no tiene productos asociados: se avisa que la lista no está filtrada. */
+  protected readonly supplierWithoutCatalog = computed(
+    () => this.supplierValue() !== null && this.products().length > 0 && this.supplierCatalog() === null,
   );
+
+  /**
+   * Primero los proveedores que venden los productos ya elegidos (el preferido marcado), luego los demás. Así, si se
+   * llega con un producto, se ve enseguida a quién se le puede comprar.
+   */
+  protected readonly supplierOptions = computed<SelectOption<number>[]>(() => {
+    const chosen = this.products().filter((p) => this.chosenProducts().includes(p.id));
+    const options = this.suppliers().map((supplier) => {
+      const deals = chosen.flatMap((p) => p.suppliers.filter((s) => s.supplierId === supplier.id));
+      const sells = deals.length;
+      let description: string | undefined;
+      if (sells > 0) {
+        const what = chosen.length === 1 ? 'Vende este producto' : `Vende ${sells} de ${chosen.length} productos`;
+        description = deals.some((d) => d.preferred) ? `${what} · Preferido` : what;
+      }
+      return { option: { value: supplier.id, label: supplier.nombre, description }, sells };
+    });
+    return options.sort((a, b) => b.sells - a.sells).map((o) => o.option);
+  });
   protected readonly branchOptions = computed<SelectOption<number>[]>(() =>
     this.branches().filter((b) => b.activa).map((b) => ({ value: b.id, label: b.nombre })),
   );
 
-  /** Solo productos activos; uno ya agregado en otra fila no se ofrece otra vez. */
+  /**
+   * Solo productos activos y, con un proveedor elegido, solo los que ese proveedor vende. Uno ya agregado en otra fila
+   * no se ofrece otra vez.
+   */
   protected productOptions(row: ItemGroup): SelectOption<number>[] {
     const own = row.controls.productId.value;
     const taken = new Set(this.form.controls.items.controls.map((g) => g.controls.productId.value));
-    const supplier = this.form.controls.supplierId.value;
+    const supplier = this.supplierValue();
+    const catalog = this.supplierCatalog();
     return this.products()
-      .filter((p) => p.active || p.id === own)
+      .filter((p) => (p.active && (catalog === null || catalog.has(p.id))) || p.id === own)
       .map((p) => {
         const agreed = supplier !== null && p.suppliers.some((s) => s.supplierId === supplier);
         return {
@@ -116,14 +164,31 @@ export class PurchaseFormModal {
       untracked(() => {
         this.form.controls.items.clear({ emitEvent: false });
         this.form.reset({ supplierId: null, branchId: null, leadTimeDays: 1, paymentDueDays: 30 }, { emitEvent: false });
+        this.supplierValue.set(null);
+        this.pendingSupplierFor.set(null);
         this.addItem();
+        this.applyPreset(this.preset());
+        this.syncChosenProducts();
         this.recalculate();
         this.serverError.set(null);
+      });
+    });
+    // Con un producto ya elegido se propone su proveedor preferido (o el único que lo vende) cuando llega el catálogo.
+    effect(() => {
+      const productId = this.pendingSupplierFor();
+      const product = this.products().find((p) => p.id === productId);
+      if (productId === null || !product) return;
+      untracked(() => {
+        this.pendingSupplierFor.set(null);
+        if (this.form.controls.supplierId.value !== null) return;
+        const deal = product.suppliers.find((s) => s.preferred) ?? (product.suppliers.length === 1 ? product.suppliers[0] : undefined);
+        if (deal) this.form.controls.supplierId.setValue(deal.supplierId);
       });
     });
     this.form.controls.supplierId.valueChanges.pipe(takeUntilDestroyed()).subscribe((id) => this.supplierChosen(id));
     this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
       this.serverError.set(null);
+      this.syncChosenProducts();
       this.recalculate();
     });
   }
@@ -203,13 +268,46 @@ export class PurchaseFormModal {
   }
 
   /** Al elegir proveedor se propone su tiempo de entrega y, en las filas ya con producto, su precio pactado. */
-  private supplierChosen(id: number | null): void {
-    const supplier = this.suppliers().find((s) => s.id === id);
-    if (supplier?.tiempoEntregaDias && supplier.tiempoEntregaDias > 0) this.form.controls.leadTimeDays.setValue(supplier.tiempoEntregaDias, { emitEvent: false });
-    for (const row of this.form.controls.items.controls) {
-      const agreement = this.products().find((p) => p.id === row.controls.productId.value)?.suppliers.find((s) => s.supplierId === id);
-      if (agreement && agreement.price > 0) row.controls.unitPrice.setValue(agreement.price, { emitEvent: false });
+  private applyPreset(preset: PurchasePreset | null): void {
+    if (!preset) return;
+    // Solo el ADMIN elige sucursal; los demás compran siempre para la suya.
+    if (this.chooseBranch() && preset.branchId !== null) this.form.controls.branchId.setValue(preset.branchId, { emitEvent: false });
+    if (preset.productId !== null) {
+      this.form.controls.items.at(0).controls.productId.setValue(preset.productId);
+      this.pendingSupplierFor.set(preset.productId);
     }
+  }
+
+  private syncChosenProducts(): void {
+    const ids = this.form.controls.items.controls.map((row) => row.controls.productId.value).filter((id): id is number => id !== null);
+    const current = this.chosenProducts();
+    if (ids.length !== current.length || ids.some((id, i) => id !== current[i])) this.chosenProducts.set(ids);
+  }
+
+  /**
+   * Al elegir proveedor: se sueltan los productos que no vende (no se le puede pedir lo que no tiene), se propone el
+   * precio pactado de los que sí y el plazo de entrega: el pactado más largo entre esos productos o, si no hay, el
+   * habitual del proveedor.
+   */
+  private supplierChosen(id: number | null): void {
+    this.supplierValue.set(id);
+    const catalog = this.supplierCatalog();
+    const agreedDays: number[] = [];
+    for (const row of this.form.controls.items.controls) {
+      const productId = row.controls.productId.value;
+      if (productId === null) continue;
+      if (catalog !== null && !catalog.has(productId)) {
+        row.controls.productId.setValue(null);
+        row.controls.unitPrice.setValue(null, { emitEvent: false });
+        continue;
+      }
+      const agreement = this.products().find((p) => p.id === productId)?.suppliers.find((s) => s.supplierId === id);
+      if (agreement && agreement.price > 0) row.controls.unitPrice.setValue(agreement.price, { emitEvent: false });
+      if (agreement && agreement.deliveryDays > 0) agreedDays.push(agreement.deliveryDays);
+    }
+    const usual = this.suppliers().find((s) => s.id === id)?.tiempoEntregaDias ?? 0;
+    const days = agreedDays.length > 0 ? Math.max(...agreedDays) : usual;
+    if (days > 0) this.form.controls.leadTimeDays.setValue(days, { emitEvent: false });
   }
 
   private recalculate(): void {

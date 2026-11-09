@@ -9,6 +9,7 @@ import { errorInterceptor } from '@core/api/error.interceptor';
 import { NotificationService } from '@core/notifications/notification.service';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
 import { expectAccessible } from '@testing/a11y';
+import { chooseOption } from '@testing/select-helpers';
 import { BranchesPage } from './branches-page';
 
 const BRANCHES = [
@@ -230,6 +231,48 @@ describe('BranchesPage', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('La sucursal tiene stock');
       expect(screen.getByRole('dialog', { name: 'Desactivar sucursal' })).toBeInTheDocument();
       expect(TestBed.inject(NotificationService).items()).toEqual([]);
+    });
+  });
+
+  describe('filtros', () => {
+    const WITH_MANAGER = BRANCHES.map((b) => (b.id === 1 ? { ...b, managerId: 7 } : b));
+
+    it('busca por nombre, dirección o teléfono', async () => {
+      server.use(http.get(URL, () => HttpResponse.json(BRANCHES)));
+      await renderPage();
+      await screen.findByText('Sede Central');
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar sucursal' }), 'norte');
+      expect(names()).toEqual(['Sucursal Norte']);
+      await userEvent.clear(screen.getByRole('searchbox', { name: 'Buscar sucursal' }));
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar sucursal' }), 'carrera 30');
+      expect(names()).toEqual(['Sucursal Sur']);
+      await userEvent.clear(screen.getByRole('searchbox', { name: 'Buscar sucursal' }));
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar sucursal' }), '7002');
+      expect(names()).toEqual(['Sucursal Norte']);
+    });
+
+    it('filtra por estado y por gerente asignado', async () => {
+      server.use(http.get(URL, () => HttpResponse.json(WITH_MANAGER)));
+      await renderPage();
+      await screen.findByText('Sede Central');
+      await chooseOption('Estado de la sucursal', 'Solo inactivas');
+      expect(names()).toEqual(['Sucursal Sur']);
+      await chooseOption('Estado de la sucursal', 'Solo activas');
+      expect(names()).toEqual(['Sede Central', 'Sucursal Norte']);
+      await chooseOption('Gerente de la sucursal', 'Sin gerente');
+      expect(names()).toEqual(['Sucursal Norte']);
+      await chooseOption('Gerente de la sucursal', 'Con gerente');
+      expect(names()).toEqual(['Sede Central']);
+    });
+
+    it('sin coincidencias lo dice, y quitar filtros vuelve a mostrar todo', async () => {
+      server.use(http.get(URL, () => HttpResponse.json(BRANCHES)));
+      await renderPage();
+      await screen.findByText('Sede Central');
+      await userEvent.type(screen.getByLabelText('Buscar sucursal'), 'zzz');
+      expect(screen.getByText('Ninguna sucursal coincide')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+      expect(names()).toHaveLength(3);
     });
   });
 });

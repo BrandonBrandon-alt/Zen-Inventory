@@ -11,6 +11,9 @@ export interface ThemeOrigin {
 
 export const THEME_STORAGE_KEY = 'zen_inventory_theme';
 
+/** Fondo de cada tema (igual que `--bg-base` en theme.css): es el `theme-color` de la página. */
+const THEME_COLOR: Readonly<Record<Theme, string>> = { dark: '#1b2823', light: '#ffffff' };
+
 function isTheme(value: unknown): value is Theme {
   return value === 'dark' || value === 'light';
 }
@@ -18,9 +21,9 @@ function isTheme(value: unknown): value is Theme {
 function readStoredTheme(): Theme {
   try {
     const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    return isTheme(stored) ? stored : 'dark';
+    return isTheme(stored) ? stored : 'light';
   } catch {
-    return 'dark';
+    return 'light';
   }
 }
 
@@ -35,7 +38,7 @@ function writeStoredTheme(theme: Theme): void {
 /**
  * Tema claro/oscuro. Se refleja en `<html data-theme>`, que activa los tokens de `theme.css`.
  *
- * Al cambiar con un `origin`, el tema nuevo se revela como un círculo que crece desde ese punto (View Transitions API).
+ * Al cambiar con un `origin`, el tema nuevo se extiende como una mancha de luz de borde difuminado desde ese punto (View Transitions API).
  * Sin soporte del navegador, sin origen o si el usuario pidió menos movimiento, el cambio es instantáneo.
  */
 @Injectable({ providedIn: 'root' })
@@ -80,6 +83,8 @@ export class ThemeService {
 
   private apply(theme: Theme): void {
     this.root.dataset['theme'] = theme;
+    // La barra del navegador (en móvil) toma el color de fondo del tema vigente.
+    this.doc.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEME_COLOR[theme]);
   }
 
   private canAnimate(): boolean {
@@ -89,8 +94,17 @@ export class ThemeService {
   }
 
   private animate(commit: () => void, origin: ThemeOrigin): void {
+    const view = this.doc.defaultView;
+    const width = view?.innerWidth ?? 1280;
+    const height = view?.innerHeight ?? 720;
+    // El revelado debe terminar justo cuando cubre la esquina más lejana: ni se queda corto ni sigue después.
+    const farthest = Math.hypot(Math.max(origin.x, width - origin.x), Math.max(origin.y, height - origin.y));
+    const feather = 140;
     this.root.style.setProperty('--theme-x', `${origin.x}px`);
     this.root.style.setProperty('--theme-y', `${origin.y}px`);
+    this.root.style.setProperty('--theme-max', `${Math.ceil(farthest + feather)}px`);
+    this.root.style.setProperty('--theme-feather', `${feather}px`);
+    this.root.style.setProperty('--theme-duration', `${Math.round(Math.min(950, Math.max(650, 420 + farthest * 0.4)))}ms`);
     this.root.dataset['themeSwitching'] = '';
 
     const transition = this.doc.startViewTransition(() => {
@@ -104,6 +118,9 @@ export class ThemeService {
   private clearTransitionMarks(): void {
     this.root.style.removeProperty('--theme-x');
     this.root.style.removeProperty('--theme-y');
+    this.root.style.removeProperty('--theme-max');
+    this.root.style.removeProperty('--theme-feather');
+    this.root.style.removeProperty('--theme-duration');
     delete this.root.dataset['themeSwitching'];
   }
 }

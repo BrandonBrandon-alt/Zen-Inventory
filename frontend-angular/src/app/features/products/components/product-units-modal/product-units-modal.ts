@@ -48,31 +48,25 @@ const positive = (control: AbstractControl): ValidationErrors | null => (Number(
         <div class="flex justify-center py-6"><app-spinner /></div>
       } @else {
         <ul class="divide-y divide-line">
+          <li class="flex items-center justify-between gap-3 py-2.5">
+            <p class="min-w-0 text-sm text-fg">{{ baseName() }}</p>
+            <app-badge variant="info">Base</app-badge>
+          </li>
           @for (unit of units(); track unit.unitId) {
             <li class="flex items-center justify-between gap-3 py-2.5">
-              <p class="min-w-0 text-sm text-fg">
-                @if (unit.isBase) {
-                  {{ unit.nombre }} ({{ unit.abreviatura }})
-                } @else {
-                  1 {{ unit.abreviatura }} = {{ formatQuantity(unit.factor) }} {{ baseLabel() }}
-                }
-              </p>
-              @if (unit.isBase) {
-                <app-badge variant="info">Base</app-badge>
-              } @else {
-                <button
-                  appButton
-                  variant="ghost-danger"
-                  size="sm"
-                  type="button"
-                  appTooltip="Quitar unidad"
-                  [attr.aria-label]="'Quitar ' + unit.nombre"
-                  [disabled]="busy()"
-                  (click)="remove(unit)"
-                >
-                  <svg lucideTrash2 [size]="16" aria-hidden="true"></svg>
-                </button>
-              }
+              <p class="min-w-0 text-sm text-fg">1 {{ unit.abreviatura }} = {{ formatQuantity(unit.factor) }} {{ baseLabel() }}</p>
+              <button
+                appButton
+                variant="ghost-danger"
+                size="sm"
+                type="button"
+                appTooltip="Quitar unidad"
+                [attr.aria-label]="'Quitar ' + unit.nombre"
+                [disabled]="busy()"
+                (click)="remove(unit)"
+              >
+                <svg lucideTrash2 [size]="16" aria-hidden="true"></svg>
+              </button>
             </li>
           } @empty {
             <li class="py-2.5 text-sm text-fg-subtle">Este producto solo se maneja en su unidad base.</li>
@@ -121,6 +115,11 @@ export class ProductUnitsModal {
 
   protected readonly baseAbbreviation = computed(() => this.product()?.unitAbbreviation || 'base');
   protected readonly baseLabel = this.baseAbbreviation;
+  /** La unidad base viene del producto; la API de unidades solo trae las alternas. */
+  protected readonly baseName = computed(() => {
+    const base = this.allUnits().find((unit) => unit.id === this.product()?.unitId);
+    return base ? `${base.nombre} (${base.abreviatura})` : this.baseAbbreviation();
+  });
 
   /** Unidades que todavía se pueden agregar: ni la base del producto ni las ya asignadas. */
   protected readonly options = computed<SelectOption<number>[]>(() => {

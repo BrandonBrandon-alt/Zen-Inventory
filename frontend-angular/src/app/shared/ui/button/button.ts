@@ -6,7 +6,7 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
 
 const BASE =
   'inline-flex cursor-pointer items-center justify-center gap-2 font-semibold tracking-tight ' +
-  'transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ' +
+  'transition-[background-color,border-color,color,box-shadow,transform,opacity] duration-200 outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ' +
   'disabled:cursor-not-allowed disabled:opacity-55 enabled:hover:-translate-y-px ' +
   'enabled:active:translate-y-0 enabled:active:scale-[0.98]';
 

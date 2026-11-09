@@ -39,6 +39,9 @@ public interface ProductRepositoryPort {
     /** Bloquea la fila del producto hasta el fin de la transacción; {@code false} si no existe. */
     boolean lockById(Long id);
 
+    /** Indica si algo depende de la unidad base del producto: presentaciones, stock, movimientos o compras en esa unidad. */
+    boolean isBaseUnitInUse(Long id);
+
     /** Actualiza solo el costo promedio (no reescribe el resto del producto). */
     void updateAverageCost(Long id, java.math.BigDecimal averageCost);
 

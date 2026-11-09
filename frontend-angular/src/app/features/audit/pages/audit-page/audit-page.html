@@ -28,10 +28,7 @@
     <app-form-field label="Cantidad hasta">
       <input appInput type="number" min="0" step="any" inputmode="decimal" [value]="maxQuantity() ?? ''" (input)="maxQuantity.set(numberFromInput($event))" />
     </app-form-field>
-    <label class="flex min-h-11 items-center gap-2 text-sm text-fg-muted">
-      <input type="checkbox" class="size-4 accent-[var(--brand-500)]" [checked]="onlyObserved()" (change)="onlyObserved.set($any($event.target).checked)" />
-      Solo con observaciones
-    </label>
+    <div class="flex min-h-11 items-center"><app-checkbox [checked]="onlyObserved()" (checkedChange)="onlyObserved.set($event)">Solo con observaciones</app-checkbox></div>
   </app-advanced-filters>
 </div>
 <app-active-filters class="mb-4 animate-enter-delayed" [filters]="activeFilters()" (removed)="removeFilter($event)" (cleared)="clearFilters()" />

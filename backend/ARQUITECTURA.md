@@ -188,13 +188,12 @@ un JSON de error con un código estable (`INSUFFICIENT_STOCK`, `INVALID_STATE`�
 | `transferencias` | transfer | Cabecera del traslado entre sucursales |
 | `detalles_transferencia` | transfer | Líneas del traslado (solicitada / enviada / recibida / faltantes) |
 | `alertas_stock` | alert | Alertas abiertas y resueltas |
-| `rutas_logisticas` | — | Existe en el esquema pero **ningún código la usa todavía** |
 
 `analytics` no tiene tablas propias: lee con SQL directo (`JdbcTemplate`) `ventas`, `detalles_venta`,
 `inventario_local`, `producto`, `sucursal`, `transferencias` y `detalles_transferencia`.
 
 Las migraciones están en `src/main/resources/db/migration/` (Flyway): `V1` esquema, `V2` datos iniciales,
-`V3` alertas de ejemplo, `V4` foto de perfil. Hibernate está en `ddl-auto: validate`: **no crea tablas**, solo
+`V3` alertas de ejemplo, `V4` foto de perfil, `V5`–`V7` pagos, `V8` consolida las relaciones. Hibernate está en `ddl-auto: validate`: **no crea tablas**, solo
 comprueba que las entidades coincidan con el esquema.
 
 ### 4.2 Diagrama de relaciones (claves foráneas reales)
@@ -224,28 +223,30 @@ erDiagram
     usuario ||--o{ ventas : "vendedor"
     ventas ||--|{ detalles_venta : "líneas"
     producto ||--o{ detalles_venta : ""
-    ventas ||--o{ solicitudes_devolucion : ""
-    sucursal ||--o{ solicitudes_devolucion : ""
+    lista_precios ||--o{ detalles_venta : "de dónde salió el precio"
+    ventas ||--o{ solicitudes_devolucion : "misma sucursal (FK compuesta)"
     usuario ||--o{ solicitudes_devolucion : "solicita / aprueba"
     solicitudes_devolucion ||--|{ detalles_devolucion_solicitud : "líneas"
-    producto ||--o{ detalles_devolucion_solicitud : ""
+    detalles_venta ||--o{ detalles_devolucion_solicitud : "línea devuelta, mismo producto (FK compuesta)"
 
     proveedor ||--o{ ordenes_compra : ""
     sucursal ||--o{ ordenes_compra : "destino"
     usuario ||--o{ ordenes_compra : "crea / recibe / resuelve"
     ordenes_compra ||--|{ detalles_orden_compra : "líneas"
     producto ||--o{ detalles_orden_compra : ""
+    ordenes_compra ||--o{ pagos_orden_compra : "pagos"
+    usuario ||--o{ pagos_orden_compra : "registra"
 
     sucursal ||--o{ transferencias : "origen y destino"
     transferencias ||--o{ transferencias : "reenvío (parent)"
-    usuario ||--o{ transferencias : "resuelve"
+    usuario ||--o{ transferencias : "solicita / autoriza / despacha / recibe / resuelve"
     transferencias ||--|{ detalles_transferencia : "líneas"
     producto ||--o{ detalles_transferencia : ""
+    transferencias ||--o{ pagos_traslado : "pagos del flete"
+    usuario ||--o{ pagos_traslado : "registra"
 
     sucursal ||--o{ alertas_stock : ""
     producto ||--o{ alertas_stock : ""
-
-    sucursal ||--o{ rutas_logisticas : "origen y destino (sin uso)"
 ```
 
 Claves para leerlo:
@@ -308,4 +309,4 @@ Ejemplo: un nuevo caso de uso en un módulo existente.
 6. **Controller + DTO**: expón el endpoint, con `@PreAuthorize`, y mapea dominio → `*Response`.
 7. **Tests**: del service (con mocks) y del controller (`@WebMvcTest`). Corre `./mvnw test`.
 8. Cambió el contrato → en el frontend `npm run openapi:gen`.
-9. ¿Tabla o columna nueva? **Nunca** editar V1: crea `V5__…sql` con Flyway.
+9. ¿Tabla o columna nueva? **Nunca** editar una migración ya aplicada: crea la siguiente (`V9__…sql`) con Flyway.

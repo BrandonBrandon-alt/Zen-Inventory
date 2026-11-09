@@ -122,6 +122,16 @@ public class TransferController {
         return ResponseEntity.ok().build();
     }
 
+    @PostMapping("/{id}/pay-freight")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<TransferResponse> payFreight(
+            @PathVariable Long id,
+            @Valid @RequestBody(required = false) FreightPaymentRequest request) {
+        FreightPaymentRequest pay = request != null ? request : new FreightPaymentRequest(null, null, null, null);
+        Transfer transfer = transferUseCase.registerFreightPayment(id, pay.amount(), pay.method(), pay.reference(), pay.notes());
+        return ResponseEntity.ok(TransferResponse.fromDomain(transfer));
+    }
+
     @PostMapping("/{id}/cancel")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<Void> cancelTransfer(

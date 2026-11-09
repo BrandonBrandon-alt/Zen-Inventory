@@ -42,6 +42,11 @@ public class ProductPersistenceAdapter implements ProductRepositoryPort {
     }
 
     @Override
+    public boolean isBaseUnitInUse(Long id) {
+        return jpaRepository.isBaseUnitInUse(id);
+    }
+
+    @Override
     public boolean lockById(Long id) {
         return !jpaRepository.lockById(id).isEmpty();
     }

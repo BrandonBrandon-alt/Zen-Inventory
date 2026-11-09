@@ -16,8 +16,9 @@ Maneja **dos estados independientes** en la misma orden: el de **recepción** (�
 |---|---|
 | `ordenes_compra` | `proveedor_id`, `sucursal_id` (destino), `usuario_id` (quien la creó), `usuario_recepcion_id`, `estado_recepcion`, `estado_pago`, `total`, `fecha_solicitud`, `fecha_estimada_llegada`, `fecha_real_llegada`, `tiempo_entrega_dias`, `plazo_pago_dias`, `fecha_vencimiento_pago`, `excepcion_aprobada`, datos de resolución (`motivo_resolucion`, `resuelto_por_id`, `fecha_resolucion`) y `version` (control de concurrencia optimista) |
 | `detalles_orden_compra` | `producto_id`, `cantidad`, `precio_unitario_pactado`, `descuento_pct`, `subtotal`, `cantidad_recibida` |
+| `pagos_orden_compra` | **Un pago o abono por fila** (migración V5): `orden_id`, `monto`, `fecha`, `usuario_id` + `usuario_nombre` (quién lo registró), `metodo`, `referencia` (n.º de transferencia, cheque o comprobante) y `notas`. Es inmutable: un pago equivocado no se edita |
 
-FKs: `ordenes_compra → proveedor, sucursal, usuario (×3)`; `detalles_orden_compra → ordenes_compra (cascada), producto`.
+FKs: `ordenes_compra → proveedor, sucursal, usuario (×3)`; `detalles_orden_compra → ordenes_compra (cascada), producto`; `pagos_orden_compra → ordenes_compra, usuario`.
 
 ## Estados
 
@@ -36,8 +37,17 @@ FKs: `ordenes_compra → proveedor, sucursal, usuario (×3)`; `detalles_orden_co
 - `RECEIVED_PARTIAL`: llegó parte; sigue admitiendo recepciones hasta completar.
 - `close-shortfall`: el ADMIN da por cerrada una orden con faltantes definitivos.
 
-**Pago (`PaymentStatus`):** `POR_PAGAR` → `PAGO_PARCIAL` → `PAGADO`. Solo se puede pagar una orden ya recibida
-(total o parcialmente), y no dos veces.
+**Pago (`PaymentStatus`):** `POR_PAGAR` → `PAGO_PARCIAL` → `PAGADO`. El estado **se deduce de los pagos registrados**:
+cada abono suma, queda `PAGO_PARCIAL` mientras haya saldo y `PAGADO` cuando lo pagado cubre el total.
+
+Reglas del pago (`PurchaseOrder.registerPayment`):
+- Solo se paga una orden ya recibida (total o parcialmente).
+- El monto debe ser mayor que cero y **no puede exceder el saldo**; sin monto se paga todo el saldo.
+- Cada pago guarda monto, fecha, quién lo hizo, método (`EFECTIVO`, `TRANSFERENCIA`, `CHEQUE`, `TARJETA`, `OTRO`) y referencia.
+- **Saldo** = total − pagado (cero si la orden está cancelada). Una orden está **vencida** si tiene saldo y ya pasó
+  `fecha_vencimiento_pago`.
+- Las órdenes que ya estaban pagadas antes de V5 recibieron un pago por el total («Pago anterior al registro de pagos»).
+  Las que figuraban como «pago parcial» sin ningún pago volvieron a «por pagar», porque no consta cuánto se abonó.
 
 ## Qué hace cada carpeta
 
@@ -46,9 +56,11 @@ purchase/
 ├── domain/
 │   ├── model/
 │   │   ├── PurchaseOrder        Agregado raíz: create, approve, approveException, markAsInTransit, receive,
-│   │   │                        closeShortfall, cancel, registerPayment. CADA método valida el estado de origen y
+│   │   │                        closeShortfall, cancel, registerPayment (paidAmount, balance, isOverdue). CADA método valida el estado de origen y
 │   │   │                        lanza InvalidPurchaseStateException si no corresponde
 │   │   ├── PurchaseOrderDetail  Línea: cantidad pedida/recibida, precio, descuento, subtotal
+│   │   ├── PurchasePayment      Un pago o abono (monto, fecha, quién, método, referencia). Inmutable
+│   │   ├── PaymentMethod        EFECTIVO | TRANSFERENCIA | CHEQUE | TARJETA | OTRO
 │   │   ├── ReceptionStatus      Estado logístico
 │   │   └── PaymentStatus        Estado financiero
 │   └── exception/InvalidPurchaseStateException
@@ -91,7 +103,7 @@ Se hace todo en una transacción: si falla el ingreso a inventario, la orden no 
 | `POST /{id}/dispatch` | Marcar en tránsito | ADMIN, MANAGER |
 | `POST /{id}/receive` | Recibir mercancía | ADMIN, MANAGER, OPERADOR |
 | `POST /{id}/close-shortfall` | Cerrar con faltantes definitivos | ADMIN |
-| `POST /{id}/pay` | Registrar el pago | ADMIN, MANAGER |
+| `POST /{id}/pay` | Registrar un pago o abono: `{amount?, method?, reference?, notes?}` (sin cuerpo paga todo el saldo). La respuesta de la orden trae `paidAmount`, `balance`, `overdue` y la lista `payments` | ADMIN, MANAGER |
 | `POST /{id}/cancel` | Cancelar (con motivo) | ADMIN, MANAGER |
 | `GET /`, `GET /{id}` | Consultar | ADMIN, MANAGER, OPERADOR |
 

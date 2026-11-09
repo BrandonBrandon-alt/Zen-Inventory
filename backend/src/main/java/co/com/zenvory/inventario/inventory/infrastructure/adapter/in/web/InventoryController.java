@@ -71,6 +71,24 @@ public class InventoryController {
     }
 
     /**
+     * Productos con existencia disponible en una sucursal, para armar una solicitud de traslado: solo los que tienen
+     * algo que enviar, con la cantidad disponible. A diferencia del listado por sucursal no trae precios ni costos, por
+     * eso se puede consultar la de otra sucursal.
+     *
+     * @param branchId ID de la sucursal que enviaría la mercancía.
+     */
+    @GetMapping("/branches/{branchId}/availability")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'OPERADOR_INVENTARIO')")
+    public ResponseEntity<List<co.com.zenvory.inventario.inventory.infrastructure.adapter.in.web.dto.BranchAvailabilityResponse>> getAvailability(
+            @PathVariable Long branchId) {
+        return ResponseEntity.ok(inventoryUseCase.getInventoryByBranch(branchId).stream()
+                .filter(inv -> inv.availableQuantity().signum() > 0)
+                .map(inv -> new co.com.zenvory.inventario.inventory.infrastructure.adapter.in.web.dto.BranchAvailabilityResponse(
+                        inv.getProductId(), inv.availableQuantity()))
+                .toList());
+    }
+
+    /**
      * Recupera el inventario completo enriquecido de una sucursal.
      * 
      * @param branchId ID de la sucursal.

@@ -8,6 +8,7 @@ import co.com.zenvory.inventario.inventory.domain.model.MovementReason;
 import co.com.zenvory.inventario.purchase.application.port.in.CreatePurchaseCommand;
 import co.com.zenvory.inventario.purchase.application.port.in.PurchaseUseCase;
 import co.com.zenvory.inventario.purchase.application.port.out.PurchaseRepositoryPort;
+import co.com.zenvory.inventario.purchase.domain.model.PaymentMethod;
 import co.com.zenvory.inventario.purchase.domain.model.PurchaseOrder;
 import co.com.zenvory.inventario.purchase.domain.model.PurchaseOrderDetail;
 import co.com.zenvory.inventario.purchase.domain.model.ReceptionStatus;
@@ -200,9 +201,10 @@ public class PurchaseService implements PurchaseUseCase {
 
     @Override
     @Transactional
-    public PurchaseOrder registerPayment(Long orderId) {
+    public PurchaseOrder registerPayment(Long orderId, BigDecimal amount, PaymentMethod method, String reference,
+            String notes, Long userId, String userName) {
         PurchaseOrder order = getOrderById(orderId);
-        order.registerPayment();
+        order.registerPayment(amount, method, reference, notes, userId, userName);
         return repository.save(order);
     }
 

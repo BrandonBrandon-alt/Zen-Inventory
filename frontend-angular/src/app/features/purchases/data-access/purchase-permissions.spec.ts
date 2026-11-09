@@ -14,6 +14,10 @@ const purchase = (reception: ReceptionStatus, payment: PaymentStatus = 'POR_PAGA
   paymentDueDays: 30,
   paymentDueDate: null,
   total: 100,
+  paid: payment === 'PAGADO' ? 100 : 0,
+  balance: payment === 'PAGADO' ? 0 : 100,
+  overdue: false,
+  payments: [],
   reason: '',
   lines: [],
 });
@@ -52,6 +56,14 @@ describe('purchaseActions', () => {
 
   it('una orden ya pagada no ofrece pagar otra vez', () => {
     expect(allowed(purchase('RECEIVED_TOTAL', 'PAGADO'), 'ADMIN')).toEqual([]);
+  });
+
+  it('una orden con el saldo en cero no ofrece pagar aunque su estado no sea PAGADO', () => {
+    expect(allowed({ ...purchase('RECEIVED_TOTAL', 'PAGO_PARCIAL'), balance: 0 }, 'ADMIN')).toEqual([]);
+  });
+
+  it('una orden con pago parcial sigue ofreciendo pagar el saldo', () => {
+    expect(allowed({ ...purchase('RECEIVED_TOTAL', 'PAGO_PARCIAL'), paid: 40, balance: 60 }, 'MANAGER')).toEqual(['pay']);
   });
 
   it('una orden cancelada no ofrece nada', () => {

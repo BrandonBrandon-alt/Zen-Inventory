@@ -106,6 +106,7 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
                 sub.select(detail.get("id")).where(cb.equal(detail.get("sale"), root), detail.<Long>get("productId").in(supplied));
                 predicates.add(cb.exists(sub));
             }
+            if (c.paymentMethod() != null) predicates.add(cb.equal(root.get("paymentMethod"), c.paymentMethod()));
             if (c.withDiscount() != null) {
                 var discount = root.<BigDecimal>get("totalDiscount");
                 predicates.add(c.withDiscount() ? cb.greaterThan(discount, BigDecimal.ZERO) : cb.lessThanOrEqualTo(discount, BigDecimal.ZERO));
@@ -189,6 +190,8 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
         entity.setCancellationReason(domain.getCancellationReason());
         entity.setCustomerName(domain.getCustomerName());
         entity.setCustomerDocument(domain.getCustomerDocument());
+        entity.setPaymentMethod(domain.getPaymentMethod());
+        entity.setPaymentReference(domain.getPaymentReference());
         entity.setGlobalDiscountPercentage(domain.getGlobalDiscountPercentage());
 
         if (domain.getDetails() != null) {
@@ -197,6 +200,7 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
                 detailEntity.setId(detail.getId());
                 detailEntity.setProductId(detail.getProductId());
                 detailEntity.setProductName(detail.getProductName());
+                detailEntity.setPriceListId(detail.getPriceListId());
                 detailEntity.setQuantity(detail.getQuantity());
                 detailEntity.setUnitPriceApplied(detail.getUnitPriceApplied());
                 detailEntity.setDiscountPercentage(detail.getDiscountPercentage());
@@ -220,6 +224,8 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
                 entity.getCancellationReason(),
                 entity.getCustomerName(),
                 entity.getCustomerDocument(),
+                entity.getPaymentMethod(),
+                entity.getPaymentReference(),
                 entity.getGlobalDiscountPercentage(),
                 entity.getDetails().stream().map(d -> new SaleDetail(
                         d.getId(),
@@ -227,7 +233,8 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
                         d.getProductName(),
                         d.getQuantity(),
                         d.getUnitPriceApplied(),
-                        d.getDiscountPercentage()
+                        d.getDiscountPercentage(),
+                        d.getPriceListId()
                 )).collect(Collectors.toList())
         );
     }

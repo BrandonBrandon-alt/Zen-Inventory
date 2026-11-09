@@ -17,10 +17,22 @@ const report = (extra: Partial<SalesReport> = {}): SalesReport => ({
   canceledTotal: 700,
   bySeller: [{ seller: 'Luis', sales: 2, units: 5, total: 4000, average: 2000 }],
   topProducts: [{ name: 'Tornillo', units: 5, total: 4000 }],
+  byPayment: [
+    { method: 'EFECTIVO', sales: 1, total: 2500 },
+    { method: 'TARJETA', sales: 1, total: 1500 },
+  ],
   ...extra,
 });
 
 describe('reportes de ventas en HTML', () => {
+  it('el cierre de caja trae lo cobrado por cada forma de pago y agrupa lo anterior al registro como «Sin registrar»', () => {
+    const html = buildSalesReportHtml(report({ byPayment: [{ method: 'EFECTIVO', sales: 1, total: 2500 }, { method: null, sales: 1, total: 1500 }] }), DEFAULT_COMPANY, 'Sede Central');
+    expect(html).toContain('Cobrado por forma de pago');
+    expect(html).toContain('Efectivo');
+    expect(html).toContain(formatMoney(2500));
+    expect(html).toContain('Sin registrar');
+  });
+
   it('un solo día es un cierre de caja; un rango, un reporte de ventas, con su nombre de archivo', () => {
     expect(reportTitle(report())).toBe('Cierre de caja');
     expect(reportFileName(report())).toBe('cierre-de-caja-2026-10-18');
@@ -43,7 +55,7 @@ describe('reportes de ventas en HTML', () => {
   });
 
   it('sin ventas lo dice en lugar de dibujar tablas vacías', () => {
-    const html = buildSalesReportHtml(report({ sales: 0, bySeller: [], topProducts: [] }), DEFAULT_COMPANY, 'Todas las sucursales');
+    const html = buildSalesReportHtml(report({ sales: 0, bySeller: [], topProducts: [], byPayment: [] }), DEFAULT_COMPANY, 'Todas las sucursales');
     expect(html).not.toContain('<table><thead>');
     expect(html).toContain('No hubo ventas en este periodo.');
   });

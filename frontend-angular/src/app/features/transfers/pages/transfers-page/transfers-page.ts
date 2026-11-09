@@ -11,14 +11,16 @@ import {
   LucidePlus,
   LucideRoute,
   LucideSearch,
+  LucideWallet,
 } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { CatalogOptionsApi, type ProductOption } from '@core/catalog/catalog-options-api';
-import { formatDateTime, normalizeText } from '@shared/format/format';
+import { formatDateTime, formatMoney, normalizeText } from '@shared/format/format';
 import { inDateRange, optionsFrom } from '@shared/filters/filter-helpers';
 import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
+import { Checkbox } from '@shared/ui/checkbox/checkbox';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { DatePicker } from '@shared/ui/date-picker/date-picker';
@@ -30,8 +32,9 @@ import { Segmented, type SegmentedOption } from '@shared/ui/segmented/segmented'
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { TransferDetailModal } from '../../components/transfer-detail-modal/transfer-detail-modal';
-import { TransferRequestModal } from '../../components/transfer-request-modal/transfer-request-modal';
-import { OPEN_STATUSES, PRIORITY_INFO, STATUS_INFO } from '../../data-access/transfer-labels';
+import { TransferRequestModal, type TransferPreset } from '../../components/transfer-request-modal/transfer-request-modal';
+import { takeNewDocumentRequest } from '@core/navigation/new-document-link';
+import { FREIGHT_INFO, OPEN_STATUSES, PRIORITY_INFO, STATUS_INFO } from '../../data-access/transfer-labels';
 import { type Actor, transferActions } from '../../data-access/transfer-permissions';
 import { type Transfer, TRANSFER_STATUSES, type TransferPriority, type TransferStatus, TransfersApi } from '../../data-access/transfers-api';
 
@@ -42,6 +45,7 @@ interface TransferRow extends Transfer {
   readonly route: string;
   readonly statusLabel: string;
   readonly priorityLabel: string;
+  readonly freightLabel: string;
   readonly products: string;
   readonly needsMe: boolean;
 }
@@ -53,6 +57,7 @@ const PRIORITIES: readonly TransferPriority[] = ['HIGH', 'NORMAL', 'LOW'];
 @Component({
   selector: 'app-transfers-page',
   imports: [
+    Checkbox,
     DataTable,
     DataTableCell,
     Badge,
@@ -112,6 +117,8 @@ export class TransfersPage {
   protected readonly advancedOpen = persistedFilter(TransfersPage.SCREEN, 'advancedOpen', false, codecs.bool());
 
   protected readonly requestOpen = signal(false);
+  /** Lo que llega ya elegido a la solicitud cuando se viene de otra pantalla (el ajuste de stock). */
+  protected readonly requestPreset = signal<TransferPreset | null>(null);
   protected readonly detailOpen = signal(false);
   protected readonly selectedId = signal<number | null>(null);
 
@@ -146,7 +153,8 @@ export class TransfersPage {
     { key: 'route', header: 'Ruta', icon: LucideRoute.icon, sortable: true, primary: true },
     { key: 'products', header: 'Productos', icon: LucidePackage.icon },
     { key: 'priorityLabel', header: 'Prioridad', icon: LucideFlag.icon, sortable: true },
-    { key: 'requestDate', header: 'Solicitado', icon: LucideCalendar.icon, sortable: true, width: '11.5rem', value: (r) => r.requestDate, display: (r) => formatDateTime(r.requestDate) },
+    { key: 'freightLabel', header: 'Flete', icon: LucideWallet.icon, sortable: true },
+    { key: 'requestDate', header: 'Solicitado', icon: LucideCalendar.icon, sortable: true, nowrap: true, width: '11.5rem', value: (r) => r.requestDate, display: (r) => formatDateTime(r.requestDate) },
     { key: 'acciones', header: 'Acciones', align: 'end' },
   ];
 
@@ -185,6 +193,7 @@ export class TransfersPage {
           route: `${name(t.originBranchId)} → ${name(t.destinationBranchId)}`,
           statusLabel: STATUS_INFO[t.status].label,
           priorityLabel: PRIORITY_INFO[t.priority].label,
+          freightLabel: FREIGHT_INFO[t.freightStatus].label,
           products: this.productsLabel(t),
           // Le toca a quien mira: hay un paso que solo él puede dar.
           needsMe: actions.approve || actions.prepare || actions.dispatch || actions.receive || actions.resolve,
@@ -220,12 +229,29 @@ export class TransfersPage {
 
   protected readonly pending = computed(() => this.rows().filter((r) => r.needsMe).length);
 
+  /** Lo que se le debe a los transportistas en los traslados visibles. */
+  protected readonly freightOwed = computed(() => {
+    const owed = this.transfers().filter((t) => t.freightBalance > 0);
+    return { total: owed.reduce((sum, t) => sum + t.freightBalance, 0), count: owed.length };
+  });
+  protected readonly formatMoney = formatMoney;
+
   protected readonly summary = computed(() => {
     const open = this.transfers().filter((t) => OPEN_STATUSES.includes(t.status)).length;
     return open === 1 ? '1 traslado en curso' : `${open} traslados en curso`;
   });
 
   constructor() {
+    // Desde «Traslado recibido/enviado» en el ajuste de stock: la sucursal del inventario es el destino o el origen.
+    const request = takeNewDocumentRequest();
+    if (request) {
+      const sending = request.side === 'origen';
+      this.openRequest({
+        productId: request.productId,
+        originBranchId: sending ? request.branchId : null,
+        destinationBranchId: sending ? null : request.branchId,
+      });
+    }
     void this.load();
     // Los nombres de sucursal y de producto adornan la tabla y el formulario: si fallan, se muestran los códigos.
     forkJoin({
@@ -235,6 +261,11 @@ export class TransfersPage {
       this.branches.set(branches);
       this.products.set(products);
     });
+  }
+
+  protected openRequest(preset: TransferPreset | null = null): void {
+    this.requestPreset.set(preset);
+    this.requestOpen.set(true);
   }
 
   protected async load(silent = false): Promise<void> {
@@ -290,5 +321,9 @@ export class TransfersPage {
     if (!first) return '—';
     const others = transfer.lines.length - 1;
     return others > 0 ? `${first.productName} +${others}` : first.productName;
+  }
+
+  protected freightVariant(row: TransferRow): BadgeVariant {
+    return FREIGHT_INFO[row.freightStatus].variant;
   }
 }

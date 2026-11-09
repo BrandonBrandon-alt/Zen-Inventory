@@ -6,9 +6,11 @@ import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { errorInterceptor } from '@core/api/error.interceptor';
+import { SESSION_STORAGE_KEY } from '@core/auth/session/auth-store';
 import { NotificationService } from '@core/notifications/notification.service';
 import { apiErrorBody, server, TEST_API } from '@testing/msw-server';
 import { expectAccessible } from '@testing/a11y';
+import { chooseOption } from '@testing/select-helpers';
 import { SuppliersPage } from './suppliers-page';
 
 const SUPPLIERS = [
@@ -150,5 +152,57 @@ describe('SuppliersPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('productos o compras asociadas');
     expect(screen.getByRole('dialog', { name: 'Eliminar proveedor' })).toBeInTheDocument();
+  });
+
+  describe('filtros', () => {
+    const MANY = [...SUPPLIERS, { id: 4, nombre: 'Importadora Lejana', contacto: 'import@lejana.com', tiempoEntregaDias: 15 }];
+
+    it('busca por nombre o contacto sin distinguir acentos', async () => {
+      server.use(http.get(URL, () => HttpResponse.json(MANY)));
+      await renderPage();
+      await screen.findByText('Ferretería Central');
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar proveedor' }), 'ferreteria');
+      expect(names()).toEqual(['Ferretería Central']);
+      await userEvent.clear(screen.getByRole('searchbox', { name: 'Buscar proveedor' }));
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar proveedor' }), 'ventas@');
+      expect(names()).toEqual(['Aceros del Sur']);
+    });
+
+    it('filtra por plazo de entrega, incluidos los que no lo tienen registrado', async () => {
+      server.use(http.get(URL, () => HttpResponse.json(MANY)));
+      await renderPage();
+      await screen.findByText('Ferretería Central');
+      await chooseOption('Plazo de entrega', 'Entrega en 3 días o menos');
+      expect(names()).toEqual(['Ferretería Central', 'Aceros del Sur']);
+      await chooseOption('Plazo de entrega', 'Entrega en más de 7 días');
+      expect(names()).toEqual(['Importadora Lejana']);
+      await chooseOption('Plazo de entrega', 'Sin plazo registrado');
+      expect(names()).toEqual(['Sin datos']);
+      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro Plazo: Sin plazo registrado' }));
+      expect(names()).toHaveLength(4);
+    });
+
+    it('recuerda el plazo elegido la próxima vez que se entra', async () => {
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token: 't', email: 'e@z.co', nombre: 'Yo', rol: 'ADMIN', id: 1 }));
+      server.use(http.get(URL, () => HttpResponse.json(MANY)));
+      const first = await renderPage();
+      await screen.findByText('Ferretería Central');
+      await chooseOption('Plazo de entrega', 'Entrega en más de 7 días');
+      first.fixture.destroy();
+      TestBed.resetTestingModule();
+
+      await renderPage();
+      await screen.findByText('Importadora Lejana');
+      expect(names()).toEqual(['Importadora Lejana']);
+      localStorage.clear();
+    });
+
+    it('sin coincidencias lo dice (no es una lista vacía)', async () => {
+      server.use(http.get(URL, () => HttpResponse.json(MANY)));
+      await renderPage();
+      await screen.findByText('Ferretería Central');
+      await userEvent.type(screen.getByLabelText('Buscar proveedor'), 'zzz');
+      expect(screen.getByText('Ningún proveedor coincide')).toBeInTheDocument();
+    });
   });
 });

@@ -5,16 +5,18 @@ import { toApiError } from '@core/api/api-error';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { CompanyInfo } from '@core/company/company-info';
+import { paymentLabel } from '@core/sales/payment-method';
 import { formatMoney, formatQuantity } from '@shared/format/format';
 import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
 import { PrintService } from '@shared/print/print.service';
 import { Button } from '@shared/ui/button/button';
+import { Hint } from '@shared/ui/hint/hint';
 import { Card } from '@shared/ui/card/card';
 import { DataTable, type TableColumn } from '@shared/ui/data-table/data-table';
 import { DatePicker } from '@shared/ui/date-picker/date-picker';
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { ReportsApi, type ReportSale } from '../../data-access/reports-api';
-import { type ProductSummary, type SellerSummary, buildSalesReport, isSameDay } from '../../data-access/sales-report';
+import { type PaymentSummary, type ProductSummary, type SellerSummary, buildSalesReport, isSameDay } from '../../data-access/sales-report';
 import { buildSalesReportHtml, reportTitle } from '../../data-access/sales-report-html';
 
 const today = (): Date => {
@@ -29,7 +31,7 @@ const today = (): Date => {
  */
 @Component({
   selector: 'app-reports-page',
-  imports: [Card, Button, DataTable, DatePicker, Select, LucideFileDown],
+  imports: [Card, Hint, Button, DataTable, DatePicker, Select, LucideFileDown],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './reports-page.html',
@@ -98,7 +100,7 @@ export class ReportsPage {
     { key: 'seller', header: 'Vendedor', primary: true, sortable: true },
     { key: 'sales', header: 'Ventas', align: 'end', sortable: true },
     { key: 'units', header: 'Unidades', align: 'end', sortable: true, display: (r) => formatQuantity(r.units) },
-    { key: 'average', header: 'Ticket promedio', align: 'end', sortable: true, display: (r) => formatMoney(r.average), export: (r) => r.average },
+    { key: 'average', header: 'Valor promedio por venta', align: 'end', sortable: true, display: (r) => formatMoney(r.average), export: (r) => r.average },
     { key: 'total', header: 'Total', align: 'end', sortable: true, display: (r) => formatMoney(r.total), export: (r) => r.total },
   ];
   protected readonly productColumns: readonly TableColumn<ProductSummary>[] = [
@@ -106,6 +108,12 @@ export class ReportsPage {
     { key: 'units', header: 'Unidades', align: 'end', sortable: true, display: (r) => formatQuantity(r.units) },
     { key: 'total', header: 'Total', align: 'end', sortable: true, display: (r) => formatMoney(r.total), export: (r) => r.total },
   ];
+  protected readonly paymentColumns: readonly TableColumn<PaymentSummary>[] = [
+    { key: 'method', header: 'Forma de pago', primary: true, display: (r) => paymentLabel(r.method), export: (r) => paymentLabel(r.method) },
+    { key: 'sales', header: 'Ventas', align: 'end', sortable: true },
+    { key: 'total', header: 'Total', align: 'end', sortable: true, display: (r) => formatMoney(r.total), export: (r) => r.total },
+  ];
+  protected readonly paymentKey = (row: PaymentSummary): string => row.method ?? 'sin-registrar';
   protected readonly sellerKey = (row: SellerSummary): string => row.seller;
   protected readonly productKey = (row: ProductSummary): string => row.name;
 

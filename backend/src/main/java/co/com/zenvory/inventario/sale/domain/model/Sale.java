@@ -22,11 +22,21 @@ public class Sale {
     private String cancellationReason;
     private String customerName;
     private String customerDocument;
+    private SalePaymentMethod paymentMethod;
+    private String paymentReference;
     private BigDecimal globalDiscountPercentage;
     private List<SaleDetail> details;
 
-    public Sale(Long id, LocalDateTime date, Long branchId, String branchName, Long userId, String userName, SaleStatus status, 
+    public Sale(Long id, LocalDateTime date, Long branchId, String branchName, Long userId, String userName, SaleStatus status,
                 String cancellationReason, String customerName, String customerDocument, BigDecimal globalDiscountPercentage, List<SaleDetail> details) {
+        this(id, date, branchId, branchName, userId, userName, status, cancellationReason, customerName, customerDocument,
+                null, null, globalDiscountPercentage, details);
+    }
+
+    /** {@code paymentMethod} es nulo solo en las ventas anteriores al registro de la forma de pago. */
+    public Sale(Long id, LocalDateTime date, Long branchId, String branchName, Long userId, String userName, SaleStatus status,
+                String cancellationReason, String customerName, String customerDocument, SalePaymentMethod paymentMethod,
+                String paymentReference, BigDecimal globalDiscountPercentage, List<SaleDetail> details) {
         if (details == null || details.isEmpty()) {
             throw new EmptySaleException("Una factura de venta no puede estar vacía.");
         }
@@ -47,6 +57,8 @@ public class Sale {
         this.cancellationReason = cancellationReason;
         this.customerName = customerName;
         this.customerDocument = customerDocument;
+        this.paymentMethod = paymentMethod;
+        this.paymentReference = paymentReference == null || paymentReference.isBlank() ? null : paymentReference.trim();
         this.globalDiscountPercentage = globalDiscountPercentage != null ? globalDiscountPercentage : BigDecimal.ZERO;
         this.details = details;
         
@@ -54,8 +66,12 @@ public class Sale {
         calculateFinancials();
     }
 
-    public static Sale create(Long branchId, String branchName, Long userId, String userName, String customerName, String customerDocument, BigDecimal globalDiscountPercentage, List<SaleDetail> details) {
-        return new Sale(null, LocalDateTime.now(), branchId, branchName, userId, userName, SaleStatus.COMPLETED, null, customerName, customerDocument, globalDiscountPercentage, details);
+    public static Sale create(Long branchId, String branchName, Long userId, String userName, String customerName, String customerDocument,
+                              SalePaymentMethod paymentMethod, String paymentReference, BigDecimal globalDiscountPercentage, List<SaleDetail> details) {
+        if (paymentMethod == null) {
+            throw new IllegalArgumentException("La forma de pago es obligatoria.");
+        }
+        return new Sale(null, LocalDateTime.now(), branchId, branchName, userId, userName, SaleStatus.COMPLETED, null, customerName, customerDocument, paymentMethod, paymentReference, globalDiscountPercentage, details);
     }
 
     public void cancel(String reason) {
@@ -81,24 +97,17 @@ public class Sale {
     }
 
     /**
-     * Precio unitario realmente pagado de un producto: total de sus líneas con el descuento de línea y el global,
-     * dividido entre las unidades. Es el valor que debe usarse al devolver (el precio de lista lo sobrestimaría).
-     * Si el producto aparece en varias líneas (p. ej. con distinto descuento) devuelve el promedio ponderado.
+     * Precio unitario realmente pagado en una línea: su total con el descuento de línea y el global, dividido entre
+     * sus unidades. Es el valor que debe usarse al devolver (el precio de lista lo sobrestimaría).
      */
-    public BigDecimal effectiveUnitPaid(Long productId) {
-        List<SaleDetail> lines = this.details.stream().filter(d -> d.getProductId().equals(productId)).toList();
-        int units = lines.stream().mapToInt(SaleDetail::getQuantity).sum();
-        if (units == 0) {
-            throw new IllegalArgumentException("El producto " + productId + " no pertenece a la venta.");
-        }
-        BigDecimal linesTotal = lines.stream().map(SaleDetail::getSubtotalLine).reduce(BigDecimal.ZERO, BigDecimal::add);
+    public BigDecimal effectiveUnitPaid(SaleDetail line) {
         BigDecimal globalFactor = BigDecimal.ONE.subtract(this.globalDiscountPercentage.divide(new BigDecimal("100")));
-        return linesTotal.multiply(globalFactor).divide(BigDecimal.valueOf(units), 4, java.math.RoundingMode.HALF_UP);
+        return line.getSubtotalLine().multiply(globalFactor).divide(BigDecimal.valueOf(line.getQuantity()), 4, java.math.RoundingMode.HALF_UP);
     }
 
-    /** Unidades vendidas de un producto sumando todas sus líneas. */
-    public int soldUnits(Long productId) {
-        return this.details.stream().filter(d -> d.getProductId().equals(productId)).mapToInt(SaleDetail::getQuantity).sum();
+    /** La línea de esta venta con ese id, si existe. */
+    public java.util.Optional<SaleDetail> findLine(Long saleDetailId) {
+        return this.details.stream().filter(d -> saleDetailId.equals(d.getId())).findFirst();
     }
 
     private void calculateFinancials() {
@@ -145,6 +154,8 @@ public class Sale {
     public String getCancellationReason() { return cancellationReason; }
     public String getCustomerName() { return customerName; }
     public String getCustomerDocument() { return customerDocument; }
+    public SalePaymentMethod getPaymentMethod() { return paymentMethod; }
+    public String getPaymentReference() { return paymentReference; }
     public BigDecimal getGlobalDiscountPercentage() { return globalDiscountPercentage; }
     public List<SaleDetail> getDetails() { return Collections.unmodifiableList(details); }
 }

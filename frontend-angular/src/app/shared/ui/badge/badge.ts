@@ -4,7 +4,7 @@ export type BadgeVariant = 'success' | 'danger' | 'warning' | 'info' | 'neutral'
 
 const STYLES: Record<BadgeVariant, string> = {
   success: 'bg-success/12 text-success border-success/25',
-  danger: 'bg-brand/12 text-brand-soft border-brand/25',
+  danger: 'bg-danger/12 text-danger border-danger/25',
   warning: 'bg-warning/10 text-warning border-warning/25',
   info: 'bg-info/10 text-info border-info/25',
   neutral: 'bg-hover text-fg-subtle border-line',

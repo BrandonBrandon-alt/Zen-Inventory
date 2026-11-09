@@ -440,12 +440,11 @@ describe('ProductsPage', () => {
 
   describe('unidades alternas', () => {
     const UNITS_URL = `${URL}/1/units`;
-    const BASE = { id: 1, productoId: 1, unidadId: 10, nombreUnidad: 'Unidad', abreviaturaUnidad: 'UND', factorConversion: 1, esBase: true };
-    const BOX = { id: 2, productoId: 1, unidadId: 12, nombreUnidad: 'Caja', abreviaturaUnidad: 'CJ', factorConversion: 12, esBase: false };
+    const BOX = { id: 2, productoId: 1, unidadId: 12, nombreUnidad: 'Caja', abreviaturaUnidad: 'CJ', factorConversion: 12 };
 
     it('lista la base y las equivalencias ("1 CJ = 12 UND")', async () => {
       stub();
-      server.use(http.get(UNITS_URL, () => HttpResponse.json([BASE, BOX])));
+      server.use(http.get(UNITS_URL, () => HttpResponse.json([BOX])));
       await renderPage();
       await screen.findByText('Tornillo');
       await userEvent.click(screen.getByRole('button', { name: 'Unidades de Tornillo' }));
@@ -459,13 +458,13 @@ describe('ProductsPage', () => {
 
     it('agrega una unidad con su equivalencia y no ofrece la base ni las ya agregadas', async () => {
       stub();
-      let units = [BASE];
+      let units: (typeof BOX)[] = [];
       let body: unknown;
       server.use(
         http.get(UNITS_URL, () => HttpResponse.json(units)),
         http.post(UNITS_URL, async ({ request }) => {
           body = await request.json();
-          units = [BASE, BOX];
+          units = [BOX];
           return HttpResponse.json(BOX, { status: 201 });
         }),
       );
@@ -480,7 +479,7 @@ describe('ProductsPage', () => {
       await userEvent.type(within(dialog).getByLabelText('Equivale a (UND)'), '12');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Agregar' }));
       expect(await within(dialog).findByText('1 CJ = 12 UND')).toBeInTheDocument();
-      expect(body).toEqual({ productoId: 1, unidadId: 12, factorConversion: 12, esBase: false });
+      expect(body).toEqual({ productoId: 1, unidadId: 12, factorConversion: 12 });
       // Ya agregada: deja de ofrecerse.
       await userEvent.click(within(dialog).getByRole('combobox', { name: 'Unidad' }));
       expect(screen.queryByRole('option', { name: /^Caja/ })).not.toBeInTheDocument();
@@ -489,7 +488,7 @@ describe('ProductsPage', () => {
     it('rechaza una equivalencia de 0 o con más de 4 decimales sin llamar al servidor', async () => {
       stub();
       let posted = false;
-      server.use(http.get(UNITS_URL, () => HttpResponse.json([BASE])), http.post(UNITS_URL, () => ((posted = true), HttpResponse.json(BOX))));
+      server.use(http.get(UNITS_URL, () => HttpResponse.json([])), http.post(UNITS_URL, () => ((posted = true), HttpResponse.json(BOX))));
       await renderPage();
       await screen.findByText('Tornillo');
       await userEvent.click(screen.getByRole('button', { name: 'Unidades de Tornillo' }));
@@ -505,7 +504,7 @@ describe('ProductsPage', () => {
 
     it('rechaza una equivalencia de 0', async () => {
       stub();
-      server.use(http.get(UNITS_URL, () => HttpResponse.json([BASE])));
+      server.use(http.get(UNITS_URL, () => HttpResponse.json([])));
       await renderPage();
       await screen.findByText('Tornillo');
       await userEvent.click(screen.getByRole('button', { name: 'Unidades de Tornillo' }));
@@ -520,13 +519,13 @@ describe('ProductsPage', () => {
 
     it('quita una unidad alterna', async () => {
       stub();
-      let units = [BASE, BOX];
+      let units: (typeof BOX)[] = [BOX];
       let deleted = '';
       server.use(
         http.get(UNITS_URL, () => HttpResponse.json(units)),
         http.delete(`${UNITS_URL}/:unitId`, ({ params }) => {
           deleted = String(params['unitId']);
-          units = [BASE];
+          units = [];
           return new HttpResponse(null, { status: 204 });
         }),
       );

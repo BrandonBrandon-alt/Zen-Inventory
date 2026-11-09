@@ -24,6 +24,7 @@ const sale = (id: number, status: string, extra: object = {}) => ({
   userName: 'Luis',
   customerName: 'Ana Pérez',
   customerDocument: '123',
+  paymentMethod: 'EFECTIVO' as string | null,
   subtotal: 1000 * id,
   totalDiscount: 0,
   totalFinal: 1000 * id,
@@ -67,6 +68,7 @@ function searchResponse(sales: RawSale[], params: URLSearchParams) {
     .filter((s) => num('supplierId') === null || s.details.some((d) => SUPPLIED_BY[d.productId]?.includes(num('supplierId')!)))
     .filter((s) => params.get('withDiscount') === null || (s.totalDiscount > 0) === (params.get('withDiscount') === 'true'))
     .filter((s) => params.get('registeredCustomer') === null || !!s.customerName.trim() === (params.get('registeredCustomer') === 'true'))
+    .filter((s) => params.get('paymentMethod') === null || s.paymentMethod === params.get('paymentMethod'))
     .filter((s) => num('minTotal') === null || s.totalFinal >= num('minTotal')!)
     .filter((s) => num('maxTotal') === null || s.totalFinal <= num('maxTotal')!)
     .filter((s) => !q || plain(`${s.id} ${s.customerName} ${s.customerDocument} ${s.userName}`).includes(q));
@@ -350,6 +352,24 @@ describe('SalesHistoryPage', () => {
         expect(asked.at(-1)?.get('registeredCustomer')).toBe('false');
         await chooseOption('Cliente', 'Cliente registrado');
         await vi.waitFor(() => expect(ids().sort()).toEqual(['1', '3']));
+        expect(screen.getByLabelText('1 filtro activo')).toBeInTheDocument();
+      });
+
+      it('filtra por forma de pago, la muestra en la tabla y las ventas anteriores dicen «Sin registrar»', async () => {
+        useSession('MANAGER', 10);
+        stub([
+          sale(1, 'COMPLETED', { paymentMethod: 'TARJETA' }),
+          sale(2, 'COMPLETED', { paymentMethod: null }),
+          sale(3, 'COMPLETED'),
+        ]);
+        await renderPage();
+        await screen.findByText('#3');
+        expect(screen.getByText('Tarjeta')).toBeInTheDocument();
+        expect(screen.getByText('Sin registrar')).toBeInTheDocument();
+        await openAdvanced();
+        await chooseOption('Forma de pago', 'Tarjeta');
+        await vi.waitFor(() => expect(ids()).toEqual(['1']));
+        expect(asked.at(-1)?.get('paymentMethod')).toBe('TARJETA');
         expect(screen.getByLabelText('1 filtro activo')).toBeInTheDocument();
       });
 

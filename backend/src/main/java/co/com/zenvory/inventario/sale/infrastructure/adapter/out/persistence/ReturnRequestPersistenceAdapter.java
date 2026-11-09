@@ -4,6 +4,8 @@ import co.com.zenvory.inventario.sale.application.port.out.ReturnRequestReposito
 import co.com.zenvory.inventario.sale.domain.model.ReturnRequest;
 import co.com.zenvory.inventario.sale.domain.model.ReturnRequestDetail;
 import co.com.zenvory.inventario.sale.domain.model.ReturnRequestStatus;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -14,6 +16,9 @@ import java.util.stream.Collectors;
 public class ReturnRequestPersistenceAdapter implements ReturnRequestRepositoryPort {
 
     private final JpaReturnRequestRepository repository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     public ReturnRequestPersistenceAdapter(JpaReturnRequestRepository repository) {
         this.repository = repository;
@@ -29,6 +34,20 @@ public class ReturnRequestPersistenceAdapter implements ReturnRequestRepositoryP
     @Override
     public Optional<ReturnRequest> findById(Long id) {
         return repository.findById(id).map(this::toDomain);
+    }
+
+    @Override
+    public Optional<ReturnRequest> findByIdForUpdate(Long id) {
+        // Primero el bloqueo y después la lectura. Un refresh o una consulta con bloqueo no sirven aquí: al traer los
+        // detalles con JOIN, Hibernate lee antes de bloquear (follow-on locking) y validaría un estado viejo. El refresh es
+        // porque el controlador ya leyó la entidad en esta sesión (open-in-view) y findById devolvería esa copia.
+        if (repository.lockById(id).isEmpty()) {
+            return Optional.empty();
+        }
+        return repository.findById(id).map(entity -> {
+            entityManager.refresh(entity);
+            return toDomain(entity);
+        });
     }
 
     @Override
@@ -84,6 +103,7 @@ public class ReturnRequestPersistenceAdapter implements ReturnRequestRepositoryP
                 .map(d -> ReturnRequestDetailEntity.builder()
                         .id(d.getId())
                         .request(entity)
+                        .saleDetailId(d.getSaleDetailId())
                         .productId(d.getProductId())
                         .cantidad(d.getQuantity())
                         .motivoEspecifico(d.getReasonSpecific())
@@ -99,6 +119,7 @@ public class ReturnRequestPersistenceAdapter implements ReturnRequestRepositoryP
         List<ReturnRequestDetail> details = entity.getDetails().stream()
                 .map(e -> new ReturnRequestDetail(
                         e.getId(),
+                        e.getSaleDetailId(),
                         e.getProductId(),
                         e.getCantidad(),
                         e.getMotivoEspecifico(),

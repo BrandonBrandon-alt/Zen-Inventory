@@ -129,9 +129,13 @@ public class PurchaseController {
 
     @PostMapping("/{id}/pay")
     @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    public ResponseEntity<PurchaseResponse> registerPayment(@PathVariable Long id) {
-        requireOrderAccess(id);
-        PurchaseOrder order = purchaseUseCase.registerPayment(id);
+    public ResponseEntity<PurchaseResponse> registerPayment(
+            @PathVariable Long id,
+            @Valid @RequestBody(required = false) PaymentRequest request) {
+        CurrentUser current = requireOrderAccess(id);
+        PaymentRequest pay = request != null ? request : new PaymentRequest(null, null, null, null);
+        PurchaseOrder order = purchaseUseCase.registerPayment(id, pay.amount(), pay.method(), pay.reference(),
+                pay.notes(), current.id(), current.user().getNombre());
         return ResponseEntity.ok(PurchaseResponse.fromDomain(order));
     }
 

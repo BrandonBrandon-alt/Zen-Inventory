@@ -54,4 +54,10 @@ describe('Segmented', () => {
     await userEvent.keyboard('{ArrowLeft}');
     expect(host.value()).toBe('month');
   });
+
+  it('el tamaño «lg» iguala la altura de los campos de formulario', async () => {
+    await render(`<app-segmented [options]="options" value="today" size="lg" ariaLabel="Periodo" />`, { imports: [Segmented], componentProperties: { options: OPTIONS } });
+    expect(screen.getByRole('radio', { name: 'Hoy' })).toHaveClass('py-[9px]');
+    expect(screen.getByRole('radio', { name: 'Hoy' })).not.toHaveClass('py-1.5');
+  });
 });

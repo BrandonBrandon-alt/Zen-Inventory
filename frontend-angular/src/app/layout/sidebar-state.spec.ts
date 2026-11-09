@@ -1,7 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  SIDEBAR_AUTOHIDE_STORAGE_KEY,
   SIDEBAR_DEFAULT_WIDTH,
   SIDEBAR_MAX_WIDTH,
   SIDEBAR_MIN_WIDTH,
@@ -18,30 +17,6 @@ function createState(): SidebarState {
 describe('SidebarState', () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => vi.restoreAllMocks());
-
-  it('ocultar automáticamente parte desactivado, alterna y se recuerda', () => {
-    expect(createState().autoHide()).toBe(false);
-    const state = createState();
-    state.toggleAutoHide();
-    expect(state.autoHide()).toBe(true);
-    expect(localStorage.getItem(SIDEBAR_AUTOHIDE_STORAGE_KEY)).toBe('true');
-    expect(createState().autoHide()).toBe(true);
-    state.toggleAutoHide();
-    expect(state.autoHide()).toBe(false);
-  });
-
-  it('ocultar automáticamente funciona en memoria aunque no pueda leer ni guardar', () => {
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new Error('bloqueado');
-    });
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('bloqueado');
-    });
-    const state = createState();
-    expect(state.autoHide()).toBe(false);
-    state.toggleAutoHide();
-    expect(state.autoHide()).toBe(true);
-  });
 
   it('por defecto está expandido', () => {
     expect(createState().collapsed()).toBe(false);

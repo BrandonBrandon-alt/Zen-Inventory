@@ -40,6 +40,13 @@ public class SaleEntity {
     @Column(name = "cliente_documento", length = 20)
     private String customerDocument;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "metodo_pago", length = 20)
+    private co.com.zenvory.inventario.sale.domain.model.SalePaymentMethod paymentMethod;
+
+    @Column(name = "referencia_pago", length = 100)
+    private String paymentReference;
+
     @Column(name = "global_discount_percentage", precision = 5, scale = 2)
     private BigDecimal globalDiscountPercentage;
 
@@ -55,6 +62,8 @@ public class SaleEntity {
     @Column(name = "vendedor_nombre")
     private String userName;
 
+    // Orden estable: las devoluciones nombran las líneas por su posición en la venta.
+    @OrderBy("id")
     @OneToMany(mappedBy = "sale", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SaleDetailEntity> details = new ArrayList<>();
 
@@ -109,6 +118,11 @@ public class SaleEntity {
 
     public String getCustomerName() { return customerName; }
     public void setCustomerName(String customerName) { this.customerName = customerName; }
+
+    public co.com.zenvory.inventario.sale.domain.model.SalePaymentMethod getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(co.com.zenvory.inventario.sale.domain.model.SalePaymentMethod paymentMethod) { this.paymentMethod = paymentMethod; }
+    public String getPaymentReference() { return paymentReference; }
+    public void setPaymentReference(String paymentReference) { this.paymentReference = paymentReference; }
 
     public String getCustomerDocument() { return customerDocument; }
     public void setCustomerDocument(String customerDocument) { this.customerDocument = customerDocument; }

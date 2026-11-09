@@ -24,7 +24,9 @@ export interface SegmentedOption<T extends string = string> {
           #radio
           type="button"
           role="radio"
-          class="cursor-pointer rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          class="cursor-pointer rounded-md px-3.5 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          [class.py-1.5]="size() === 'md'"
+          [class.py-[9px]]="size() === 'lg'"
           [class]="option.value === value() ? 'bg-hover text-fg shadow-sm' : 'text-fg-subtle hover:text-fg'"
           [attr.aria-checked]="option.value === value()"
           [attr.tabindex]="option.value === value() ? 0 : -1"
@@ -41,6 +43,8 @@ export class Segmented<T extends string = string> {
   readonly options = input.required<readonly SegmentedOption<T>[]>();
   readonly value = model.required<T>();
   readonly ariaLabel = input<string>();
+  /** `lg` iguala la altura de los campos de formulario (44 px): úsalo en una fila de filtros junto a selectores y campos. */
+  readonly size = input<'md' | 'lg'>('md');
 
   private readonly radios = viewChildren<ElementRef<HTMLButtonElement>>('radio');
 

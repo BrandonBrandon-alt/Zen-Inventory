@@ -157,4 +157,28 @@ describe('UnitsPage', () => {
     expect(screen.getByRole('dialog', { name: 'Eliminar unidad' })).toBeInTheDocument();
     expect(screen.queryByText(/foreign key/)).not.toBeInTheDocument();
   });
+
+  describe('búsqueda', () => {
+    it('busca por nombre o abreviatura sin distinguir mayúsculas', async () => {
+      server.use(http.get(URL, () => HttpResponse.json(UNITS)));
+      await renderPage();
+      await screen.findByText('Kilogramo');
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar unidad' }), 'kilo');
+      expect(names()).toEqual(['Kilogramo']);
+      await userEvent.clear(screen.getByRole('searchbox', { name: 'Buscar unidad' }));
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar unidad' }), 'und');
+      expect(names()).toEqual(['Unidad']);
+    });
+
+    it('sin coincidencias lo dice, y quitar la búsqueda vuelve a mostrar todo', async () => {
+      server.use(http.get(URL, () => HttpResponse.json(UNITS)));
+      await renderPage();
+      await screen.findByText('Kilogramo');
+      await userEvent.type(screen.getByLabelText('Buscar unidad'), 'zzz');
+      expect(screen.getByText('Ninguna unidad coincide')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro Búsqueda: zzz' }));
+      expect(screen.getByLabelText('Buscar unidad')).toHaveValue('');
+      expect(names()).toEqual(['Unidad', 'Kilogramo']);
+    });
+  });
 });

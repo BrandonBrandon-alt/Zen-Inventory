@@ -8,15 +8,17 @@ import { Alert } from '@shared/ui/alert/alert';
 import { UserAvatar } from '@shared/ui/avatar/user-avatar';
 import { Button } from '@shared/ui/button/button';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
+import { Hint } from '@shared/ui/hint/hint';
 import { Card } from '@shared/ui/card/card';
 import { AreaChart } from '@shared/ui/charts/area-chart';
+import { ChartSkeleton } from '@shared/ui/charts/chart-skeleton';
 import { BarList } from '@shared/ui/charts/bar-list';
 import { ColumnChart } from '@shared/ui/charts/column-chart';
 import { EmptyState } from '@shared/ui/empty-state/empty-state';
 import { Segmented, type SegmentedOption } from '@shared/ui/segmented/segmented';
 import { Spinner } from '@shared/ui/spinner/spinner';
-import { AlertResolutionModal } from '../../../alerts/components/alert-resolution-modal/alert-resolution-modal';
-import { AlertsApi, type StockAlert } from '../../../alerts/data-access/alerts-api';
+import { AlertResolutionModal } from '@shared/ui/alert-resolution-modal/alert-resolution-modal';
+import { AlertsApi, type StockAlert } from '@core/alerts/alerts-api';
 import { DashboardApi, type Range, type ReplenishmentPriority } from '../../data-access/dashboard-api';
 
 const RANGES: readonly SegmentedOption<Range>[] = [
@@ -50,7 +52,7 @@ const plural = (n: number, one: string, many: string): string => `${n} ${n === 1
 
 @Component({
   selector: 'app-dashboard-page',
-  imports: [Alert, AlertResolutionModal, Button, UserAvatar, Badge, Card, AreaChart, BarList, ColumnChart, EmptyState, Segmented, Spinner],
+  imports: [ChartSkeleton, Alert, AlertResolutionModal, Button, UserAvatar, Badge, Card, Hint, AreaChart, BarList, ColumnChart, EmptyState, Segmented, Spinner],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './dashboard-page.html',

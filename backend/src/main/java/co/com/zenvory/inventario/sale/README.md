@@ -15,10 +15,10 @@ Dos áreas en un mismo módulo:
 
 | Tabla | Qué guarda |
 |---|---|
-| `ventas` | Cabecera: `fecha`, `sucursal_id`, `usuario_id`, `subtotal`, `descuento_total`, `total_final`, `estado`, `motivo_anulacion`, `cliente_nombre`/`cliente_documento`, `global_discount_percentage`, y la "foto" `sucursal_nombre` + `vendedor_nombre` |
-| `detalles_venta` | Líneas: `producto_id`, `producto_nombre` (foto), `cantidad`, `precio_unitario_aplicado`, `porcentaje_descuento`, `subtotal_linea` |
+| `ventas` | Cabecera: `fecha`, `sucursal_id`, `usuario_id`, `subtotal`, `descuento_total`, `total_final`, `estado`, `motivo_anulacion`, `cliente_nombre`/`cliente_documento`, `metodo_pago` (EFECTIVO, TARJETA, TRANSFERENCIA, OTRO) y `referencia_pago` (migración V6; **nulos en las ventas anteriores**, que se muestran como «Sin registrar»), `global_discount_percentage`, y la "foto" `sucursal_nombre` + `vendedor_nombre` |
+| `detalles_venta` | Líneas: `producto_id`, `lista_precios_id` (de qué lista salió el precio; vacío si fue el precio base), `producto_nombre` (foto), `cantidad`, `precio_unitario_aplicado`, `porcentaje_descuento`, `subtotal_linea` |
 | `solicitudes_devolucion` | `venta_id`, `sucursal_id`, `solicitante_id`, `aprobador_id`, `estado`, `motivo_general`, `comentario_aprobador`, fechas |
-| `detalles_devolucion_solicitud` | Líneas: `producto_id`, `cantidad`, `motivo_especifico`, `precio_unidad_venta` |
+| `detalles_devolucion_solicitud` | Líneas: `detalle_venta_id` (la línea vendida que se devuelve; una FK compuesta exige que `producto_id` sea el de esa línea), `producto_id`, `cantidad`, `motivo_especifico`, `precio_unidad_venta` |
 
 Las líneas se borran en cascada con su cabecera. El «nombre» del producto, sucursal y vendedor se guarda como *foto*
 para que el historial no cambie si luego se renombran.
@@ -30,9 +30,9 @@ sale/
 ├── domain/
 │   ├── model/
 │   │   ├── Sale                 Venta. Sale.create(...) CALCULA subtotal, descuentos de línea, descuento global y
-│   │   │                        total. Métodos: cancel(motivo), markAsReturned(), effectiveUnitPaid(producto)
-│   │   │                        (lo realmente pagado por unidad, para devolver al precio correcto), soldUnits()
-│   │   ├── SaleDetail           Línea de venta (cantidad, precio aplicado, % descuento, subtotal)
+│   │   │                        total. Métodos: cancel(motivo), markAsReturned(), effectiveUnitPaid(línea)
+│   │   │                        (lo realmente pagado por unidad, para devolver al precio correcto), findLine(id)
+│   │   ├── SaleDetail           Línea de venta (cantidad, precio aplicado, lista de precios, % descuento, subtotal)
 │   │   ├── SaleStatus           COMPLETED | CANCELED | RETURNED
 │   │   ├── ReturnRequest        Solicitud de devolución (create / approve / reject)
 │   │   ├── ReturnRequestDetail  Línea de la solicitud
@@ -65,7 +65,7 @@ sale/
 
 ## Flujo 1: registrar una venta (`SaleService.execute`, transaccional)
 
-1. El controller toma al vendedor y la sucursal de `CurrentUser` (ignora lo que venga en el JSON).
+1. El controller toma al vendedor y la sucursal de `CurrentUser` (ignora lo que venga en el JSON). La **forma de pago es obligatoria** (`paymentMethod`); `paymentReference` es opcional (n.º de voucher o de transferencia).
 2. Por cada ítem: busca el producto (`catalog`) y resuelve el precio con esta jerarquía:
    **lista de la línea → lista global de la venta → precio base del producto** (`pricelist`).
 3. **Pre-valida el stock de todas las líneas antes de guardar nada** (`inventory`).
@@ -87,19 +87,21 @@ Si cualquier paso falla, **todo se revierte** (no queda una venta sin descontar 
 
 ## Flujo 3: devolución
 
-1. **Solicitar** (`createRequest`): bloquea la venta; verifica que sea de la sucursal indicada; suma lo ya devuelto o
-   pendiente por producto y comprueba que no se devuelva más de lo vendido (une líneas repetidas); fija el precio
-   con lo **realmente pagado** (con descuentos), no el de lista. Estado `PENDIENTE`.
-2. **Aprobar** (`approveRequest`, MANAGER/ADMIN): no permite aprobar sobre una venta anulada (repondría el stock dos
+1. **Solicitar** (`createRequest`): bloquea la venta; verifica que sea de la sucursal indicada; cada ítem indica la línea de
+   la venta que se devuelve (`saleDetailId`): suma lo ya devuelto o pendiente de esa línea y comprueba que no se devuelva
+   más de lo vendido en ella (une ítems repetidos); fija el precio con lo **realmente pagado** en esa línea (con
+   descuentos), no el de lista. Estado `PENDIENTE`.
+2. **Aprobar** (`approveRequest`, MANAGER/ADMIN): lee la solicitud con su fila bloqueada, así que de dos aprobaciones
+   simultáneas solo una repone stock; no permite aprobar sobre una venta anulada (repondría el stock dos
    veces); pasa a `APROBADA`, repone stock (sin costo, motivo DEVOLUCION) y marca la venta como `RETURNED`.
-3. **Rechazar**: pasa a `RECHAZADA` con motivo.
+3. **Rechazar**: también con la fila bloqueada; pasa a `RECHAZADA` con motivo.
 
 ## Historial paginado: `GET /api/v1/sales/search`
 
 El frontend ya no baja las 18.000 ventas. Este endpoint filtra, ordena y pagina en el servidor:
 
 - Parámetros: `page` (desde 0), `size` (máx. 100), `sortBy` (id, date, customer, seller, branchName, total, status),
-  `direction`, `branchId`, `status`, `from`, `to`, `seller`, `product`, `minTotal`, `maxTotal`, `q` (texto: n.º,
+  `direction`, `branchId`, `status`, `from`, `to`, `seller`, `product`, `minTotal`, `maxTotal`, `paymentMethod`, `q` (texto: n.º,
   cliente, documento o vendedor, sin importar tildes ni mayúsculas).
 - Responde `{content, totalElements, totalPages, completedCount, completedTotal}`: el **resumen** («N ventas
   completadas, $X») cubre todo lo filtrado, no solo la página.

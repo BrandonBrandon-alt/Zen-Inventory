@@ -1,11 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { LucideClock, LucideContact, LucideEllipsis, LucidePencil, LucidePlus, LucideTrash2, LucideTruck } from '@lucide/angular';
+import { LucideClock, LucideContact, LucideEllipsis, LucidePencil, LucidePlus, LucideSearch, LucideTrash2, LucideTruck } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { NotificationService } from '@core/notifications/notification.service';
+import { normalizeText } from '@shared/format/format';
+import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
 import { Button } from '@shared/ui/button/button';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog/confirm-dialog';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
+import { ActiveFilters, type ActiveFilter } from '@shared/ui/filters/active-filters';
+import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
+import { Select, type SelectOption } from '@shared/ui/select/select';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { SupplierFormModal } from '../../components/supplier-form-modal/supplier-form-modal';
 import { type Supplier, SuppliersApi } from '../../data-access/suppliers-api';
@@ -26,9 +31,31 @@ const COLUMNS: readonly TableColumn<Supplier>[] = [
 
 const rowKey = (supplier: Supplier): number => supplier.id;
 
+type DeliveryFilter = 'all' | 'upTo3' | 'upTo7' | 'over7' | 'unknown';
+const DELIVERY_FILTERS = ['all', 'upTo3', 'upTo7', 'over7', 'unknown'] as const;
+const DELIVERY_LABELS: Record<DeliveryFilter, string> = {
+  all: 'Cualquier plazo de entrega',
+  upTo3: 'Entrega en 3 días o menos',
+  upTo7: 'Entrega en 7 días o menos',
+  over7: 'Entrega en más de 7 días',
+  unknown: 'Sin plazo registrado',
+};
+
+function matchesDelivery(days: number | null, filter: DeliveryFilter): boolean {
+  switch (filter) {
+    case 'all': return true;
+    case 'unknown': return days === null;
+    case 'upTo3': return days !== null && days <= 3;
+    case 'upTo7': return days !== null && days <= 7;
+    case 'over7': return days !== null && days > 7;
+  }
+}
+
+const SCREEN = 'suppliers';
+
 @Component({
   selector: 'app-suppliers-page',
-  imports: [DataTable, DataTableCell, Button, ConfirmDialog, SupplierFormModal, Tooltip, LucidePencil, LucidePlus, LucideTrash2],
+  imports: [DataTable, DataTableCell, Button, ConfirmDialog, ActiveFilters, FormField, InputDirective, Select, SupplierFormModal, Tooltip, LucidePencil, LucidePlus, LucideSearch, LucideTrash2],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './suppliers-page.html',
@@ -43,6 +70,27 @@ export class SuppliersPage {
   protected readonly suppliers = signal<readonly Supplier[]>([]);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+
+  // Los filtros se recuerdan por persona (la búsqueda de texto no: se escribe cada vez).
+  protected readonly search = signal('');
+  protected readonly deliveryFilter = persistedFilter(SCREEN, 'delivery', 'all' as DeliveryFilter, codecs.oneOf(DELIVERY_FILTERS));
+  protected readonly deliveryOptions: readonly SelectOption<DeliveryFilter>[] = DELIVERY_FILTERS.map((value) => ({ value, label: DELIVERY_LABELS[value] }));
+
+  protected readonly rows = computed(() => {
+    const term = normalizeText(this.search().trim());
+    const delivery = this.deliveryFilter();
+    return this.suppliers()
+      .filter((s) => matchesDelivery(s.tiempoEntregaDias, delivery))
+      .filter((s) => !term || normalizeText(s.nombre).includes(term) || normalizeText(s.contacto).includes(term));
+  });
+
+  /** Todos los filtros aplicados, para mostrarlos como etiquetas que se quitan. */
+  protected readonly activeFilters = computed<ActiveFilter[]>(() => {
+    const list: ActiveFilter[] = [];
+    if (this.deliveryFilter() !== 'all') list.push({ id: 'delivery', label: 'Plazo', text: DELIVERY_LABELS[this.deliveryFilter()] });
+    if (this.search().trim()) list.push({ id: 'search', label: 'Búsqueda', text: this.search().trim() });
+    return list;
+  });
 
   protected readonly formOpen = signal(false);
   protected readonly editing = signal<Supplier | null>(null);
@@ -71,6 +119,21 @@ export class SuppliersPage {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  protected onSearch(event: Event): void {
+    this.search.set((event.target as HTMLInputElement).value);
+  }
+
+  protected removeFilter(id: string): void {
+    switch (id) {
+      case 'delivery': this.deliveryFilter.set('all'); break;
+      case 'search': this.search.set(''); break;
+    }
+  }
+
+  protected clearFilters(): void {
+    for (const filter of this.activeFilters()) this.removeFilter(filter.id);
   }
 
   protected openCreate(): void {

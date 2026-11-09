@@ -14,6 +14,7 @@ import { Select, type SelectOption } from '@shared/ui/select/select';
 import { Spinner } from '@shared/ui/spinner/spinner';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { SaleDetailModal } from '../../components/sale-detail-modal/sale-detail-modal';
+import { PAYMENT_METHOD_LABELS, SALE_PAYMENT_METHODS, type SalePaymentMethod } from '@core/sales/payment-method';
 import { type PosProduct, type PriceListOption, type Sale, SalesApi } from '../../data-access/sales-api';
 
 /** Una línea del carrito: lo que el cajero decide (producto, cantidad y descuento). El precio sale del catálogo. */
@@ -91,6 +92,9 @@ export class PosPage {
   protected readonly cart = signal<readonly CartLine[]>([]);
   protected readonly customerName = signal('');
   protected readonly customerDocument = signal('');
+  protected readonly paymentMethod = signal<SalePaymentMethod>('EFECTIVO');
+  protected readonly paymentReference = signal('');
+  protected readonly paymentOptions: readonly SelectOption<SalePaymentMethod>[] = SALE_PAYMENT_METHODS.map((value) => ({ value, label: PAYMENT_METHOD_LABELS[value] }));
   protected readonly globalDiscount = signal<number | null>(0);
   protected readonly priceLists = signal<readonly PriceListOption[]>([]);
   protected readonly priceListId = signal<number | null>(null);
@@ -279,6 +283,8 @@ export class PosPage {
           userId,
           customerName: this.customerName(),
           customerDocument: this.customerDocument(),
+          paymentMethod: this.paymentMethod(),
+          paymentReference: this.paymentReference(),
           globalDiscountPct: this.globalDiscount() ?? 0,
           priceListId: this.priceListId(),
           items: this.rows().map((r) => ({ productId: r.productId, quantity: r.quantity ?? 0, discountPct: r.discount ?? 0 })),
@@ -289,6 +295,7 @@ export class PosPage {
       this.cart.set([]);
       this.customerName.set('');
       this.customerDocument.set('');
+      this.paymentReference.set('');
       this.globalDiscount.set(0);
       // El stock cambió: se vuelve a pedir el catálogo sin esperar a que el cajero lo note.
       void this.loadCatalog(branch, true);

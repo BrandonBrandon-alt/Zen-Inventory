@@ -85,26 +85,34 @@ describe('AdjustStockModal', () => {
       );
     });
 
-    it('al elegir Compra explica por qué y lleva a Compras; no se puede registrar el movimiento aquí', async () => {
+    it('al elegir Compra explica por qué y abre la orden de compra con este producto; no se registra aquí', async () => {
       let posted = false;
       server.use(http.post(`${TEST_API}/api/v1/inventory/branches/3/products/7/add`, () => ((posted = true), HttpResponse.json({}))));
       const { host } = await setup();
       await chooseOption('Motivo', 'Compra a proveedor');
       const dialog = screen.getByRole('dialog', { name: 'Ajustar stock' });
-      expect(within(dialog).getByText(/orden de compra/)).toBeInTheDocument();
+      expect(within(dialog).getByText(/se registra con una orden de compra/)).toBeInTheDocument();
       expect(screen.queryByLabelText(/Cantidad a/)).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Registrar movimiento' })).not.toBeInTheDocument();
-      await userEvent.click(within(dialog).getByRole('button', { name: /Ir a Compras/ }));
-      expect(navigateByUrl).toHaveBeenCalledWith('/purchases');
+      await userEvent.click(within(dialog).getByRole('button', { name: /Crear orden de compra/ }));
+      expect(navigateByUrl).toHaveBeenCalledWith('/purchases?nuevo=1&producto=7&sucursal=3');
       expect(host.open).toBe(false);
       expect(posted).toBe(false);
     });
 
-    it('Traslado lleva a Traslados', async () => {
+    it('Traslado recibido abre la solicitud con esta sucursal como destino', async () => {
       await setup();
       await chooseOption('Motivo', 'Traslado recibido');
-      await userEvent.click(screen.getByRole('button', { name: /Ir a Traslados/ }));
-      expect(navigateByUrl).toHaveBeenLastCalledWith('/transfers');
+      await userEvent.click(screen.getByRole('button', { name: /Solicitar traslado/ }));
+      expect(navigateByUrl).toHaveBeenLastCalledWith('/transfers?nuevo=1&producto=7&sucursal=3&lado=destino');
+    });
+
+    it('Traslado enviado abre el traslado con esta sucursal como origen', async () => {
+      await setup();
+      await userEvent.click(screen.getByRole('tab', { name: 'Retiro' }));
+      await chooseOption('Motivo', 'Traslado enviado');
+      await userEvent.click(screen.getByRole('button', { name: /Crear traslado/ }));
+      expect(navigateByUrl).toHaveBeenLastCalledWith('/transfers?nuevo=1&producto=7&sucursal=3&lado=origen');
     });
 
     it('Venta lleva al punto de venta', async () => {

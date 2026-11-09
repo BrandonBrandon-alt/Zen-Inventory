@@ -10,8 +10,10 @@ public class SaleDetail {
     private BigDecimal discountPercentage;
     private BigDecimal subtotalLine;
     private String productName;
+    /** Lista de la que salió el precio; null si se vendió al precio base del producto. */
+    private Long priceListId;
 
-    public SaleDetail(Long id, Long productId, String productName, Integer quantity, BigDecimal unitPriceApplied, BigDecimal discountPercentage) {
+    public SaleDetail(Long id, Long productId, String productName, Integer quantity, BigDecimal unitPriceApplied, BigDecimal discountPercentage, Long priceListId) {
         if (quantity == null || quantity <= 0) {
             throw new IllegalArgumentException("La cantidad debe ser mayor a cero.");
         }
@@ -22,6 +24,7 @@ public class SaleDetail {
         this.id = id;
         this.productId = productId;
         this.productName = productName;
+        this.priceListId = priceListId;
         this.quantity = quantity;
         this.unitPriceApplied = unitPriceApplied;
         this.discountPercentage = discountPercentage != null ? discountPercentage : BigDecimal.ZERO;
@@ -30,8 +33,8 @@ public class SaleDetail {
         this.subtotalLine = computeSubtotal();
     }
 
-    public static SaleDetail create(Long productId, String productName, Integer quantity, BigDecimal unitPriceApplied, BigDecimal discountPercentage) {
-        return new SaleDetail(null, productId, productName, quantity, unitPriceApplied, discountPercentage);
+    public static SaleDetail create(Long productId, String productName, Integer quantity, BigDecimal unitPriceApplied, BigDecimal discountPercentage, Long priceListId) {
+        return new SaleDetail(null, productId, productName, quantity, unitPriceApplied, discountPercentage, priceListId);
     }
 
     public BigDecimal computeSubtotal() {
@@ -48,4 +51,5 @@ public class SaleDetail {
     public BigDecimal getDiscountPercentage() { return discountPercentage; }
     public BigDecimal getSubtotalLine() { return subtotalLine; }
     public String getProductName() { return productName; }
+    public Long getPriceListId() { return priceListId; }
 }

@@ -15,19 +15,19 @@
         <fieldset class="flex flex-col gap-3 border-t border-line pt-4">
           <legend class="font-title text-lg font-bold text-fg">Productos a devolver</legend>
           <p class="-mt-2 text-xs text-fg-subtle">Deja en 0 lo que el cliente se queda. La devolución es por el precio que pagó.</p>
-          @for (line of lines(); track line.productId; let i = $index) {
+          @for (line of lines(); track line.saleDetailId; let i = $index) {
             <div class="grid items-start gap-3 rounded-lg border border-line-subtle p-3 sm:grid-cols-[1fr_8rem_1fr]">
               <div class="min-w-0">
-                <p class="truncate text-sm font-medium text-fg">{{ line.name }}</p>
+                <p class="truncate text-sm font-medium text-fg">{{ line.label }}</p>
                 <p class="text-xs text-fg-subtle">
                   Vendidas {{ formatQuantity(line.sold) }}@if (line.processed > 0) { · ya devueltas o pendientes {{ formatQuantity(line.processed) }} } · {{ formatMoney(line.unitPrice) }} c/u
                 </p>
               </div>
               <app-form-field label="Devuelve" [error]="quantityError(i)">
-                <input appInput type="number" min="0" [max]="line.available" step="1" inputmode="numeric" [attr.aria-label]="'Unidades a devolver de ' + line.name" [formControl]="form.controls.quantities.at(i)" />
+                <input appInput type="number" min="0" [max]="line.available" step="1" inputmode="numeric" [attr.aria-label]="'Unidades a devolver de ' + line.label" [formControl]="form.controls.quantities.at(i)" />
               </app-form-field>
               <app-form-field label="Motivo (opcional)">
-                <input appInput type="text" autocomplete="off" [attr.aria-label]="'Motivo de la devolución de ' + line.name" [formControl]="form.controls.reasons.at(i)" />
+                <input appInput type="text" autocomplete="off" [attr.aria-label]="'Motivo de la devolución de ' + line.label" [formControl]="form.controls.reasons.at(i)" />
               </app-form-field>
             </div>
           }

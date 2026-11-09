@@ -20,6 +20,9 @@ public record SaleResponse(
         String cancellationReason,
         String customerName,
         String customerDocument,
+        /** Nulo en las ventas anteriores al registro de la forma de pago. */
+        String paymentMethod,
+        String paymentReference,
         BigDecimal globalDiscountPercentage,
         List<SaleDetailResponse> details
 ) {
@@ -30,7 +33,8 @@ public record SaleResponse(
             Integer quantity,
             BigDecimal unitPriceApplied,
             BigDecimal discountPercentage,
-            BigDecimal subtotalLine
+            BigDecimal subtotalLine,
+            Long priceListId
     ) {}
 
     public static SaleResponse fromDomain(Sale sale) {
@@ -48,6 +52,8 @@ public record SaleResponse(
                 sale.getCancellationReason(),
                 sale.getCustomerName(),
                 sale.getCustomerDocument(),
+                sale.getPaymentMethod() != null ? sale.getPaymentMethod().name() : null,
+                sale.getPaymentReference(),
                 sale.getGlobalDiscountPercentage(),
                 sale.getDetails().stream().map(d -> new SaleDetailResponse(
                         d.getId(),
@@ -56,7 +62,8 @@ public record SaleResponse(
                         d.getQuantity(),
                         d.getUnitPriceApplied(),
                         d.getDiscountPercentage(),
-                        d.getSubtotalLine()
+                        d.getSubtotalLine(),
+                        d.getPriceListId()
                 )).toList()
         );
     }
