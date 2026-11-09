@@ -139,8 +139,11 @@ let nextId = 0;
 
         <div class="mt-2 flex flex-col gap-1.5 border-t border-line pt-2">
           @if (showTime()) {
-            <div class="flex items-center justify-between gap-2">
-              <span class="flex items-center gap-1.5">
+            <!-- La hora va sola en su fila y "Listo" abajo, junto a "Hoy": en 280 px no caben los tres selectores, un
+                 aviso y un botón en la misma línea (se cortaba el texto). -->
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center gap-1.5">
+                <span class="mr-1 text-xs font-medium text-fg-muted" aria-hidden="true">Hora</span>
                 <select [class]="timeSelectClass" aria-label="Hora" [disabled]="!value()" (change)="onTimePart('hours', $event)">
                   @for (hour of hours; track hour) {
                     <option [value]="hour" [selected]="hour === hourValue()">{{ hour }}</option>
@@ -156,18 +159,22 @@ let nextId = 0;
                   <option value="am" [selected]="periodValue() === 'am'">a. m.</option>
                   <option value="pm" [selected]="periodValue() === 'pm'">p. m.</option>
                 </select>
-                @if (!value()) {
-                  <span class="text-xs text-fg-subtle">Elige un día</span>
-                }
-              </span>
-              <button type="button" class="cursor-pointer rounded-md bg-brand px-3 py-1.5 text-[13px] font-semibold text-brand-ink transition-colors hover:bg-brand/90 focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none" (click)="close(true)">Listo</button>
+              </div>
+              @if (!value()) {
+                <p class="text-xs text-fg-subtle">Elige un día para poner la hora.</p>
+              }
             </div>
           }
           <div class="flex items-center justify-between gap-2">
             <button type="button" class="cursor-pointer rounded-md px-2.5 py-1 text-[13px] font-semibold text-brand transition-colors hover:bg-brand/10 focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40" [disabled]="isOutOfRange(today)" (click)="pick(today)">Hoy</button>
-            @if (clearable() && value()) {
-              <button type="button" class="cursor-pointer rounded-md px-2.5 py-1 text-[13px] font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none" (click)="clear()">Quitar fecha</button>
-            }
+            <span class="flex items-center gap-1">
+              @if (clearable() && value()) {
+                <button type="button" class="cursor-pointer rounded-md px-2.5 py-1 text-[13px] font-medium text-fg-muted transition-colors hover:bg-hover hover:text-fg focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none" (click)="clear()">Quitar fecha</button>
+              }
+              @if (showTime()) {
+                <button type="button" class="cursor-pointer rounded-md bg-brand px-3 py-1.5 text-[13px] font-semibold text-brand-ink transition-colors hover:bg-brand/90 focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:outline-none" (click)="close(true)">Listo</button>
+              }
+            </span>
           </div>
         </div>
       </div>

@@ -314,7 +314,7 @@ describe('DatePicker', () => {
       expect(hour()).toBeDisabled();
       expect(minutes()).toBeDisabled();
       expect(period()).toBeDisabled();
-      expect(screen.getByText('Elige un día')).toBeInTheDocument();
+      expect(screen.getByText('Elige un día para poner la hora.')).toBeInTheDocument();
     });
 
     it('con un mínimo con hora, elegir ese día no deja una hora anterior al mínimo', async () => {
