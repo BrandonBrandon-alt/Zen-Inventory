@@ -32,7 +32,8 @@ import { Segmented, type SegmentedOption } from '@shared/ui/segmented/segmented'
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { TransferDetailModal } from '../../components/transfer-detail-modal/transfer-detail-modal';
-import { TransferRequestModal } from '../../components/transfer-request-modal/transfer-request-modal';
+import { TransferRequestModal, type TransferPreset } from '../../components/transfer-request-modal/transfer-request-modal';
+import { takeNewDocumentRequest } from '@core/navigation/new-document-link';
 import { FREIGHT_INFO, OPEN_STATUSES, PRIORITY_INFO, STATUS_INFO } from '../../data-access/transfer-labels';
 import { type Actor, transferActions } from '../../data-access/transfer-permissions';
 import { type Transfer, TRANSFER_STATUSES, type TransferPriority, type TransferStatus, TransfersApi } from '../../data-access/transfers-api';
@@ -116,6 +117,8 @@ export class TransfersPage {
   protected readonly advancedOpen = persistedFilter(TransfersPage.SCREEN, 'advancedOpen', false, codecs.bool());
 
   protected readonly requestOpen = signal(false);
+  /** Lo que llega ya elegido a la solicitud cuando se viene de otra pantalla (el ajuste de stock). */
+  protected readonly requestPreset = signal<TransferPreset | null>(null);
   protected readonly detailOpen = signal(false);
   protected readonly selectedId = signal<number | null>(null);
 
@@ -239,6 +242,16 @@ export class TransfersPage {
   });
 
   constructor() {
+    // Desde «Traslado recibido/enviado» en el ajuste de stock: la sucursal del inventario es el destino o el origen.
+    const request = takeNewDocumentRequest();
+    if (request) {
+      const sending = request.side === 'origen';
+      this.openRequest({
+        productId: request.productId,
+        originBranchId: sending ? request.branchId : null,
+        destinationBranchId: sending ? null : request.branchId,
+      });
+    }
     void this.load();
     // Los nombres de sucursal y de producto adornan la tabla y el formulario: si fallan, se muestran los códigos.
     forkJoin({
@@ -248,6 +261,11 @@ export class TransfersPage {
       this.branches.set(branches);
       this.products.set(products);
     });
+  }
+
+  protected openRequest(preset: TransferPreset | null = null): void {
+    this.requestPreset.set(preset);
+    this.requestOpen.set(true);
   }
 
   protected async load(silent = false): Promise<void> {

@@ -27,8 +27,11 @@ export interface ProductOption {
   readonly unit: string;
   /** Si el producto está activo (los inactivos no se ofrecen para comprar ni vender). */
   readonly active: boolean;
-  /** Condiciones pactadas con cada proveedor: sirven para proponer el precio de una compra. */
-  readonly suppliers: readonly { supplierId: number; price: number; deliveryDays: number }[];
+  /**
+   * Condiciones pactadas con cada proveedor: qué proveedores venden el producto, a qué precio, en cuántos días y cuál es
+   * el preferido. Sirven para armar una compra.
+   */
+  readonly suppliers: readonly { supplierId: number; price: number; deliveryDays: number; preferred: boolean }[];
 }
 
 /** Proveedor elegible en un selector. */
@@ -88,7 +91,7 @@ export class CatalogOptionsApi {
                   unit: product.unitAbbreviation?.trim() ?? '',
                   active: product.activo !== false,
                   suppliers: (product.proveedores ?? []).flatMap((s) =>
-                    typeof s.id === 'number' ? [{ supplierId: s.id, price: s.precioPactado ?? 0, deliveryDays: s.tiempoEntregaDias ?? 0 }] : [],
+                    typeof s.id === 'number' ? [{ supplierId: s.id, price: s.precioPactado ?? 0, deliveryDays: s.tiempoEntregaDias ?? 0, preferred: s.preferido === true }] : [],
                   ),
                 },
               ]

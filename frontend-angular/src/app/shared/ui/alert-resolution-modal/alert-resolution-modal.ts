@@ -1,12 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, model, output, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { type FormGroup, NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { firstValueFrom } from 'rxjs';
+import { catchError, firstValueFrom, forkJoin, map, of } from 'rxjs';
 import { LucideBan, LucideCircleCheck, LucideShoppingBag, LucideShuffle, LucideStore, LucideTruck } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import type { BranchOption } from '@core/branches/branch-options-api';
 import { CatalogOptionsApi, type SupplierOption } from '@core/catalog/catalog-options-api';
+import { StockAvailabilityApi } from '@core/inventory/stock-availability-api';
 import { NotificationService } from '@core/notifications/notification.service';
+import { formatQuantity } from '@shared/format/format';
 import { controlError } from '@shared/forms/control-error';
 import { Alert } from '@shared/ui/alert/alert';
 import { Button } from '@shared/ui/button/button';
@@ -57,6 +59,7 @@ const MESSAGES = {
 export class AlertResolutionModal {
   private readonly api = inject(AlertsApi);
   private readonly catalog = inject(CatalogOptionsApi);
+  private readonly stockApi = inject(StockAvailabilityApi);
   private readonly notifications = inject(NotificationService);
   private readonly fb = inject(NonNullableFormBuilder);
 
@@ -109,11 +112,45 @@ export class AlertResolutionModal {
     other: [''],
   });
 
-  protected readonly originOptions = computed<SelectOption<number>[]>(() =>
-    this.branches()
-      .filter((branch) => branch.activa && branch.id !== this.alert()?.branchId)
-      .map((branch) => ({ value: branch.id, label: branch.nombre })),
+  /**
+   * Cuánto tiene disponible del producto cada otra sucursal: la cantidad, 0 si nada, o `null` si no se pudo consultar.
+   * `loading` mientras se consulta; `null` (sin mapa) si todavía no se pidió.
+   */
+  protected readonly originStock = signal<ReadonlyMap<number, number | null> | 'loading' | null>(null);
+  private stockRequest = 0;
+
+  private readonly candidateOrigins = computed(() =>
+    this.branches().filter((branch) => branch.activa && branch.id !== this.alert()?.branchId),
   );
+
+  /**
+   * Solo las sucursales que tienen el producto disponible, de la que más tiene a la que menos, con la cantidad a la
+   * vista. Una sucursal cuya existencia no se pudo consultar se ofrece igual (al final): el servidor valida al pedir.
+   */
+  protected readonly originOptions = computed<SelectOption<number>[]>(() => {
+    const stock = this.originStock();
+    const candidates = this.candidateOrigins();
+    if (stock === 'loading') return [];
+    if (stock === null) return candidates.map((branch) => ({ value: branch.id, label: branch.nombre }));
+    const withStock = candidates
+      .filter((branch) => (stock.get(branch.id) ?? 0) > 0)
+      .sort((a, b) => (stock.get(b.id) ?? 0) - (stock.get(a.id) ?? 0))
+      .map((branch) => ({ value: branch.id, label: branch.nombre, description: `${formatQuantity(stock.get(branch.id))} disponibles` }));
+    const unknown = candidates
+      .filter((branch) => stock.has(branch.id) && stock.get(branch.id) === null)
+      .map((branch) => ({ value: branch.id, label: branch.nombre, description: 'No se pudo consultar su existencia' }));
+    return [...withStock, ...unknown];
+  });
+
+  protected readonly originPlaceholder = computed(() => {
+    const stock = this.originStock();
+    if (stock === 'loading') return 'Consultando existencias…';
+    if (stock !== null && this.originOptions().length === 0) return 'Ninguna otra sucursal lo tiene disponible';
+    return 'Selecciona una sucursal';
+  });
+
+  /** Lo disponible en la sucursal elegida, para no pedir más de lo que tiene. */
+  private readonly chosenOriginAvailable = signal<number | null>(null);
 
   protected readonly supplierOptions = computed<SelectOption<number>[]>(() =>
     this.suppliers().map((supplier) => ({
@@ -139,8 +176,26 @@ export class AlertResolutionModal {
         this.dismissForm.reset({ reason: null, other: '' });
         this.dismissReasonValue.set(null);
         this.suppliers.set([]);
+        this.chosenOriginAvailable.set(null);
+        this.originStock.set(null);
         if (this.isStock()) void this.loadSuppliers(alert.productId);
       });
+    });
+    // La existencia del producto en las demás sucursales: se consulta al abrir, cuando ya se conocen las sucursales.
+    effect(() => {
+      const alert = this.alert();
+      const candidates = this.candidateOrigins();
+      if (!this.open() || !alert || !this.isStock() || candidates.length === 0) return;
+      untracked(() => this.loadOriginStock(alert.productId, candidates.map((branch) => branch.id)));
+    });
+    // Al elegir la sucursal de origen no se puede pedir más de lo que tiene disponible.
+    this.transferForm.controls.originBranchId.valueChanges.pipe(takeUntilDestroyed()).subscribe((id) => {
+      const stock = this.originStock();
+      const available = id !== null && stock instanceof Map ? (stock.get(id) ?? null) : null;
+      this.chosenOriginAvailable.set(available);
+      const quantity = this.transferForm.controls.quantity;
+      quantity.setValidators([Validators.required, Validators.min(1), Validators.pattern(/^\d+$/), ...(available !== null ? [Validators.max(available)] : [])]);
+      quantity.updateValueAndValidity({ emitEvent: false });
     });
     this.dismissForm.controls.reason.valueChanges.pipe(takeUntilDestroyed()).subscribe((reason) => {
       this.dismissReasonValue.set(reason);
@@ -165,7 +220,10 @@ export class AlertResolutionModal {
       reason: MESSAGES.reason,
       other: MESSAGES.other,
       leadTimeDays: MESSAGES.leadTime,
-      quantity: group === 'transfer' ? MESSAGES.quantityInt : MESSAGES.quantity,
+      quantity:
+        group === 'transfer'
+          ? { ...MESSAGES.quantityInt, max: `Esa sucursal solo tiene ${formatQuantity(this.chosenOriginAvailable())} disponibles.` }
+          : MESSAGES.quantity,
     };
     return controlError(control, messages[field] ?? REQUIRED);
   }
@@ -227,6 +285,21 @@ export class AlertResolutionModal {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  private loadOriginStock(productId: number, branchIds: readonly number[]): void {
+    const request = ++this.stockRequest;
+    this.originStock.set('loading');
+    forkJoin(
+      branchIds.map((id) =>
+        this.stockApi.availability(id).pipe(
+          map((byProduct): [number, number | null] => [id, byProduct.get(productId) ?? 0]),
+          catchError(() => of<[number, number | null]>([id, null])),
+        ),
+      ),
+    ).subscribe((rows) => {
+      if (request === this.stockRequest) this.originStock.set(new Map(rows));
+    });
   }
 
   private async loadSuppliers(productId: number): Promise<void> {

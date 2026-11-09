@@ -29,6 +29,13 @@ const PRIORITIES: readonly SelectOption<TransferPriority>[] = (['HIGH', 'NORMAL'
   label: PRIORITY_INFO[value].label,
 }));
 
+/** Valores con los que se abre la solicitud en vez de vacía (p. ej. desde el ajuste de stock). */
+export interface TransferPreset {
+  readonly productId: number | null;
+  readonly originBranchId: number | null;
+  readonly destinationBranchId: number | null;
+}
+
 let nextId = 0;
 
 /** Existencia disponible en el origen elegido: `idle` sin origen, `loading` mientras se consulta, `error` si falló. */
@@ -84,6 +91,7 @@ export class TransferRequestModal {
   /** Sucursal del usuario; `null` para el ADMIN, que elige el destino. */
   readonly ownBranchId = input<number | null>(null);
   /** El traslado ya creado en el servidor. */
+  readonly preset = input<TransferPreset | null>(null);
   readonly saved = output<Transfer>();
 
   protected readonly formId = `app-transfer-form-${nextId++}`;
@@ -172,6 +180,7 @@ export class TransferRequestModal {
         this.origin.set(null);
         this.stock.set({ status: 'idle' });
         this.addItem();
+        this.applyPreset(this.preset(), own);
         this.serverError.set(null);
       });
     });
@@ -202,6 +211,21 @@ export class TransferRequestModal {
       });
     this.form.controls.destinationBranchId.valueChanges.pipe(takeUntilDestroyed()).subscribe((id) => this.destination.set(id));
     this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.serverError.set(null));
+  }
+
+  /**
+   * El producto va a la primera fila antes de fijar el origen: al elegir el origen se consulta su existencia y, si no
+   * tiene el producto, la fila se vacía como con cualquier elección manual. Quien no es ADMIN siempre pide para su
+   * sucursal, así que el destino fijo manda sobre el del preset, y el origen nunca puede coincidir con el destino.
+   */
+  private applyPreset(preset: TransferPreset | null, own: number | null): void {
+    if (!preset) return;
+    const destination = own ?? preset.destinationBranchId;
+    if (destination !== null) this.form.controls.destinationBranchId.setValue(destination);
+    if (preset.productId !== null) this.form.controls.items.at(0).controls.productId.setValue(preset.productId);
+    if (preset.originBranchId !== null && preset.originBranchId !== destination) {
+      this.form.controls.originBranchId.setValue(preset.originBranchId);
+    }
   }
 
   protected branchError(field: 'originBranchId' | 'destinationBranchId'): string | null {

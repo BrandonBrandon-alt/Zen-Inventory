@@ -94,6 +94,17 @@ export class PurchaseDetailModal {
         if (purchase) this.resetForms(purchase);
       });
     });
+    // Si los datos de la orden llegan después de abrir (la lista se recarga tras recibir o pagar), los formularios se
+    // rehacen con lo nuevo: si no, la recepción propondría lo que faltaba antes. Nunca se pisa lo que alguien ya escribió.
+    effect(() => {
+      const purchase = this.purchase();
+      if (!this.open() || !purchase) return;
+      untracked(() => {
+        const mode = this.mode();
+        if (mode === 'view') this.resetForms(purchase);
+        else if (mode === 'receive' && this.receiveForm.pristine) this.resetReceiveForm(purchase);
+      });
+    });
   }
 
   protected title(): string {
@@ -204,13 +215,30 @@ export class PurchaseDetailModal {
     }
   }
 
-  private resetForms(purchase: Purchase): void {
+  /** La recepción propone lo que falta de cada línea, y no deja registrar más que eso. */
+  private resetReceiveForm(purchase: Purchase): void {
     const received = this.receiveForm.controls.received;
-    received.clear({ emitEvent: false });
-    for (const line of purchase.lines) {
-      const pending = pendingOf(line);
-      received.push(new FormControl<number | null>(pending, [Validators.required, Validators.min(0), Validators.max(pending)]), { emitEvent: false });
+    const validators = (pending: number) => [Validators.required, Validators.min(0), Validators.max(pending)];
+    if (received.length === purchase.lines.length) {
+      // Mismas líneas: se actualizan los controles que ya existen. Los campos están atados por índice
+      // (`formControlName`) y no se vuelven a atar a un control nuevo, así que reemplazarlos dejaría el valor viejo.
+      purchase.lines.forEach((line, i) => {
+        const control = received.at(i);
+        control.setValidators(validators(pendingOf(line)));
+        control.setValue(pendingOf(line), { emitEvent: false });
+      });
+    } else {
+      received.clear({ emitEvent: false });
+      for (const line of purchase.lines) {
+        received.push(new FormControl<number | null>(pendingOf(line), validators(pendingOf(line))), { emitEvent: false });
+      }
     }
+    this.receiveForm.markAsPristine();
+    this.receiveForm.markAsUntouched();
+  }
+
+  private resetForms(purchase: Purchase): void {
+    this.resetReceiveForm(purchase);
     this.reasonForm.reset({ reason: '' }, { emitEvent: false });
     this.payForm.reset({ amount: purchase.balance, method: 'TRANSFERENCIA', reference: '', notes: '' }, { emitEvent: false });
     this.payForm.controls.amount.setValidators([Validators.required, Validators.min(0.01), Validators.max(purchase.balance)]);

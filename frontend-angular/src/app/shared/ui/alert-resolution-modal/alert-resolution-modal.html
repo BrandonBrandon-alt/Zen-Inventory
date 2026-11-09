@@ -17,7 +17,7 @@
         <form id="alert-resolution-form" class="flex flex-col gap-4" [formGroup]="transferForm" novalidate (ngSubmit)="submit()">
           <p class="text-sm text-fg-subtle">Pide el producto a otra sucursal. Se crea una solicitud de traslado.</p>
           <app-form-field label="Sucursal que lo envía" [error]="fieldError('transfer', 'originBranchId')">
-            <app-select formControlName="originBranchId" [options]="originOptions()" [icon]="storeIcon" searchable searchPlaceholder="Buscar sucursal…" placeholder="Selecciona una sucursal" />
+            <app-select formControlName="originBranchId" [options]="originOptions()" [icon]="storeIcon" searchable searchPlaceholder="Buscar sucursal…" [placeholder]="originPlaceholder()" />
           </app-form-field>
           <div class="grid gap-4 sm:grid-cols-2">
             <app-form-field label="Cantidad" [error]="fieldError('transfer', 'quantity')">

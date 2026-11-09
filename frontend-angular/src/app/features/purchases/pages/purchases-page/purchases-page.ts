@@ -31,7 +31,8 @@ import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-tabl
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { PurchaseDetailModal } from '../../components/purchase-detail-modal/purchase-detail-modal';
-import { PurchaseFormModal } from '../../components/purchase-form-modal/purchase-form-modal';
+import { PurchaseFormModal, type PurchasePreset } from '../../components/purchase-form-modal/purchase-form-modal';
+import { takeNewDocumentRequest } from '@core/navigation/new-document-link';
 import { OPEN_RECEPTIONS, PAYMENT_INFO, RECEPTION_INFO } from '../../data-access/purchase-labels';
 import { purchaseActions } from '../../data-access/purchase-permissions';
 import { PAYMENT_STATUSES, type PaymentStatus, type Purchase, PurchasesApi, RECEPTION_STATUSES, type ReceptionStatus } from '../../data-access/purchases-api';
@@ -91,6 +92,8 @@ export class PurchasesPage {
   protected readonly numberFromInput = numberFromInput;
 
   protected readonly formOpen = signal(false);
+  /** Lo que llega ya elegido al formulario cuando se viene de otra pantalla (el ajuste de stock). */
+  protected readonly formPreset = signal<PurchasePreset | null>(null);
   protected readonly detailOpen = signal(false);
   protected readonly selectedId = signal<number | null>(null);
 
@@ -212,6 +215,9 @@ export class PurchasesPage {
   });
 
   constructor() {
+    // Desde «Compra a proveedor» en el ajuste de stock: se abre la orden nueva con ese producto (y su sucursal).
+    const request = takeNewDocumentRequest();
+    if (request) this.openForm({ productId: request.productId, branchId: request.branchId });
     void this.load();
     // Los nombres de proveedor, producto y sucursal adornan la tabla y el formulario: si fallan, se muestran los códigos.
     forkJoin({
@@ -259,6 +265,11 @@ export class PurchasesPage {
 
   protected clearFilters(): void {
     for (const filter of this.activeFilters()) this.removeFilter(filter.id);
+  }
+
+  protected openForm(preset: PurchasePreset | null = null): void {
+    this.formPreset.set(preset);
+    this.formOpen.set(true);
   }
 
   protected openDetail(row: PurchaseRow): void {

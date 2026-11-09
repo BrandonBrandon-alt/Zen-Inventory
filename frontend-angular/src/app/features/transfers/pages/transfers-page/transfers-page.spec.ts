@@ -1,5 +1,6 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
+import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -60,8 +61,18 @@ function stub(transfers: unknown[] = ALL) {
   );
 }
 
-const renderPage = () =>
-  render(TransfersPage, { providers: [provideHttpClient(withInterceptors([errorInterceptor])), { provide: API_BASE_URL, useValue: TEST_API }] });
+const navigate = vi.fn(async () => true);
+
+/** `query`: los parámetros con los que se llega a la pantalla (p. ej. desde el ajuste de stock). */
+const renderPage = (query: Record<string, string> = {}) =>
+  render(TransfersPage, {
+    providers: [
+      provideHttpClient(withInterceptors([errorInterceptor])),
+      { provide: API_BASE_URL, useValue: TEST_API },
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(query) } } },
+      { provide: Router, useValue: { navigate } },
+    ],
+  });
 
 const ids = () => screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0]?.textContent?.trim());
 
@@ -525,6 +536,38 @@ it('resume varios productos como "Tornillo +1"', async () => {
   });
 
   describe('solicitar', () => {
+    it('desde «Traslado recibido» abre la solicitud con esa sucursal como destino y conserva el producto', async () => {
+      useSession('ADMIN');
+      stub();
+      navigate.mockClear();
+      await renderPage({ nuevo: '1', producto: '101', sucursal: '20', lado: 'destino' });
+      const dialog = await screen.findByRole('dialog', { name: 'Solicitar traslado' });
+      await vi.waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Sucursal que lo recibe' })).toHaveTextContent('Sucursal Norte'));
+      // El producto se ve al elegir de dónde viene: solo entonces se sabe si esa sucursal lo tiene.
+      await chooseOption('Sucursal que lo envía', 'Sede Central');
+      await vi.waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Producto' })).toHaveTextContent('Tuerca'));
+      await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: expect.objectContaining({ nuevo: null, lado: null }), replaceUrl: true })));
+    });
+
+    it('desde «Traslado enviado» abre la solicitud con esa sucursal como origen y el producto elegido', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage({ nuevo: '1', producto: '100', sucursal: '10', lado: 'origen' });
+      const dialog = await screen.findByRole('dialog', { name: 'Solicitar traslado' });
+      await vi.waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Sucursal que lo envía' })).toHaveTextContent('Sede Central'));
+      await vi.waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Producto' })).toHaveTextContent('Tornillo'));
+    });
+
+    it('quien no es ADMIN pide para su sucursal: si el origen sería la misma, se deja por elegir', async () => {
+      useSession('MANAGER', 20);
+      stub();
+      await renderPage({ nuevo: '1', producto: '100', sucursal: '20', lado: 'origen' });
+      const dialog = await screen.findByRole('dialog', { name: 'Solicitar traslado' });
+      expect(within(dialog).getByRole('combobox', { name: 'Sucursal que lo envía' })).not.toHaveTextContent('Sucursal Norte');
+      await chooseOption('Sucursal que lo envía', 'Sede Central');
+      await vi.waitFor(() => expect(within(dialog).getByRole('combobox', { name: 'Producto' })).toHaveTextContent('Tornillo'));
+    });
+
     it('un gerente pide hacia su propia sucursal: el destino queda fijo y no ofrece repetir un producto', async () => {
       useSession('MANAGER', 20);
       stub();

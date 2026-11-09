@@ -14,7 +14,7 @@
       }
     }
   </div>
-  <button appButton type="button" (click)="formOpen.set(true)"><svg lucidePlus [size]="16" />Nueva orden de compra</button>
+  <button appButton type="button" (click)="openForm()"><svg lucidePlus [size]="16" />Nueva orden de compra</button>
 </header>
 
 <div class="mb-3 flex animate-enter-delayed flex-wrap items-center gap-3">
@@ -94,6 +94,7 @@
   [products]="products()"
   [branches]="branches()"
   [chooseBranch]="isAdmin()"
+  [preset]="formPreset()"
   (saved)="load(true)"
 />
 

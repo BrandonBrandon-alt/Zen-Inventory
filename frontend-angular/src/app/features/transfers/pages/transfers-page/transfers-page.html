@@ -14,7 +14,7 @@
       }
     }
   </div>
-  <button appButton type="button" (click)="requestOpen.set(true)"><svg lucidePlus [size]="16" />Solicitar traslado</button>
+  <button appButton type="button" (click)="openRequest()"><svg lucidePlus [size]="16" />Solicitar traslado</button>
 </header>
 
 <div class="mb-3 flex animate-enter-delayed flex-wrap items-center gap-3">
@@ -97,6 +97,7 @@
   [branches]="branches()"
   [products]="products()"
   [ownBranchId]="isAdmin() ? null : ownBranchId()"
+  [preset]="requestPreset()"
   (saved)="load(true)"
 />
 

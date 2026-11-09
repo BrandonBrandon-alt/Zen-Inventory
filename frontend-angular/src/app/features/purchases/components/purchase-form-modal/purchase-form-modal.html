@@ -35,6 +35,14 @@
           Agregar producto
         </button>
       </div>
+      @if (supplierWithoutCatalog()) {
+        <p class="text-xs text-fg-subtle" role="status">
+          Este proveedor no tiene productos asociados en el catálogo, así que se muestran todos. Asócialos en Productos para que
+          aquí solo aparezca lo que vende.
+        </p>
+      } @else if (form.controls.supplierId.value !== null) {
+        <p class="text-xs text-fg-subtle">Solo se muestran los productos que vende este proveedor.</p>
+      }
       @for (row of form.controls.items.controls; track row; let i = $index) {
         <!-- Cada producto son dos líneas: arriba cuál es; abajo cuánto, a qué precio y cuánto suma. Los campos tienen el mismo ancho en todas las filas. -->
         <div class="flex flex-col gap-3 rounded-lg border border-line-subtle p-3 [&_*]:min-w-0" [formGroupName]="i">

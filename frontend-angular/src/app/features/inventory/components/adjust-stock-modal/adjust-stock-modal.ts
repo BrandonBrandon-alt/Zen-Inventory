@@ -15,7 +15,8 @@ import { Modal } from '@shared/ui/modal/modal';
 import { Select } from '@shared/ui/select/select';
 import { type TabItem, Tabs } from '@shared/ui/tabs/tabs';
 import { type InventoryItem, InventoryApi, type MovementReason, type MovementType } from '../../data-access/inventory-api';
-import { GUIDED_REASONS, MANUAL_REASONS, MIN_JUSTIFICATION_LENGTH, SHRINKAGE_CATEGORIES, requiresJustification } from '../../data-access/inventory-labels';
+import { GUIDED_REASONS, MANUAL_REASONS, MIN_JUSTIFICATION_LENGTH, SHRINKAGE_CATEGORIES, requiresJustification, type GuidedReason } from '../../data-access/inventory-labels';
+import { newDocumentUrl } from '@core/navigation/new-document-link';
 
 const TYPE_TABS: readonly TabItem[] = [
   { id: 'INGRESO', label: 'Ingreso', icon: LucideArrowDownToLine.icon },
@@ -66,7 +67,7 @@ let nextId = 0;
             </span>
             <h3 class="font-title text-base font-bold text-fg">Este movimiento se registra en otra pantalla</h3>
             <p class="max-w-prose text-sm text-fg-muted">{{ g.explanation }}</p>
-            <button appButton type="button" (click)="goTo(g.path)">
+            <button appButton type="button" (click)="goTo(g)">
               {{ g.action }}
               <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
             </button>
@@ -172,9 +173,13 @@ export class AdjustStockModal {
     this.form.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.serverError.set(null));
   }
 
-  protected goTo(path: string): void {
+  /** Lleva a la pantalla del motivo; si esa pantalla crea el documento, la abre con el formulario y este producto. */
+  protected goTo(reason: GuidedReason): void {
     this.open.set(false);
-    void this.router.navigateByUrl(path);
+    const url = reason.opensForm
+      ? newDocumentUrl(reason.path, { productId: this.product()?.productId ?? null, branchId: this.branchId(), side: reason.opensForm.side })
+      : reason.path;
+    void this.router.navigateByUrl(url);
   }
 
   protected setType(id: string): void {
