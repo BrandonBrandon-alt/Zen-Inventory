@@ -13,6 +13,7 @@ import {
   LucideUser,
   LucideArrowUpDown,
   LucideScale,
+  LucideLock,
 } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
@@ -31,7 +32,9 @@ import { ActiveFilters, type ActiveFilter } from '@shared/ui/filters/active-filt
 import { AdvancedFilters } from '@shared/ui/filters/advanced-filters';
 import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Select, type SelectOption } from '@shared/ui/select/select';
+import { type TabItem, Tabs } from '@shared/ui/tabs/tabs';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
+import { LoginEventsPanel } from '../../components/login-events-panel/login-events-panel';
 import { AuditDetailModal, type AuditRow } from '../../components/audit-detail-modal/audit-detail-modal';
 import { MOVEMENT_REASONS, type AuditMovement, AuditApi, type AuditQuery, type MovementReason, type MovementType } from '../../data-access/audit-api';
 import { REASON_INFO, documentLabel, subReasonText } from '../../data-access/audit-labels';
@@ -60,7 +63,7 @@ const toRow = (m: AuditMovement): AuditRow => ({
  */
 @Component({
   selector: 'app-audit-page',
-  imports: [Checkbox, DataTable, DataTableCell, Badge, Button, DatePicker, ActiveFilters, AdvancedFilters, FormField, InputDirective, Select, Tooltip, AuditDetailModal, LucideEye, LucideSearch],
+  imports: [Checkbox, DataTable, DataTableCell, Badge, Button, DatePicker, ActiveFilters, AdvancedFilters, FormField, InputDirective, Select, Tabs, Tooltip, AuditDetailModal, LoginEventsPanel, LucideEye, LucideSearch],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './audit-page.html',
@@ -109,6 +112,13 @@ export class AuditPage {
   protected readonly advancedOpen = persistedFilter(AuditPage.SCREEN, 'advancedOpen', false, codecs.bool());
   protected readonly numberFromInput = numberFromInput;
   protected readonly sort = signal<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
+  /** Qué se audita: los movimientos de inventario o los inicios de sesión. Se recuerda por persona. */
+  protected readonly tab = persistedFilter(AuditPage.SCREEN, 'tab', 'movements', codecs.oneOf(['movements', 'logins'] as const));
+  protected readonly tabs: readonly TabItem[] = [
+    { id: 'movements', label: 'Movimientos de inventario', icon: LucideArrowUpDown.icon },
+    { id: 'logins', label: 'Inicios de sesión', icon: LucideLock.icon },
+  ];
 
   protected readonly detailOpen = signal(false);
   protected readonly selectedId = signal<number | null>(null);

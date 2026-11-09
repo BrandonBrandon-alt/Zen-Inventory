@@ -40,3 +40,13 @@ test('auditoría global: lista los movimientos de todas las sucursales con su de
   await detail.click();
   await expect(page.getByRole('dialog')).toBeVisible();
 });
+
+test('auditoría global: el inicio de sesión que se acaba de hacer aparece en «Inicios de sesión»', async ({ page }) => {
+  await loginReal(page);
+  await page.goto('/audit');
+  await page.getByRole('tab', { name: 'Inicios de sesión' }).click();
+  const latest = page.getByRole('row').nth(1); // fila 0: encabezados; la más reciente primero
+  await expect(latest).toContainText(process.env['E2E_USER'] ?? '');
+  await expect(latest).toContainText('Exitoso');
+  await page.getByRole('tab', { name: 'Movimientos de inventario' }).click(); // la pestaña se recuerda: se deja como estaba
+});

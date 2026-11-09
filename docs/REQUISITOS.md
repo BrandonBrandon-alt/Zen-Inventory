@@ -149,6 +149,8 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 | RF-49 | Rotación de inventario, productos sin movimiento y sugerencias de reabastecimiento | ADMIN, MANAGER, OPERADOR | M | Implementado |
 | RF-50 | Reporte de cierre de caja y de ventas por vendedor, con lo cobrado por forma de pago, para imprimir o guardar como PDF | ADMIN, MANAGER | M | Implementado |
 | RF-51 | Consultar la auditoría global: todos los movimientos de inventario del sistema, con quién y cuándo | ADMIN | M | Implementado |
+| RF-64 | Registrar cada intento de inicio de sesión (exitoso, credenciales inválidas, cuenta desactivada o bloqueado) con el correo, la persona, la fecha y la IP, y consultarlos en la auditoría global | ADMIN | M | Implementado |
+| RF-65 | Anular un pago equivocado a un proveedor o del flete con un motivo: queda en el historial con quién y cuándo, y deja de contar en lo pagado | ADMIN, MANAGER | M | Implementado |
 
 ### 3.10 Interfaz
 
@@ -222,7 +224,7 @@ Se declara para no presentar como hecho lo que no lo está:
 - No hay tablas virtualizadas.
 - La exportación a CSV del historial de ventas no está disponible (se retiró al paginar en el servidor).
 - La API gratuita de Render se mantiene despierta con llamadas periódicas (monitor externo y `keep-alive.yml`); si fallan, el primer request tras una pausa tarda 30–90 s.
-- La auditoría solo registra movimientos de inventario, no cualquier acción del sistema (por ejemplo, no registra inicios de sesión).
+- La auditoría registra los movimientos de inventario y los inicios de sesión, pero no cualquier acción (por ejemplo, no registra quién editó un producto).
 
 ## 9. Trazabilidad con las pantallas
 

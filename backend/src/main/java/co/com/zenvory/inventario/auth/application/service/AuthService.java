@@ -1,12 +1,17 @@
 package co.com.zenvory.inventario.auth.application.service;
 
 import co.com.zenvory.inventario.auth.application.port.in.AuthUseCase;
+import co.com.zenvory.inventario.auth.application.port.out.LoginAuditPort;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
 import co.com.zenvory.inventario.auth.domain.exception.AccountDisabledException;
 import co.com.zenvory.inventario.auth.domain.exception.InvalidCredentialsException;
+import co.com.zenvory.inventario.auth.domain.exception.TooManyLoginAttemptsException;
+import co.com.zenvory.inventario.auth.domain.model.LoginOutcome;
 import co.com.zenvory.inventario.auth.domain.model.LoginResult;
 import co.com.zenvory.inventario.auth.domain.model.User;
 import co.com.zenvory.inventario.shared.infrastructure.security.JwtService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -31,7 +36,10 @@ public class AuthService implements AuthUseCase {
     private final UserRepositoryPort userRepositoryPort;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
     private final LoginAttemptLimiter loginAttemptLimiter;
+    private final LoginAuditPort loginAudit;
     /** Hash de relleno para igualar el tiempo de respuesta cuando el correo no existe. */
     private final String dummyHash;
 
@@ -47,11 +55,13 @@ public class AuthService implements AuthUseCase {
             UserRepositoryPort userRepositoryPort,
             JwtService jwtService,
             PasswordEncoder passwordEncoder,
-            LoginAttemptLimiter loginAttemptLimiter) {
+            LoginAttemptLimiter loginAttemptLimiter,
+            LoginAuditPort loginAudit) {
         this.userRepositoryPort = userRepositoryPort;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
         this.loginAttemptLimiter = loginAttemptLimiter;
+        this.loginAudit = loginAudit;
         this.dummyHash = passwordEncoder.encode("relleno-contra-enumeracion");
     }
 
@@ -63,9 +73,14 @@ public class AuthService implements AuthUseCase {
      * Si las credenciales son correctas pero la cuenta está inactiva, lanza {@link AccountDisabledException}.</p>
      */
     @Override
-    public LoginResult login(String email, String password) {
+    public LoginResult login(String email, String password, String clientIp) {
         String key = email.trim().toLowerCase(Locale.ROOT);
-        loginAttemptLimiter.checkAllowed(key);
+        try {
+            loginAttemptLimiter.checkAllowed(key);
+        } catch (TooManyLoginAttemptsException blocked) {
+            audit(key, null, LoginOutcome.BLOQUEADO, clientIp);
+            throw blocked;
+        }
 
         Optional<User> found = userRepositoryPort.findByEmail(key);
         // Se compara siempre contra un hash (el real o uno de relleno): así un correo inexistente tarda lo mismo
@@ -74,21 +89,33 @@ public class AuthService implements AuthUseCase {
         boolean passwordMatches = passwordEncoder.matches(password, hash);
         if (found.isEmpty() || !passwordMatches) {
             loginAttemptLimiter.recordFailure(key);
+            audit(key, found.map(User::getId).orElse(null), LoginOutcome.CREDENCIALES_INVALIDAS, clientIp);
             throw new InvalidCredentialsException();
         }
         User user = found.get();
         loginAttemptLimiter.reset(key);
 
         if (user.getActive() != null && !user.getActive()) {
+            audit(key, user.getId(), LoginOutcome.CUENTA_DESACTIVADA, clientIp);
             throw new AccountDisabledException();
         }
 
         String token = jwtService.generateToken(user.getId(), user.getEmail());
+        audit(key, user.getId(), LoginOutcome.EXITOSO, clientIp);
 
         return LoginResult.builder()
                 .token(token)
                 .user(user)
                 .build();
+    }
+
+    /** Registrar el intento nunca hace fallar el inicio de sesión: si la base no responde, se deja en el log. */
+    private void audit(String email, Long userId, LoginOutcome outcome, String clientIp) {
+        try {
+            loginAudit.record(email, userId, outcome, clientIp);
+        } catch (RuntimeException e) {
+            log.warn("No se pudo registrar el intento de inicio de sesión ({}): {}", outcome, e.getMessage());
+        }
     }
 }
 

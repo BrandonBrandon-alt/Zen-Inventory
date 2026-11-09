@@ -20,6 +20,15 @@ public interface AuthUseCase {
      * @throws co.com.zenvory.inventario.auth.domain.exception.InvalidCredentialsException Si el correo no existe o la clave es incorrecta.
      * @throws co.com.zenvory.inventario.auth.domain.exception.AccountDisabledException Si el usuario está marcado como inactivo.
      */
-    LoginResult login(String email, String password);
+    default LoginResult login(String email, String password) {
+        return login(email, password, null);
+    }
+
+    /**
+     * Inicia sesión y deja registrado el intento (exitoso o no) con la IP de quien lo hizo.
+     *
+     * @param clientIp IP del cliente, o {@code null} si no se conoce.
+     */
+    LoginResult login(String email, String password, String clientIp);
 }
 

@@ -1,6 +1,8 @@
 package co.com.zenvory.inventario.auth.application.service;
 
+import co.com.zenvory.inventario.auth.application.port.out.LoginAuditPort;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
+import co.com.zenvory.inventario.auth.domain.model.LoginOutcome;
 import co.com.zenvory.inventario.auth.domain.exception.AccountDisabledException;
 import co.com.zenvory.inventario.auth.domain.exception.InvalidCredentialsException;
 import co.com.zenvory.inventario.auth.domain.exception.TooManyLoginAttemptsException;
@@ -32,6 +34,7 @@ class AuthServiceTest {
     private PasswordEncoder encoder;
     private JwtService jwt;
     private LoginAttemptLimiter limiter;
+    private LoginAuditPort audit;
     private AuthService service;
     private User ana;
 
@@ -42,7 +45,8 @@ class AuthServiceTest {
         jwt = mock(JwtService.class);
         limiter = new LoginAttemptLimiter();
         when(encoder.encode(any())).thenReturn(DUMMY);
-        service = new AuthService(repo, jwt, encoder, limiter);
+        audit = mock(LoginAuditPort.class);
+        service = new AuthService(repo, jwt, encoder, limiter, audit);
         ana = User.builder().id(7L).email("ana@x.co").passwordHash("hash-ana").active(true)
                 .role(Role.builder().id(2L).nombre("MANAGER").build()).sucursalId(3L).build();
         when(repo.findByEmail("ana@x.co")).thenReturn(Optional.of(ana));
@@ -104,5 +108,41 @@ class AuthServiceTest {
             assertThatThrownBy(() -> service.login("ana@x.co", "mala")).isInstanceOf(InvalidCredentialsException.class);
         }
         assertThat(service.login("ana@x.co", "buena").token()).isEqualTo("jwt");
+    }
+
+    @Test
+    @DisplayName("auditoría: cada resultado queda registrado con el correo normalizado, la persona si existe y la IP")
+    void auditsEveryOutcome() {
+        service.login("  ANA@x.co ", "buena", "10.0.0.5");
+        verify(audit).record("ana@x.co", 7L, LoginOutcome.EXITOSO, "10.0.0.5");
+
+        assertThatThrownBy(() -> service.login("ana@x.co", "mala", "10.0.0.5")).isInstanceOf(InvalidCredentialsException.class);
+        verify(audit).record("ana@x.co", 7L, LoginOutcome.CREDENCIALES_INVALIDAS, "10.0.0.5");
+
+        // Un correo que no es de nadie: se registra sin persona (y no se distingue en la respuesta).
+        assertThatThrownBy(() -> service.login("nadie@x.co", "x", "1.2.3.4")).isInstanceOf(InvalidCredentialsException.class);
+        verify(audit).record("nadie@x.co", null, LoginOutcome.CREDENCIALES_INVALIDAS, "1.2.3.4");
+    }
+
+    @Test
+    @DisplayName("auditoría: una cuenta desactivada y un correo bloqueado también quedan registrados")
+    void auditsDisabledAndBlocked() {
+        ana.setActive(false);
+        assertThatThrownBy(() -> service.login("ana@x.co", "buena", "ip")).isInstanceOf(AccountDisabledException.class);
+        verify(audit).record("ana@x.co", 7L, LoginOutcome.CUENTA_DESACTIVADA, "ip");
+
+        for (int i = 0; i < LoginAttemptLimiter.MAX_FAILURES; i++) {
+            assertThatThrownBy(() -> service.login("nadie@x.co", "x", "ip")).isInstanceOf(InvalidCredentialsException.class);
+        }
+        assertThatThrownBy(() -> service.login("nadie@x.co", "x", "ip")).isInstanceOf(TooManyLoginAttemptsException.class);
+        verify(audit).record("nadie@x.co", null, LoginOutcome.BLOQUEADO, "ip");
+    }
+
+    @Test
+    @DisplayName("si no se puede registrar el intento, el inicio de sesión sigue funcionando")
+    void auditFailureNeverBlocksLogin() {
+        org.mockito.Mockito.doThrow(new RuntimeException("base caída")).when(audit).record(any(), any(), any(), any());
+        assertThat(service.login("ana@x.co", "buena", "ip").token()).isEqualTo("jwt");
+        assertThatThrownBy(() -> service.login("ana@x.co", "mala", "ip")).isInstanceOf(InvalidCredentialsException.class);
     }
 }

@@ -53,13 +53,27 @@ class AuthControllerTest {
                 .build();
         LoginResult result = new LoginResult("mock-jwt-token", user);
         
-        when(authUseCase.login(anyString(), anyString())).thenReturn(result);
+        when(authUseCase.login(anyString(), anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(result);
 
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token").value("mock-jwt-token"));
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/login: pasa la IP del cliente (la primera de X-Forwarded-For detrás de un proxy)")
+    void login_passesClientIp() throws Exception {
+        User user = User.builder().id(1L).email("user@example.com").nombre("U")
+                .role(co.com.zenvory.inventario.auth.domain.model.Role.builder().nombre("ADMIN").build()).build();
+        when(authUseCase.login(anyString(), anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(new LoginResult("t", user));
+
+        mockMvc.perform(post("/api/auth/login").header("X-Forwarded-For", "181.50.1.2, 10.0.0.1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new LoginRequest("user@example.com", "pass"))))
+                .andExpect(status().isOk());
+        org.mockito.Mockito.verify(authUseCase).login("user@example.com", "pass", "181.50.1.2");
     }
 }
 

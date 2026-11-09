@@ -1108,6 +1108,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit/logins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["search_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analytics/valuations": {
         parameters: {
             query?: never;
@@ -2109,6 +2125,32 @@ export interface components {
             phone?: string;
             invoicePrefix?: string;
             invoiceFooter?: string;
+        };
+        LoginEventPageResponse: {
+            content?: components["schemas"]["LoginEventResponse"][];
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            /** Format: int32 */
+            totalPages?: number;
+            /** Format: int64 */
+            failures?: number;
+        };
+        LoginEventResponse: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: date-time */
+            date?: string;
+            email?: string;
+            /** Format: int64 */
+            userId?: number;
+            userName?: string;
+            /** @enum {string} */
+            outcome?: "EXITOSO" | "CREDENCIALES_INVALIDAS" | "CUENTA_DESACTIVADA" | "BLOQUEADO";
+            ip?: string;
         };
         BranchValuation: {
             /** Format: int64 */
@@ -4392,6 +4434,33 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["CompanyResponse"];
+                };
+            };
+        };
+    };
+    search_1: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+                from?: string;
+                to?: string;
+                outcome?: "EXITOSO" | "CREDENCIALES_INVALIDAS" | "CUENTA_DESACTIVADA" | "BLOQUEADO";
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LoginEventPageResponse"];
                 };
             };
         };

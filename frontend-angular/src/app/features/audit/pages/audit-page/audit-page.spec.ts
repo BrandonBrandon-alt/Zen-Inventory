@@ -345,6 +345,29 @@ describe('AuditPage', () => {
     });
   });
 
+  describe('pestañas', () => {
+    it('«Inicios de sesión» muestra los intentos de entrar al sistema y se recuerda', async () => {
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token: 't', email: 'e@z.co', nombre: 'Yo', rol: 'ADMIN', id: 1 }));
+      stub();
+      server.use(
+        http.get(`${TEST_API}/api/v1/audit/logins`, () =>
+          HttpResponse.json({ content: [{ id: 1, date: '2026-11-08T21:00:00', email: 'ana@x.co', userId: 7, userName: 'Ana Ruiz', outcome: 'EXITOSO', ip: '10.0.0.5' }], totalElements: 1, failures: 0 }),
+        ),
+      );
+      const first = await renderPage();
+      await screen.findAllByRole('row', { name: /Tuerca/ });
+      await userEvent.click(screen.getByRole('tab', { name: 'Inicios de sesión' }));
+      expect(await screen.findByRole('row', { name: /ana@x\.co/ })).toBeInTheDocument();
+      expect(screen.queryByRole('searchbox', { name: 'Buscar movimiento' })).not.toBeInTheDocument();
+      first.fixture.destroy();
+      TestBed.resetTestingModule();
+
+      await renderPage(); // otra visita: abre en la misma pestaña
+      expect(await screen.findByRole('row', { name: /ana@x\.co/ })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Inicios de sesión' })).toHaveAttribute('aria-selected', 'true');
+    });
+  });
+
   describe('detalle', () => {
     it('muestra todo el movimiento, con las observaciones completas', async () => {
       stub();
