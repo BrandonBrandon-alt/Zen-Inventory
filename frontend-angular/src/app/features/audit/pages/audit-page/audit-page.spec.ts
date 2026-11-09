@@ -66,7 +66,10 @@ const products = () => screen.getAllByRole('row').slice(1).map((r) => within(r).
 
 describe('AuditPage', () => {
   beforeEach(() => localStorage.clear());
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 
   describe('lista', () => {
     it('no tiene problemas de accesibilidad detectables', async () => {
@@ -251,6 +254,9 @@ describe('AuditPage', () => {
     });
 
     it('filtra por un rango de fechas: el día "Hasta" se incluye completo', async () => {
+      // El calendario abre en el mes en curso: sin fijar el reloj, el 12 de octubre deja de verse al pasar de mes.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(2026, 9, 20, 10, 0));
       stub();
       await renderPage();
       await screen.findAllByRole('row', { name: /Tuerca/ });

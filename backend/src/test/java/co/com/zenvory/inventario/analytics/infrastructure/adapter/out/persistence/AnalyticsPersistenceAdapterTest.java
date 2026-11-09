@@ -1,6 +1,7 @@
 package co.com.zenvory.inventario.analytics.infrastructure.adapter.out.persistence;
 
 import co.com.zenvory.inventario.analytics.domain.model.BranchPerformance;
+import co.com.zenvory.inventario.analytics.domain.model.InventoryRotation;
 import co.com.zenvory.inventario.analytics.domain.model.MonthlySales;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -91,6 +92,48 @@ class AnalyticsPersistenceAdapterTest {
         assertThat(result).extracting(MonthlySales::year).containsExactly(lastMonth.getYear(), thisMonth.getYear());
         assertThat(result.get(1).revenue()).isEqualByComparingTo("500.00");
         assertThat(result.get(1).volume()).isEqualByComparingTo("2");
+    }
+
+    @Test
+    @DisplayName("rotación por sede: solo cuenta las ventas completadas de esa sede")
+    void inventoryRotation_onlyCountsCompletedSalesOfTheBranch() {
+        // Producto 2 (seed V2): 10 unidades en la sede 1 y 800 en la 2.
+        saleOf(1L, 2L, "COMPLETED", 3);
+        saleOf(2L, 2L, "COMPLETED", 7);
+        saleOf(1L, 2L, "CANCELED", 100);
+
+        InventoryRotation rebar = rotationOf(adapter.findInventoryRotation(1L), 2L);
+
+        assertThat(rebar.soldQuantity()).isEqualByComparingTo("3");
+        assertThat(rebar.rotationRatio()).isEqualByComparingTo("0.3");
+        assertThat(rebar.isDeadStock()).isFalse();
+    }
+
+    @Test
+    @DisplayName("rotación por sede: un producto que solo se vende en otra sede es inventario sin movimiento aquí")
+    void inventoryRotation_salesOfAnotherBranchDoNotHideDeadStock() {
+        saleOf(2L, 2L, "COMPLETED", 7);
+
+        InventoryRotation rebar = rotationOf(adapter.findInventoryRotation(1L), 2L);
+
+        assertThat(rebar.soldQuantity()).isEqualByComparingTo("0");
+        assertThat(rebar.isDeadStock()).isTrue();
+    }
+
+    /** Venta con una sola línea del producto y en el estado dados. */
+    private void saleOf(Long branchId, Long productId, String status, int quantity) {
+        Long saleId = jdbc.queryForObject("""
+                INSERT INTO ventas (sucursal_id, usuario_id, fecha, subtotal, total_final, estado)
+                VALUES (?, 1, ?, 0, 0, ?) RETURNING id
+                """, Long.class, branchId, LocalDateTime.of(2026, 3, 5, 10, 0), status);
+        jdbc.update("""
+                INSERT INTO detalles_venta (venta_id, producto_id, cantidad, precio_unitario_aplicado, subtotal_linea)
+                VALUES (?, ?, ?, 0, 0)
+                """, saleId, productId, quantity);
+    }
+
+    private static InventoryRotation rotationOf(List<InventoryRotation> rows, Long productId) {
+        return rows.stream().filter(row -> row.productId().equals(productId)).findFirst().orElseThrow();
     }
 
     /** Venta completada con una línea (producto 1) por cada cantidad dada. */

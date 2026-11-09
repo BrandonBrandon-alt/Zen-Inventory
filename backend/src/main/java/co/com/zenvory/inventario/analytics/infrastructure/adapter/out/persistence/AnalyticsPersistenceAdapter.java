@@ -304,8 +304,10 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
                     EXTRACT(DAY FROM (CURRENT_TIMESTAMP - COALESCE(MAX(v.fecha), i.last_updated)))::INT as inactive_days
                 FROM producto p
                 JOIN inventario_local i ON p.id = i.producto_id
-                LEFT JOIN detalles_venta dv ON p.id = dv.producto_id
-                LEFT JOIN ventas v ON dv.venta_id = v.id AND v.estado = 'COMPLETED'
+                -- Una línea cuenta solo si su venta está completada y es de la misma sucursal que la fila de stock:
+                -- unir las líneas por producto a secas sumaba las ventas de todas las sedes y las anuladas.
+                LEFT JOIN (detalles_venta dv JOIN ventas v ON v.id = dv.venta_id)
+                       ON dv.producto_id = p.id AND v.sucursal_id = i.sucursal_id AND v.estado = 'COMPLETED'
                 WHERE 1=1
                 """);
         List<Object> args = new ArrayList<>();
@@ -315,7 +317,8 @@ public class AnalyticsPersistenceAdapter implements AnalyticsRepositoryPort {
             args.add(branchId);
         }
 
-        query.append(" GROUP BY p.id, p.nombre, i.cantidad_actual, i.last_updated ");
+        // i.sucursal_id: sin filtro de sucursal, dos sedes con el mismo stock no deben fundirse en una fila.
+        query.append(" GROUP BY p.id, p.nombre, i.sucursal_id, i.cantidad_actual, i.last_updated ");
         query.append(" ORDER BY rotation DESC ");
 
         return jdbcTemplate.query(query.toString(), (rs, rowNum) -> new InventoryRotation(
