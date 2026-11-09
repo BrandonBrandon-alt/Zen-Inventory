@@ -223,7 +223,7 @@ Se declara para no presentar como hecho lo que no lo está:
 - Los pagos de compras no se pueden anular ni editar (son inmutables); un pago equivocado no tiene todavía un contra-asiento.
 - Los pagos del flete no se pueden anular ni editar (son inmutables), igual que los de compras.
 - La exportación a CSV del historial de ventas no está disponible (se retiró al paginar en el servidor).
-- No hay mecanismo que mantenga despierta la API gratuita de Render.
+- La API gratuita de Render se mantiene despierta con llamadas periódicas (monitor externo y `keep-alive.yml`); si fallan, el primer request tras una pausa tarda 30–90 s.
 - La auditoría solo registra movimientos de inventario, no cualquier acción del sistema (por ejemplo, no registra inicios de sesión).
 
 ## 9. Trazabilidad con las pantallas

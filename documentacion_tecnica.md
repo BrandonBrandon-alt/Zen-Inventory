@@ -745,4 +745,6 @@ flowchart LR
   con un dominio) y manda las demás rutas a `index.html` para que las resuelva Angular.
 
 Pasos, variables y lista de comprobación en `DEPLOY.md`. Limitación del plan gratuito: Render duerme la API tras
-~15 minutos sin tráfico, y el primer request después tarda entre 30 y 90 s.
+~15 minutos sin tráfico, y el primer request después tarda entre 30 y 90 s. Para evitarlo se la llama periódicamente
+(un monitor externo cada 5 minutos y, como respaldo, el workflow `keep-alive.yml` cada 10) en `GET /api/auth/login`,
+que responde sin consultar la base: Render no se duerme y Neon puede apagarse cuando nadie usa la app.

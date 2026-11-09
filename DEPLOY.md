@@ -48,8 +48,8 @@ igual que hace nginx en Docker. Los límites de los planes gratuitos cambian: co
    API la rechazaría si no reconoce ese origen.
 4. Despliega. Al primer arranque Flyway crea las tablas (tarda un poco más). Anota la URL: `https://<servicio>.onrender.com`.
 
-> El plan gratuito **se duerme tras ~15 minutos sin tráfico** y el primer request tarda 30–90 s. Abre la app un minuto
-> antes de una demostración.
+> El plan gratuito **se duerme tras ~15 minutos sin tráfico** y el primer request tarda 30–90 s. Para evitarlo, ver
+> «Mantener despierta la API» más abajo.
 
 ## 3. Frontend: Netlify
 
@@ -71,13 +71,31 @@ psql "postgresql://<usuario>:<contraseña>@<host>/<base>?sslmode=require" -f dem
 Hazlo **después** del primer arranque de la API (cuando Flyway ya creó las tablas). Son ~18.000 ventas; caben en los
 0,5 GB del plan gratuito. Más detalle en `scripts/demo-data/README.md`.
 
-## 5. Lista de comprobación
+## 5. Mantener despierta la API
+
+Render duerme el servicio gratuito tras ~15 minutos sin tráfico. Basta con llamarlo más seguido que eso. La llamada
+va a `GET /api/auth/login`: responde **401** desde el filtro de seguridad **sin tocar la base**, así que despierta a
+Render pero deja que Neon se apague cuando nadie usa la app (cada hora encendida gasta horas de cómputo del plan).
+
+1. **Monitor externo (recomendado, el más puntual).** En <https://uptimerobot.com> (gratis) crea un monitor:
+   - *Monitor type:* **HTTP(s)**; *URL:* `https://<servicio>.onrender.com/api/auth/login`; *Interval:* **5 minutos**.
+   - Un 401 cuenta como respuesta: si el monitor lo marca como caído, en *Advanced settings* agrega 401 a los códigos
+     aceptados. Lo que importa es que llegue tráfico, no el resultado.
+2. **Respaldo dentro del repositorio:** `.github/workflows/keep-alive.yml` hace lo mismo cada 10 minutos desde GitHub
+   Actions. Solo corre desde `master`, GitHub puede retrasarlo (a veces más de 10 minutos) y lo desactiva si el
+   repositorio pasa 60 días sin actividad. Para otra URL, define la variable de repositorio `RENDER_API_URL`
+   (*Settings → Secrets and variables → Actions → Variables*). Se puede lanzar a mano desde la pestaña *Actions*.
+
+Un servicio despierto todo el mes usa ~720–744 de las 750 horas gratuitas de Render por cuenta: alcanza para uno solo.
+
+## 6. Lista de comprobación
 
 - [ ] `SPRING_PROFILES_ACTIVE=prod` y `SECURITY_JWT_SECRET` propio en Render.
 - [ ] Entras con tu administrador inicial; `admin@zeninventory.co` / `admin123` ya **no** funciona.
 - [ ] `https://<servicio>.onrender.com/swagger-ui.html` responde 401/403 (no abre la documentación).
 - [ ] Las contraseñas de la demostración cambiadas, o demo conscientemente pública.
 - [ ] La URL de Render en `netlify.toml` y la de Netlify en `CORS_ALLOWED_ORIGINS`.
+- [ ] El monitor de UptimeRobot activo (o el workflow `keep-alive` corriendo en *Actions*).
 
 ## Alternativa: una sola máquina (Oracle Cloud Always Free)
 
