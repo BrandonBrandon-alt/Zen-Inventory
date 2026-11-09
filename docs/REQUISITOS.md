@@ -188,7 +188,7 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 | RNF-05 | Seguridad | Autorización por rol en cada endpoint y por sucursal en los datos | `@PreAuthorize`, `CurrentUser` |
 | RNF-06 | Seguridad | Las cuentas de ejemplo se desactivan fuera de desarrollo | `DefaultAccountsGuard` |
 | RNF-07 | Seguridad | El HTML que se imprime escapa los textos que vienen de la API | `escapeHtml` en factura y reporte |
-| RNF-08 | Rendimiento | El historial de ventas no descarga todo: pagina, filtra y ordena en el servidor (máximo 100 por página) | `GET /api/v1/sales/search` |
+| RNF-08 | Rendimiento | El historial de ventas y la auditoría global no descargan todo: paginan, filtran y ordenan en el servidor (máximo 100 por página) | `GET /api/v1/sales/search`, `GET /api/v1/inventory/movements/search` |
 | RNF-09 | Integridad | Cada operación de negocio es transaccional: si un paso falla, nada queda a medias | Servicios `@Transactional` |
 | RNF-10 | Integridad | El esquema de base de datos se versiona y el arranque lo valida | Flyway y `ddl-auto: validate` |
 | RNF-11 | Trazabilidad | Cada movimiento de stock y cada paso de traslado y compra queda con usuario y fecha | Kardex, campos de auditoría |
@@ -217,8 +217,8 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 
 Se declara para no presentar como hecho lo que no lo está:
 
-- La paginación en el servidor existe solo en el historial de ventas. Auditoría Global (que lista los movimientos de
-  inventario), el kardex por producto y Reportes descargan todas sus filas; la auditoría las pagina en el navegador.
+- La paginación en el servidor existe en el historial de ventas y en Auditoría Global. El kardex por producto, Reportes
+  y las listas de compras y traslados descargan todas sus filas y las paginan en el navegador.
 - No hay tablas virtualizadas.
 - Los pagos de compras no se pueden anular ni editar (son inmutables); un pago equivocado no tiene todavía un contra-asiento.
 - Los pagos del flete no se pueden anular ni editar (son inmutables), igual que los de compras.

@@ -964,6 +964,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inventory/movements/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/movements/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inventory/branches/{branchId}": {
         parameters: {
             query?: never;
@@ -1969,6 +2001,45 @@ export interface components {
             observations?: string;
             subReason?: string;
             finalBalance?: number;
+        };
+        MovementAuditPageResponse: {
+            content?: components["schemas"]["MovementAuditResponse"][];
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            /** Format: int32 */
+            totalPages?: number;
+            totalIn?: number;
+            totalOut?: number;
+        };
+        MovementAuditResponse: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: date-time */
+            date?: string;
+            /** @enum {string} */
+            type?: "INGRESO" | "RETIRO";
+            /** @enum {string} */
+            reason?: "VENTA" | "COMPRA" | "TRASLADO" | "MERMA" | "DEVOLUCION" | "AJUSTE_POSITIVO" | "AJUSTE_NEGATIVO";
+            subReason?: string;
+            quantity?: number;
+            finalBalance?: number;
+            /** Format: int64 */
+            productId?: number;
+            productName?: string;
+            /** Format: int64 */
+            branchId?: number;
+            branchName?: string;
+            /** Format: int64 */
+            userId?: number;
+            userName?: string;
+            referenceType?: string;
+            /** Format: int64 */
+            referenceId?: number;
+            observations?: string;
         };
         InventoryProductResponse: {
             /** Format: int64 */
@@ -4047,6 +4118,76 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["InventoryMovement"][];
+                };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+                sortBy?: string;
+                direction?: string;
+                branchId?: number;
+                type?: "INGRESO" | "RETIRO";
+                reason?: "VENTA" | "COMPRA" | "TRASLADO" | "MERMA" | "DEVOLUCION" | "AJUSTE_POSITIVO" | "AJUSTE_NEGATIVO";
+                from?: string;
+                to?: string;
+                productId?: number;
+                userId?: number;
+                minQuantity?: number;
+                maxQuantity?: number;
+                onlyObserved?: boolean;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MovementAuditPageResponse"];
+                };
+            };
+        };
+    };
+    export: {
+        parameters: {
+            query?: {
+                sortBy?: string;
+                direction?: string;
+                branchId?: number;
+                type?: "INGRESO" | "RETIRO";
+                reason?: "VENTA" | "COMPRA" | "TRASLADO" | "MERMA" | "DEVOLUCION" | "AJUSTE_POSITIVO" | "AJUSTE_NEGATIVO";
+                from?: string;
+                to?: string;
+                productId?: number;
+                userId?: number;
+                minQuantity?: number;
+                maxQuantity?: number;
+                onlyObserved?: boolean;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MovementAuditResponse"][];
                 };
             };
         };

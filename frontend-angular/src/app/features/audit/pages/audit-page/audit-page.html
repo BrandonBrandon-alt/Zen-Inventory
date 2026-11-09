@@ -1,7 +1,7 @@
 <header class="mb-6 animate-enter">
   <div>
     <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Auditoría global</h1>
-    @if (!loading() && !error() && movements().length > 0) {
+    @if (!error() && total() > 0) {
       <p class="mt-1 text-sm text-fg-subtle">{{ summary() }}</p>
     }
   </div>
@@ -41,15 +41,20 @@
   [rowKey]="rowKey"
   [loading]="loading()"
   [error]="error()"
-  [pageSize]="15"
+  [pageSize]="pageSize"
+  [total]="total()"
+  [(page)]="page"
   exportName="auditoria"
   persistKey="auditoria"
   [exportColumns]="exportColumns"
+  [exportAll]="exportAll"
   [clickableRows]="true"
   [emptyTitle]="filtered() ? 'Ningún movimiento coincide' : 'Todavía no hay movimientos'"
   [emptyDescription]="filtered() ? 'Prueba quitando algún filtro.' : 'Las compras, ventas, traslados y ajustes que muevan existencias aparecerán aquí.'"
   minWidth="64rem"
   (rowClick)="openDetail($event)"
+  (sortChange)="sort.set($event)"
+  (exportFailed)="exportFailed($event)"
   (retry)="load()"
 >
   <ng-template appCell="typeLabel" let-m>

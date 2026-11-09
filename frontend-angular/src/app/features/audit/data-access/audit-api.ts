@@ -1,11 +1,12 @@
-import { HttpClient, HttpContext } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, map } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { SKIP_ERROR_NOTIFICATION } from '@core/api/error.interceptor';
 import type { components } from '@core/api/schema';
 
-type InventoryMovement = components['schemas']['InventoryMovement'];
+type MovementAuditResponse = components['schemas']['MovementAuditResponse'];
+type MovementAuditPageResponse = components['schemas']['MovementAuditPageResponse'];
 
 export const MOVEMENT_REASONS = ['VENTA', 'COMPRA', 'TRASLADO', 'MERMA', 'DEVOLUCION', 'AJUSTE_POSITIVO', 'AJUSTE_NEGATIVO'] as const;
 export type MovementReason = (typeof MOVEMENT_REASONS)[number];
@@ -22,20 +23,64 @@ export interface AuditMovement {
   /** Existencias de la sucursal después del movimiento. */
   readonly balance: number | null;
   readonly productId: number;
+  readonly productName: string;
   readonly branchId: number;
+  readonly branchName: string;
   readonly userId: number | null;
+  readonly userName: string;
   readonly referenceType: string;
   readonly referenceId: number | null;
   readonly observations: string;
 }
 
+/** Columnas por las que el servidor sabe ordenar (las claves de la tabla). */
+export const AUDIT_SORT_KEYS: Readonly<Record<string, string>> = {
+  date: 'date',
+  branch: 'branch',
+  product: 'product',
+  typeLabel: 'type',
+  reasonLabel: 'reason',
+  signedQuantity: 'quantity',
+  balance: 'balance',
+  responsible: 'responsible',
+  document: 'document',
+};
+
+/** Filtros, orden y página que se piden al servidor. `page` empieza en 1, como en la tabla. */
+export interface AuditQuery {
+  readonly page: number;
+  readonly size: number;
+  readonly sortBy: string;
+  readonly ascending: boolean;
+  readonly branchId: number | null;
+  readonly type: MovementType | null;
+  readonly reason: MovementReason | null;
+  readonly from: Date | null;
+  readonly to: Date | null;
+  readonly productId: number | null;
+  readonly userId: number | null;
+  readonly minQuantity: number | null;
+  readonly maxQuantity: number | null;
+  readonly onlyObserved: boolean;
+  readonly text: string;
+}
+
+export interface AuditPage {
+  readonly movements: AuditMovement[];
+  readonly total: number;
+  /** Lo que entró y salió en TODO lo filtrado, no solo en la página. */
+  readonly totalIn: number;
+  readonly totalOut: number;
+}
+
 const isReason = (value: unknown): value is MovementReason => (MOVEMENT_REASONS as readonly unknown[]).includes(value);
 
-function toMovement(raw: InventoryMovement): AuditMovement | null {
+function toMovement(raw: MovementAuditResponse): AuditMovement | null {
   if (typeof raw.id !== 'number' || typeof raw.productId !== 'number' || typeof raw.branchId !== 'number' || typeof raw.quantity !== 'number') return null;
   if ((raw.type !== 'INGRESO' && raw.type !== 'RETIRO') || !isReason(raw.reason)) return null;
   const date = raw.date ? new Date(raw.date) : null;
   if (!date || Number.isNaN(date.getTime())) return null;
+  const userId = raw.userId ?? null;
   return {
     id: raw.id,
     date,
@@ -45,30 +90,70 @@ function toMovement(raw: InventoryMovement): AuditMovement | null {
     quantity: raw.quantity,
     balance: raw.finalBalance ?? null,
     productId: raw.productId,
+    productName: raw.productName?.trim() || `Producto ${raw.productId}`,
     branchId: raw.branchId,
-    userId: raw.userId ?? null,
+    branchName: raw.branchName?.trim() || `Sede ${raw.branchId}`,
+    userId,
+    userName: raw.userName?.trim() || (userId === null ? 'Sistema' : `Usuario ${userId}`),
     referenceType: raw.referenceType?.trim() ?? '',
     referenceId: raw.referenceId ?? null,
     observations: raw.observations?.trim() ?? '',
   };
 }
 
+const toMovements = (items: readonly MovementAuditResponse[] | undefined): AuditMovement[] =>
+  (items ?? []).map(toMovement).filter((m): m is AuditMovement => m !== null);
+
+/** `2026-10-12`: el día local (no UTC), que es lo que la persona eligió en el calendario. */
+const isoDay = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+/** Los filtros y el orden como parámetros; lo vacío no se manda. */
+function filterParams(query: AuditQuery): HttpParams {
+  let params = new HttpParams().set('sortBy', AUDIT_SORT_KEYS[query.sortBy] ?? 'date').set('direction', query.ascending ? 'asc' : 'desc');
+  const set = (key: string, value: string | number | null) => {
+    if (value !== null && value !== '') params = params.set(key, String(value));
+  };
+  set('branchId', query.branchId);
+  set('type', query.type);
+  set('reason', query.reason);
+  set('from', query.from ? isoDay(query.from) : null);
+  set('to', query.to ? isoDay(query.to) : null);
+  set('productId', query.productId);
+  set('userId', query.userId);
+  set('minQuantity', query.minQuantity);
+  set('maxQuantity', query.maxQuantity);
+  if (query.onlyObserved) params = params.set('onlyObserved', 'true');
+  set('q', query.text.trim());
+  return params;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuditApi {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = inject(API_BASE_URL);
+  private readonly context = new HttpContext().set(SKIP_ERROR_NOTIFICATION, true);
 
-  /** Todos los movimientos de existencias de todas las sucursales (solo el ADMIN los recibe de todas), el más reciente primero. */
-  movements(): Observable<AuditMovement[]> {
+  /**
+   * Una página de movimientos: el servidor filtra, ordena y pagina (antes se descargaban todos). Solo el ADMIN recibe
+   * los de todas las sucursales; los demás, los de la suya.
+   */
+  search(query: AuditQuery): Observable<AuditPage> {
+    const params = filterParams(query).set('page', String(Math.max(0, query.page - 1))).set('size', String(query.size));
+    return this.http.get<MovementAuditPageResponse>(`${this.baseUrl}/api/v1/inventory/movements/search`, { params, context: this.context }).pipe(
+      map((page) => ({
+        movements: toMovements(page.content),
+        total: page.totalElements ?? 0,
+        totalIn: page.totalIn ?? 0,
+        totalOut: page.totalOut ?? 0,
+      })),
+    );
+  }
+
+  /** Todos los movimientos filtrados, en el orden elegido (hasta 20.000), para exportar a CSV. */
+  exportAll(query: AuditQuery): Observable<AuditMovement[]> {
     return this.http
-      .get<InventoryMovement[]>(`${this.baseUrl}/api/v1/inventory/movements`, { context: new HttpContext().set(SKIP_ERROR_NOTIFICATION, true) })
-      .pipe(
-        map((items) =>
-          items
-            .map(toMovement)
-            .filter((m): m is AuditMovement => m !== null)
-            .sort((a, b) => b.date.getTime() - a.date.getTime() || b.id - a.id),
-        ),
-      );
+      .get<MovementAuditResponse[]>(`${this.baseUrl}/api/v1/inventory/movements/export`, { params: filterParams(query), context: this.context })
+      .pipe(map(toMovements));
   }
 }
