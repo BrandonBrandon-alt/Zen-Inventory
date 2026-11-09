@@ -152,6 +152,10 @@ let nextId = 0;
                     <option [value]="minute" [selected]="minute === minuteValue()">{{ minute }}</option>
                   }
                 </select>
+                <select [class]="timeSelectClass" aria-label="a. m. o p. m." [disabled]="!value()" (change)="onTimePart('period', $event)">
+                  <option value="am" [selected]="periodValue() === 'am'">a. m.</option>
+                  <option value="pm" [selected]="periodValue() === 'pm'">p. m.</option>
+                </select>
                 @if (!value()) {
                   <span class="text-xs text-fg-subtle">Elige un día</span>
                 }
@@ -222,10 +226,13 @@ export class DatePicker implements ControlValueAccessor, FieldControl {
     const value = this.value();
     return value ? formatTrigger(value, this.showTime()) : this.placeholder();
   });
-  protected readonly hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+  /** Reloj de 12 horas (1 a 12) con a. m. / p. m., como se lee la hora en Colombia. */
+  protected readonly hours = Array.from({ length: 12 }, (_, i) => String(i + 1));
   protected readonly timeSelectClass =
     'rounded-md border border-line bg-card px-2 py-1 text-sm tabular-nums text-fg outline-none transition-[border-color,box-shadow] duration-200 focus:border-brand focus:ring-3 focus:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-50';
-  protected readonly hourValue = computed(() => String(this.value()?.getHours() ?? 9).padStart(2, '0'));
+  private readonly hours24 = computed(() => this.value()?.getHours() ?? 9);
+  protected readonly hourValue = computed(() => String(this.hours24() % 12 || 12));
+  protected readonly periodValue = computed<'am' | 'pm'>(() => (this.hours24() < 12 ? 'am' : 'pm'));
   protected readonly minuteValue = computed(() => String(this.value()?.getMinutes() ?? 0).padStart(2, '0'));
   /** Minutos de cinco en cinco; si la hora elegida trae otro minuto (p. ej. un mínimo de "ahora"), también se ofrece. */
   protected readonly minuteOptions = computed(() => {
@@ -358,12 +365,16 @@ export class DatePicker implements ControlValueAccessor, FieldControl {
     this.close(true);
   }
 
-  protected onTimePart(part: 'hours' | 'minutes', event: Event): void {
+  protected onTimePart(part: 'hours' | 'minutes' | 'period', event: Event): void {
     const current = this.value();
     if (!current) return;
     const chosen = (event.target as HTMLSelectElement).value;
-    const time = part === 'hours' ? `${chosen}:${this.minuteValue()}` : `${this.hourValue()}:${chosen}`;
-    this.set(this.clampToMin(withTime(current, time)));
+    const hour12 = Number(part === 'hours' ? chosen : this.hourValue());
+    const period = part === 'period' ? chosen : this.periodValue();
+    const minutes = part === 'minutes' ? chosen : this.minuteValue();
+    // 12 a. m. es la medianoche (00) y 12 p. m. el mediodía (12).
+    const hours = (hour12 % 12) + (period === 'pm' ? 12 : 0);
+    this.set(this.clampToMin(withTime(current, `${String(hours).padStart(2, '0')}:${minutes}`)));
   }
 
   /** Con un mínimo con hora (por ejemplo "ahora"), una hora anterior a él en ese mismo día se sube al mínimo. */

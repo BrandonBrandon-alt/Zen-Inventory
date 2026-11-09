@@ -377,7 +377,10 @@ describe('AlertsPage', () => {
       await vi.waitFor(() => expect(lists).toBe(2));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       expect(refreshBadge).toHaveBeenCalledTimes(1);
-      expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ kind: 'success' });
+      expect(TestBed.inject(NotificationService).confirmation()).toMatchObject({
+        title: 'Traslado solicitado',
+        summary: 'La alerta se resolvió correctamente con una solicitud de traslado.',
+      });
     });
 
     it('exige sucursal y una cantidad entera mayor que 0', async () => {

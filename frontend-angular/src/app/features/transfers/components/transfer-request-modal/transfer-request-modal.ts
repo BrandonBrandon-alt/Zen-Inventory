@@ -271,7 +271,11 @@ export class TransferRequestModal {
         next: (transfer) => {
           this.saving.set(false);
           this.form.enable({ emitEvent: false });
-          this.notifications.success(`Traslado #${transfer.id} solicitado.`);
+          this.notifications.confirm({
+            title: `Traslado #${transfer.id} solicitado`,
+            summary: 'La solicitud de traslado se registró correctamente.',
+            detail: 'Lo pedido queda reservado en la sucursal de origen hasta que lo autorice y lo despache.',
+          });
           this.saved.emit(transfer);
           this.open.set(false);
         },

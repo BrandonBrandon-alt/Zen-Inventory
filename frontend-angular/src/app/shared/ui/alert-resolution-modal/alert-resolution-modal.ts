@@ -7,7 +7,7 @@ import { toApiError } from '@core/api/api-error';
 import type { BranchOption } from '@core/branches/branch-options-api';
 import { CatalogOptionsApi, type SupplierOption } from '@core/catalog/catalog-options-api';
 import { StockAvailabilityApi } from '@core/inventory/stock-availability-api';
-import { NotificationService } from '@core/notifications/notification.service';
+import { type ConfirmationInput, NotificationService } from '@core/notifications/notification.service';
 import { formatQuantity } from '@shared/format/format';
 import { controlError } from '@shared/forms/control-error';
 import { Alert } from '@shared/ui/alert/alert';
@@ -239,7 +239,11 @@ export class AlertResolutionModal {
         void this.run(
           alert,
           this.api.resolveViaTransfer(alert.id, { originBranchId: v.originBranchId as number, quantity: v.quantity as number, priority: v.priority }),
-          'Solicitud de traslado creada y alerta resuelta.',
+          {
+            title: 'Traslado solicitado',
+            summary: 'La alerta se resolvió correctamente con una solicitud de traslado.',
+            detail: 'La sucursal de origen debe autorizar y despachar el envío. Síguelo en Traslados.',
+          },
         );
         return;
       }
@@ -250,7 +254,11 @@ export class AlertResolutionModal {
         void this.run(
           alert,
           this.api.resolveViaPurchase(alert.id, { supplierId: v.supplierId as number, quantity: v.quantity as number, leadTimeDays: v.leadTimeDays as number }),
-          'Orden de compra creada y alerta resuelta.',
+          {
+            title: 'Orden de compra creada',
+            summary: 'La alerta se resolvió correctamente con una orden de compra.',
+            detail: 'Síguela en Compras: cuando llegue la mercancía, al recibirla se suma al stock.',
+          },
         );
         return;
       }
@@ -260,7 +268,11 @@ export class AlertResolutionModal {
         const v = this.dismissForm.getRawValue();
         const reason = v.reason === 'other' ? v.other.trim() : (v.reason as string);
         if (!reason) return;
-        void this.run(alert, this.api.dismiss(alert.id, reason), 'Alerta descartada.');
+        void this.run(alert, this.api.dismiss(alert.id, reason), {
+          title: 'Alerta descartada',
+          summary: 'La alerta se descartó correctamente.',
+          detail: `Motivo: ${reason}. Si el stock vuelve a bajar del mínimo, se creará una alerta nueva.`,
+        });
         return;
       }
     }
@@ -269,15 +281,19 @@ export class AlertResolutionModal {
   /** Alertas que no son de stock: se marcan como resueltas sin más. */
   protected markResolved(): void {
     const alert = this.alert();
-    if (alert && !this.busy()) void this.run(alert, this.api.resolve(alert.id), 'Alerta marcada como resuelta.');
+    if (alert && !this.busy()) void this.run(alert, this.api.resolve(alert.id), {
+        title: 'Alerta resuelta',
+        summary: 'La alerta se marcó como resuelta correctamente.',
+        detail: 'Ya no aparece entre las alertas pendientes.',
+      });
   }
 
-  private async run(alert: StockAlert, request: ReturnType<AlertsApi['dismiss']>, message: string): Promise<void> {
+  private async run(alert: StockAlert, request: ReturnType<AlertsApi['dismiss']>, confirmation: ConfirmationInput): Promise<void> {
     this.busy.set(true);
     this.error.set(null);
     try {
       await firstValueFrom(request);
-      this.notifications.success(message);
+      this.notifications.confirm(confirmation);
       this.resolved.emit(alert);
       this.open.set(false);
     } catch (error) {

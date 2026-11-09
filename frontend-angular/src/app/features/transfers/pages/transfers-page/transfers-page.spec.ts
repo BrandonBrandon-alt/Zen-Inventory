@@ -327,7 +327,11 @@ it('resume varios productos como "Tornillo +1"', async () => {
       await vi.waitFor(() => expect(lists).toBe(2));
       expect(approved).toBe('5');
       await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-      expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ kind: 'success', message: 'Traslado #5 aprobado.' });
+      expect(TestBed.inject(NotificationService).confirmation()).toMatchObject({
+        title: 'Traslado #5 aprobado',
+        summary: 'El traslado se aprobó correctamente.',
+        detail: 'Ahora la sucursal de origen puede autorizar la salida y preparar el envío.',
+      });
     });
 
     it('el gerente de origen no ve "Aprobar" en un traslado pendiente', async () => {
@@ -599,7 +603,11 @@ it('resume varios productos como "Tornillo +1"', async () => {
           items: [{ productId: 100, requestedQuantity: 6 }, { productId: 101, requestedQuantity: 2 }],
         }),
       );
-      expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ message: 'Traslado #77 solicitado.' });
+      expect(TestBed.inject(NotificationService).confirmation()).toMatchObject({
+        title: 'Traslado #77 solicitado',
+        summary: 'La solicitud de traslado se registró correctamente.',
+        detail: 'Lo pedido queda reservado en la sucursal de origen hasta que lo autorice y lo despache.',
+      });
     });
 
     it('el administrador elige también el destino', async () => {

@@ -332,7 +332,11 @@ describe('ReturnsPage', () => {
       await userEvent.click(within(dialog).getByRole('button', { name: 'Aprobar devolución' }));
       await vi.waitFor(() => expect(hit).toEqual({ id: '1', comment: 'Revisado' }));
       await vi.waitFor(() => expect(lists).toBe(2));
-      expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ kind: 'success', message: 'Devolución #1 aprobada: las unidades volvieron al stock.' });
+      expect(TestBed.inject(NotificationService).confirmation()).toMatchObject({
+        title: 'Devolución #1 aprobada',
+        summary: 'La devolución se aprobó correctamente.',
+        detail: 'Las unidades devueltas ya volvieron al stock de la sucursal y quedaron registradas en el kardex.',
+      });
     });
 
     it('aprobar sin comentario también se puede', async () => {
@@ -462,7 +466,11 @@ describe('ReturnsPage', () => {
           items: [{ saleDetailId: 1, quantity: 2, reasonSpecific: 'Rayado' }],
         }),
       );
-      expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ message: 'Devolución #20 solicitada: espera la decisión de un gerente.' });
+      expect(TestBed.inject(NotificationService).confirmation()).toMatchObject({
+        title: 'Devolución #20 solicitada',
+        summary: 'La solicitud de devolución se registró correctamente.',
+        detail: 'Un gerente debe aprobarla. Al aprobarla, las unidades vuelven al stock de la sucursal.',
+      });
     });
 
     it('exige elegir la venta, el motivo y al menos una unidad', async () => {

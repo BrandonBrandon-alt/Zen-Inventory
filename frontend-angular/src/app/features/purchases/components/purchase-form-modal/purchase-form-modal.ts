@@ -251,9 +251,14 @@ export class PurchaseFormModal {
         next: (purchase) => {
           this.saving.set(false);
           this.form.enable({ emitEvent: false });
-          this.notifications.success(
-            purchase.reception === 'AWAITING_APPROVAL' ? `Orden #${purchase.id} creada: espera la aprobación de un gerente.` : `Orden #${purchase.id} creada.`,
-          );
+          const waiting = purchase.reception === 'AWAITING_APPROVAL';
+          this.notifications.confirm({
+            title: `Orden #${purchase.id} creada`,
+            summary: `La orden de compra por ${formatMoney(purchase.total)} se registró correctamente.`,
+            detail: waiting
+              ? 'Espera la aprobación de un gerente antes de pedirla al proveedor.'
+              : 'Ya está aprobada. Cuando el proveedor despache la mercancía, márcala como enviada.',
+          });
           this.saved.emit(purchase);
           this.open.set(false);
         },

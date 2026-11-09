@@ -104,7 +104,11 @@ export class SaleDetailModal {
     this.error.set(null);
     try {
       await firstValueFrom(this.api.cancel(sale.id, this.reasonForm.getRawValue().reason));
-      this.notifications.success(`Venta #${sale.id} anulada: el stock volvió a la sucursal.`);
+      this.notifications.confirm({
+        title: `Venta #${sale.id} anulada`,
+        summary: 'La venta se anuló correctamente.',
+        detail: 'Las unidades volvieron al stock de la sucursal y la venta ya no cuenta en los totales ni en los reportes.',
+      });
       this.changed.emit();
       this.open.set(false);
     } catch (error) {

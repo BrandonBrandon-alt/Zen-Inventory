@@ -586,7 +586,11 @@ describe('SalesHistoryPage', () => {
       await userEvent.click(within(dialog).getByRole('button', { name: 'Anular venta' }));
       await vi.waitFor(() => expect(hit).toEqual({ id: '1', reason: 'Cliente se arrepintió' }));
       await vi.waitFor(() => expect(lists).toBe(2));
-      expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ kind: 'success', message: 'Venta #1 anulada: el stock volvió a la sucursal.' });
+      expect(TestBed.inject(NotificationService).confirmation()).toMatchObject({
+        title: 'Venta #1 anulada',
+        summary: 'La venta se anuló correctamente.',
+        detail: 'Las unidades volvieron al stock de la sucursal y la venta ya no cuenta en los totales ni en los reportes.',
+      });
     });
 
     it.each(['SELLER', 'OPERADOR_INVENTARIO'])('%s no puede anular', async (rol) => {

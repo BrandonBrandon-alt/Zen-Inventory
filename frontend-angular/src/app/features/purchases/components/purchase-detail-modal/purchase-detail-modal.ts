@@ -3,7 +3,7 @@ import { FormArray, FormControl, NonNullableFormBuilder, ReactiveFormsModule, Va
 import { firstValueFrom, type Observable } from 'rxjs';
 import type { Role } from '@core/auth/roles/role';
 import { toApiError } from '@core/api/api-error';
-import { NotificationService } from '@core/notifications/notification.service';
+import { type ConfirmationInput, NotificationService } from '@core/notifications/notification.service';
 import { formatDateTime, formatMoney, formatQuantity } from '@shared/format/format';
 import { controlError } from '@shared/forms/control-error';
 import { Alert } from '@shared/ui/alert/alert';
@@ -141,17 +141,32 @@ export class PurchaseDetailModal {
   // ---- Acciones directas ----
   protected approve(): void {
     const p = this.purchase();
-    if (p) void this.run(this.api.approve(p.id), `Orden #${p.id} aprobada.`);
+    if (p)
+      void this.run(this.api.approve(p.id), {
+        title: `Orden #${p.id} aprobada`,
+        summary: 'La orden de compra se aprobó correctamente.',
+        detail: 'Cuando el proveedor despache la mercancía, márcala como enviada.',
+      });
   }
 
   protected dispatch(): void {
     const p = this.purchase();
-    if (p) void this.run(this.api.dispatch(p.id), `Orden #${p.id} marcada como enviada.`);
+    if (p)
+      void this.run(this.api.dispatch(p.id), {
+        title: `Orden #${p.id} en camino`,
+        summary: 'La orden se marcó como enviada correctamente.',
+        detail: 'Cuando llegue la mercancía, regístrala con «Recibir mercancía»: ahí se suma al stock y se actualiza el costo promedio.',
+      });
   }
 
   protected closeShortfall(): void {
     const p = this.purchase();
-    if (p) void this.run(this.api.closeShortfall(p.id), `Orden #${p.id} cerrada con faltante.`);
+    if (p)
+      void this.run(this.api.closeShortfall(p.id), {
+        title: `Orden #${p.id} cerrada con faltante`,
+        summary: 'La orden se cerró correctamente con lo que se recibió.',
+        detail: 'Lo que no llegó ya no se espera: el stock solo incluye lo recibido.',
+      });
   }
 
   // ---- Con formulario ----
@@ -176,12 +191,22 @@ export class PurchaseDetailModal {
       const full = paid >= p.balance;
       void this.run(
         this.api.pay(p.id, { amount: paid, method, reference, notes }),
-        full ? `Orden #${p.id} pagada por completo.` : `Abono de ${formatMoney(paid)} registrado en la orden #${p.id}.`,
+        full
+          ? { title: `Orden #${p.id} pagada`, summary: `El pago de ${formatMoney(paid)} se registró correctamente.`, detail: 'La orden quedó pagada por completo: no tiene saldo pendiente con el proveedor.' }
+          : {
+              title: `Abono a la orden #${p.id}`,
+              summary: `El abono de ${formatMoney(paid)} se registró correctamente.`,
+              detail: `Queda un saldo de ${formatMoney(p.balance - paid)} por pagar al proveedor.`,
+            },
       );
     } else if (this.mode() === 'cancel') {
       this.reasonForm.markAllAsTouched();
       if (this.reasonForm.invalid) return;
-      void this.run(this.api.cancel(p.id, this.reasonForm.getRawValue().reason), `Orden #${p.id} cancelada.`);
+      void this.run(this.api.cancel(p.id, this.reasonForm.getRawValue().reason), {
+        title: `Orden #${p.id} cancelada`,
+        summary: 'La orden de compra se canceló correctamente.',
+        detail: 'Ya no se espera mercancía de esta orden y no genera deuda con el proveedor.',
+      });
     }
   }
 
@@ -200,12 +225,12 @@ export class PurchaseDetailModal {
     }
   }
 
-  private async run(request: Observable<unknown>, message: string): Promise<void> {
+  private async run(request: Observable<unknown>, confirmation: ConfirmationInput): Promise<void> {
     this.busy.set(true);
     this.error.set(null);
     try {
       await firstValueFrom(request);
-      this.notifications.success(message);
+      this.notifications.confirm(confirmation);
       this.changed.emit();
       this.open.set(false);
     } catch (error) {

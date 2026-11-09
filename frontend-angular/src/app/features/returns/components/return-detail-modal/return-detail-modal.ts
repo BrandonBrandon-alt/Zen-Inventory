@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, mo
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { firstValueFrom, type Observable } from 'rxjs';
 import { toApiError } from '@core/api/api-error';
-import { NotificationService } from '@core/notifications/notification.service';
+import { type ConfirmationInput, NotificationService } from '@core/notifications/notification.service';
 import { formatDateTime, formatMoney, formatQuantity } from '@shared/format/format';
 import { controlError } from '@shared/forms/control-error';
 import { Alert } from '@shared/ui/alert/alert';
@@ -91,20 +91,28 @@ export class ReturnDetailModal {
     const request = this.request();
     if (!request || this.busy()) return;
     if (this.mode() === 'approve') {
-      void this.run(this.api.approve(request.id, this.approveForm.getRawValue().comment), `Devolución #${request.id} aprobada: las unidades volvieron al stock.`);
+      void this.run(this.api.approve(request.id, this.approveForm.getRawValue().comment), {
+        title: `Devolución #${request.id} aprobada`,
+        summary: 'La devolución se aprobó correctamente.',
+        detail: 'Las unidades devueltas ya volvieron al stock de la sucursal y quedaron registradas en el kardex.',
+      });
     } else if (this.mode() === 'reject') {
       this.rejectForm.markAllAsTouched();
       if (this.rejectForm.invalid) return;
-      void this.run(this.api.reject(request.id, this.rejectForm.getRawValue().reason), `Devolución #${request.id} rechazada.`);
+      void this.run(this.api.reject(request.id, this.rejectForm.getRawValue().reason), {
+        title: `Devolución #${request.id} rechazada`,
+        summary: 'La devolución se rechazó correctamente.',
+        detail: 'El stock no cambia y la venta queda como estaba. Quien la pidió puede ver el motivo en la solicitud.',
+      });
     }
   }
 
-  private async run(call: Observable<unknown>, message: string): Promise<void> {
+  private async run(call: Observable<unknown>, confirmation: ConfirmationInput): Promise<void> {
     this.busy.set(true);
     this.error.set(null);
     try {
       await firstValueFrom(call);
-      this.notifications.success(message);
+      this.notifications.confirm(confirmation);
       this.changed.emit();
       this.open.set(false);
     } catch (error) {

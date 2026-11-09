@@ -51,7 +51,7 @@ describe('DatePicker', () => {
 
     it('con hora, la muestra junto a la fecha', async () => {
       await setup({ initial: d(2026, 10, 5, 9, 5), showTime: true });
-      expect(screen.getByText('5 oct 2026, 09:05')).toBeInTheDocument();
+      expect(screen.getByText('5 oct 2026, 9:05 a. m.')).toBeInTheDocument();
     });
 
     it('un valor que no es una fecha válida se ignora', async () => {
@@ -252,6 +252,7 @@ describe('DatePicker', () => {
   describe('con hora', () => {
     const hour = () => screen.getByLabelText('Hora');
     const minutes = () => screen.getByLabelText('Minutos');
+    const period = () => screen.getByLabelText('a. m. o p. m.');
 
     it('elegir un día no cierra el calendario: propone las 09:00 y permite ajustar la hora', async () => {
       const { control } = await setup({ showTime: true });
@@ -259,20 +260,39 @@ describe('DatePicker', () => {
       await userEvent.click(day('viernes, 16 de octubre de 2026'));
       expect(control.value).toEqual(d(2026, 10, 16, 9, 0));
       expect(panel()).toBeInTheDocument();
-      await userEvent.selectOptions(hour(), '14');
+      await userEvent.selectOptions(hour(), '2');
       await userEvent.selectOptions(minutes(), '45');
+      await userEvent.selectOptions(period(), 'pm');
       expect(control.value).toEqual(d(2026, 10, 16, 14, 45));
       await userEvent.click(screen.getByRole('button', { name: 'Listo' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(screen.getByText('16 oct 2026, 14:45')).toBeInTheDocument();
+      expect(screen.getByText('16 oct 2026, 2:45 p. m.')).toBeInTheDocument();
     });
 
-    it('la hora es de 24 horas (00 a 23) y los minutos de cinco en cinco', async () => {
+    it('la hora es de 12 horas (1 a 12) con a. m. / p. m., y los minutos de cinco en cinco', async () => {
       await setup({ showTime: true, initial: d(2026, 10, 16, 9, 0) });
       await open();
-      expect(within(hour()).getAllByRole('option')).toHaveLength(24);
-      expect(within(hour()).getAllByRole('option').at(-1)).toHaveTextContent('23');
+      expect(within(hour()).getAllByRole('option').map((o) => o.textContent)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']);
+      expect(within(period()).getAllByRole('option').map((o) => o.textContent)).toEqual(['a. m.', 'p. m.']);
+      expect(hour()).toHaveValue('9');
+      expect(period()).toHaveValue('am');
       expect(within(minutes()).getAllByRole('option').map((o) => o.textContent)).toEqual(['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55']);
+    });
+
+    it('12 a. m. es la medianoche y 12 p. m. el mediodía', async () => {
+      const { control } = await setup({ showTime: true, initial: d(2026, 10, 16, 9, 0) });
+      await open();
+      await userEvent.selectOptions(hour(), '12');
+      expect(control.value).toEqual(d(2026, 10, 16, 0, 0));
+      await userEvent.selectOptions(period(), 'pm');
+      expect(control.value).toEqual(d(2026, 10, 16, 12, 0));
+    });
+
+    it('una hora de la tarde se muestra como p. m.', async () => {
+      await setup({ showTime: true, initial: d(2026, 10, 16, 18, 30) });
+      await open();
+      expect(hour()).toHaveValue('6');
+      expect(period()).toHaveValue('pm');
     });
 
     it('si la hora trae un minuto que no es múltiplo de cinco, también se ofrece (no se pierde)', async () => {
@@ -293,6 +313,7 @@ describe('DatePicker', () => {
       await open();
       expect(hour()).toBeDisabled();
       expect(minutes()).toBeDisabled();
+      expect(period()).toBeDisabled();
       expect(screen.getByText('Elige un día')).toBeInTheDocument();
     });
 
@@ -301,9 +322,9 @@ describe('DatePicker', () => {
       await open();
       await userEvent.click(day('jueves, 15 de octubre de 2026'));
       expect(control.value).toEqual(d(2026, 10, 15, 14, 30)); // las 09:00 propuestas quedaron antes del mínimo
-      await userEvent.selectOptions(hour(), '08');
+      await userEvent.selectOptions(period(), 'am'); // 2:30 a. m. queda antes del mínimo
       expect(control.value).toEqual(d(2026, 10, 15, 14, 30));
-      await userEvent.selectOptions(hour(), '16');
+      await userEvent.selectOptions(hour(), '4'); // 4:30 p. m.
       expect(control.value).toEqual(d(2026, 10, 15, 16, 30));
     });
 

@@ -3,7 +3,7 @@ import { FormArray, FormControl, NonNullableFormBuilder, ReactiveFormsModule, Va
 import { firstValueFrom, type Observable } from 'rxjs';
 import { LucideArrowRight } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
-import { NotificationService } from '@core/notifications/notification.service';
+import { type ConfirmationInput, NotificationService } from '@core/notifications/notification.service';
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS, type PaymentMethod } from '@core/payments/payment-method';
 import { formatDateTime, formatMoney } from '@shared/format/format';
 import { controlError } from '@shared/forms/control-error';
@@ -176,24 +176,46 @@ export class TransferDetailModal {
 
   protected approve(): void {
     const t = this.transfer();
-    if (t) void this.run(this.api.approve(t.id), `Traslado #${t.id} aprobado.`);
+    if (t)
+      void this.run(this.api.approve(t.id), {
+        title: `Traslado #${t.id} aprobado`,
+        summary: 'El traslado se aprobó correctamente.',
+        detail: 'Ahora la sucursal de origen puede autorizar la salida y preparar el envío.',
+      });
   }
 
   protected prepare(): void {
     const t = this.transfer();
-    if (t) void this.run(this.api.prepare(t), `Salida del traslado #${t.id} autorizada.`);
+    if (t)
+      void this.run(this.api.prepare(t), {
+        title: `Traslado #${t.id} en preparación`,
+        summary: 'La salida del traslado se autorizó correctamente.',
+        detail: 'El siguiente paso es despacharlo indicando el transportista, la guía y el costo del envío.',
+      });
   }
 
   protected resolve(kind: 'shrinkage' | 'resend' | 'claim'): void {
     const t = this.transfer();
     if (!t) return;
     const call = { shrinkage: this.api.resolveAsShrinkage(t.id), resend: this.api.resolveAsResend(t.id), claim: this.api.resolveAsClaim(t.id) }[kind];
-    const message = {
-      shrinkage: 'Diferencia aceptada como merma: traslado entregado.',
-      resend: 'Se creó un traslado nuevo con los faltantes.',
-      claim: 'Reclamo abierto por la diferencia.',
+    const confirmation: ConfirmationInput = {
+      shrinkage: {
+        title: `Traslado #${t.id} entregado`,
+        summary: 'La diferencia se registró como merma correctamente.',
+        detail: 'El traslado queda entregado con lo que realmente llegó; lo que faltó se da por perdido.',
+      },
+      resend: {
+        title: `Faltantes del traslado #${t.id} reenviados`,
+        summary: 'Se creó correctamente un traslado nuevo con lo que faltó.',
+        detail: 'Búscalo en la lista de traslados: sigue el mismo camino (preparar, despachar y recibir).',
+      },
+      claim: {
+        title: `Reclamo del traslado #${t.id}`,
+        summary: 'El reclamo por la diferencia se abrió correctamente.',
+        detail: 'El traslado queda en reclamo mientras se aclara con el transportista o la sucursal de origen.',
+      },
     }[kind];
-    void this.run(call, message);
+    void this.run(call, confirmation);
   }
 
   // ---- Acciones con formulario ----
@@ -216,7 +238,11 @@ export class TransferDetailModal {
         estimatedArrival: v.estimatedArrival,
         items,
       }),
-      `Traslado #${t.id} despachado.`,
+      {
+        title: `Traslado #${t.id} despachado`,
+        summary: 'El traslado se despachó correctamente.',
+        detail: 'El stock ya salió de la sucursal de origen. La sucursal de destino debe confirmar lo recibido cuando llegue.',
+      },
     );
   }
 
@@ -225,9 +251,20 @@ export class TransferDetailModal {
     this.receiveForm.markAllAsTouched();
     if (!t || this.receiveForm.invalid || this.busy()) return;
     const v = this.receiveForm.getRawValue();
+    const complete = t.lines.every((line, i) => (v.received[i] ?? 0) >= (line.sent ?? line.requested));
     void this.run(
       this.api.receive(t.id, { notes: v.notes, items: t.lines.map((line, i) => ({ detailId: line.id, received: v.received[i] ?? 0 })) }),
-      `Traslado #${t.id} recibido.`,
+      complete
+        ? {
+            title: `Traslado #${t.id} recibido`,
+            summary: 'El traslado se recibió completo correctamente.',
+            detail: 'Lo recibido ya se sumó al stock de la sucursal de destino.',
+          }
+        : {
+            title: `Traslado #${t.id} recibido con diferencias`,
+            summary: 'La recepción se registró correctamente, pero llegó menos de lo enviado.',
+            detail: 'Lo recibido ya se sumó al stock. Resuelve la diferencia desde el traslado: merma, reenvío de faltantes o reclamo.',
+          },
     );
   }
 
@@ -239,7 +276,13 @@ export class TransferDetailModal {
     const paid = amount ?? 0;
     void this.run(
       this.api.payFreight(t.id, { amount: paid, method, reference, notes }),
-      paid >= t.freightBalance ? `Flete del traslado #${t.id} pagado por completo.` : `Abono de ${formatMoney(paid)} registrado en el flete del traslado #${t.id}.`,
+      paid >= t.freightBalance
+        ? { title: `Flete del traslado #${t.id} pagado`, summary: `El pago de ${formatMoney(paid)} se registró correctamente.`, detail: 'El flete quedó pagado por completo al transportista.' }
+        : {
+            title: `Abono al flete del traslado #${t.id}`,
+            summary: `El abono de ${formatMoney(paid)} se registró correctamente.`,
+            detail: `Queda un saldo de ${formatMoney(t.freightBalance - paid)} por pagar al transportista.`,
+          },
     );
   }
 
@@ -251,16 +294,23 @@ export class TransferDetailModal {
     const reason = this.reasonForm.getRawValue().reason;
     void this.run(
       mode === 'cancel' ? this.api.cancel(t.id, reason) : this.api.reject(t.id, reason),
-      mode === 'cancel' ? `Traslado #${t.id} cancelado.` : `Traslado #${t.id} rechazado.`,
+      {
+        title: `Traslado #${t.id} ${mode === 'cancel' ? 'cancelado' : 'rechazado'}`,
+        summary: `El traslado se ${mode === 'cancel' ? 'canceló' : 'rechazó'} correctamente.`,
+        detail:
+          t.status === 'IN_TRANSIT'
+            ? 'Lo que se había enviado volvió al stock de la sucursal de origen.'
+            : 'Lo que estaba reservado en la sucursal de origen vuelve a estar disponible.',
+      },
     );
   }
 
-  private async run(request: Observable<unknown>, message: string): Promise<void> {
+  private async run(request: Observable<unknown>, confirmation: ConfirmationInput): Promise<void> {
     this.busy.set(true);
     this.error.set(null);
     try {
       await firstValueFrom(request);
-      this.notifications.success(message);
+      this.notifications.confirm(confirmation);
       this.changed.emit();
       this.open.set(false);
     } catch (error) {

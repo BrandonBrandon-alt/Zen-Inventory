@@ -221,7 +221,11 @@ describe('PurchasesPage', () => {
       await vi.waitFor(() => expect(lists).toBe(2));
       expect(approved).toBe('1');
       await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-      expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ kind: 'success', message: 'Orden #1 aprobada.' });
+      expect(TestBed.inject(NotificationService).confirmation()).toMatchObject({
+        title: 'Orden #1 aprobada',
+        summary: 'La orden de compra se aprobó correctamente.',
+        detail: 'Cuando el proveedor despache la mercancía, márcala como enviada.',
+      });
     });
 
     it('el operador no ve aprobar ni cancelar, pero sí recibir', async () => {
@@ -674,7 +678,11 @@ describe('PurchasesPage', () => {
           items: [{ productId: 1, quantity: 10, unitPrice: 80, discountPct: 10 }],
         }),
       );
-      expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ message: 'Orden #9 creada.' });
+      expect(TestBed.inject(NotificationService).confirmation()).toMatchObject({
+        title: 'Orden #9 creada',
+        summary: expect.stringMatching(/^La orden de compra por \$\s?1\.000 se registró correctamente\.$/),
+        detail: 'Ya está aprobada. Cuando el proveedor despache la mercancía, márcala como enviada.',
+      });
     });
 
     it('al cambiar de producto se propone el precio del nuevo mientras nadie haya escrito el precio', async () => {
@@ -719,7 +727,7 @@ describe('PurchasesPage', () => {
       await userEvent.type(within(dialog).getByLabelText('Precio unitario'), '50');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Crear orden' }));
       await vi.waitFor(() =>
-        expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ message: 'Orden #9 creada: espera la aprobación de un gerente.' }),
+        expect(TestBed.inject(NotificationService).confirmation()).toMatchObject({ title: 'Orden #9 creada', detail: 'Espera la aprobación de un gerente antes de pedirla al proveedor.' }),
       );
     });
 
