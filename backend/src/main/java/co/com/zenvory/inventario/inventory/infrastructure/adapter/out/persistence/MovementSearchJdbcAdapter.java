@@ -100,9 +100,9 @@ public class MovementSearchJdbcAdapter implements MovementSearchPort {
             sql.append(" AND m.tipo = ?");
             args.add(c.type().name());
         }
-        if (c.reason() != null) {
-            sql.append(" AND m.motivo = ?");
-            args.add(c.reason().name());
+        if (c.reasons() != null && !c.reasons().isEmpty()) {
+            sql.append(" AND m.motivo = ANY(?)");
+            args.add(c.reasons().stream().map(Enum::name).toArray(String[]::new));
         }
         if (c.from() != null) {
             sql.append(" AND m.fecha >= ?");
@@ -113,9 +113,9 @@ public class MovementSearchJdbcAdapter implements MovementSearchPort {
             sql.append(" AND m.fecha < ?");
             args.add(Timestamp.valueOf(c.to().plusDays(1).atStartOfDay()));
         }
-        if (c.productId() != null) {
-            sql.append(" AND m.producto_id = ?");
-            args.add(c.productId());
+        if (c.productIds() != null && !c.productIds().isEmpty()) {
+            sql.append(" AND m.producto_id = ANY(?)");
+            args.add(c.productIds().toArray(Long[]::new));
         }
         if (c.userId() != null) {
             sql.append(" AND m.usuario_id = ?");

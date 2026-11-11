@@ -4267,10 +4267,10 @@ export interface operations {
                 direction?: string;
                 branchId?: number;
                 type?: "INGRESO" | "RETIRO";
-                reason?: "VENTA" | "COMPRA" | "TRASLADO" | "MERMA" | "DEVOLUCION" | "AJUSTE_POSITIVO" | "AJUSTE_NEGATIVO";
+                reason?: ("VENTA" | "COMPRA" | "TRASLADO" | "MERMA" | "DEVOLUCION" | "AJUSTE_POSITIVO" | "AJUSTE_NEGATIVO")[];
                 from?: string;
                 to?: string;
-                productId?: number;
+                productId?: number[];
                 userId?: number;
                 minQuantity?: number;
                 maxQuantity?: number;
@@ -4301,10 +4301,10 @@ export interface operations {
                 direction?: string;
                 branchId?: number;
                 type?: "INGRESO" | "RETIRO";
-                reason?: "VENTA" | "COMPRA" | "TRASLADO" | "MERMA" | "DEVOLUCION" | "AJUSTE_POSITIVO" | "AJUSTE_NEGATIVO";
+                reason?: ("VENTA" | "COMPRA" | "TRASLADO" | "MERMA" | "DEVOLUCION" | "AJUSTE_POSITIVO" | "AJUSTE_NEGATIVO")[];
                 from?: string;
                 to?: string;
-                productId?: number;
+                productId?: number[];
                 userId?: number;
                 minQuantity?: number;
                 maxQuantity?: number;

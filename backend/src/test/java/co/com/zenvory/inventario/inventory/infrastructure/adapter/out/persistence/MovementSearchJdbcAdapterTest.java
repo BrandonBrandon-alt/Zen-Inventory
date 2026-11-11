@@ -95,9 +95,9 @@ class MovementSearchJdbcAdapterTest {
                 .containsExactlyInAnyOrder(shrinkage, transferOut);
         assertThat(ids(adapter.search(new MovementSearchCriteria(null, MovementType.INGRESO, null, null, null, null, null, null, null, false, null), 0, 25, "date", false).content()))
                 .containsExactly(purchase);
-        assertThat(ids(adapter.search(new MovementSearchCriteria(null, null, MovementReason.MERMA, null, null, null, null, null, null, false, null), 0, 25, "date", false).content()))
+        assertThat(ids(adapter.search(new MovementSearchCriteria(null, null, List.of(MovementReason.MERMA), null, null, null, null, null, null, false, null), 0, 25, "date", false).content()))
                 .containsExactly(shrinkage);
-        assertThat(ids(adapter.search(new MovementSearchCriteria(null, null, null, null, null, 1L, 2L, null, null, false, null), 0, 25, "date", false).content()))
+        assertThat(ids(adapter.search(new MovementSearchCriteria(null, null, null, null, null, List.of(1L), 2L, null, null, false, null), 0, 25, "date", false).content()))
                 .containsExactly(transferOut);
         assertThat(ids(adapter.search(new MovementSearchCriteria(null, null, null, null, null, null, null, new BigDecimal("3"), new BigDecimal("10"), false, null), 0, 25, "date", false).content()))
                 .containsExactlyInAnyOrder(sale, transferOut);
@@ -148,9 +148,21 @@ class MovementSearchJdbcAdapterTest {
         return adapter.search(criteria(null, null, null, null, null, null, false, text), 0, 25, "date", false).content();
     }
 
+    @Test
+    @DisplayName("filtra por varios productos y varios motivos a la vez (el kardex los permite)")
+    void filtraVariosProductosYMotivos() {
+        assertThat(ids(adapter.search(new MovementSearchCriteria(null, null, null, null, null, List.of(1L, 3L), null, null, null, false, null), 0, 25, "date", false).content()))
+                .containsExactlyInAnyOrder(sale, shrinkage, transferOut);
+        assertThat(ids(adapter.search(new MovementSearchCriteria(null, null, List.of(MovementReason.VENTA, MovementReason.MERMA), null, null, null, null, null, null, false, null), 0, 25, "date", false).content()))
+                .containsExactlyInAnyOrder(sale, shrinkage);
+        // Una lista vacía no filtra.
+        assertThat(adapter.search(new MovementSearchCriteria(null, null, List.of(), null, null, List.of(), null, null, null, false, null), 0, 25, "date", false).totalElements())
+                .isEqualTo(4);
+    }
+
     private static MovementSearchCriteria criteria(Long branch, MovementType type, MovementReason reason, LocalDate from, LocalDate to,
                                                    Long product, boolean onlyObserved, String text) {
-        return new MovementSearchCriteria(branch, type, reason, from, to, product, null, null, null, onlyObserved, text);
+        return new MovementSearchCriteria(branch, type, reason == null ? null : List.of(reason), from, to, product == null ? null : List.of(product), null, null, null, onlyObserved, text);
     }
 
     private long movement(long branch, long product, long user, String type, String reason, String quantity, LocalDateTime date,

@@ -5,18 +5,19 @@ import co.com.zenvory.inventario.inventory.domain.model.MovementType;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
- * Filtros de la auditoría de movimientos. Todos son opcionales (`null` = sin filtro); `to` incluye el día completo y
+ * Filtros de la auditoría de movimientos y del kardex. Todos son opcionales (`null` o lista vacía = sin filtro); `to` incluye el día completo y
  * `text` busca en producto, SKU, responsable, motivo, documento, observaciones y número, sin distinguir tildes.
  */
 public record MovementSearchCriteria(
         Long branchId,
         MovementType type,
-        MovementReason reason,
+        List<MovementReason> reasons,
         LocalDate from,
         LocalDate to,
-        Long productId,
+        List<Long> productIds,
         Long userId,
         BigDecimal minQuantity,
         BigDecimal maxQuantity,

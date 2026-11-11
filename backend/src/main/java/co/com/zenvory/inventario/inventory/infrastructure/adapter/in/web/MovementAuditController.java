@@ -47,10 +47,10 @@ public class MovementAuditController {
             @RequestParam(defaultValue = "desc") String direction,
             @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) MovementType type,
-            @RequestParam(required = false) MovementReason reason,
+            @RequestParam(required = false) List<MovementReason> reason,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) List<Long> productId,
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) BigDecimal minQuantity,
             @RequestParam(required = false) BigDecimal maxQuantity,
@@ -73,10 +73,10 @@ public class MovementAuditController {
             @RequestParam(defaultValue = "desc") String direction,
             @RequestParam(required = false) Long branchId,
             @RequestParam(required = false) MovementType type,
-            @RequestParam(required = false) MovementReason reason,
+            @RequestParam(required = false) List<MovementReason> reason,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) List<Long> productId,
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) BigDecimal minQuantity,
             @RequestParam(required = false) BigDecimal maxQuantity,
@@ -86,8 +86,8 @@ public class MovementAuditController {
         return ResponseEntity.ok(audit.export(criteria, sortBy, "asc".equalsIgnoreCase(direction)).stream().map(MovementAuditResponse::from).toList());
     }
 
-    private MovementSearchCriteria criteria(Long branchId, MovementType type, MovementReason reason, LocalDate from, LocalDate to,
-                                            Long productId, Long userId, BigDecimal minQuantity, BigDecimal maxQuantity,
+    private MovementSearchCriteria criteria(Long branchId, MovementType type, List<MovementReason> reason, LocalDate from, LocalDate to,
+                                            List<Long> productId, Long userId, BigDecimal minQuantity, BigDecimal maxQuantity,
                                             boolean onlyObserved, String text) {
         CurrentUser current = CurrentUser.resolve(users);
         Long branch = current.isAdmin() ? branchId : current.resolveBranch(null);

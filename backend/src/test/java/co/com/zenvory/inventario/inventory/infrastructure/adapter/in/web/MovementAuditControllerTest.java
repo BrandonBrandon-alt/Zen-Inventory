@@ -113,8 +113,20 @@ class MovementAuditControllerTest {
 
         ArgumentCaptor<MovementSearchCriteria> criteria = ArgumentCaptor.forClass(MovementSearchCriteria.class);
         verify(audit).search(criteria.capture(), eq(0), eq(25), eq("quantity"), eq(true));
-        assertThat(criteria.getValue()).isEqualTo(new MovementSearchCriteria(2L, MovementType.RETIRO, MovementReason.VENTA,
-                LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), 1L, 4L, new BigDecimal("2"), new BigDecimal("9"), true, "venta"));
+        assertThat(criteria.getValue()).isEqualTo(new MovementSearchCriteria(2L, MovementType.RETIRO, List.of(MovementReason.VENTA),
+                LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), List.of(1L), 4L, new BigDecimal("2"), new BigDecimal("9"), true, "venta"));
+    }
+
+    @Test
+    @DisplayName("varios productos y varios motivos llegan como listas")
+    void variosProductosYMotivos() throws Exception {
+        actAs("ADMIN", null);
+        mockMvc.perform(get("/api/v1/inventory/movements/search?productId=1&productId=3&reason=VENTA&reason=MERMA")).andExpect(status().isOk());
+
+        ArgumentCaptor<MovementSearchCriteria> criteria = ArgumentCaptor.forClass(MovementSearchCriteria.class);
+        verify(audit).search(criteria.capture(), anyInt(), anyInt(), anyString(), anyBoolean());
+        assertThat(criteria.getValue().productIds()).containsExactly(1L, 3L);
+        assertThat(criteria.getValue().reasons()).containsExactly(MovementReason.VENTA, MovementReason.MERMA);
     }
 
     @Test
