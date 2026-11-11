@@ -1,5 +1,8 @@
 package co.com.zenvory.inventario.auth.application.service;
 
+import co.com.zenvory.inventario.audit.domain.model.FieldChange;
+import co.com.zenvory.inventario.audit.domain.model.ChangedEntity;
+import co.com.zenvory.inventario.audit.application.port.in.CatalogAuditUseCase;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
 import co.com.zenvory.inventario.auth.domain.exception.DuplicateEmailException;
 import co.com.zenvory.inventario.auth.domain.exception.UnauthorizedActionException;
@@ -22,6 +25,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @DisplayName("UserService — alcance por rol")
@@ -60,6 +64,7 @@ class UserServiceTest {
 
     private FakeRepo repo;
     private UserService service;
+    private CatalogAuditUseCase audit;
     private User admin;
     private User manager;
     private User mySeller;
@@ -77,7 +82,8 @@ class UserServiceTest {
         when(branches.getBranchById(MY_BRANCH)).thenReturn(Branch.builder().id(MY_BRANCH).name("Mía").build());
         when(branches.getBranchById(OTHER_BRANCH)).thenReturn(Branch.builder().id(OTHER_BRANCH).name("Otra").build());
         when(branches.getBranchById(999L)).thenThrow(new BranchNotFoundException(999L));
-        service = new UserService(repo, encoder, branches);
+        audit = mock(CatalogAuditUseCase.class);
+        service = new UserService(repo, encoder, branches, audit);
         admin = repo.add("admin@x.co", ADMIN, null);
         manager = repo.add("manager@x.co", MANAGER, MY_BRANCH);
         mySeller = repo.add("seller@x.co", SELLER, MY_BRANCH);
@@ -416,6 +422,37 @@ class UserServiceTest {
             assertThat(service.getAssignableRoles("admin@x.co")).hasSize(4);
             assertThat(service.getAssignableRoles("manager@x.co")).extracting(Role::getNombre)
                     .containsExactlyInAnyOrder("SELLER", "OPERADOR_INVENTARIO");
+        }
+    }
+
+    @Nested
+    @DisplayName("auditoría del catálogo")
+    class Audit {
+        @Test
+        @DisplayName("cambiar el rol queda registrado con el antes y el después")
+        void updateUser_registraRol() {
+            User changes = User.builder().nombre("seller@x.co").email("seller@x.co").role(Role.builder().id(OPERADOR.getId()).build()).build();
+
+            service.updateUser(mySeller.getId(), changes, null, "admin@x.co");
+
+            verify(audit).record(ChangedEntity.USUARIO, mySeller.getId(), "seller@x.co",
+                    List.of(new FieldChange("Rol", "Vendedor", "Operador de inventario")));
+        }
+
+        @Test
+        @DisplayName("crear una cuenta queda registrado")
+        void createUser_registraLaCuenta() {
+            User created = service.createUser(newUser(SELLER, MY_BRANCH), "secreta", "admin@x.co");
+
+            verify(audit).record(ChangedEntity.USUARIO, created.getId(), "Nuevo", List.of(new FieldChange("Cuenta", "—", "Creada · Vendedor")));
+        }
+
+        @Test
+        @DisplayName("desactivar una cuenta queda registrado")
+        void deactivateUser_registraElEstado() {
+            service.deactivateUser(mySeller.getId(), "admin@x.co");
+
+            verify(audit).record(ChangedEntity.USUARIO, mySeller.getId(), "seller@x.co", List.of(new FieldChange("Estado", "Activo", "Inactivo")));
         }
     }
 }

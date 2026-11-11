@@ -1,5 +1,10 @@
 package co.com.zenvory.inventario.catalog.application.service;
 
+import java.util.List;
+import co.com.zenvory.inventario.catalog.application.port.out.SupplierRepositoryPort;
+import co.com.zenvory.inventario.audit.domain.model.FieldChange;
+import co.com.zenvory.inventario.audit.domain.model.ChangedEntity;
+import co.com.zenvory.inventario.audit.application.port.in.CatalogAuditUseCase;
 import co.com.zenvory.inventario.catalog.application.port.out.ProductRepositoryPort;
 import co.com.zenvory.inventario.catalog.domain.exception.DuplicateSkuException;
 import co.com.zenvory.inventario.catalog.domain.exception.ProductNotFoundException;
@@ -26,6 +31,12 @@ class ProductServiceTest {
 
     @Mock
     private ProductRepositoryPort productRepositoryPort;
+
+    @Mock
+    private SupplierRepositoryPort supplierRepositoryPort;
+
+    @Mock
+    private CatalogAuditUseCase catalogAudit;
 
     @InjectMocks
     private ProductService productService;
@@ -179,5 +190,36 @@ class ProductServiceTest {
         Product changes = Product.builder().sku("SKU-001").name("X").averageCost(new BigDecimal("12.50")).salePrice(new BigDecimal("25.00")).unitId(1L).build();
 
         assertThat(productService.updateProduct(1L, changes).getAverageCost()).isEqualByComparingTo("12.50");
+    }
+
+    @Test
+    @DisplayName("updateProduct: registra en la auditoría del catálogo solo los campos que cambiaron")
+    void updateProduct_registraLosCambios() {
+        when(productRepositoryPort.findById(1L)).thenReturn(Optional.of(existingProduct));
+        when(productRepositoryPort.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        Product changes = Product.builder().sku("SKU-001").name("Producto Original").salePrice(new BigDecimal("22")).unitId(1L).build();
+
+        productService.updateProduct(1L, changes);
+
+        verify(catalogAudit).record(ChangedEntity.PRODUCTO, 1L, "Producto Original",
+                List.of(new FieldChange("Precio de venta", "$ 20", "$ 22")));
+    }
+
+    @Test
+    @DisplayName("deleteProduct: registra que quedó inactivo")
+    void deleteProduct_registraElEstado() {
+        when(productRepositoryPort.findById(1L)).thenReturn(Optional.of(existingProduct));
+
+        productService.deleteProduct(1L);
+
+        verify(catalogAudit).record(ChangedEntity.PRODUCTO, 1L, "Producto Original", List.of(new FieldChange("Estado", "Activo", "Inactivo")));
+    }
+
+    @Test
+    @DisplayName("updateAverageCost (lo usa la recepción de compras) no se audita: no es un cambio del catálogo")
+    void updateAverageCost_noRegistraNada() {
+        productService.updateAverageCost(1L, new BigDecimal("15"));
+
+        verifyNoInteractions(catalogAudit);
     }
 }
