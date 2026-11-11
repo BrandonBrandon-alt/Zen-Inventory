@@ -40,7 +40,7 @@ function stub(inventory: Record<number, unknown[]> = { 10: INVENTORY_10, 20: INV
     http.get(`${TEST_API}/api/catalog/products`, () => HttpResponse.json(PRODUCTS)),
     http.get(`${TEST_API}/api/branches`, () => HttpResponse.json(BRANCHES)),
     http.get(`${TEST_API}/api/v1/inventory/branches/:id`, ({ params }) => HttpResponse.json(inventory[Number(params['id'])] ?? [])),
-    http.get(`${TEST_API}/api/v1/inventory/movements`, () => HttpResponse.json([])),
+    http.get(`${TEST_API}/api/v1/inventory/movements/search`, () => HttpResponse.json({ content: [], totalElements: 0, totalIn: 0, totalOut: 0 })),
   );
 }
 
@@ -356,8 +356,16 @@ describe('InventoryPage', () => {
       useSession('MANAGER', 10);
       stub();
       server.use(
-        http.get(`${TEST_API}/api/v1/inventory/movements`, () =>
-          HttpResponse.json([{ id: 1, type: 'INGRESO', reason: 'AJUSTE_POSITIVO', quantity: 4, date: '2026-01-02T10:00:00', productId: 1, branchId: 10, finalBalance: 16 }]),
+        http.get(`${TEST_API}/api/v1/inventory/movements/search`, ({ request }) =>
+          // El kardex pide la sucursal elegida en Inventario.
+          new URL(request.url).searchParams.get('branchId') === '10'
+            ? HttpResponse.json({
+                content: [{ id: 1, type: 'INGRESO', reason: 'AJUSTE_POSITIVO', quantity: 4, date: '2026-01-02T10:00:00', productId: 1, productName: 'Tornillo', branchId: 10, finalBalance: 16 }],
+                totalElements: 1,
+                totalIn: 4,
+                totalOut: 0,
+              })
+            : HttpResponse.json({ content: [], totalElements: 0, totalIn: 0, totalOut: 0 }),
         ),
       );
       await renderPage();

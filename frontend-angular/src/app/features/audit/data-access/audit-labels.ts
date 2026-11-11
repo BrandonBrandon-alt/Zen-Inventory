@@ -8,7 +8,7 @@ import {
   type LucideIconData,
 } from '@lucide/angular';
 import type { BadgeVariant } from '@shared/ui/badge/badge';
-import type { MovementReason } from './audit-api';
+import type { MovementReason } from '@core/inventory/movement-search-api';
 
 export const REASON_INFO: Readonly<Record<MovementReason, { label: string; icon: LucideIconData; variant: BadgeVariant }>> = {
   VENTA: { label: 'Venta', icon: LucideShoppingCart.icon, variant: 'info' },

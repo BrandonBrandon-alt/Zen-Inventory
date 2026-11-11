@@ -4,7 +4,7 @@ import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { Modal } from '@shared/ui/modal/modal';
 import { REASON_INFO, documentLabel, subReasonText } from '../../data-access/audit-labels';
-import type { AuditMovement } from '../../data-access/audit-api';
+import type { MovementRecord as AuditMovement } from '@core/inventory/movement-search-api';
 
 /** Un movimiento con los nombres ya resueltos (producto, sucursal, responsable). */
 export interface AuditRow extends AuditMovement {

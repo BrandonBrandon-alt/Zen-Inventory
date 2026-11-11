@@ -1,7 +1,7 @@
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { delay, http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { errorInterceptor } from '@core/api/error.interceptor';
@@ -13,9 +13,42 @@ const PRODUCTS: InventoryItem[] = [
   { productId: 7, sku: 'T-1', nombre: 'Tornillo', unit: 'UND', stock: 10, minimum: 2, price: 5, cost: 2 },
   { productId: 8, sku: 'T-2', nombre: 'Tuerca', unit: 'UND', stock: 4, minimum: 0, price: 3, cost: 1 },
 ];
-const mov = (over: Record<string, unknown>) => ({ id: 1, type: 'INGRESO', reason: 'AJUSTE_POSITIVO', quantity: 5, date: '2026-01-02T10:00:00', productId: 7, branchId: 3, finalBalance: 15, observations: '', ...over });
-const ALL = `${TEST_API}/api/v1/inventory/movements`;
-const KARDEX_7 = `${TEST_API}/api/v1/inventory/branches/3/products/7/kardex`;
+/** Un movimiento como lo devuelve el servidor: ya trae los nombres. */
+const mov = (over: Record<string, unknown>) => ({
+  id: 1,
+  type: 'INGRESO',
+  reason: 'AJUSTE_POSITIVO',
+  quantity: 5,
+  date: '2026-10-02T10:00:00',
+  productId: 7,
+  productName: 'Tornillo',
+  branchId: 3,
+  branchName: 'Sede Central',
+  userId: 1,
+  userName: 'Ana',
+  finalBalance: 15,
+  observations: '',
+  ...over,
+});
+const MOVES = [
+  mov({ id: 4, productId: 7, type: 'INGRESO', reason: 'AJUSTE_POSITIVO', date: '2026-10-18T09:00:00' }),
+  mov({ id: 3, productId: 8, productName: 'Tuerca', type: 'RETIRO', reason: 'MERMA', subReason: 'DAÑO_FISICO', quantity: 2, finalBalance: 4, observations: 'bulto roto' }),
+  mov({ id: 2, productId: 8, productName: 'Tuerca', type: 'RETIRO', reason: 'VENTA', quantity: 3, finalBalance: 6 }),
+];
+const URL_SEARCH = `${TEST_API}/api/v1/inventory/movements/search`;
+const URL_EXPORT = `${TEST_API}/api/v1/inventory/movements/export`;
+
+let requests: URLSearchParams[] = [];
+const last = () => requests.at(-1)!;
+
+function stub(content: unknown[] = MOVES, totals = { totalElements: content.length, totalIn: 5, totalOut: 5 }) {
+  server.use(
+    http.get(URL_SEARCH, ({ request }) => {
+      requests.push(new URL(request.url).searchParams);
+      return HttpResponse.json({ content, page: 0, size: 15, totalPages: 1, ...totals });
+    }),
+  );
+}
 
 const renderPanel = () =>
   render(`<app-kardex-panel [branchId]="3" [products]="products" />`, {
@@ -25,186 +58,174 @@ const renderPanel = () =>
   });
 
 const filter = () => screen.getByRole('combobox', { name: 'Filtrar por producto' });
-/** Marca (o desmarca) productos en el filtro de varias opciones; la lista queda abierta entre una y otra. */
-const toggleProducts = async (...names: string[]) => {
-  await userEvent.click(filter());
+/** Marca (o desmarca) opciones en un selector de varias opciones; la lista queda abierta entre una y otra. */
+const toggle = async (combo: HTMLElement, ...names: string[]) => {
+  await userEvent.click(combo);
   for (const name of names) await userEvent.click(screen.getByRole('option', { name: new RegExp(`^${name}`) }));
   await userEvent.keyboard('{Escape}');
 };
-
 const rowsText = () => screen.getAllByRole('row').slice(1).map((r) => r.textContent ?? '');
+const expectLastSearch = (params: Record<string, string | string[] | null>) =>
+  vi.waitFor(() => {
+    for (const [key, value] of Object.entries(params)) {
+      if (Array.isArray(value)) expect(last().getAll(key)).toEqual(value);
+      else expect(last().get(key)).toBe(value);
+    }
+  });
 
 describe('KardexPanel', () => {
-  it('muestra los movimientos de la sucursal con producto, tipo, motivo, cantidad con signo y saldo', async () => {
-    server.use(
-      http.get(ALL, () =>
-        HttpResponse.json([
-          mov({ id: 1 }),
-          mov({ id: 2, type: 'RETIRO', reason: 'MERMA', subReason: 'DAÑO_FISICO', quantity: 2, finalBalance: 13, productId: 8, date: '2026-01-03T10:00:00', observations: 'bulto roto' }),
-        ]),
-      ),
-    );
+  beforeEach(() => {
+    requests = [];
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('pide al servidor la primera página de la sucursal, del más reciente al más antiguo', async () => {
+    stub();
     await renderPanel();
-    expect(await screen.findByText('Tuerca')).toBeInTheDocument();
-    const [first, second] = rowsText();
-    expect(first).toContain('Tuerca');
-    expect(first).toContain('Retiro');
-    expect(first).toContain('Merma · Daño físico');
-    expect(first).toContain('−2');
-    expect(first).toContain('bulto roto');
-    expect(second).toContain('Tornillo');
-    expect(second).toContain('Ingreso');
-    expect(second).toContain('+5');
+    await expectLastSearch({ branchId: '3', page: '0', size: '15', sortBy: 'date', direction: 'desc', productId: [], reason: [] });
+  });
+
+  it('muestra producto, tipo, motivo (con su categoría), cantidad con signo y el saldo que manda el servidor', async () => {
+    stub();
+    await renderPanel();
+    await vi.waitFor(() => expect(rowsText()).toHaveLength(3));
+    const merma = screen.getByRole('row', { name: /bulto roto/ });
+    expect(within(merma).getByText('Tuerca')).toBeInTheDocument();
+    expect(within(merma).getByText('Retiro')).toBeInTheDocument();
+    expect(merma).toHaveTextContent(/Merma · Daño físico/);
+    expect(merma).toHaveTextContent('−2');
+    expect(merma).toHaveTextContent('4');
+  });
+
+  it('el resumen de entradas y salidas es de todo lo filtrado (lo calcula el servidor)', async () => {
+    stub(MOVES, { totalElements: 120, totalIn: 300, totalOut: 180 });
+    await renderPanel();
+    expect(await screen.findByText('120 movimientos: entraron 300 unidades y salieron 180')).toBeInTheDocument();
+  });
+
+  it('con más filas que una página, «Página siguiente» pide la siguiente', async () => {
+    stub(MOVES, { totalElements: 40, totalIn: 0, totalOut: 0 });
+    await renderPanel();
+    await vi.waitFor(() => expect(rowsText()).toHaveLength(3));
+    await userEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await expectLastSearch({ page: '1' });
+  });
+
+  it('ordenar por cantidad lo pide al servidor', async () => {
+    stub();
+    await renderPanel();
+    await vi.waitFor(() => expect(rowsText()).toHaveLength(3));
+    await userEvent.click(screen.getByRole('button', { name: /Cantidad/ }));
+    await expectLastSearch({ sortBy: 'quantity', direction: 'asc' });
   });
 
   it('sin movimientos muestra el estado vacío', async () => {
-    server.use(http.get(ALL, () => HttpResponse.json([])));
+    stub([]);
     await renderPanel();
     expect(await screen.findByText('Sin movimientos')).toBeInTheDocument();
   });
 
-  it('filtrar por un producto consulta su kardex; quitarlo vuelve al listado general', async () => {
-    let kardexCalls = 0;
-    server.use(
-      http.get(ALL, () => HttpResponse.json([mov({ id: 1 }), mov({ id: 2, productId: 8 })])),
-      http.get(KARDEX_7, () => { kardexCalls++; return HttpResponse.json([mov({ id: 9, productId: 7, branchId: undefined })]); }),
-    );
-    await renderPanel();
-    await screen.findAllByText('Tuerca');
-    await toggleProducts('Tornillo');
-    await vi.waitFor(() => expect(rowsText()).toHaveLength(1));
-    expect(kardexCalls).toBe(1);
-    await userEvent.click(screen.getByRole('button', { name: 'Quitar Tornillo' }));
-    await vi.waitFor(() => expect(rowsText()).toHaveLength(2));
-  });
-
-  it('con varios productos usa el listado general y muestra solo los movimientos de los elegidos', async () => {
-    server.use(
-      http.get(ALL, () => HttpResponse.json([mov({ id: 1, productId: 7 }), mov({ id: 2, productId: 8 }), mov({ id: 3, productId: 9 })])),
-      http.get(KARDEX_7, () => HttpResponse.json([mov({ id: 9, productId: 7 })])),
-    );
-    await renderPanel();
-    await vi.waitFor(() => expect(rowsText()).toHaveLength(3));
-    await toggleProducts('Tornillo', 'Tuerca');
-    await vi.waitFor(() => expect(rowsText()).toHaveLength(2));
-    expect(rowsText().join(' ')).not.toContain('Producto 9');
-    expect(rowsText().join(' ')).toContain('Tuerca');
-  });
-
-  it('el filtro de producto se puede buscar por nombre', async () => {
-    server.use(http.get(ALL, () => HttpResponse.json([])));
-    await renderPanel();
-    await userEvent.type(filter(), 'tuer');
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([expect.stringContaining('Tuerca')]);
-  });
-
-  it('descarta la respuesta de una consulta anterior si ya se cambió el filtro (la lenta no pisa a la nueva)', async () => {
-    server.use(
-      http.get(ALL, async () => { await delay(250); return HttpResponse.json([mov({ id: 1, productId: 7 }), mov({ id: 2, productId: 8 })]); }),
-      http.get(KARDEX_7, () => HttpResponse.json([mov({ id: 9, productId: 7, branchId: undefined })])),
-    );
-    await renderPanel();
-    await toggleProducts('Tornillo'); // mientras la general sigue en camino
-    await vi.waitFor(() => expect(rowsText()).toHaveLength(1));
-    await new Promise((resolve) => setTimeout(resolve, 400)); // llega la respuesta tardía
-    expect(rowsText()).toHaveLength(1);
-  });
-
-  it('si falla, muestra el error en la tabla (sin aviso global) y reintentar recupera', async () => {
-    let calls = 0;
-    server.use(
-      http.get(ALL, () => {
-        calls++;
-        return calls === 1 ? HttpResponse.json(apiErrorBody(500, 'INTERNAL_ERROR', 'Falla de prueba'), { status: 500 }) : HttpResponse.json([mov({ id: 1 })]);
-      }),
-    );
+  it('si falla, muestra el error en la tabla y reintentar recupera', async () => {
+    server.use(http.get(URL_SEARCH, () => HttpResponse.json(apiErrorBody(500, 'INTERNAL_ERROR', 'Falla de prueba'), { status: 500 })));
     await renderPanel();
     expect(await screen.findByRole('alert')).toHaveTextContent('Falla de prueba');
-    await userEvent.click(within(screen.getByRole('alert').parentElement as HTMLElement).getByRole('button', { name: 'Reintentar' }));
-    expect(await screen.findByText('Tornillo')).toBeInTheDocument();
+    stub();
+    await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    await vi.waitFor(() => expect(rowsText()).toHaveLength(3));
   });
+
   describe('filtros', () => {
-    // Hoy: 20 de octubre de 2026, para que el calendario de los filtros abra en octubre.
-    beforeEach(() => {
+    it('varios productos se mandan como lista y quitarlos vuelve a todos', async () => {
+      stub();
+      await renderPanel();
+      await vi.waitFor(() => expect(rowsText()).toHaveLength(3));
+      await toggle(filter(), 'Tornillo', 'Tuerca');
+      await expectLastSearch({ productId: ['7', '8'], page: '0' });
+      await userEvent.click(screen.getByRole('button', { name: /Quitar filtro Producto/ }));
+      await expectLastSearch({ productId: [] });
+    });
+
+    it('el filtro de producto se puede buscar por nombre', async () => {
+      stub();
+      await renderPanel();
+      await userEvent.type(filter(), 'tuer');
+      expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([expect.stringContaining('Tuerca')]);
+    });
+
+    it('el tipo y varios motivos se mandan al servidor', async () => {
+      stub();
+      await renderPanel();
+      await vi.waitFor(() => expect(rowsText()).toHaveLength(3));
+      await userEvent.click(screen.getByRole('radio', { name: 'Retiros' }));
+      await toggle(screen.getByRole('combobox', { name: 'Filtrar por motivo' }), 'Venta', 'Merma');
+      await expectLastSearch({ type: 'RETIRO', reason: ['VENTA', 'MERMA'] });
+    });
+
+    it('el rango de fechas se manda como días locales', async () => {
       vi.useFakeTimers({ toFake: ['Date'] });
       vi.setSystemTime(new Date(2026, 9, 20, 10, 0));
-    });
-    afterEach(() => vi.useRealTimers());
-
-    const MOVES = [
-      mov({ id: 1, productId: 7, type: 'INGRESO', reason: 'COMPRA', date: '2026-10-05T09:00:00', observations: 'Factura 123' }),
-      mov({ id: 2, productId: 8, type: 'RETIRO', reason: 'VENTA', date: '2026-10-12T09:00:00' }),
-      mov({ id: 3, productId: 8, type: 'RETIRO', reason: 'MERMA', subReason: 'DAÑO_FISICO', date: '2026-10-13T23:30:00', observations: 'bulto roto' }),
-      mov({ id: 4, productId: 7, type: 'INGRESO', reason: 'AJUSTE_POSITIVO', date: '2026-10-18T09:00:00' }),
-    ];
-    const load = async () => {
-      server.use(http.get(ALL, () => HttpResponse.json(MOVES)));
+      stub();
       await renderPanel();
-      await vi.waitFor(() => expect(rowsText()).toHaveLength(4));
-    };
-
-    it('el tipo deja solo ingresos o solo retiros', async () => {
-      await load();
-      await userEvent.click(screen.getByRole('radio', { name: 'Retiros' }));
-      expect(rowsText()).toHaveLength(2);
-      expect(rowsText().every((r) => r.includes('Retiro'))).toBe(true);
-      await userEvent.click(screen.getByRole('radio', { name: 'Ingresos' }));
-      expect(rowsText().every((r) => r.includes('Ingreso'))).toBe(true);
-    });
-
-    it('el motivo admite varios a la vez', async () => {
-      await load();
-      await userEvent.click(screen.getByRole('combobox', { name: 'Filtrar por motivo' }));
-      await userEvent.click(screen.getByRole('option', { name: /^Compra/ }));
-      await userEvent.click(screen.getByRole('option', { name: /^Merma/ }));
-      expect(rowsText()).toHaveLength(2);
-      expect(rowsText().join(' ')).toContain('Merma');
-      expect(rowsText().join(' ')).toContain('Compra');
-    });
-
-    it('el rango de fechas incluye completo el día «Hasta»', async () => {
-      await load();
+      await vi.waitFor(() => expect(rowsText()).toHaveLength(3));
       await userEvent.click(screen.getByRole('button', { name: 'Desde' }));
       await userEvent.click(screen.getByRole('button', { name: /12 de octubre de 2026/ }));
       await userEvent.click(screen.getByRole('button', { name: 'Hasta' }));
       await userEvent.click(screen.getByRole('button', { name: /13 de octubre de 2026/ }));
-      // El movimiento del 13 a las 23:30 entra: el día «Hasta» cuenta completo.
-      expect(rowsText()).toHaveLength(2);
-      expect(rowsText().join(' ')).toContain('Merma');
+      await expectLastSearch({ from: '2026-10-12', to: '2026-10-13' });
     });
 
-    it('la búsqueda mira producto, motivo y observaciones, sin importar tildes ni mayúsculas', async () => {
-      await load();
-      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar en el kardex' }), 'FACTURA');
-      expect(rowsText()).toHaveLength(1);
-      await userEvent.clear(screen.getByRole('searchbox', { name: 'Buscar en el kardex' }));
-      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar en el kardex' }), 'merma');
-      expect(rowsText()).toHaveLength(1);
-      await userEvent.clear(screen.getByRole('searchbox', { name: 'Buscar en el kardex' }));
-      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar en el kardex' }), 'tuerca');
-      expect(rowsText()).toHaveLength(2);
+    it('la búsqueda se manda una vez, al dejar de escribir', async () => {
+      stub();
+      await renderPanel();
+      await vi.waitFor(() => expect(rowsText()).toHaveLength(3));
+      const before = requests.length;
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar en el kardex' }), ' bulto ');
+      await expectLastSearch({ q: 'bulto' });
+      expect(requests.length).toBe(before + 1);
     });
 
-    it('los filtros se combinan, se ven como etiquetas y «Quitar filtros» los restablece', async () => {
-      await load();
-      await userEvent.click(screen.getByRole('radio', { name: 'Retiros' }));
-      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar en el kardex' }), 'bulto');
-      expect(rowsText()).toHaveLength(1);
-      const chips = screen.getByRole('group', { name: 'Filtros aplicados' });
-      expect(chips).toHaveTextContent('Tipo:');
-      expect(chips).toHaveTextContent('Búsqueda:');
-      await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro Tipo: Retiros' }));
-      expect(rowsText()).toHaveLength(1);
+    it('los filtros se ven como etiquetas y «Quitar filtros» los restablece', async () => {
+      stub();
+      await renderPanel();
+      await vi.waitFor(() => expect(rowsText()).toHaveLength(3));
+      await userEvent.click(screen.getByRole('radio', { name: 'Ingresos' }));
+      await toggle(filter(), 'Tornillo');
+      expect(screen.getByRole('button', { name: 'Quitar filtro Tipo: Ingresos' })).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
-      expect(rowsText()).toHaveLength(4);
-      expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
+      await expectLastSearch({ type: null, productId: [] });
     });
 
     it('si ningún movimiento coincide lo dice y propone quitar filtros', async () => {
-      await load();
-      await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar en el kardex' }), 'zzzz');
+      stub();
+      await renderPanel();
+      await vi.waitFor(() => expect(rowsText()).toHaveLength(3));
+      stub([]);
+      await userEvent.click(screen.getByRole('radio', { name: 'Retiros' }));
       expect(await screen.findByText('Ningún movimiento coincide')).toBeInTheDocument();
-      expect(screen.getByText('Prueba quitando algún filtro.')).toBeInTheDocument();
     });
+  });
+
+  it('exportar trae todo lo filtrado del servidor, no solo la página', async () => {
+    stub(MOVES, { totalElements: 40, totalIn: 0, totalOut: 0 });
+    let exported: URLSearchParams | null = null;
+    server.use(
+      http.get(URL_EXPORT, ({ request }) => {
+        exported = new URL(request.url).searchParams;
+        return HttpResponse.json([...MOVES, mov({ id: 9, productName: 'Arandela' })]);
+      }),
+    );
+    let csv = '';
+    vi.spyOn(URL, 'createObjectURL').mockImplementation((blob: Blob | MediaSource) => (void (blob as Blob).text().then((t) => (csv = t)), 'blob:csv'));
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    await renderPanel();
+    await vi.waitFor(() => expect(rowsText()).toHaveLength(3));
+    await userEvent.click(screen.getByRole('button', { name: /Exportar CSV/ }));
+    await vi.waitFor(() => expect(csv).toContain('Arandela'));
+    expect(exported!.get('branchId')).toBe('3');
+    expect(exported!.has('page')).toBe(false);
   });
 });

@@ -35,20 +35,6 @@ export function stockLevel(item: Pick<InventoryItem, 'stock' | 'minimum'>): Stoc
   return 'ok';
 }
 
-/** Un movimiento del kardex. */
-export interface Movement {
-  readonly id: number;
-  readonly type: MovementType;
-  readonly reason: MovementReason;
-  readonly quantity: number;
-  readonly date: Date;
-  readonly productId: number;
-  readonly observations: string;
-  readonly subReason: string;
-  /** Saldo de la sucursal después del movimiento. */
-  readonly balance: number | null;
-}
-
 /** Ajuste manual de existencias. */
 export interface AdjustInput {
   readonly type: MovementType;
@@ -59,24 +45,6 @@ export interface AdjustInput {
   readonly subReason?: string;
   /** Solo en ingresos por ajuste: costo unitario sugerido. */
   readonly unitCost?: number;
-}
-
-function toMovement(raw: InventoryMovementResponse): Movement | null {
-  if (typeof raw.id !== 'number' || typeof raw.productId !== 'number' || typeof raw.quantity !== 'number') return null;
-  if ((raw.type !== 'INGRESO' && raw.type !== 'RETIRO') || !raw.reason) return null;
-  const date = raw.date ? new Date(raw.date) : null;
-  if (!date || Number.isNaN(date.getTime())) return null;
-  return {
-    id: raw.id,
-    type: raw.type,
-    reason: raw.reason,
-    quantity: raw.quantity,
-    date,
-    productId: raw.productId,
-    observations: raw.observations?.trim() ?? '',
-    subReason: raw.subReason?.trim() ?? '',
-    balance: raw.finalBalance ?? null,
-  };
 }
 
 @Injectable({ providedIn: 'root' })
@@ -115,24 +83,6 @@ export class InventoryApi {
           ];
         });
       }),
-    );
-  }
-
-  /** Kardex de una sucursal: de un producto, o de todos; el más reciente primero. */
-  movements(branchId: number, productId: number | null): Observable<Movement[]> {
-    const url =
-      productId === null
-        ? `${this.baseUrl}/api/v1/inventory/movements`
-        : `${this.baseUrl}/api/v1/inventory/branches/${branchId}/products/${productId}/kardex`;
-    return this.http.get<InventoryMovementResponse[]>(url, { context: this.context }).pipe(
-      map((items) =>
-        items
-          // /movements trae todas las sucursales a quien es ADMIN: aquí solo interesa la elegida.
-          .filter((item) => productId !== null || item.branchId === branchId)
-          .map(toMovement)
-          .filter((movement): movement is Movement => movement !== null)
-          .sort((a, b) => b.date.getTime() - a.date.getTime()),
-      ),
     );
   }
 

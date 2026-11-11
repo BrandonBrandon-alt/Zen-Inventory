@@ -66,39 +66,6 @@ describe('InventoryApi (contrato HTTP con MSW)', () => {
     });
   });
 
-  describe('movements', () => {
-    const raw = (over: Record<string, unknown>) => ({ id: 1, type: 'INGRESO', reason: 'AJUSTE_POSITIVO', quantity: 5, date: '2026-01-02T10:00:00', productId: 7, branchId: 3, finalBalance: 9, ...over });
-
-    it('sin producto usa /movements, deja solo la sucursal elegida y ordena del más reciente al más antiguo', async () => {
-      server.use(
-        http.get(`${TEST_API}/api/v1/inventory/movements`, () =>
-          HttpResponse.json([
-            raw({ id: 1, date: '2026-01-01T10:00:00' }),
-            raw({ id: 2, date: '2026-01-03T10:00:00' }),
-            raw({ id: 3, branchId: 99, date: '2026-01-05T10:00:00' }),
-          ]),
-        ),
-      );
-      expect((await firstValueFrom(api.movements(3, null))).map((m) => m.id)).toEqual([2, 1]);
-    });
-
-    it('con producto usa el kardex de ese producto (ya viene de la sucursal)', async () => {
-      server.use(http.get(`${inventoryUrl(3)}/products/7/kardex`, () => HttpResponse.json([raw({ id: 8, branchId: undefined })])));
-      const [movement] = await firstValueFrom(api.movements(3, 7));
-      expect(movement).toMatchObject({ id: 8, type: 'INGRESO', reason: 'AJUSTE_POSITIVO', quantity: 5, productId: 7, balance: 9, observations: '', subReason: '' });
-      expect(movement.date).toBeInstanceOf(Date);
-    });
-
-    it('descarta movimientos incompletos o con tipo o fecha inválidos', async () => {
-      server.use(
-        http.get(`${TEST_API}/api/v1/inventory/movements`, () =>
-          HttpResponse.json([raw({ id: 1 }), raw({ id: 2, type: 'OTRO' }), raw({ id: 3, date: 'no-es-fecha' }), raw({ id: 4, quantity: undefined }), raw({ id: 5, reason: undefined })]),
-        ),
-      );
-      expect((await firstValueFrom(api.movements(3, null))).map((m) => m.id)).toEqual([1]);
-    });
-  });
-
   describe('adjust', () => {
     it('un ingreso llama a /add con la autoría de la sesión, observaciones recortadas y costo sugerido', async () => {
       let body: Record<string, unknown> = {};

@@ -38,7 +38,7 @@ import { type TabItem, Tabs } from '@shared/ui/tabs/tabs';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { LoginEventsPanel } from '../../components/login-events-panel/login-events-panel';
 import { AuditDetailModal, type AuditRow } from '../../components/audit-detail-modal/audit-detail-modal';
-import { MOVEMENT_REASONS, type AuditMovement, AuditApi, type AuditQuery, type MovementReason, type MovementType } from '../../data-access/audit-api';
+import { MOVEMENT_REASONS, type MovementQuery, type MovementReason, type MovementRecord, MovementSearchApi, type MovementType } from '@core/inventory/movement-search-api';
 import { REASON_INFO, documentLabel, subReasonText } from '../../data-access/audit-labels';
 
 const rowKey = (row: AuditRow): number => row.id;
@@ -49,13 +49,26 @@ const PAGE_SIZE = 15;
 const SEARCH_DELAY_MS = 300;
 
 /** De la consulta de la lista al formato de la API (orden por fecha, del más reciente, si no se eligió otro). */
-const toAuditQuery = ({ sort, ...query }: PagedQuery<Omit<AuditQuery, 'page' | 'size' | 'sortBy' | 'ascending'>>): AuditQuery => ({
+/** Columna de la tabla → campo de orden del servidor. */
+const SORT_KEYS: Readonly<Record<string, string>> = {
+  date: 'date',
+  branch: 'branch',
+  product: 'product',
+  typeLabel: 'type',
+  reasonLabel: 'reason',
+  signedQuantity: 'quantity',
+  balance: 'balance',
+  responsible: 'responsible',
+  document: 'document',
+};
+
+const toMovementQuery = ({ sort, ...query }: PagedQuery<Omit<MovementQuery, 'page' | 'size' | 'sortBy' | 'ascending'>>): MovementQuery => ({
   ...query,
-  sortBy: sort?.key ?? 'date',
+  sortBy: sort ? (SORT_KEYS[sort.key] ?? 'date') : 'date',
   ascending: sort ? sort.direction === 'asc' : false,
 });
 
-const toRow = (m: AuditMovement): AuditRow => ({
+const toRow = (m: MovementRecord): AuditRow => ({
   ...m,
   product: m.productName,
   branch: m.branchName,
@@ -78,7 +91,7 @@ const toRow = (m: AuditMovement): AuditRow => ({
   templateUrl: './audit-page.html',
 })
 export class AuditPage {
-  private readonly api = inject(AuditApi);
+  private readonly api = inject(MovementSearchApi);
   private readonly branchApi = inject(BranchOptionsApi);
   private readonly catalog = inject(CatalogOptionsApi);
   private readonly userApi = inject(UserOptionsApi);
@@ -179,10 +192,10 @@ export class AuditPage {
   private readonly filters = computed(() => ({
     branchId: this.branchFilter(),
     type: this.typeFilter(),
-    reason: this.reasonFilter(),
+    reasons: this.reasonFilter() === null ? [] : [this.reasonFilter()!],
     from: this.from(),
     to: this.to(),
-    productId: this.productFilter(),
+    productIds: this.productFilter() === null ? [] : [this.productFilter()!],
     userId: this.responsibleFilter(),
     minQuantity: this.minQuantity(),
     maxQuantity: this.maxQuantity(),
@@ -194,7 +207,7 @@ export class AuditPage {
     filters: this.filters,
     sort: this.sort,
     size: PAGE_SIZE,
-    fetch: (query) => this.api.search(toAuditQuery(query)).pipe(map((page) => ({ ...page, rows: page.movements.map(toRow) }))),
+    fetch: (query) => this.api.search(toMovementQuery(query)).pipe(map((page) => ({ ...page, rows: page.movements.map(toRow) }))),
   });
   protected readonly rows = this.list.rows;
   protected readonly total = this.list.total;
@@ -242,7 +255,7 @@ export class AuditPage {
 
   /** Para el CSV: todas las filas filtradas en el orden elegido, no solo la página. */
   protected readonly exportAll = (): Promise<readonly AuditRow[]> =>
-    firstValueFrom(this.api.exportAll(toAuditQuery(untracked(this.list.query)))).then((movements) => movements.map(toRow));
+    firstValueFrom(this.api.exportAll(toMovementQuery(untracked(this.list.query)))).then((movements) => movements.map(toRow));
 
   constructor() {
     // Las opciones de los filtros: si alguna lista no llega (p. ej. la de usuarios, que no todos pueden ver), queda vacía.

@@ -13,8 +13,8 @@ export const MOVEMENT_REASONS = ['VENTA', 'COMPRA', 'TRASLADO', 'MERMA', 'DEVOLU
 export type MovementReason = (typeof MOVEMENT_REASONS)[number];
 export type MovementType = 'INGRESO' | 'RETIRO';
 
-/** Un movimiento de existencias de cualquier sucursal: qué pasó, dónde, quién y con qué documento. */
-export interface AuditMovement {
+/** Un movimiento de existencias: qué pasó, dónde, quién, con qué documento y el saldo que dejó. Lo usan la auditoría y el kardex. */
+export interface MovementRecord {
   readonly id: number;
   readonly date: Date;
   readonly type: MovementType;
@@ -34,31 +34,19 @@ export interface AuditMovement {
   readonly observations: string;
 }
 
-/** Columnas por las que el servidor sabe ordenar (las claves de la tabla). */
-export const AUDIT_SORT_KEYS: Readonly<Record<string, string>> = {
-  date: 'date',
-  branch: 'branch',
-  product: 'product',
-  typeLabel: 'type',
-  reasonLabel: 'reason',
-  signedQuantity: 'quantity',
-  balance: 'balance',
-  responsible: 'responsible',
-  document: 'document',
-};
-
 /** Filtros, orden y página que se piden al servidor. `page` empieza en 1, como en la tabla. */
-export interface AuditQuery {
+export interface MovementQuery {
   readonly page: number;
   readonly size: number;
+  /** Campo de orden del servidor: date, branch, product, type, reason, quantity, balance, responsible o document. */
   readonly sortBy: string;
   readonly ascending: boolean;
   readonly branchId: number | null;
   readonly type: MovementType | null;
-  readonly reason: MovementReason | null;
+  readonly reasons: readonly MovementReason[];
   readonly from: Date | null;
   readonly to: Date | null;
-  readonly productId: number | null;
+  readonly productIds: readonly number[];
   readonly userId: number | null;
   readonly minQuantity: number | null;
   readonly maxQuantity: number | null;
@@ -66,8 +54,8 @@ export interface AuditQuery {
   readonly text: string;
 }
 
-export interface AuditPage {
-  readonly movements: AuditMovement[];
+export interface MovementPage {
+  readonly movements: MovementRecord[];
   readonly total: number;
   /** Lo que entró y salió en TODO lo filtrado, no solo en la página. */
   readonly totalIn: number;
@@ -76,7 +64,7 @@ export interface AuditPage {
 
 const isReason = (value: unknown): value is MovementReason => (MOVEMENT_REASONS as readonly unknown[]).includes(value);
 
-function toMovement(raw: MovementAuditResponse): AuditMovement | null {
+function toMovement(raw: MovementAuditResponse): MovementRecord | null {
   if (typeof raw.id !== 'number' || typeof raw.productId !== 'number' || typeof raw.branchId !== 'number' || typeof raw.quantity !== 'number') return null;
   if ((raw.type !== 'INGRESO' && raw.type !== 'RETIRO') || !isReason(raw.reason)) return null;
   const date = raw.date ? new Date(raw.date) : null;
@@ -102,31 +90,31 @@ function toMovement(raw: MovementAuditResponse): AuditMovement | null {
   };
 }
 
-const toMovements = (items: readonly MovementAuditResponse[] | undefined): AuditMovement[] =>
-  (items ?? []).map(toMovement).filter((m): m is AuditMovement => m !== null);
+const toMovements = (items: readonly MovementAuditResponse[] | undefined): MovementRecord[] =>
+  (items ?? []).map(toMovement).filter((m): m is MovementRecord => m !== null);
 
 /** Los filtros y el orden como parámetros; lo vacío no se manda. */
-function filterParams(query: AuditQuery): HttpParams {
-  let params = new HttpParams().set('sortBy', AUDIT_SORT_KEYS[query.sortBy] ?? 'date').set('direction', query.ascending ? 'asc' : 'desc');
+function filterParams(query: MovementQuery): HttpParams {
+  let params = new HttpParams().set('sortBy', query.sortBy).set('direction', query.ascending ? 'asc' : 'desc');
   const set = (key: string, value: string | number | null) => {
     if (value !== null && value !== '') params = params.set(key, String(value));
   };
   set('branchId', query.branchId);
   set('type', query.type);
-  set('reason', query.reason);
   set('from', query.from ? toIsoDay(query.from) : null);
   set('to', query.to ? toIsoDay(query.to) : null);
-  set('productId', query.productId);
   set('userId', query.userId);
   set('minQuantity', query.minQuantity);
   set('maxQuantity', query.maxQuantity);
+  for (const reason of query.reasons) params = params.append('reason', reason);
+  for (const id of query.productIds) params = params.append('productId', String(id));
   if (query.onlyObserved) params = params.set('onlyObserved', 'true');
   set('q', query.text.trim());
   return params;
 }
 
 @Injectable({ providedIn: 'root' })
-export class AuditApi {
+export class MovementSearchApi {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = inject(API_BASE_URL);
   private readonly context = new HttpContext().set(SKIP_ERROR_NOTIFICATION, true);
@@ -135,7 +123,7 @@ export class AuditApi {
    * Una página de movimientos: el servidor filtra, ordena y pagina (antes se descargaban todos). Solo el ADMIN recibe
    * los de todas las sucursales; los demás, los de la suya.
    */
-  search(query: AuditQuery): Observable<AuditPage> {
+  search(query: MovementQuery): Observable<MovementPage> {
     const params = filterParams(query).set('page', String(Math.max(0, query.page - 1))).set('size', String(query.size));
     return this.http.get<MovementAuditPageResponse>(`${this.baseUrl}/api/v1/inventory/movements/search`, { params, context: this.context }).pipe(
       map((page) => ({
@@ -148,7 +136,7 @@ export class AuditApi {
   }
 
   /** Todos los movimientos filtrados, en el orden elegido (hasta 20.000), para exportar a CSV. */
-  exportAll(query: AuditQuery): Observable<AuditMovement[]> {
+  exportAll(query: MovementQuery): Observable<MovementRecord[]> {
     return this.http
       .get<MovementAuditResponse[]>(`${this.baseUrl}/api/v1/inventory/movements/export`, { params: filterParams(query), context: this.context })
       .pipe(map(toMovements));
