@@ -4,6 +4,7 @@ import co.com.zenvory.inventario.auth.application.port.in.LoginAuditUseCase;
 import co.com.zenvory.inventario.auth.application.port.out.LoginAuditPort;
 import co.com.zenvory.inventario.auth.domain.model.LoginEvent;
 import co.com.zenvory.inventario.auth.domain.model.LoginOutcome;
+import co.com.zenvory.inventario.shared.infrastructure.web.PageParams;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -48,10 +49,9 @@ public class LoginAuditController {
             @RequestParam(required = false, name = "q") String text) {
         LoginAuditPort.Page result = audit.search(
                 new LoginAuditPort.Criteria(from, to, outcome, text == null || text.isBlank() ? null : text.trim()), page, size);
-        int safePage = Math.max(0, page);
-        int safeSize = Math.min(Math.max(1, size), 100);
+        PageParams paging = PageParams.of(page, size);
         return ResponseEntity.ok(new LoginEventPageResponse(
                 result.content().stream().map(LoginEventResponse::from).toList(),
-                result.totalElements(), safePage, safeSize, (int) Math.ceil(result.totalElements() / (double) safeSize), result.failures()));
+                result.totalElements(), paging.page(), paging.size(), paging.totalPages(result.totalElements()), result.failures()));
     }
 }

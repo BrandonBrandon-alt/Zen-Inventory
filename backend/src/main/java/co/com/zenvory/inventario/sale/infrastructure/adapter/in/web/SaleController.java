@@ -1,5 +1,6 @@
 package co.com.zenvory.inventario.sale.infrastructure.adapter.in.web;
 
+import co.com.zenvory.inventario.shared.infrastructure.web.PageParams;
 import co.com.zenvory.inventario.sale.application.port.in.CreateSaleCommand;
 import co.com.zenvory.inventario.sale.application.port.in.CreateSaleUseCase;
 import co.com.zenvory.inventario.sale.application.port.in.SaleManagementUseCase;
@@ -87,7 +88,6 @@ public class SaleController {
     }
 
     /** Tamaño máximo de página: protege al servidor de que le pidan todo el historial de una vez. */
-    private static final int MAX_PAGE_SIZE = 100;
 
     /**
      * Historial paginado, filtrado y ordenado en el servidor. La sucursal sigue la misma regla que {@link #getAllSales}:
@@ -115,18 +115,17 @@ public class SaleController {
             @RequestParam(required = false) SalePaymentMethod paymentMethod) {
         CurrentUser current = CurrentUser.resolve(userRepositoryPort);
         Long effectiveBranch = current.isAdmin() ? branchId : current.resolveBranch(null);
-        int safePage = Math.max(0, page);
-        int safeSize = Math.min(Math.max(1, size), MAX_PAGE_SIZE);
+        PageParams paging = PageParams.of(page, size);
 
         SalePage result = saleManagementUseCase.searchSales(
                 new SaleSearchCriteria(effectiveBranch, status, from, to, blankToNull(seller), blankToNull(product), minTotal, maxTotal, text,
                         supplierId, withDiscount, registeredCustomer, paymentMethod),
-                safePage, safeSize, sortBy, !"desc".equalsIgnoreCase(direction));
+                paging.page(), paging.size(), sortBy, !"desc".equalsIgnoreCase(direction));
 
-        int totalPages = (int) Math.ceil(result.totalElements() / (double) safeSize);
+        int totalPages = paging.totalPages(result.totalElements());
         return ResponseEntity.ok(new SalePageResponse(
                 result.content().stream().map(SaleResponse::fromDomain).toList(),
-                result.totalElements(), safePage, safeSize, totalPages,
+                result.totalElements(), paging.page(), paging.size(), totalPages,
                 result.completedCount(), result.completedTotal()));
     }
 

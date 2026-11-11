@@ -9,6 +9,7 @@ import co.com.zenvory.inventario.inventory.domain.model.MovementType;
 import co.com.zenvory.inventario.inventory.infrastructure.adapter.in.web.dto.MovementAuditPageResponse;
 import co.com.zenvory.inventario.inventory.infrastructure.adapter.in.web.dto.MovementAuditResponse;
 import co.com.zenvory.inventario.shared.infrastructure.security.CurrentUser;
+import co.com.zenvory.inventario.shared.infrastructure.web.PageParams;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -57,11 +58,10 @@ public class MovementAuditController {
             @RequestParam(required = false, name = "q") String text) {
         MovementSearchCriteria criteria = criteria(branchId, type, reason, from, to, productId, userId, minQuantity, maxQuantity, onlyObserved, text);
         MovementPage result = audit.search(criteria, page, size, sortBy, "asc".equalsIgnoreCase(direction));
-        int safePage = Math.max(0, page);
-        int safeSize = Math.min(Math.max(1, size), 100);
+        PageParams paging = PageParams.of(page, size);
         return ResponseEntity.ok(new MovementAuditPageResponse(
                 result.content().stream().map(MovementAuditResponse::from).toList(),
-                result.totalElements(), safePage, safeSize, (int) Math.ceil(result.totalElements() / (double) safeSize),
+                result.totalElements(), paging.page(), paging.size(), paging.totalPages(result.totalElements()),
                 result.totalIn(), result.totalOut()));
     }
 

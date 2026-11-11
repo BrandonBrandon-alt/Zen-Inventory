@@ -10,14 +10,12 @@ import co.com.zenvory.inventario.inventory.domain.model.MovementType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Component;
+import co.com.zenvory.inventario.shared.infrastructure.persistence.SqlText;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
-import java.text.Normalizer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -48,9 +46,6 @@ public class MovementSearchJdbcAdapter implements MovementSearchPort {
             "balance", "m.saldo_final",
             "responsible", "u.nombre",
             "document", "m.tipo_referencia");
-
-    /** Texto comparable: minúsculas y sin tildes, igual que {@link #normalize} hace con lo que se busca. */
-    private static final String PLAIN = "translate(lower(coalesce(%s, '')), 'áéíóúüñ', 'aeiouun')";
 
     private static final int MAX_SEARCH_WORDS = 5;
 
@@ -138,15 +133,15 @@ public class MovementSearchJdbcAdapter implements MovementSearchPort {
             sql.append(" AND NULLIF(TRIM(m.observaciones), '') IS NOT NULL");
         }
         // Cada palabra debe aparecer en algún campo («compra 41» = de una compra y con el número 41).
-        for (String word : words(c.text())) {
-            String like = "%" + escapeLike(word) + "%";
+        for (String word : SqlText.words(c.text(), MAX_SEARCH_WORDS)) {
+            String like = SqlText.containsPattern(word);
             sql.append(" AND (")
-                    .append(PLAIN.formatted("p.nombre")).append(" LIKE ? OR ")
-                    .append(PLAIN.formatted("p.sku")).append(" LIKE ? OR ")
-                    .append(PLAIN.formatted("u.nombre")).append(" LIKE ? OR ")
-                    .append(PLAIN.formatted("m.observaciones")).append(" LIKE ? OR ")
-                    .append(PLAIN.formatted("m.tipo_referencia")).append(" LIKE ? OR ")
-                    .append(PLAIN.formatted("m.motivo")).append(" LIKE ? OR ")
+                    .append(SqlText.plain("p.nombre")).append(" LIKE ? OR ")
+                    .append(SqlText.plain("p.sku")).append(" LIKE ? OR ")
+                    .append(SqlText.plain("u.nombre")).append(" LIKE ? OR ")
+                    .append(SqlText.plain("m.observaciones")).append(" LIKE ? OR ")
+                    .append(SqlText.plain("m.tipo_referencia")).append(" LIKE ? OR ")
+                    .append(SqlText.plain("m.motivo")).append(" LIKE ? OR ")
                     .append("CAST(m.id AS TEXT) = ? OR CAST(m.referencia_id AS TEXT) = ?)");
             for (int i = 0; i < 6; i++) args.add(like);
             args.add(word);
@@ -159,24 +154,6 @@ public class MovementSearchJdbcAdapter implements MovementSearchPort {
         String column = SORTS.getOrDefault(sortBy, "m.fecha");
         String direction = ascending ? "ASC" : "DESC";
         return " ORDER BY " + column + " " + direction + " NULLS LAST, m.id " + direction;
-    }
-
-    /** Las palabras buscadas, normalizadas; «#41» se busca como 41. */
-    static List<String> words(String text) {
-        if (text == null || text.isBlank()) return List.of();
-        return Arrays.stream(normalize(text).split("\\s+"))
-                .map(word -> word.replace("#", ""))
-                .filter(word -> !word.isEmpty())
-                .limit(MAX_SEARCH_WORDS)
-                .toList();
-    }
-
-    static String normalize(String text) {
-        return Normalizer.normalize(text.trim().toLowerCase(Locale.ROOT), Normalizer.Form.NFD).replaceAll("\\p{M}", "");
-    }
-
-    private static String escapeLike(String word) {
-        return word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     private static final RowMapper<MovementRecord> ROW = (rs, i) -> {
