@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { type Observable, map } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { SKIP_ERROR_NOTIFICATION } from '@core/api/error.interceptor';
+import { toIsoDay } from '@shared/format/format';
 import type { components } from '@core/api/schema';
 
 type MovementAuditResponse = components['schemas']['MovementAuditResponse'];
@@ -104,10 +105,6 @@ function toMovement(raw: MovementAuditResponse): AuditMovement | null {
 const toMovements = (items: readonly MovementAuditResponse[] | undefined): AuditMovement[] =>
   (items ?? []).map(toMovement).filter((m): m is AuditMovement => m !== null);
 
-/** `2026-10-12`: el día local (no UTC), que es lo que la persona eligió en el calendario. */
-const isoDay = (date: Date): string =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-
 /** Los filtros y el orden como parámetros; lo vacío no se manda. */
 function filterParams(query: AuditQuery): HttpParams {
   let params = new HttpParams().set('sortBy', AUDIT_SORT_KEYS[query.sortBy] ?? 'date').set('direction', query.ascending ? 'asc' : 'desc');
@@ -117,8 +114,8 @@ function filterParams(query: AuditQuery): HttpParams {
   set('branchId', query.branchId);
   set('type', query.type);
   set('reason', query.reason);
-  set('from', query.from ? isoDay(query.from) : null);
-  set('to', query.to ? isoDay(query.to) : null);
+  set('from', query.from ? toIsoDay(query.from) : null);
+  set('to', query.to ? toIsoDay(query.to) : null);
   set('productId', query.productId);
   set('userId', query.userId);
   set('minQuantity', query.minQuantity);

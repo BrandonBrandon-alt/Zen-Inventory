@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
-import { catchError, firstValueFrom, of } from 'rxjs';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, untracked } from '@angular/core';
+import { catchError, firstValueFrom, map, of } from 'rxjs';
 import {
   LucideCalendar,
   LucideClipboardList,
@@ -23,6 +23,8 @@ import { type UserName, UserOptionsApi } from '@core/users/user-options-api';
 import { formatDateTime, formatQuantity } from '@shared/format/format';
 import { numberFromInput } from '@shared/filters/filter-helpers';
 import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
+import { debouncedText } from '@shared/data/debounced-text';
+import { type PagedQuery, serverPagedList } from '@shared/data/server-paged-list';
 import { Checkbox } from '@shared/ui/checkbox/checkbox';
 import { Badge } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
@@ -45,6 +47,13 @@ const DAY = new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium' });
 const PAGE_SIZE = 15;
 /** Espera tras la última tecla antes de buscar: no se pide una página por cada letra. */
 const SEARCH_DELAY_MS = 300;
+
+/** De la consulta de la lista al formato de la API (orden por fecha, del más reciente, si no se eligió otro). */
+const toAuditQuery = ({ sort, ...query }: PagedQuery<Omit<AuditQuery, 'page' | 'size' | 'sortBy' | 'ascending'>>): AuditQuery => ({
+  ...query,
+  sortBy: sort?.key ?? 'date',
+  ascending: sort ? sort.direction === 'asc' : false,
+});
 
 const toRow = (m: AuditMovement): AuditRow => ({
   ...m,
@@ -74,7 +83,6 @@ export class AuditPage {
   private readonly catalog = inject(CatalogOptionsApi);
   private readonly userApi = inject(UserOptionsApi);
   private readonly notifications = inject(NotificationService);
-  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly rowKey = rowKey;
   protected readonly pageSize = PAGE_SIZE;
@@ -84,21 +92,15 @@ export class AuditPage {
   protected readonly formatQuantity = formatQuantity;
   protected readonly reasonInfo = REASON_INFO;
 
-  protected readonly rows = signal<readonly AuditRow[]>([]);
-  protected readonly total = signal(0);
-  private readonly totals = signal({ in: 0, out: 0 });
   protected readonly branches = signal<readonly BranchOption[]>([]);
   protected readonly products = signal<readonly ProductOption[]>([]);
   protected readonly users = signal<readonly UserName[]>([]);
-  protected readonly loading = signal(true);
-  protected readonly error = signal<string | null>(null);
 
   // Los filtros se recuerdan por persona (la búsqueda de texto no: se escribe cada vez). Producto y responsable se
   // guardan por id (antes, por nombre: las claves cambiaron para no leer un valor viejo).
   private static readonly SCREEN = 'audit';
-  protected readonly search = signal('');
-  private readonly searchTerm = signal('');
-  private searchTimer: ReturnType<typeof setTimeout> | undefined;
+  private readonly searchBox = debouncedText(SEARCH_DELAY_MS);
+  protected readonly search = this.searchBox.text;
   protected readonly branchFilter = persistedFilter(AuditPage.SCREEN, 'branch', null as number | null, codecs.nullable(codecs.number()));
   protected readonly typeFilter = persistedFilter(AuditPage.SCREEN, 'type', null as MovementType | null, codecs.nullable(codecs.oneOf(['INGRESO', 'RETIRO'] as const)));
   protected readonly reasonFilter = persistedFilter(AuditPage.SCREEN, 'reason', null as MovementReason | null, codecs.nullable(codecs.oneOf(MOVEMENT_REASONS)));
@@ -185,20 +187,21 @@ export class AuditPage {
     minQuantity: this.minQuantity(),
     maxQuantity: this.maxQuantity(),
     onlyObserved: this.onlyObserved(),
-    text: this.searchTerm(),
+    text: this.searchBox.term(),
   }));
-  protected readonly page = linkedSignal<unknown, number>({ source: this.filters, computation: () => 1 });
-
-  private readonly query = computed<AuditQuery>(() => {
-    const sort = this.sort();
-    return {
-      ...this.filters(),
-      page: this.page(),
-      size: PAGE_SIZE,
-      sortBy: sort?.key ?? 'date',
-      ascending: sort ? sort.direction === 'asc' : false,
-    };
+  /** La página que se ve: el servidor filtra, ordena, pagina y suma lo que entró y salió. */
+  private readonly list = serverPagedList({
+    filters: this.filters,
+    sort: this.sort,
+    size: PAGE_SIZE,
+    fetch: (query) => this.api.search(toAuditQuery(query)).pipe(map((page) => ({ ...page, rows: page.movements.map(toRow) }))),
   });
+  protected readonly rows = this.list.rows;
+  protected readonly total = this.list.total;
+  protected readonly loading = this.list.loading;
+  protected readonly error = this.list.error;
+  protected readonly page = this.list.page;
+  private readonly totals = computed(() => ({ in: this.list.last()?.totalIn ?? 0, out: this.list.last()?.totalOut ?? 0 }));
 
   /** Los filtros del panel «Más filtros» que están aplicados (el botón muestra cuántos). */
   protected readonly advancedCount = computed(
@@ -239,47 +242,21 @@ export class AuditPage {
 
   /** Para el CSV: todas las filas filtradas en el orden elegido, no solo la página. */
   protected readonly exportAll = (): Promise<readonly AuditRow[]> =>
-    firstValueFrom(this.api.exportAll(untracked(this.query))).then((movements) => movements.map(toRow));
+    firstValueFrom(this.api.exportAll(toAuditQuery(untracked(this.list.query)))).then((movements) => movements.map(toRow));
 
   constructor() {
-    // Cada cambio de página, orden o filtro vuelve a pedir la página al servidor.
-    effect(() => {
-      const query = this.query();
-      untracked(() => void this.load(false, query));
-    });
     // Las opciones de los filtros: si alguna lista no llega (p. ej. la de usuarios, que no todos pueden ver), queda vacía.
     this.branchApi.list().pipe(catchError(() => of([]))).subscribe((branches) => this.branches.set(branches));
     this.catalog.products().pipe(catchError(() => of([]))).subscribe((products) => this.products.set(products));
     this.userApi.names().pipe(catchError(() => of([]))).subscribe((users) => this.users.set(users));
-    this.destroyRef.onDestroy(() => clearTimeout(this.searchTimer));
   }
 
-  /** Solo la última petición manda: al cambiar rápido de página o filtro, una respuesta vieja no pisa la lista. */
-  private loadId = 0;
-
-  protected async load(silent = false, query = untracked(this.query)): Promise<void> {
-    const id = ++this.loadId;
-    if (!silent) this.loading.set(true);
-    this.error.set(null);
-    try {
-      const page = await firstValueFrom(this.api.search(query));
-      if (id === this.loadId) {
-        this.rows.set(page.movements.map(toRow));
-        this.total.set(page.total);
-        this.totals.set({ in: page.totalIn, out: page.totalOut });
-      }
-    } catch (error) {
-      if (id === this.loadId) this.error.set(toApiError(error).message);
-    } finally {
-      if (id === this.loadId) this.loading.set(false);
-    }
+  protected load(silent = false): Promise<void> {
+    return this.list.reload(silent);
   }
 
   protected onSearch(event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
-    this.search.set(value);
-    clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.searchTerm.set(value.trim()), SEARCH_DELAY_MS);
+    this.searchBox.set((event.target as HTMLInputElement).value);
   }
 
   protected exportFailed(error: unknown): void {
@@ -298,7 +275,7 @@ export class AuditPage {
       case 'minQuantity': this.minQuantity.set(null); break;
       case 'maxQuantity': this.maxQuantity.set(null); break;
       case 'onlyObserved': this.onlyObserved.set(false); break;
-      case 'search': this.search.set(''); clearTimeout(this.searchTimer); this.searchTerm.set(''); break;
+      case 'search': this.searchBox.clear(); break;
     }
   }
 

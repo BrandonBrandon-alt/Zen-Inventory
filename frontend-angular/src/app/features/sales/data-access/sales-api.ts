@@ -4,6 +4,7 @@ import { type Observable, catchError, forkJoin, map, of } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { type SalePaymentMethod, isPaymentMethod } from '@core/sales/payment-method';
 import { SKIP_ERROR_NOTIFICATION } from '@core/api/error.interceptor';
+import { toIsoDay } from '@shared/format/format';
 import type { components } from '@core/api/schema';
 
 type SaleResponse = components['schemas']['SaleResponse'];
@@ -90,9 +91,6 @@ interface RawSalePage {
   completedCount?: number;
   completedTotal?: number;
 }
-
-/** Día local como `aaaa-mm-dd` (no UTC: de noche no debe saltar al día siguiente). */
-const isoDay = (date: Date): string => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
 /** Un producto que se puede vender en el punto de venta, con su existencia en la sucursal. */
 export interface PosProduct {
@@ -274,8 +272,8 @@ export class SalesApi {
     if (query.sortBy) params['sortBy'] = query.sortBy;
     if (query.branchId !== null) params['branchId'] = query.branchId;
     if (query.status) params['status'] = query.status;
-    if (query.from) params['from'] = isoDay(query.from);
-    if (query.to) params['to'] = isoDay(query.to);
+    if (query.from) params['from'] = toIsoDay(query.from);
+    if (query.to) params['to'] = toIsoDay(query.to);
     if (query.seller) params['seller'] = query.seller;
     if (query.product) params['product'] = query.product;
     if (query.minTotal !== null) params['minTotal'] = query.minTotal;

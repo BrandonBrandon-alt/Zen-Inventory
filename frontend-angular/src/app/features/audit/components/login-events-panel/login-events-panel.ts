@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { map } from 'rxjs';
 import { LucideCalendar, LucideMapPin, LucideMail, LucideSearch, LucideShield, LucideUser } from '@lucide/angular';
-import { toApiError } from '@core/api/api-error';
+import { debouncedText } from '@shared/data/debounced-text';
+import { serverPagedList } from '@shared/data/server-paged-list';
 import { formatDateTime, formatQuantity } from '@shared/format/format';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
@@ -76,20 +77,13 @@ interface LoginRow extends LoginEvent {
 })
 export class LoginEventsPanel {
   private readonly api = inject(LoginAuditApi);
-  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly pageSize = PAGE_SIZE;
   protected readonly rowKey = (row: LoginRow): number => row.id;
 
-  protected readonly rows = signal<readonly LoginRow[]>([]);
-  protected readonly total = signal(0);
-  private readonly failures = signal(0);
-  protected readonly loading = signal(true);
-  protected readonly error = signal<string | null>(null);
 
-  protected readonly search = signal('');
-  private readonly searchTerm = signal('');
-  private searchTimer: ReturnType<typeof setTimeout> | undefined;
+  private readonly searchBox = debouncedText(SEARCH_DELAY_MS);
+  protected readonly search = this.searchBox.text;
   protected readonly outcome = signal<LoginOutcome | null>(null);
   protected readonly from = signal<Date | null>(null);
   protected readonly to = signal<Date | null>(null);
@@ -107,9 +101,24 @@ export class LoginEventsPanel {
     { key: 'ip', header: 'IP', icon: LucideMapPin.icon },
   ];
 
-  private readonly filters = computed(() => ({ outcome: this.outcome(), from: this.from(), to: this.to(), text: this.searchTerm() }));
-  protected readonly page = linkedSignal<unknown, number>({ source: this.filters, computation: () => 1 });
-  private readonly query = computed(() => ({ ...this.filters(), page: this.page(), size: PAGE_SIZE }));
+  private readonly filters = computed(() => ({ outcome: this.outcome(), from: this.from(), to: this.to(), text: this.searchBox.term() }));
+  private readonly list = serverPagedList({
+    filters: this.filters,
+    size: PAGE_SIZE,
+    fetch: (query) =>
+      this.api.search(query).pipe(
+        map((page) => ({
+          ...page,
+          rows: page.events.map((e) => ({ ...e, person: e.userName ?? 'Sin cuenta', outcomeLabel: OUTCOME_INFO[e.outcome].label, ip: e.ip || '—' })),
+        })),
+      ),
+  });
+  protected readonly rows = this.list.rows;
+  protected readonly total = this.list.total;
+  protected readonly loading = this.list.loading;
+  protected readonly error = this.list.error;
+  protected readonly page = this.list.page;
+  private readonly failures = computed(() => this.list.last()?.failures ?? 0);
 
   protected readonly activeFilters = computed<ActiveFilter[]>(() => {
     const list: ActiveFilter[] = [];
@@ -127,38 +136,12 @@ export class LoginEventsPanel {
     return `${attempts}, ${failures === 1 ? '1 fallido' : `${formatQuantity(failures)} fallidos`}`;
   });
 
-  constructor() {
-    effect(() => {
-      const query = this.query();
-      untracked(() => void this.load(query));
-    });
-    this.destroyRef.onDestroy(() => clearTimeout(this.searchTimer));
-  }
-
-  private loadId = 0;
-
-  protected async load(query = untracked(this.query)): Promise<void> {
-    const id = ++this.loadId;
-    this.loading.set(true);
-    this.error.set(null);
-    try {
-      const page = await firstValueFrom(this.api.search(query));
-      if (id !== this.loadId) return;
-      this.rows.set(page.events.map((e) => ({ ...e, person: e.userName ?? 'Sin cuenta', outcomeLabel: OUTCOME_INFO[e.outcome].label, ip: e.ip || '—' })));
-      this.total.set(page.total);
-      this.failures.set(page.failures);
-    } catch (error) {
-      if (id === this.loadId) this.error.set(toApiError(error).message);
-    } finally {
-      if (id === this.loadId) this.loading.set(false);
-    }
+  protected load(): Promise<void> {
+    return this.list.reload();
   }
 
   protected onSearch(event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
-    this.search.set(value);
-    clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.searchTerm.set(value.trim()), SEARCH_DELAY_MS);
+    this.searchBox.set((event.target as HTMLInputElement).value);
   }
 
   protected variant(row: LoginRow): BadgeVariant {
@@ -170,7 +153,7 @@ export class LoginEventsPanel {
       case 'outcome': this.outcome.set(null); break;
       case 'from': this.from.set(null); break;
       case 'to': this.to.set(null); break;
-      case 'search': this.search.set(''); clearTimeout(this.searchTimer); this.searchTerm.set(''); break;
+      case 'search': this.searchBox.clear(); break;
     }
   }
 

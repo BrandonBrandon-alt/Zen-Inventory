@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
-import { catchError, firstValueFrom, of } from 'rxjs';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { catchError, map, of } from 'rxjs';
 import {
   LucideCalendar,
   LucideCircleCheck,
@@ -13,13 +13,14 @@ import {
   LucideUser,
   LucideUserRound,
 } from '@lucide/angular';
-import { toApiError } from '@core/api/api-error';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { CatalogOptionsApi, type SupplierOption } from '@core/catalog/catalog-options-api';
 import { formatDateTime, formatMoney, formatQuantity } from '@shared/format/format';
 import { numberFromInput, optionsFrom } from '@shared/filters/filter-helpers';
 import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
+import { debouncedText } from '@shared/data/debounced-text';
+import { serverPagedList } from '@shared/data/server-paged-list';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
 import { Button } from '@shared/ui/button/button';
 import { DatePicker } from '@shared/ui/date-picker/date-picker';
@@ -32,7 +33,7 @@ import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { SaleDetailModal } from '../../components/sale-detail-modal/sale-detail-modal';
 import { PAYMENT_METHOD_LABELS, SALE_PAYMENT_METHODS, type SalePaymentMethod, paymentLabel } from '@core/sales/payment-method';
 import { SALE_INFO, customerLabel } from '../../data-access/sale-labels';
-import { SALE_STATUSES, type Sale, type SaleQuery, type SaleStatus, SalesApi } from '../../data-access/sales-api';
+import { SALE_STATUSES, type Sale, type SaleStatus, SalesApi } from '../../data-access/sales-api';
 
 /** Fila de la tabla: la venta con los textos que se muestran y se ordenan. */
 interface SaleRow extends Sale {
@@ -61,7 +62,6 @@ export class SalesHistoryPage {
   private readonly branchApi = inject(BranchOptionsApi);
   private readonly catalogApi = inject(CatalogOptionsApi);
   private readonly auth = inject(AuthStore);
-  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly rowKey = rowKey;
   protected readonly storeIcon = LucideStore.icon;
@@ -72,15 +72,10 @@ export class SalesHistoryPage {
   protected readonly canCancel = computed(() => this.auth.role() === 'ADMIN' || this.auth.role() === 'MANAGER');
 
   /** Las ventas de la página que se ve; el resto las pide el servidor al cambiar de página, orden o filtros. */
-  protected readonly sales = signal<readonly Sale[]>([]);
-  protected readonly total = signal(0);
-  private readonly completed = signal({ count: 0, total: 0 });
   private readonly sellers = signal<readonly string[]>([]);
   private readonly products = signal<readonly string[]>([]);
   protected readonly branches = signal<readonly BranchOption[]>([]);
   protected readonly suppliers = signal<readonly SupplierOption[]>([]);
-  protected readonly loading = signal(true);
-  protected readonly error = signal<string | null>(null);
 
   // Los filtros se recuerdan por persona (la búsqueda de texto no: se escribe cada vez).
   private static readonly SCREEN = 'sales-history';
@@ -97,10 +92,9 @@ export class SalesHistoryPage {
   protected readonly customerFilter = persistedFilter(SalesHistoryPage.SCREEN, 'customer', 'all' as 'all' | 'registered' | 'anonymous', codecs.oneOf(['all', 'registered', 'anonymous'] as const));
   protected readonly paymentFilter = persistedFilter(SalesHistoryPage.SCREEN, 'payment', null as SalePaymentMethod | null, codecs.nullable(codecs.oneOf(SALE_PAYMENT_METHODS)));
   protected readonly advancedOpen = persistedFilter(SalesHistoryPage.SCREEN, 'advancedOpen', false, codecs.bool());
-  protected readonly search = signal('');
-  /** Lo buscado, ya con la pausa: es lo que se envía al servidor. */
-  private readonly searchTerm = signal('');
-  private searchTimer: ReturnType<typeof setTimeout> | undefined;
+  /** El buscador: `search` es lo que se ve; lo que se envía al servidor llega con una pausa. */
+  private readonly searchBox = debouncedText(SEARCH_DELAY_MS);
+  protected readonly search = this.searchBox.text;
   protected readonly sort = signal<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   protected readonly detailOpen = signal(false);
@@ -163,24 +157,28 @@ export class SalesHistoryPage {
     product: this.productFilter(),
     minTotal: this.minTotal(),
     maxTotal: this.maxTotal(),
-    text: this.searchTerm(),
+    text: this.searchBox.term(),
     supplierId: this.supplierFilter(),
     withDiscount: this.discountFilter() === 'all' ? null : this.discountFilter() === 'with',
     registeredCustomer: this.customerFilter() === 'all' ? null : this.customerFilter() === 'registered',
     paymentMethod: this.paymentFilter(),
   }));
-  protected readonly page = linkedSignal<unknown, number>({ source: this.filters, computation: () => 1 });
-
-  private readonly query = computed<SaleQuery>(() => {
-    const sort = this.sort();
-    return {
-      ...this.filters(),
-      page: this.page(),
-      size: PAGE_SIZE,
-      sortBy: sort ? (SORT_KEYS[sort.key] ?? sort.key) : null,
-      direction: sort?.direction ?? 'desc',
-    };
+  /** Las ventas de la página que se ve: el servidor filtra, ordena y pagina. */
+  private readonly list = serverPagedList({
+    filters: this.filters,
+    sort: this.sort,
+    size: PAGE_SIZE,
+    fetch: ({ sort, ...query }) =>
+      this.api
+        .search({ ...query, sortBy: sort ? (SORT_KEYS[sort.key] ?? sort.key) : null, direction: sort?.direction ?? 'desc' })
+        .pipe(map((page) => ({ rows: page.sales, total: page.total, completedCount: page.completedCount, completedTotal: page.completedTotal }))),
   });
+  protected readonly sales = this.list.rows;
+  protected readonly total = this.list.total;
+  protected readonly loading = this.list.loading;
+  protected readonly error = this.list.error;
+  protected readonly page = this.list.page;
+  private readonly completed = computed(() => ({ count: this.list.last()?.completedCount ?? 0, total: this.list.last()?.completedTotal ?? 0 }));
 
   /** Los filtros del panel «Más filtros» que están aplicados (el botón muestra cuántos). */
   protected readonly advancedCount = computed(
@@ -225,11 +223,6 @@ export class SalesHistoryPage {
       .suppliers()
       .pipe(catchError(() => of([])))
       .subscribe((suppliers) => this.suppliers.set(suppliers));
-    // Cada cambio de página, orden o filtro vuelve a pedir la página al servidor.
-    effect(() => {
-      const query = this.query();
-      untracked(() => void this.load(false, query));
-    });
     // Los vendedores y productos que se pueden elegir dependen de la sucursal.
     effect(() => {
       const branch = this.isAdmin() ? this.branchFilter() : null;
@@ -243,35 +236,14 @@ export class SalesHistoryPage {
           }),
       );
     });
-    this.destroyRef.onDestroy(() => clearTimeout(this.searchTimer));
   }
 
-  /** Solo la última petición manda: al cambiar de página o filtro rápido, la respuesta de la anterior no debe pisar la lista. */
-  private loadId = 0;
-
-  protected async load(silent = false, query = untracked(this.query)): Promise<void> {
-    const id = ++this.loadId;
-    if (!silent) this.loading.set(true);
-    this.error.set(null);
-    try {
-      const page = await firstValueFrom(this.api.search(query));
-      if (id === this.loadId) {
-        this.sales.set(page.sales);
-        this.total.set(page.total);
-        this.completed.set({ count: page.completedCount, total: page.completedTotal });
-      }
-    } catch (error) {
-      if (id === this.loadId) this.error.set(toApiError(error).message);
-    } finally {
-      if (id === this.loadId) this.loading.set(false);
-    }
+  protected load(silent = false): Promise<void> {
+    return this.list.reload(silent);
   }
 
   protected onSearch(event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
-    this.search.set(value);
-    clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.searchTerm.set(value.trim()), SEARCH_DELAY_MS);
+    this.searchBox.set((event.target as HTMLInputElement).value);
   }
 
   protected readonly numberFromInput = numberFromInput;
@@ -290,7 +262,7 @@ export class SalesHistoryPage {
       case 'payment': this.paymentFilter.set(null); break;
       case 'minTotal': this.minTotal.set(null); break;
       case 'maxTotal': this.maxTotal.set(null); break;
-      case 'search': this.search.set(''); clearTimeout(this.searchTimer); this.searchTerm.set(''); break;
+      case 'search': this.searchBox.clear(); break;
     }
   }
 

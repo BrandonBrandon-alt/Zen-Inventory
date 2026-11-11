@@ -46,6 +46,11 @@ export function toLocalIso(date: Date): string {
   return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}T${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
 }
 
+/** `2026-10-05`: el día local (no UTC) como lo espera la API en los filtros de fecha. */
+export function toIsoDay(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 /** Minúsculas y sin acentos: "Panamá" coincide con "panama" al buscar. */
 export function normalizeText(text: string): string {
   return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();

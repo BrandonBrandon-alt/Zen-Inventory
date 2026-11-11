@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { type Observable, map } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { SKIP_ERROR_NOTIFICATION } from '@core/api/error.interceptor';
+import { toIsoDay } from '@shared/format/format';
 import type { components } from '@core/api/schema';
 
 type LoginEventPageResponse = components['schemas']['LoginEventPageResponse'];
@@ -39,9 +40,6 @@ export interface LoginEventPage {
 }
 
 const isOutcome = (value: unknown): value is LoginOutcome => (LOGIN_OUTCOMES as readonly unknown[]).includes(value);
-const isoDay = (date: Date): string =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-
 function toEvent(raw: LoginEventResponse): LoginEvent | null {
   const date = raw.date ? new Date(raw.date) : null;
   if (typeof raw.id !== 'number' || !date || Number.isNaN(date.getTime()) || !isOutcome(raw.outcome)) return null;
@@ -57,8 +55,8 @@ export class LoginAuditApi {
 
   search(query: LoginEventQuery): Observable<LoginEventPage> {
     let params = new HttpParams().set('page', String(Math.max(0, query.page - 1))).set('size', String(query.size));
-    if (query.from) params = params.set('from', isoDay(query.from));
-    if (query.to) params = params.set('to', isoDay(query.to));
+    if (query.from) params = params.set('from', toIsoDay(query.from));
+    if (query.to) params = params.set('to', toIsoDay(query.to));
     if (query.outcome) params = params.set('outcome', query.outcome);
     if (query.text.trim()) params = params.set('q', query.text.trim());
     return this.http.get<LoginEventPageResponse>(`${this.baseUrl}/api/v1/audit/logins`, { params, context: this.context }).pipe(
