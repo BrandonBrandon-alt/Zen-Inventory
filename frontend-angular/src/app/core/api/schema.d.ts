@@ -1124,6 +1124,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit/catalog-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["search_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analytics/valuations": {
         parameters: {
             query?: never;
@@ -2151,6 +2167,32 @@ export interface components {
             /** @enum {string} */
             outcome?: "EXITOSO" | "CREDENCIALES_INVALIDAS" | "CUENTA_DESACTIVADA" | "BLOQUEADO";
             ip?: string;
+        };
+        CatalogChangePageResponse: {
+            content?: components["schemas"]["CatalogChangeResponse"][];
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        CatalogChangeResponse: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: date-time */
+            date?: string;
+            /** @enum {string} */
+            entity?: "PRODUCTO" | "USUARIO";
+            /** Format: int64 */
+            entityId?: number;
+            entityName?: string;
+            field?: string;
+            before?: string;
+            after?: string;
+            userName?: string;
         };
         BranchValuation: {
             /** Format: int64 */
@@ -4461,6 +4503,33 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["LoginEventPageResponse"];
+                };
+            };
+        };
+    };
+    search_2: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+                entity?: "PRODUCTO" | "USUARIO";
+                from?: string;
+                to?: string;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CatalogChangePageResponse"];
                 };
             };
         };

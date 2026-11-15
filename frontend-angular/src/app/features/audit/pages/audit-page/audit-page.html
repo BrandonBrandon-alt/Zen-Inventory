@@ -85,8 +85,10 @@
 </app-data-table>
 
 </div>
-} @else {
+} @else if (tab() === 'logins') {
   <app-login-events-panel id="audit-panel-logins" role="tabpanel" aria-labelledby="audit-tab-logins" />
+} @else {
+  <app-catalog-changes-panel id="audit-panel-catalog" role="tabpanel" aria-labelledby="audit-tab-catalog" />
 }
 
 <app-audit-detail-modal [(open)]="detailOpen" [row]="selected()" />

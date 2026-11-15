@@ -366,6 +366,30 @@ describe('AuditPage', () => {
       expect(await screen.findByRole('row', { name: /ana@x\.co/ })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: 'Inicios de sesión' })).toHaveAttribute('aria-selected', 'true');
     });
+
+    it('«Cambios del catálogo» abre el panel y se recuerda', async () => {
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token: 't', email: 'e@z.co', nombre: 'Yo', rol: 'ADMIN', id: 1 }));
+      stub();
+      server.use(
+        http.get(`${TEST_API}/api/v1/audit/catalog-changes`, () =>
+          HttpResponse.json({
+            content: [{ id: 1, date: '2026-11-08T21:00:00', entity: 'PRODUCTO', entityId: 1, entityName: 'Cemento Gris 50Kg', field: 'Precio de venta', before: '$ 34.000', after: '$ 36.000', userName: 'Ana Ruiz' }],
+            totalElements: 1,
+          }),
+        ),
+      );
+      const first = await renderPage();
+      await screen.findAllByRole('row', { name: /Tuerca/ });
+      await userEvent.click(screen.getByRole('tab', { name: 'Cambios del catálogo' }));
+      expect(await screen.findByRole('row', { name: /Cemento Gris 50Kg/ })).toBeInTheDocument();
+      expect(screen.queryByRole('searchbox', { name: 'Buscar movimiento' })).not.toBeInTheDocument();
+      first.fixture.destroy();
+      TestBed.resetTestingModule();
+
+      await renderPage();
+      expect(await screen.findByRole('row', { name: /Cemento Gris 50Kg/ })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Cambios del catálogo' })).toHaveAttribute('aria-selected', 'true');
+    });
   });
 
   describe('detalle', () => {

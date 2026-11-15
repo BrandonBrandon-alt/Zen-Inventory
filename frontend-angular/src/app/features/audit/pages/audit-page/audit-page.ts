@@ -36,6 +36,7 @@ import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { type TabItem, Tabs } from '@shared/ui/tabs/tabs';
 import { Tooltip } from '@shared/ui/tooltip/tooltip';
+import { CatalogChangesPanel } from '../../components/catalog-changes-panel/catalog-changes-panel';
 import { LoginEventsPanel } from '../../components/login-events-panel/login-events-panel';
 import { AuditDetailModal, type AuditRow } from '../../components/audit-detail-modal/audit-detail-modal';
 import { MOVEMENT_REASONS, type MovementQuery, type MovementReason, type MovementRecord, MovementSearchApi, type MovementType } from '@core/inventory/movement-search-api';
@@ -85,7 +86,7 @@ const toRow = (m: MovementRecord): AuditRow => ({
  */
 @Component({
   selector: 'app-audit-page',
-  imports: [Checkbox, DataTable, DataTableCell, Badge, Button, DatePicker, ActiveFilters, AdvancedFilters, FormField, InputDirective, Select, Tabs, Tooltip, AuditDetailModal, LoginEventsPanel, LucideEye, LucideSearch],
+  imports: [Checkbox, DataTable, DataTableCell, Badge, Button, DatePicker, ActiveFilters, AdvancedFilters, FormField, InputDirective, Select, Tabs, Tooltip, AuditDetailModal, LoginEventsPanel, CatalogChangesPanel, LucideEye, LucideSearch],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block p-(--page-padding)' },
   templateUrl: './audit-page.html',
@@ -129,10 +130,11 @@ export class AuditPage {
   protected readonly sort = signal<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   /** Qué se audita: los movimientos de inventario o los inicios de sesión. Se recuerda por persona. */
-  protected readonly tab = persistedFilter(AuditPage.SCREEN, 'tab', 'movements', codecs.oneOf(['movements', 'logins'] as const));
+  protected readonly tab = persistedFilter(AuditPage.SCREEN, 'tab', 'movements', codecs.oneOf(['movements', 'logins', 'catalog'] as const));
   protected readonly tabs: readonly TabItem[] = [
     { id: 'movements', label: 'Movimientos de inventario', icon: LucideArrowUpDown.icon },
     { id: 'logins', label: 'Inicios de sesión', icon: LucideLock.icon },
+    { id: 'catalog', label: 'Cambios del catálogo', icon: LucideTag.icon },
   ];
 
   protected readonly detailOpen = signal(false);
