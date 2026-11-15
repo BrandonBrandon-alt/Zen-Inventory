@@ -804,6 +804,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/transfers/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/transfers/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/transfers/fulfillment-report": {
         parameters: {
             query?: never;
@@ -955,7 +987,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["summary"];
+        get: operations["summary_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -971,7 +1003,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["search"];
+        get: operations["search_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1035,7 +1067,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["search_1"];
+        get: operations["search_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1147,7 +1179,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["search_2"];
+        get: operations["search_3"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1163,7 +1195,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["search_3"];
+        get: operations["search_4"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2015,6 +2047,49 @@ export interface components {
             id?: number;
             /** Format: date-time */
             avatarActualizadoEn?: string;
+        };
+        TransferSummaryResponse: {
+            /** Format: int64 */
+            open?: number;
+            /** Format: int64 */
+            awaitingMe?: number;
+            freightOwed?: number;
+            /** Format: int64 */
+            freightOwedCount?: number;
+        };
+        TransferPageResponse: {
+            content?: components["schemas"]["TransferRowResponse"][];
+            /** Format: int64 */
+            totalElements?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        TransferRowResponse: {
+            /** Format: int64 */
+            id?: number;
+            /** @enum {string} */
+            status?: "PENDING" | "APPROVED_DEST" | "PREPARING" | "IN_TRANSIT" | "DELIVERED" | "WITH_ISSUE" | "UNDER_CLAIM" | "CANCELLED" | "REJECTED";
+            /** @enum {string} */
+            priority?: "HIGH" | "NORMAL" | "LOW";
+            /** Format: int64 */
+            originId?: number;
+            originName?: string;
+            /** Format: int64 */
+            destinationId?: number;
+            destinationName?: string;
+            firstProductName?: string;
+            /** Format: int32 */
+            productCount?: number;
+            /** @enum {string} */
+            freightStatus?: "SIN_COSTO" | "POR_PAGAR" | "PAGO_PARCIAL" | "PAGADO";
+            freightBalance?: number;
+            /** Format: date-time */
+            requestDate?: string;
+            awaitsMe?: boolean;
         };
         TransferFulfillmentReport: {
             /** Format: int64 */
@@ -4080,6 +4155,61 @@ export interface operations {
             };
         };
     };
+    summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransferSummaryResponse"];
+                };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+                sortBy?: string;
+                direction?: string;
+                status?: string;
+                flow?: string;
+                priority?: "HIGH" | "NORMAL" | "LOW";
+                from?: string;
+                to?: string;
+                originId?: number;
+                destinationId?: number;
+                productId?: number;
+                onlyMine?: boolean;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransferPageResponse"];
+                };
+            };
+        };
+    };
     getFulfillmentReport: {
         parameters: {
             query?: never;
@@ -4312,7 +4442,7 @@ export interface operations {
             };
         };
     };
-    summary: {
+    summary_1: {
         parameters: {
             query?: {
                 branchId?: number;
@@ -4334,7 +4464,7 @@ export interface operations {
             };
         };
     };
-    search: {
+    search_1: {
         parameters: {
             query?: {
                 page?: number;
@@ -4432,7 +4562,7 @@ export interface operations {
             };
         };
     };
-    search_1: {
+    search_2: {
         parameters: {
             query?: {
                 page?: number;
@@ -4612,7 +4742,7 @@ export interface operations {
             };
         };
     };
-    search_2: {
+    search_3: {
         parameters: {
             query?: {
                 page?: number;
@@ -4639,7 +4769,7 @@ export interface operations {
             };
         };
     };
-    search_3: {
+    search_4: {
         parameters: {
             query?: {
                 page?: number;

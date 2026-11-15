@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { catchError, firstValueFrom, forkJoin, of } from 'rxjs';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, untracked } from '@angular/core';
+import { catchError, firstValueFrom, forkJoin, map, of } from 'rxjs';
 import {
   LucideCalendar,
   LucideCircleCheck,
@@ -17,8 +17,9 @@ import { toApiError } from '@core/api/api-error';
 import { AuthStore } from '@core/auth/session/auth-store';
 import { type BranchOption, BranchOptionsApi } from '@core/branches/branch-options-api';
 import { CatalogOptionsApi, type ProductOption } from '@core/catalog/catalog-options-api';
-import { formatDateTime, formatMoney, normalizeText } from '@shared/format/format';
-import { inDateRange, optionsFrom } from '@shared/filters/filter-helpers';
+import { debouncedText } from '@shared/data/debounced-text';
+import { type PagedQuery, type SortState, serverPagedList } from '@shared/data/server-paged-list';
+import { formatDateTime, formatMoney } from '@shared/format/format';
 import { codecs, persistedFilter } from '@shared/filters/persisted-filter';
 import { Checkbox } from '@shared/ui/checkbox/checkbox';
 import { Badge, type BadgeVariant } from '@shared/ui/badge/badge';
@@ -34,20 +35,68 @@ import { Tooltip } from '@shared/ui/tooltip/tooltip';
 import { TransferDetailModal } from '../../components/transfer-detail-modal/transfer-detail-modal';
 import { TransferRequestModal, type TransferPreset } from '../../components/transfer-request-modal/transfer-request-modal';
 import { takeNewDocumentRequest } from '@core/navigation/new-document-link';
-import { FREIGHT_INFO, OPEN_STATUSES, PRIORITY_INFO, STATUS_INFO } from '../../data-access/transfer-labels';
-import { type Actor, transferActions } from '../../data-access/transfer-permissions';
-import { type Transfer, TRANSFER_STATUSES, type TransferPriority, type TransferStatus, TransfersApi } from '../../data-access/transfers-api';
+import { FREIGHT_INFO, PRIORITY_INFO, STATUS_INFO } from '../../data-access/transfer-labels';
+import type { Actor } from '../../data-access/transfer-permissions';
+import {
+  type Transfer,
+  type TransferListRow,
+  type TransferQuery,
+  type TransferSortField,
+  type TransferSummary,
+  TRANSFER_STATUSES,
+  type TransferPriority,
+  type TransferStatus,
+  TransfersApi,
+} from '../../data-access/transfers-api';
 
 type Direction = 'all' | 'incoming' | 'outgoing';
 
-/** Fila de la tabla: el traslado con los textos que se ordenan y se muestran. */
-interface TransferRow extends Transfer {
+/** Fila de la tabla: el traslado con los textos que se muestran. */
+interface TransferRow extends TransferListRow {
   readonly route: string;
   readonly statusLabel: string;
   readonly priorityLabel: string;
   readonly freightLabel: string;
   readonly products: string;
-  readonly needsMe: boolean;
+}
+
+type StatusFilter = 'open' | 'all' | TransferStatus;
+interface TransferFilters {
+  readonly status: StatusFilter;
+  readonly flow: Direction;
+  readonly priority: TransferPriority | null;
+  readonly from: Date | null;
+  readonly to: Date | null;
+  readonly originId: number | null;
+  readonly destinationId: number | null;
+  readonly productId: number | null;
+  readonly onlyMine: boolean;
+  readonly text: string;
+}
+
+const PAGE_SIZE = 10;
+const SEARCH_DELAY_MS = 300;
+/** Columna de la tabla → campo de orden del servidor. */
+const SORT_KEYS: Readonly<Record<string, TransferSortField>> = {
+  id: 'id',
+  statusLabel: 'status',
+  route: 'route',
+  priorityLabel: 'priority',
+  freightLabel: 'freight',
+  requestDate: 'requestDate',
+};
+
+const toRow = (t: TransferListRow): TransferRow => ({
+  ...t,
+  route: `${t.originName} → ${t.destinationName}`,
+  statusLabel: STATUS_INFO[t.status].label,
+  priorityLabel: PRIORITY_INFO[t.priority].label,
+  freightLabel: FREIGHT_INFO[t.freightStatus].label,
+  products: !t.firstProductName ? '—' : t.productCount > 1 ? `${t.firstProductName} +${t.productCount - 1}` : t.firstProductName,
+});
+
+function toTransferQuery({ sort, ...query }: PagedQuery<TransferFilters>): TransferQuery {
+  return { ...query, sortBy: sort ? (SORT_KEYS[sort.key] ?? 'id') : 'id', ascending: sort ? sort.direction === 'asc' : false };
 }
 
 const rowKey = (row: TransferRow): number => row.id;
@@ -88,6 +137,7 @@ export class TransfersPage {
   private readonly role = inject(AuthStore).role;
 
   protected readonly rowKey = rowKey;
+  protected readonly pageSize = PAGE_SIZE;
   protected readonly formatDateTime = formatDateTime;
   protected readonly filterIcon = LucideListFilter.icon;
   protected readonly priorityIcon = LucideFlag.icon;
@@ -96,23 +146,22 @@ export class TransfersPage {
   protected readonly ownBranchId = computed(() => this.session()?.sucursalId ?? null);
   protected readonly actor = computed<Actor>(() => ({ role: this.role(), branchId: this.ownBranchId() }));
 
-  protected readonly transfers = signal<readonly Transfer[]>([]);
   protected readonly branches = signal<readonly BranchOption[]>([]);
   protected readonly products = signal<readonly ProductOption[]>([]);
-  protected readonly loading = signal(true);
-  protected readonly error = signal<string | null>(null);
 
   // Los filtros se recuerdan por persona (la búsqueda de texto no: se escribe cada vez).
   private static readonly SCREEN = 'transfers';
-  protected readonly search = signal('');
+  private readonly searchBox = debouncedText(SEARCH_DELAY_MS);
+  protected readonly search = this.searchBox.text;
   protected readonly direction = persistedFilter(TransfersPage.SCREEN, 'direction', 'all' as Direction, codecs.oneOf(['all', 'incoming', 'outgoing'] as const));
-  protected readonly statusFilter = persistedFilter(TransfersPage.SCREEN, 'status', 'open' as 'open' | 'all' | TransferStatus, codecs.oneOf(['open', 'all', ...TRANSFER_STATUSES] as const));
+  protected readonly statusFilter = persistedFilter(TransfersPage.SCREEN, 'status', 'open' as StatusFilter, codecs.oneOf(['open', 'all', ...TRANSFER_STATUSES] as const));
   protected readonly priorityFilter = persistedFilter(TransfersPage.SCREEN, 'priority', null as TransferPriority | null, codecs.nullable(codecs.oneOf(PRIORITIES)));
   protected readonly from = persistedFilter(TransfersPage.SCREEN, 'from', null as Date | null, codecs.nullable(codecs.date()));
   protected readonly to = persistedFilter(TransfersPage.SCREEN, 'to', null as Date | null, codecs.nullable(codecs.date()));
   protected readonly originFilter = persistedFilter(TransfersPage.SCREEN, 'origin', null as number | null, codecs.nullable(codecs.number()));
   protected readonly destinationFilter = persistedFilter(TransfersPage.SCREEN, 'destination', null as number | null, codecs.nullable(codecs.number()));
-  protected readonly productFilter = persistedFilter(TransfersPage.SCREEN, 'product', null as string | null, codecs.nullable(codecs.text()));
+  // Por id (antes se guardaba el nombre con la clave «product»: ese valor viejo ya no se lee).
+  protected readonly productFilter = persistedFilter(TransfersPage.SCREEN, 'productId', null as number | null, codecs.nullable(codecs.number()));
   protected readonly onlyMine = persistedFilter(TransfersPage.SCREEN, 'onlyMine', false, codecs.bool());
   protected readonly advancedOpen = persistedFilter(TransfersPage.SCREEN, 'advancedOpen', false, codecs.bool());
 
@@ -120,7 +169,10 @@ export class TransfersPage {
   /** Lo que llega ya elegido a la solicitud cuando se viene de otra pantalla (el ajuste de stock). */
   protected readonly requestPreset = signal<TransferPreset | null>(null);
   protected readonly detailOpen = signal(false);
-  protected readonly selectedId = signal<number | null>(null);
+  protected readonly selectedRow = signal<TransferRow | null>(null);
+  protected readonly selected = signal<Transfer | null>(null);
+  protected readonly detailError = signal<string | null>(null);
+  private detailRequest = 0;
 
   protected readonly directionOptions: readonly SegmentedOption<Direction>[] = [
     { value: 'all', label: 'Todos' },
@@ -128,7 +180,7 @@ export class TransfersPage {
     { value: 'outgoing', label: 'Salientes' },
   ];
 
-  protected readonly statusOptions: readonly SelectOption<'open' | 'all' | TransferStatus>[] = [
+  protected readonly statusOptions: readonly SelectOption<StatusFilter>[] = [
     { value: 'open', label: 'En curso' },
     { value: 'all', label: 'Todos los estados' },
     ...TRANSFER_STATUSES.map((value) => ({ value, label: STATUS_INFO[value].label, icon: STATUS_INFO[value].icon })),
@@ -142,7 +194,11 @@ export class TransfersPage {
     { value: null, label: 'Todas las sucursales' },
     ...this.branches().map((b) => ({ value: b.id, label: b.nombre })),
   ]);
-  protected readonly productOptions = computed(() => optionsFrom(this.transfers().flatMap((t) => t.lines.map((l) => l.productName)), this.productFilter(), 'Todos los productos'));
+  protected readonly productOptions = computed<SelectOption<number | null>[]>(() => [
+    { value: null, label: 'Todos los productos' },
+    ...this.products().map((p) => ({ value: p.id, label: p.nombre })),
+  ]);
+  private readonly productNames = computed(() => new Map(this.products().map((p) => [p.id, p.nombre])));
 
   private readonly branchNames = computed(() => new Map(this.branches().map((b) => [b.id, b.nombre])));
   protected readonly names = computed<ReadonlyMap<number, string>>(() => this.branchNames());
@@ -158,49 +214,33 @@ export class TransfersPage {
     { key: 'acciones', header: 'Acciones', align: 'end' },
   ];
 
-  protected readonly rows = computed<TransferRow[]>(() => {
-    const own = this.ownBranchId();
-    const direction = this.direction();
-    const status = this.statusFilter();
-    const names = this.branchNames();
-    const name = (id: number) => names.get(id) ?? `Sede ${id}`;
-    const needle = normalizeText(this.search().trim());
-    const { priority, from, to, origin, destination, product } = {
-      priority: this.priorityFilter(),
-      from: this.from(),
-      to: this.to(),
-      origin: this.originFilter(),
-      destination: this.destinationFilter(),
-      product: this.productFilter(),
-    };
-    return this.transfers()
-      .filter((t) => {
-        if (direction === 'incoming' && t.destinationBranchId !== own) return false;
-        if (direction === 'outgoing' && t.originBranchId !== own) return false;
-        if (status === 'open') return OPEN_STATUSES.includes(t.status);
-        return status === 'all' || t.status === status;
-      })
-      .filter((t) => priority === null || t.priority === priority)
-      .filter((t) => inDateRange(t.requestDate, from, to))
-      .filter((t) => origin === null || t.originBranchId === origin)
-      .filter((t) => destination === null || t.destinationBranchId === destination)
-      .filter((t) => product === null || t.lines.some((l) => l.productName === product))
-      .filter((t) => !needle || normalizeText(`${t.id} ${name(t.originBranchId)} ${name(t.destinationBranchId)} ${t.lines.map((l) => l.productName).join(' ')}`).includes(needle))
-      .map((t) => {
-        const actions = transferActions(t, this.actor());
-        return {
-          ...t,
-          route: `${name(t.originBranchId)} → ${name(t.destinationBranchId)}`,
-          statusLabel: STATUS_INFO[t.status].label,
-          priorityLabel: PRIORITY_INFO[t.priority].label,
-          freightLabel: FREIGHT_INFO[t.freightStatus].label,
-          products: this.productsLabel(t),
-          // Le toca a quien mira: hay un paso que solo él puede dar.
-          needsMe: actions.approve || actions.prepare || actions.dispatch || actions.receive || actions.resolve,
-        };
-      })
-      .filter((r) => !this.onlyMine() || r.needsMe);
+  protected readonly sort = signal<SortState | null>(null);
+  private readonly filters = computed<TransferFilters>(() => ({
+    status: this.statusFilter(),
+    // El ADMIN no tiene «Entrantes/Salientes» (ve todas las sucursales).
+    flow: this.isAdmin() ? 'all' : this.direction(),
+    priority: this.priorityFilter(),
+    from: this.from(),
+    to: this.to(),
+    originId: this.originFilter(),
+    destinationId: this.destinationFilter(),
+    productId: this.productFilter(),
+    onlyMine: this.onlyMine(),
+    text: this.searchBox.term(),
+  }));
+  private readonly list = serverPagedList({
+    filters: this.filters,
+    sort: this.sort,
+    size: PAGE_SIZE,
+    fetch: (query) => this.api.search(toTransferQuery(query)).pipe(map((page) => ({ ...page, rows: page.transfers.map(toRow) }))),
   });
+  protected readonly rows = this.list.rows;
+  protected readonly total = this.list.total;
+  protected readonly loading = this.list.loading;
+  protected readonly error = this.list.error;
+  protected readonly page = this.list.page;
+  protected readonly exportAll = (): Promise<readonly TransferRow[]> =>
+    firstValueFrom(this.api.searchAll(toTransferQuery(untracked(this.list.query))).pipe(map((rows) => rows.map(toRow))));
 
   /** Los filtros del panel «Más filtros» que están aplicados (el botón muestra cuántos). */
   protected readonly advancedCount = computed(
@@ -219,25 +259,19 @@ export class TransfersPage {
     if (this.to() !== null) list.push({ id: 'to', label: 'Hasta', text: DAY.format(this.to()!) });
     if (this.originFilter() !== null) list.push({ id: 'origin', label: 'Origen', text: branch(this.originFilter()!) });
     if (this.destinationFilter() !== null) list.push({ id: 'destination', label: 'Destino', text: branch(this.destinationFilter()!) });
-    if (this.productFilter() !== null) list.push({ id: 'product', label: 'Producto', text: this.productFilter()! });
+    if (this.productFilter() !== null) list.push({ id: 'product', label: 'Producto', text: this.productNames().get(this.productFilter()!) ?? `Producto ${this.productFilter()}` });
     if (this.onlyMine()) list.push({ id: 'onlyMine', label: 'Solo los que', text: 'esperan mi acción' });
     if (this.search().trim()) list.push({ id: 'search', label: 'Búsqueda', text: this.search().trim() });
     return list;
   });
 
-  protected readonly selected = computed(() => this.transfers().find((t) => t.id === this.selectedId()) ?? null);
-
-  protected readonly pending = computed(() => this.rows().filter((r) => r.needsMe).length);
-
-  /** Lo que se le debe a los transportistas en los traslados visibles. */
-  protected readonly freightOwed = computed(() => {
-    const owed = this.transfers().filter((t) => t.freightBalance > 0);
-    return { total: owed.reduce((sum, t) => sum + t.freightBalance, 0), count: owed.length };
-  });
+  /** Los totales del encabezado, sobre todo lo visible (no solo la página): los calcula el servidor. */
+  protected readonly headline = signal<TransferSummary | null>(null);
+  protected readonly pending = computed(() => this.headline()?.awaitingMe ?? 0);
   protected readonly formatMoney = formatMoney;
 
   protected readonly summary = computed(() => {
-    const open = this.transfers().filter((t) => OPEN_STATUSES.includes(t.status)).length;
+    const open = this.headline()?.open ?? 0;
     return open === 1 ? '1 traslado en curso' : `${open} traslados en curso`;
   });
 
@@ -252,8 +286,8 @@ export class TransfersPage {
         destinationBranchId: sending ? null : request.branchId,
       });
     }
-    void this.load();
-    // Los nombres de sucursal y de producto adornan la tabla y el formulario: si fallan, se muestran los códigos.
+    void this.loadSummary();
+    // Los nombres de sucursal y de producto alimentan los filtros y el formulario: si fallan, se muestran los códigos.
     forkJoin({
       branches: this.branchApi.list().pipe(catchError(() => of([]))),
       products: this.catalog.products().pipe(catchError(() => of([]))),
@@ -268,21 +302,46 @@ export class TransfersPage {
     this.requestOpen.set(true);
   }
 
+  /** Recarga la página que se ve y el encabezado (tras solicitar o cambiar un traslado). */
   protected async load(silent = false): Promise<void> {
-    if (!silent) this.loading.set(true);
-    this.error.set(null);
+    await Promise.all([this.list.reload(silent), this.loadSummary()]);
+  }
+
+  /** Un traslado cambió desde su detalle: se recargan la lista, el encabezado y el traslado abierto. */
+  protected onChanged(): void {
+    void this.load(true);
+    const id = this.selectedRow()?.id;
+    if (id !== undefined) void this.loadDetail(id);
+  }
+
+  private async loadSummary(): Promise<void> {
     try {
-      this.transfers.set(await firstValueFrom(this.api.list()));
+      this.headline.set(await firstValueFrom(this.api.summary()));
+    } catch {
+      // El encabezado es un resumen: si falla, la lista sigue sirviendo (y muestra su propio error si también falla).
+    }
+  }
+
+  private async loadDetail(id: number): Promise<void> {
+    const request = ++this.detailRequest;
+    try {
+      const transfer = await firstValueFrom(this.api.get(id));
+      if (request === this.detailRequest) {
+        this.selected.set(transfer);
+        this.detailError.set(null);
+      }
     } catch (error) {
-      this.error.set(toApiError(error).message);
-    } finally {
-      this.loading.set(false);
+      if (request === this.detailRequest && this.selected()?.id !== id) this.detailError.set(toApiError(error).message);
     }
   }
 
   protected openDetail(row: TransferRow): void {
-    this.selectedId.set(row.id);
+    // Si es otro traslado, no se muestra el anterior mientras llega el nuevo; si es el mismo, se ve lo último mientras se refresca.
+    if (this.selected()?.id !== row.id) this.selected.set(null);
+    this.detailError.set(null);
+    this.selectedRow.set(row);
     this.detailOpen.set(true);
+    void this.loadDetail(row.id);
   }
 
   protected statusVariant(row: TransferRow): BadgeVariant {
@@ -294,7 +353,7 @@ export class TransfersPage {
   }
 
   protected onSearch(event: Event): void {
-    this.search.set((event.target as HTMLInputElement).value);
+    this.searchBox.set((event.target as HTMLInputElement).value);
   }
 
   protected removeFilter(id: string): void {
@@ -308,19 +367,12 @@ export class TransfersPage {
       case 'destination': this.destinationFilter.set(null); break;
       case 'product': this.productFilter.set(null); break;
       case 'onlyMine': this.onlyMine.set(false); break;
-      case 'search': this.search.set(''); break;
+      case 'search': this.searchBox.clear(); break;
     }
   }
 
   protected clearFilters(): void {
     for (const filter of this.activeFilters()) this.removeFilter(filter.id);
-  }
-
-  private productsLabel(transfer: Transfer): string {
-    const [first] = transfer.lines;
-    if (!first) return '—';
-    const others = transfer.lines.length - 1;
-    return others > 0 ? `${first.productName} +${others}` : first.productName;
   }
 
   protected freightVariant(row: TransferRow): BadgeVariant {

@@ -50,9 +50,105 @@ function useSession(rol: string, sucursalId?: number) {
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token: 't', email: 'e@z.co', nombre: 'Yo', rol, id: 1, sucursalId }));
 }
 
+interface Fixture {
+  id: number;
+  status: string;
+  priority: string;
+  originBranchId: number;
+  destinationBranchId: number;
+  requestDate: string;
+  details: { productId: number; productName: string }[];
+  freightBalance?: number;
+  freightStatus?: string;
+}
+const OPEN = ['PENDING', 'APPROVED_DEST', 'PREPARING', 'IN_TRANSIT', 'WITH_ISSUE', 'UNDER_CLAIM'];
+const session = () => JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) ?? '{}') as { rol?: string; sucursalId?: number };
+/** Lo que el servidor decide con `TransferActionPolicy` (aquí, con el rol y la sucursal de la sesión de la prueba). */
+function awaitsMe(t: Fixture): boolean {
+  const { rol, sucursalId } = session();
+  const admin = rol === 'ADMIN';
+  const manager = admin || rol === 'MANAGER';
+  const operational = manager || rol === 'OPERADOR_INVENTARIO';
+  const origin = admin || sucursalId === t.originBranchId;
+  const destination = admin || sucursalId === t.destinationBranchId;
+  switch (t.status) {
+    case 'PENDING': return manager && destination;
+    case 'APPROVED_DEST': return manager && origin;
+    case 'PREPARING': return operational && origin;
+    case 'IN_TRANSIT': return operational && destination;
+    case 'WITH_ISSUE': return manager && (origin || destination);
+    default: return false;
+  }
+}
+const branchName = (id: number) => BRANCHES.find((b) => b.id === id)?.nombre ?? '';
+const listRow = (t: Fixture) => ({
+  id: t.id,
+  status: t.status,
+  priority: t.priority,
+  originId: t.originBranchId,
+  originName: branchName(t.originBranchId),
+  destinationId: t.destinationBranchId,
+  destinationName: branchName(t.destinationBranchId),
+  firstProductName: t.details[0]?.productName ?? null,
+  productCount: t.details.length,
+  freightStatus: t.freightStatus ?? 'SIN_COSTO',
+  freightBalance: t.freightBalance ?? 0,
+  requestDate: t.requestDate,
+  awaitsMe: awaitsMe(t),
+});
+const listRowOf = (t: unknown) => listRow(t as Fixture);
+
+/** Cada búsqueda que llegó al servidor falso (la última es la que se ve). */
+let searches: URLSearchParams[] = [];
+const lastSearch = () => searches.at(-1)!;
+
+/**
+ * Un servidor falso de traslados: alcance por sucursal, filtros, orden por número y página como el real; resume lo
+ * visible y devuelve cada traslado por id.
+ */
 function stub(transfers: unknown[] = ALL) {
+  const current = transfers as Fixture[];
+  searches = [];
+  const visible = () => {
+    const { rol, sucursalId } = session();
+    return current.filter((t) => rol === 'ADMIN' || t.originBranchId === sucursalId || t.destinationBranchId === sucursalId);
+  };
   server.use(
-    http.get(URL_T, () => HttpResponse.json(transfers)),
+    http.get(`${URL_T}/search`, ({ request }) => {
+      const q = new URL(request.url).searchParams;
+      searches.push(q);
+      const own = session().sucursalId;
+      const status = q.get('status') ?? 'open';
+      const flow = q.get('flow') ?? 'all';
+      const text = (q.get('q') ?? '').toLowerCase();
+      const num = (key: string) => (q.has(key) ? Number(q.get(key)) : null);
+      const [origin, destination, product, page, size] = [num('originId'), num('destinationId'), num('productId'), num('page') ?? 0, num('size') ?? 25];
+      const rows = visible()
+        .filter((t) => (status === 'open' ? OPEN.includes(t.status) : status === 'all' || t.status === status))
+        .filter((t) => flow === 'all' || (flow === 'incoming' ? t.destinationBranchId === own : t.originBranchId === own))
+        .filter((t) => !q.has('priority') || t.priority === q.get('priority'))
+        .filter((t) => (origin === null || t.originBranchId === origin) && (destination === null || t.destinationBranchId === destination))
+        .filter((t) => product === null || t.details.some((d) => d.productId === product))
+        .filter((t) => q.get('onlyMine') !== 'true' || awaitsMe(t))
+        .filter((t) => !text || `${t.id} ${branchName(t.originBranchId)} ${branchName(t.destinationBranchId)} ${t.details.map((d) => d.productName).join(' ')}`.toLowerCase().includes(text))
+        .sort((a, b) => b.id - a.id)
+        .map(listRow);
+      return HttpResponse.json({ content: rows.slice(page * size, page * size + size), totalElements: rows.length, page, size, totalPages: Math.ceil(rows.length / size) });
+    }),
+    http.get(`${URL_T}/summary`, () => {
+      const seen = visible();
+      const owed = seen.filter((t) => (t.freightBalance ?? 0) > 0);
+      return HttpResponse.json({
+        open: seen.filter((t) => OPEN.includes(t.status)).length,
+        awaitingMe: seen.filter(awaitsMe).length,
+        freightOwed: owed.reduce((sum, t) => sum + (t.freightBalance ?? 0), 0),
+        freightOwedCount: owed.length,
+      });
+    }),
+    http.get(`${URL_T}/:id`, ({ params }) => {
+      const found = current.find((t) => String(t.id) === params['id']);
+      return found ? HttpResponse.json(found) : HttpResponse.json(apiErrorBody(404, 'NOT_FOUND', 'Traslado no encontrado'), { status: 404 });
+    }),
     http.get(`${TEST_API}/api/branches`, () => HttpResponse.json(BRANCHES)),
     http.get(`${TEST_API}/api/catalog/products`, () => HttpResponse.json(PRODUCTS)),
     // Lo que cada sucursal tiene disponible para enviar: la Sede Central tiene Tornillo (50) y Tuerca (8); la Sur nada.
@@ -79,7 +175,9 @@ const ids = () => screen.getAllByRole('row').slice(1).map((r) => within(r).getAl
 /** Abre el detalle del traslado con ese número (la fila es clicable). */
 async function openDetail(id: number) {
   await userEvent.click(await screen.findByRole('button', { name: `Ver traslado ${id}` }));
-  return screen.getByRole('dialog', { name: `Traslado #${id}` });
+  const dialog = screen.getByRole('dialog', { name: `Traslado #${id}` });
+  await vi.waitFor(() => expect(within(dialog).queryByText('Cargando el traslado…')).not.toBeInTheDocument());
+  return dialog;
 }
 
 describe('TransfersPage', () => {
@@ -139,9 +237,11 @@ it('resume varios productos como "Tornillo +1"', async () => {
       await renderPage();
       await screen.findByText('#5');
       await chooseOption('Estado del traslado', 'Todos los estados');
-      expect(ids()).toHaveLength(6);
+      await vi.waitFor(() => expect(ids()).toHaveLength(6));
+      expect(lastSearch().get('status')).toBe('all');
       await chooseOption('Estado del traslado', 'Entregado');
-      expect(ids()).toEqual(['#9']);
+      await vi.waitFor(() => expect(ids()).toEqual(['#9']));
+      expect(lastSearch().get('status')).toBe('DELIVERED');
     });
 
     it('un gerente filtra entrantes y salientes de su sucursal', async () => {
@@ -151,9 +251,11 @@ it('resume varios productos como "Tornillo +1"', async () => {
       await screen.findByText('#5');
       await chooseOption('Estado del traslado', 'Todos los estados');
       await userEvent.click(screen.getByRole('radio', { name: 'Entrantes' }));
-      expect(ids()).toEqual(['#5', '#4', '#3', '#2', '#1']); // destino 20
+      await vi.waitFor(() => expect(ids()).toEqual(['#5', '#4', '#3', '#2', '#1'])); // destino 20
+      expect(lastSearch().get('flow')).toBe('incoming');
       await userEvent.click(screen.getByRole('radio', { name: 'Salientes' }));
-      expect(ids()).toEqual(['#9']); // origen 20
+      await vi.waitFor(() => expect(ids()).toEqual(['#9'])); // origen 20
+      expect(lastSearch().get('flow')).toBe('outgoing');
     });
 
     it('el administrador no ve el filtro de dirección (no tiene sucursal)', async () => {
@@ -175,6 +277,73 @@ it('resume varios productos como "Tornillo +1"', async () => {
       expect(screen.getByText(/3 esperan tu acción/)).toBeInTheDocument();
     });
 
+    it('pide al servidor la primera página en curso, del más nuevo al más viejo', async () => {
+      useSession('MANAGER', 20);
+      stub();
+      await renderPage();
+      await screen.findByText('#5');
+      expect(Object.fromEntries(lastSearch())).toEqual({ page: '0', size: '10', sortBy: 'id', direction: 'desc', status: 'open', flow: 'all' });
+    });
+
+    it('con más traslados que una página, «Página siguiente» pide la siguiente', async () => {
+      useSession('ADMIN');
+      stub(Array.from({ length: 12 }, (_, i) => ({ ...T.pending, id: i + 1 })));
+      await renderPage();
+      await screen.findByText('#12');
+      expect(ids()).toHaveLength(10);
+      await userEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+      await vi.waitFor(() => expect(ids()).toEqual(['#2', '#1']));
+      expect(lastSearch().get('page')).toBe('1');
+    });
+
+    it('ordenar por una columna lo pide al servidor', async () => {
+      useSession('ADMIN');
+      stub();
+      await renderPage();
+      await screen.findByText('#5');
+      await userEvent.click(screen.getByRole('button', { name: /Ruta/ }));
+      await vi.waitFor(() => expect(lastSearch().get('sortBy')).toBe('route'));
+      expect(lastSearch().get('direction')).toBe('asc');
+    });
+
+    it('«Te toca» lo decide el servidor, no la pantalla', async () => {
+      useSession('MANAGER', 20);
+      stub();
+      server.use(
+        http.get(`${URL_T}/search`, () =>
+          HttpResponse.json({ content: [{ ...listRowOf(T.approved), awaitsMe: true }, { ...listRowOf(T.pending), awaitsMe: false }], totalElements: 2 }),
+        ),
+      );
+      await renderPage();
+      await screen.findByText('#5');
+      expect(within(screen.getByRole('row', { name: /#4\b/ })).getByText('Te toca')).toBeInTheDocument();
+      expect(within(screen.getByRole('row', { name: /#5\b/ })).queryByText('Te toca')).not.toBeInTheDocument();
+    });
+
+    it('el encabezado viene de /summary: cuenta todo lo visible, no solo la página', async () => {
+      useSession('ADMIN');
+      stub();
+      server.use(http.get(`${URL_T}/summary`, () => HttpResponse.json({ open: 37, awaitingMe: 6, freightOwed: 450000, freightOwedCount: 9 })));
+      await renderPage();
+      expect(await screen.findByText(/37 traslados en curso, 6 esperan tu acción/)).toBeInTheDocument();
+      expect(screen.getByText(/en 9 traslados/)).toHaveTextContent('450.000');
+    });
+
+    it('exportar trae del servidor todo lo filtrado, no solo la página', async () => {
+      useSession('ADMIN');
+      stub(Array.from({ length: 12 }, (_, i) => ({ ...T.pending, id: i + 1 })));
+      let csv = '';
+      vi.spyOn(URL, 'createObjectURL').mockImplementation((blob: Blob | MediaSource) => (void (blob as Blob).text().then((t) => (csv = t)), 'blob:csv'));
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+      await renderPage();
+      await screen.findByText('#12');
+      await userEvent.click(screen.getByRole('button', { name: /Exportar CSV/ }));
+      await vi.waitFor(() => expect(csv.trim().split('\n')).toHaveLength(13)); // encabezado + 12 traslados
+      expect(lastSearch().get('size')).toBe('100');
+      vi.restoreAllMocks();
+    });
+
     it('sin traslados invita a solicitar el primero', async () => {
       useSession('ADMIN');
       stub([]);
@@ -185,7 +354,7 @@ it('resume varios productos como "Tornillo +1"', async () => {
     it('si falla la carga muestra el error en la tabla, sin aviso global', async () => {
       useSession('ADMIN');
       stub();
-      server.use(http.get(URL_T, () => HttpResponse.json(apiErrorBody(500, 'INTERNAL_ERROR', 'Falla de prueba'), { status: 500 })));
+      server.use(http.get(`${URL_T}/search`, () => HttpResponse.json(apiErrorBody(500, 'INTERNAL_ERROR', 'Falla de prueba'), { status: 500 })));
       await renderPage();
       expect(await screen.findByRole('alert')).toHaveTextContent('Falla de prueba');
       expect(TestBed.inject(NotificationService).items()).toEqual([]);
@@ -202,8 +371,11 @@ it('resume varios productos como "Tornillo +1"', async () => {
       stub();
       await renderPage();
       await screen.findByText('#5');
+      const before = searches.length;
       await userEvent.type(screen.getByLabelText('Buscar traslado'), 'tuerca');
-      expect(ids().sort()).toEqual(['3', '5']);
+      await vi.waitFor(() => expect(ids().sort()).toEqual(['3', '5']));
+      expect(searches.length).toBe(before + 1); // una sola búsqueda, al dejar de escribir
+      expect(lastSearch().get('q')).toBe('tuerca');
     });
 
     it('filtra por prioridad', async () => {
@@ -212,9 +384,10 @@ it('resume varios productos como "Tornillo +1"', async () => {
       await renderPage();
       await screen.findByText('#5');
       await chooseOption('Prioridad', 'Alta');
-      expect(ids()).toEqual(['5']);
+      await vi.waitFor(() => expect(ids()).toEqual(['5']));
+      expect(lastSearch().get('priority')).toBe('HIGH');
       await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro Prioridad: Alta' }));
-      expect(ids().length).toBe(5); // en curso: todos menos el entregado
+      await vi.waitFor(() => expect(ids().length).toBe(5)); // en curso: todos menos el entregado
     });
 
     it('filtra por sede de origen y de destino y por producto desde «Más filtros»', async () => {
@@ -225,13 +398,16 @@ it('resume varios productos como "Tornillo +1"', async () => {
       await chooseOption('Estado del traslado', 'Todos los estados');
       await openAdvanced();
       await chooseOption('Sede de origen', 'Sucursal Norte');
-      expect(ids()).toEqual(['9']);
+      await vi.waitFor(() => expect(ids()).toEqual(['9']));
+      expect(lastSearch().get('originId')).toBe('20');
       await chooseOption('Sede de origen', 'Todas las sucursales');
       await chooseOption('Sede de destino', 'Sucursal Sur');
-      expect(ids()).toEqual(['9']);
+      await vi.waitFor(() => expect(ids()).toEqual(['9']));
+      expect(lastSearch().get('destinationId')).toBe('30');
       await chooseOption('Sede de destino', 'Todas las sucursales');
       await chooseOption('Producto', 'Tuerca');
-      expect(ids().sort()).toEqual(['3', '5']);
+      await vi.waitFor(() => expect(ids().sort()).toEqual(['3', '5']));
+      expect(lastSearch().get('productId')).toBe('101'); // por id, no por nombre
       expect(screen.getByLabelText('1 filtro activo')).toBeInTheDocument();
     });
 
@@ -242,9 +418,8 @@ it('resume varios productos como "Tornillo +1"', async () => {
       await screen.findByText('#5');
       await openAdvanced();
       await userEvent.click(screen.getByRole('checkbox', { name: 'Solo los que esperan mi acción' }));
-      const mine = ids();
-      expect(mine.length).toBeGreaterThan(0);
-      expect(mine.length).toBeLessThan(5);
+      await vi.waitFor(() => expect(ids().sort()).toEqual(['1', '2', '5']));
+      expect(lastSearch().get('onlyMine')).toBe('true');
       expect(screen.getByRole('group', { name: 'Filtros aplicados' })).toHaveTextContent('esperan mi acción');
     });
 
@@ -257,16 +432,26 @@ it('resume varios productos como "Tornillo +1"', async () => {
       await openAdvanced();
       await chooseOption('Producto', 'Tornillo');
       await userEvent.type(screen.getByLabelText('Buscar traslado'), '5');
-      await vi.waitFor(() => expect(JSON.parse(localStorage.getItem(STORE) ?? '{}')).toMatchObject({ priority: 'HIGH', product: 'Tornillo', advancedOpen: true }));
+      await vi.waitFor(() => expect(JSON.parse(localStorage.getItem(STORE) ?? '{}')).toMatchObject({ priority: 'HIGH', productId: 100, advancedOpen: true }));
       first.fixture.destroy();
       TestBed.resetTestingModule(); // otra visita
 
       await renderPage();
       await screen.findByText('#5');
       expect(screen.getByRole('combobox', { name: 'Prioridad' })).toHaveTextContent('Alta');
-      expect(screen.getByRole('combobox', { name: 'Producto' })).toHaveTextContent('Tornillo');
+      await vi.waitFor(() => expect(screen.getByRole('combobox', { name: 'Producto' })).toHaveTextContent('Tornillo'));
       expect(screen.getByLabelText('Buscar traslado')).toHaveValue('');
-      expect(ids()).toEqual(['5']);
+      await vi.waitFor(() => expect(ids()).toEqual(['5']));
+    });
+
+    it('un filtro de producto guardado por nombre (formato anterior) se descarta', async () => {
+      useSession('ADMIN');
+      localStorage.setItem(STORE, JSON.stringify({ product: 'Tuerca' }));
+      stub();
+      await renderPage();
+      await screen.findByText('#5');
+      expect(lastSearch().has('productId')).toBe(false);
+      expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
     });
 
     it('un valor guardado dañado se ignora', async () => {
@@ -299,6 +484,29 @@ it('resume varios productos como "Tornillo +1"', async () => {
       expect(within(dialog).getByRole('row', { name: /Tornillo/ })).toHaveTextContent('Tornillo4422');
     });
 
+    it('abrir un traslado pide su detalle completo al servidor', async () => {
+      useSession('ADMIN');
+      stub();
+      const asked: string[] = [];
+      server.use(http.get(`${URL_T}/5`, () => (asked.push('5'), HttpResponse.json(T.pending))));
+      await renderPage();
+      const dialog = await openDetail(5);
+      expect(asked).toEqual(['5']);
+      expect(within(dialog).getByText('Tuerca')).toBeInTheDocument();
+    });
+
+    it('si el detalle no carga, el diálogo muestra el error y la lista sigue', async () => {
+      useSession('ADMIN');
+      stub();
+      server.use(http.get(`${URL_T}/4`, () => HttpResponse.json(apiErrorBody(500, 'INTERNAL_ERROR', 'No se pudo leer el traslado'), { status: 500 })));
+      await renderPage();
+      await userEvent.click(await screen.findByRole('button', { name: 'Ver traslado 4' }));
+      const dialog = screen.getByRole('dialog', { name: 'Traslado #4' });
+      expect(await within(dialog).findByText('No se pudo leer el traslado')).toBeInTheDocument();
+      expect(TestBed.inject(NotificationService).items()).toEqual([]);
+      expect(ids()).toHaveLength(5);
+    });
+
     it('un traslado terminado no ofrece ninguna acción', async () => {
       useSession('ADMIN');
       stub();
@@ -314,17 +522,16 @@ it('resume varios productos como "Tornillo +1"', async () => {
   describe('acciones de un solo paso', () => {
     it('aprobar en destino llama al servidor, avisa y recarga la lista', async () => {
       useSession('MANAGER', 20);
-      let lists = 0;
       let approved = '';
       stub();
       server.use(
-        http.get(URL_T, () => (lists++, HttpResponse.json(ALL))),
         http.post(`${URL_T}/:id/approve-destination`, ({ params }) => ((approved = String(params['id'])), HttpResponse.json({ ...T.pending, status: 'APPROVED_DEST' }))),
       );
       await renderPage();
       const dialog = await openDetail(5);
+      const before = searches.length;
       await userEvent.click(within(dialog).getByRole('button', { name: 'Aprobar' }));
-      await vi.waitFor(() => expect(lists).toBe(2));
+      await vi.waitFor(() => expect(searches.length).toBe(before + 1));
       expect(approved).toBe('5');
       await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
       expect(TestBed.inject(NotificationService).confirmation()).toMatchObject({
@@ -623,8 +830,8 @@ it('resume varios productos como "Tornillo +1"', async () => {
 
     it('sin origen no se puede elegir producto; al elegirlo solo salen los que tiene disponibles, con su cantidad', async () => {
       useSession('MANAGER', 20);
+      stub();
       server.use(
-        http.get(URL_T, () => HttpResponse.json(ALL)),
         http.get(`${TEST_API}/api/branches`, () => HttpResponse.json(BRANCHES)),
         http.get(`${TEST_API}/api/catalog/products`, () => HttpResponse.json([...PRODUCTS, { id: 102, sku: 'ARA-3', nombre: 'Arandela' }])),
         http.get(stockUrl(10), () => HttpResponse.json([{ productId: 100, available: 50 }, { productId: 101, available: 8 }])), // Arandela no tiene
@@ -663,8 +870,8 @@ it('resume varios productos como "Tornillo +1"', async () => {
 
     it('al cambiar de origen se suelta el producto que el nuevo origen no tiene', async () => {
       useSession('ADMIN');
+      stub();
       server.use(
-        http.get(URL_T, () => HttpResponse.json(ALL)),
         http.get(`${TEST_API}/api/branches`, () => HttpResponse.json(BRANCHES)),
         http.get(`${TEST_API}/api/catalog/products`, () => HttpResponse.json(PRODUCTS)),
         http.get(stockUrl(10), () => HttpResponse.json([{ productId: 100, available: 50 }, { productId: 101, available: 8 }])),

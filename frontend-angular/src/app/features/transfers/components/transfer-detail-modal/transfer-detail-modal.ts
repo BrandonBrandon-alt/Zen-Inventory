@@ -49,6 +49,10 @@ export class TransferDetailModal {
 
   readonly open = model(false);
   readonly transfer = input<Transfer | null>(null);
+  /** El traslado que se abrió, aunque su detalle todavía no haya llegado (para el título). */
+  readonly openedId = input<number | null>(null);
+  /** El detalle no se pudo cargar: se muestra el error en vez del traslado. */
+  readonly loadError = input<string | null>(null);
   readonly branchNames = input<ReadonlyMap<number, string>>(new Map());
   readonly actor = input<Actor>({ role: null, branchId: null });
   /** El traslado cambió en el servidor: la lista debe recargarse. */
@@ -148,8 +152,8 @@ export class TransferDetailModal {
   }
 
   protected title(): string {
-    const t = this.transfer();
-    return t ? `Traslado #${t.id}` : 'Traslado';
+    const id = this.transfer()?.id ?? this.openedId();
+    return id !== null ? `Traslado #${id}` : 'Traslado';
   }
 
   protected fieldError(form: 'dispatch' | 'receive' | 'reason', field: string): string | null {

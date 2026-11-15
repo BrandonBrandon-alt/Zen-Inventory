@@ -1,14 +1,17 @@
-import { HttpClient, HttpContext } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { type Observable, map } from 'rxjs';
+import { EMPTY, type Observable, expand, map, reduce } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { StockAvailabilityApi } from '@core/inventory/stock-availability-api';
 import { SKIP_ERROR_NOTIFICATION } from '@core/api/error.interceptor';
 import type { components } from '@core/api/schema';
 import { type PaymentMethod, isPaymentMethod } from '@core/payments/payment-method';
-import { parseDate, toLocalIso } from '@shared/format/format';
+import { parseDate, toIsoDay, toLocalIso } from '@shared/format/format';
 
 type TransferResponse = components['schemas']['TransferResponse'];
+type TransferRowResponse = components['schemas']['TransferRowResponse'];
+type TransferPageResponse = components['schemas']['TransferPageResponse'];
+type TransferSummaryResponse = components['schemas']['TransferSummaryResponse'];
 
 export const TRANSFER_STATUSES = ['PENDING', 'APPROVED_DEST', 'PREPARING', 'IN_TRANSIT', 'DELIVERED', 'WITH_ISSUE', 'UNDER_CLAIM', 'CANCELLED', 'REJECTED'] as const;
 export type TransferStatus = (typeof TRANSFER_STATUSES)[number];
@@ -166,6 +169,103 @@ function toTransfer(raw: TransferResponse): Transfer | null {
   };
 }
 
+/** Una fila de la lista de traslados: lo que muestra la tabla, sin líneas ni pagos (el detalle se pide al abrirla). */
+export interface TransferListRow {
+  readonly id: number;
+  readonly status: TransferStatus;
+  readonly priority: TransferPriority;
+  readonly originBranchId: number;
+  readonly originName: string;
+  readonly destinationBranchId: number;
+  readonly destinationName: string;
+  /** El primer producto y cuántos lleva en total (la tabla muestra «Cemento +2»). */
+  readonly firstProductName: string | null;
+  readonly productCount: number;
+  readonly freightStatus: FreightStatus;
+  readonly freightBalance: number;
+  readonly requestDate: Date | null;
+  /** Espera una acción de quien mira (lo decide el servidor). */
+  readonly awaitsMe: boolean;
+}
+
+/** Campos por los que el servidor sabe ordenar. */
+export type TransferSortField = 'id' | 'status' | 'route' | 'priority' | 'freight' | 'requestDate';
+export type TransferFlow = 'all' | 'incoming' | 'outgoing';
+
+export interface TransferQuery {
+  /** Desde 1, como en la tabla. */
+  readonly page: number;
+  readonly size: number;
+  readonly sortBy: TransferSortField;
+  readonly ascending: boolean;
+  readonly status: 'open' | 'all' | TransferStatus;
+  /** Entrantes (llegan a la sucursal propia) o salientes (salen de ella). */
+  readonly flow: TransferFlow;
+  readonly priority: TransferPriority | null;
+  readonly from: Date | null;
+  readonly to: Date | null;
+  readonly originId: number | null;
+  readonly destinationId: number | null;
+  readonly productId: number | null;
+  readonly onlyMine: boolean;
+  readonly text: string;
+}
+
+export interface TransferListPage {
+  readonly transfers: TransferListRow[];
+  readonly total: number;
+}
+
+/** Los totales del encabezado, sobre todo lo que ve quien mira. */
+export interface TransferSummary {
+  readonly open: number;
+  readonly awaitingMe: number;
+  readonly freightOwed: number;
+  readonly freightOwedCount: number;
+}
+
+/** Filas por petición al exportar (el máximo del servidor) y tope de páginas. */
+const EXPORT_PAGE_SIZE = 100;
+const EXPORT_MAX_PAGES = 200;
+
+function toListRow(raw: TransferRowResponse): TransferListRow | null {
+  if (typeof raw.id !== 'number' || !isStatus(raw.status) || typeof raw.originId !== 'number' || typeof raw.destinationId !== 'number') return null;
+  return {
+    id: raw.id,
+    status: raw.status,
+    priority: toPriority(raw.priority),
+    originBranchId: raw.originId,
+    originName: raw.originName?.trim() || `Sede ${raw.originId}`,
+    destinationBranchId: raw.destinationId,
+    destinationName: raw.destinationName?.trim() || `Sede ${raw.destinationId}`,
+    firstProductName: raw.firstProductName?.trim() || null,
+    productCount: raw.productCount ?? 0,
+    freightStatus: toFreightStatus(raw.freightStatus),
+    freightBalance: raw.freightBalance ?? 0,
+    requestDate: parseDate(raw.requestDate),
+    awaitsMe: raw.awaitsMe ?? false,
+  };
+}
+
+function searchParams(query: TransferQuery): HttpParams {
+  let params = new HttpParams()
+    .set('page', String(Math.max(0, query.page - 1)))
+    .set('size', String(query.size))
+    .set('sortBy', query.sortBy)
+    .set('direction', query.ascending ? 'asc' : 'desc')
+    .set('status', query.status)
+    .set('flow', query.flow);
+  if (query.priority) params = params.set('priority', query.priority);
+  if (query.from) params = params.set('from', toIsoDay(query.from));
+  if (query.to) params = params.set('to', toIsoDay(query.to));
+  if (query.originId !== null) params = params.set('originId', String(query.originId));
+  if (query.destinationId !== null) params = params.set('destinationId', String(query.destinationId));
+  if (query.productId !== null) params = params.set('productId', String(query.productId));
+  if (query.onlyMine) params = params.set('onlyMine', 'true');
+  if (query.text.trim()) params = params.set('q', query.text.trim());
+  return params;
+}
+
 function requireTransfer(raw: TransferResponse): Transfer {
   const transfer = toTransfer(raw);
   if (!transfer) throw new Error('El servidor devolvió un traslado incompleto.');
@@ -184,19 +284,39 @@ export class TransfersApi {
     return { context: new HttpContext().set(SKIP_ERROR_NOTIFICATION, true) };
   }
 
-  /** Traslados visibles para quien consulta (ADMIN: todos; el resto: los de su sucursal), el más reciente primero. */
-  list(): Observable<Transfer[]> {
-    return this.http.get<TransferResponse[]>(this.url, this.options).pipe(
-      map((items) =>
-        items
-          .map(toTransfer)
-          .filter((t): t is Transfer => t !== null)
-          .sort((a, b) => b.id - a.id),
-      ),
+  /** Una página de la lista de traslados (ADMIN: todos; el resto: los de su sucursal, como origen o destino). */
+  search(query: TransferQuery): Observable<TransferListPage> {
+    return this.http.get<TransferPageResponse>(`${this.url}/search`, { ...this.options, params: searchParams(query) }).pipe(
+      map((page) => ({
+        transfers: (page.content ?? []).map(toListRow).filter((t): t is TransferListRow => t !== null),
+        total: page.totalElements ?? 0,
+      })),
     );
   }
 
-  /** Existencia disponible por producto en la sucursal que enviaría la mercancía (ver `StockAvailabilityApi`). */
+  /** Todo lo filtrado, página a página, para exportar (no solo la página que se ve). */
+  searchAll(query: TransferQuery): Observable<TransferListRow[]> {
+    const pageOf = (page: number) => this.search({ ...query, page, size: EXPORT_PAGE_SIZE }).pipe(map((result) => ({ page, result })));
+    return pageOf(1).pipe(
+      expand(({ page, result }) =>
+        page * EXPORT_PAGE_SIZE < result.total && page < EXPORT_MAX_PAGES && result.transfers.length > 0 ? pageOf(page + 1) : EMPTY,
+      ),
+      reduce((all, { result }) => [...all, ...result.transfers], [] as TransferListRow[]),
+    );
+  }
+
+  /** Los totales del encabezado de traslados. */
+  summary(): Observable<TransferSummary> {
+    return this.http.get<TransferSummaryResponse>(`${this.url}/summary`, this.options).pipe(
+      map((s) => ({ open: s.open ?? 0, awaitingMe: s.awaitingMe ?? 0, freightOwed: s.freightOwed ?? 0, freightOwedCount: s.freightOwedCount ?? 0 })),
+    );
+  }
+
+  /** Un traslado completo, con sus líneas y pagos del flete (al abrir su detalle). */
+  get(id: number): Observable<Transfer> {
+    return this.http.get<TransferResponse>(`${this.url}/${id}`, this.options).pipe(map(requireTransfer));
+  }
+
   availability(branchId: number): Observable<ReadonlyMap<number, number>> {
     return this.stock.availability(branchId);
   }

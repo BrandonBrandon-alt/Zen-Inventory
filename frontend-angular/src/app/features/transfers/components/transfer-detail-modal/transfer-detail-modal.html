@@ -227,6 +227,10 @@
         </form>
       }
     }
+  } @else if (loadError(); as message) {
+    <app-alert>{{ message }}</app-alert>
+  } @else {
+    <p class="py-6 text-center text-sm text-fg-subtle" role="status">Cargando el traslado…</p>
   }
 
   <div data-slot="footer">
