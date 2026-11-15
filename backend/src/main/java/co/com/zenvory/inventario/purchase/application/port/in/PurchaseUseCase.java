@@ -1,5 +1,8 @@
 package co.com.zenvory.inventario.purchase.application.port.in;
 
+import co.com.zenvory.inventario.purchase.application.port.out.PurchaseSearchPort;
+import co.com.zenvory.inventario.shared.domain.Viewer;
+import co.com.zenvory.inventario.shared.infrastructure.web.PageParams;
 import co.com.zenvory.inventario.purchase.domain.model.PurchaseOrder;
 
 import java.util.List;
@@ -126,5 +129,11 @@ public interface PurchaseUseCase {
 
     /** Órdenes de una sucursal. */
     List<PurchaseOrder> getOrdersByBranch(Long branchId);
+
+    /** La lista de la pantalla de compras: filtrada, ordenada y paginada en la base, con «te toca» de quien mira. */
+    PurchaseSearchPort.Page search(PurchaseSearchPort.Criteria criteria, PageParams page, String sortBy, boolean ascending);
+
+    /** Los totales del encabezado de compras sobre todo lo visible. */
+    PurchaseSearchPort.Summary summary(Long branchId, Viewer viewer);
 }
 

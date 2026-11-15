@@ -45,7 +45,7 @@ class PurchaseServiceTest {
         inventory = mock(InventoryUseCase.class);
         ProductUseCase products = mock(ProductUseCase.class);
         when(products.getProductById(any())).thenReturn(Product.builder().name("P").averageCost(bd("10")).build());
-        service = new PurchaseService(repo, inventory, products);
+        service = new PurchaseService(repo, inventory, products, org.mockito.Mockito.mock(co.com.zenvory.inventario.purchase.application.port.out.PurchaseSearchPort.class));
         // Línea 1: 10 uds a 100 con 20 % de descuento; línea 2: 5 uds a 50 sin descuento.
         order = PurchaseOrder.create(1L, 2L, 3L, null, null, List.of(
                 new PurchaseOrderDetail(11L, 5L, bd("10"), bd("100"), bd("20"), null),
