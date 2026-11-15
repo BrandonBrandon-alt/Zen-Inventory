@@ -1,5 +1,8 @@
 package co.com.zenvory.inventario.transfer.application.service;
 
+import co.com.zenvory.inventario.transfer.application.port.out.TransferSearchPort;
+import co.com.zenvory.inventario.shared.domain.Viewer;
+import co.com.zenvory.inventario.shared.infrastructure.web.PageParams;
 import co.com.zenvory.inventario.inventory.application.port.in.InventoryUseCase;
 import co.com.zenvory.inventario.inventory.domain.model.MovementReason;
 import co.com.zenvory.inventario.catalog.application.port.in.ProductUseCase;
@@ -33,6 +36,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 @Service
 public class TransferService implements TransferUseCase {
 
+    private final TransferSearchPort searchPort;
     private final TransferRepositoryPort transferRepositoryPort;
     private final InventoryUseCase inventoryUseCase;
     private final ProductUseCase productUseCase;
@@ -45,8 +49,10 @@ public class TransferService implements TransferUseCase {
                            ProductUseCase productUseCase,
                            BranchUseCase branchUseCase,
                            UserRepositoryPort userRepositoryPort,
-                           ApplicationEventPublisher eventPublisher) {
+                           ApplicationEventPublisher eventPublisher,
+                           TransferSearchPort searchPort) {
         this.transferRepositoryPort = transferRepositoryPort;
+        this.searchPort = searchPort;
         this.inventoryUseCase = inventoryUseCase;
         this.productUseCase = productUseCase;
         this.branchUseCase = branchUseCase;
@@ -485,6 +491,16 @@ public class TransferService implements TransferUseCase {
     @Override
     public List<Transfer> getTransfersByBranch(Long branchId) {
         return transferRepositoryPort.findByBranch(branchId);
+    }
+
+    @Override
+    public TransferSearchPort.Page search(TransferSearchPort.Criteria criteria, PageParams page, String sortBy, boolean ascending) {
+        return searchPort.search(criteria, page, sortBy, ascending);
+    }
+
+    @Override
+    public TransferSearchPort.Summary summary(Viewer viewer) {
+        return searchPort.summary(viewer);
     }
 
     @Override

@@ -171,4 +171,63 @@ class TransferControllerTest {
                 .andExpect(status().isBadRequest());
         verify(transferUseCase, org.mockito.Mockito.never()).voidFreightPayment(any(), any(), any());
     }
+
+    private void actAsManagerOf(Long branchId) {
+        when(userRepositoryPort.findByEmail("test@example.com")).thenReturn(Optional.of(User.builder().id(5L).email("test@example.com").nombre("Gerente")
+                .sucursalId(branchId).role(co.com.zenvory.inventario.auth.domain.model.Role.builder().nombre("MANAGER").build()).build()));
+    }
+
+    @Test
+    @DisplayName("GET /search: los parámetros llegan al criterio, con quién mira, y responde la página")
+    void search_pasaLosParametros() throws Exception {
+        var row = new co.com.zenvory.inventario.transfer.application.port.out.TransferSearchPort.Row(7L,
+                co.com.zenvory.inventario.transfer.domain.model.TransferStatus.IN_TRANSIT, co.com.zenvory.inventario.transfer.domain.model.TransferPriority.HIGH,
+                1L, "Central", 2L, "Norte", "Cemento", 3, co.com.zenvory.inventario.transfer.domain.model.FreightPaymentStatus.PAGO_PARCIAL,
+                new java.math.BigDecimal("30000"), java.time.LocalDateTime.of(2026, 10, 11, 9, 0), true);
+        when(transferUseCase.search(any(), any(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenReturn(new co.com.zenvory.inventario.transfer.application.port.out.TransferSearchPort.Page(java.util.List.of(row), 30));
+
+        mockMvc.perform(get("/api/v1/transfers/search?page=1&size=25&sortBy=route&direction=asc&status=IN_TRANSIT&flow=incoming&priority=HIGH"
+                        + "&from=2026-10-01&to=2026-10-31&originId=1&destinationId=2&productId=3&onlyMine=true").param("q", " cemento "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(7))
+                .andExpect(jsonPath("$.content[0].originName").value("Central"))
+                .andExpect(jsonPath("$.content[0].firstProductName").value("Cemento"))
+                .andExpect(jsonPath("$.content[0].productCount").value(3))
+                .andExpect(jsonPath("$.content[0].freightStatus").value("PAGO_PARCIAL"))
+                .andExpect(jsonPath("$.content[0].awaitsMe").value(true))
+                .andExpect(jsonPath("$.totalPages").value(2));
+
+        var criteria = org.mockito.ArgumentCaptor.forClass(co.com.zenvory.inventario.transfer.application.port.out.TransferSearchPort.Criteria.class);
+        verify(transferUseCase).search(criteria.capture(), eq(new co.com.zenvory.inventario.shared.infrastructure.web.PageParams(1, 25)), eq("route"), eq(true));
+        org.assertj.core.api.Assertions.assertThat(criteria.getValue()).isEqualTo(new co.com.zenvory.inventario.transfer.application.port.out.TransferSearchPort.Criteria(
+                "IN_TRANSIT", "incoming", co.com.zenvory.inventario.transfer.domain.model.TransferPriority.HIGH, java.time.LocalDate.of(2026, 10, 1), java.time.LocalDate.of(2026, 10, 31),
+                1L, 2L, 3L, true, "cemento", new co.com.zenvory.inventario.shared.domain.Viewer(true, true, true, null)));
+    }
+
+    @Test
+    @DisplayName("GET /search y /summary: un gerente ve con su sucursal (no otra) y sin sucursal asignada recibe 403")
+    void gerente_no_ve_traslados_de_otras_sucursales() throws Exception {
+        actAsManagerOf(4L);
+        when(transferUseCase.search(any(), any(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenReturn(new co.com.zenvory.inventario.transfer.application.port.out.TransferSearchPort.Page(java.util.List.of(), 0));
+        when(transferUseCase.summary(any())).thenReturn(new co.com.zenvory.inventario.transfer.application.port.out.TransferSearchPort.Summary(1, 2, new java.math.BigDecimal("5"), 3));
+
+        mockMvc.perform(get("/api/v1/transfers/search")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/transfers/summary")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.open").value(1))
+                .andExpect(jsonPath("$.awaitingMe").value(2))
+                .andExpect(jsonPath("$.freightOwed").value(5))
+                .andExpect(jsonPath("$.freightOwedCount").value(3));
+
+        var viewer = new co.com.zenvory.inventario.shared.domain.Viewer(false, true, true, 4L);
+        var criteria = org.mockito.ArgumentCaptor.forClass(co.com.zenvory.inventario.transfer.application.port.out.TransferSearchPort.Criteria.class);
+        verify(transferUseCase).search(criteria.capture(), any(), eq("id"), eq(false));
+        org.assertj.core.api.Assertions.assertThat(criteria.getValue().viewer()).isEqualTo(viewer);
+        org.assertj.core.api.Assertions.assertThat(criteria.getValue().status()).isEqualTo("open");
+        verify(transferUseCase).summary(viewer);
+
+        actAsManagerOf(null);
+        mockMvc.perform(get("/api/v1/transfers/search")).andExpect(status().isForbidden());
+    }
 }

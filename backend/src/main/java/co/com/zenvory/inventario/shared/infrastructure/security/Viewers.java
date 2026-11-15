@@ -13,6 +13,6 @@ public final class Viewers {
         boolean admin = "ADMIN".equals(role);
         boolean manager = admin || "MANAGER".equals(role);
         boolean operational = manager || "OPERADOR_INVENTARIO".equals(role);
-        return new Viewer(admin, manager, operational, admin ? null : current.branchId());
+        return new Viewer(admin, manager, operational, current.branchId());
     }
 }

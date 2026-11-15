@@ -1,5 +1,8 @@
 package co.com.zenvory.inventario.transfer.application.port.in;
 
+import co.com.zenvory.inventario.transfer.application.port.out.TransferSearchPort;
+import co.com.zenvory.inventario.shared.domain.Viewer;
+import co.com.zenvory.inventario.shared.infrastructure.web.PageParams;
 import co.com.zenvory.inventario.transfer.domain.model.Transfer;
 import java.util.List;
 
@@ -29,6 +32,12 @@ public interface TransferUseCase {
     Transfer getTransferById(Long transferId);
     List<Transfer> getAllTransfers();
     List<Transfer> getTransfersByBranch(Long branchId);
+
+    /** La lista de la pantalla de traslados: filtrada, ordenada y paginada en la base, con «te toca» de quien mira. */
+    TransferSearchPort.Page search(TransferSearchPort.Criteria criteria, PageParams page, String sortBy, boolean ascending);
+
+    /** Los totales del encabezado de traslados sobre todo lo que ve quien mira. */
+    TransferSearchPort.Summary summary(Viewer viewer);
     /** Traslado visible para el usuario actual: solo si es ADMIN o su sucursal es el origen o el destino. */
     Transfer getTransferForCurrentUser(Long id);
 
