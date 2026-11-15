@@ -151,6 +151,7 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 | RF-51 | Consultar la auditoría global: todos los movimientos de inventario del sistema, con quién y cuándo | ADMIN | M | Implementado |
 | RF-64 | Registrar cada intento de inicio de sesión (exitoso, credenciales inválidas, cuenta desactivada o bloqueado) con el correo, la persona, la fecha y la IP, y consultarlos en la auditoría global | ADMIN | M | Implementado |
 | RF-65 | Anular un pago equivocado a un proveedor o del flete con un motivo: queda en el historial con quién y cuándo, y deja de contar en lo pagado | ADMIN, MANAGER | M | Implementado |
+| RF-66 | Registrar y consultar los cambios de precio, costo, estado, proveedores y mínimo de los productos, y de rol, sucursal y estado de los usuarios: qué cambió, de qué a qué, quién y cuándo (pestaña «Cambios del catálogo» de la auditoría global) | ADMIN | M | Implementado |
 
 ### 3.10 Interfaz
 
@@ -190,7 +191,7 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 | RNF-05 | Seguridad | Autorización por rol en cada endpoint y por sucursal en los datos | `@PreAuthorize`, `CurrentUser` |
 | RNF-06 | Seguridad | Las cuentas de ejemplo se desactivan fuera de desarrollo | `DefaultAccountsGuard` |
 | RNF-07 | Seguridad | El HTML que se imprime escapa los textos que vienen de la API | `escapeHtml` en factura y reporte |
-| RNF-08 | Rendimiento | El historial de ventas y la auditoría global no descargan todo: paginan, filtran y ordenan en el servidor (máximo 100 por página) | `GET /api/v1/sales/search`, `GET /api/v1/inventory/movements/search` |
+| RNF-08 | Rendimiento | El historial de ventas, la auditoría global (movimientos, inicios de sesión y cambios del catálogo), el kardex y las listas de compras y traslados no descargan todo: paginan, filtran y ordenan en el servidor (máximo 100 por página); los totales del encabezado y «te toca» también los calcula el servidor | `GET /api/v1/sales/search`, `/inventory/movements/search`, `/audit/catalog-changes`, `/purchases/search` y `/summary`, `/transfers/search` y `/summary` |
 | RNF-09 | Integridad | Cada operación de negocio es transaccional: si un paso falla, nada queda a medias | Servicios `@Transactional` |
 | RNF-10 | Integridad | El esquema de base de datos se versiona y el arranque lo valida | Flyway y `ddl-auto: validate` |
 | RNF-11 | Trazabilidad | Cada movimiento de stock y cada paso de traslado y compra queda con usuario y fecha | Kardex, campos de auditoría |
@@ -219,12 +220,12 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 
 Se declara para no presentar como hecho lo que no lo está:
 
-- La paginación en el servidor existe en el historial de ventas y en Auditoría Global. El kardex por producto, Reportes
-  y las listas de compras y traslados descargan todas sus filas y las paginan en el navegador.
+- Reportes es la única pantalla que todavía descarga todas sus filas y las pagina en el navegador; el resto de las listas
+  largas (ventas, auditoría, kardex, compras y traslados) paginan en el servidor.
 - No hay tablas virtualizadas.
 - La exportación a CSV del historial de ventas no está disponible (se retiró al paginar en el servidor).
 - La API gratuita de Render se mantiene despierta con llamadas periódicas (monitor externo y `keep-alive.yml`); si fallan, el primer request tras una pausa tarda 30–90 s.
-- La auditoría registra los movimientos de inventario y los inicios de sesión, pero no cualquier acción (por ejemplo, no registra quién editó un producto).
+- La auditoría registra los movimientos de inventario, los inicios de sesión y los cambios de productos y usuarios, pero no cualquier acción: no audita proveedores, unidades, sucursales ni listas de precios, ni cambios de nombre, SKU o contraseña.
 
 ## 9. Trazabilidad con las pantallas
 
@@ -241,6 +242,6 @@ Se declara para no presentar como hecho lo que no lo está:
 | Reportes (`/reports`) | ADMIN, MANAGER | RF-49, RF-50 |
 | Sucursales (`/branches`) | ADMIN | RF-06 |
 | Usuarios (`/users`) | ADMIN, MANAGER | RF-02 a RF-04 |
-| Auditoría Global (`/audit`) | ADMIN | RF-51 |
+| Auditoría Global (`/audit`) | ADMIN | RF-51, RF-64, RF-66 |
 | Productos, Proveedores, Unidades (`/catalog/*`) | ADMIN | RF-07 a RF-11 |
 | Mi perfil (`/profile`) | Todos | RF-05 |

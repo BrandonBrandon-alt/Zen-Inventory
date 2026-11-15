@@ -653,10 +653,21 @@ En **Inventario → Kardex** se filtra por uno o varios productos, por tipo, por
 
 ### 7.3 Auditoría
 
-**Auditoría global** (`/audit`, solo ADMIN) lista todos los movimientos de inventario del sistema con quién los hizo,
-cuándo, en qué sucursal y desde qué documento, con filtros por sucursal, responsable, tipo, motivo y fechas, y el detalle
-de cada movimiento. Además, cada paso de un traslado (solicitó, autorizó, despachó, recibió, resolvió) y de una compra
-guarda su usuario y su fecha. La auditoría no registra acciones que no mueven stock, como los inicios de sesión.
+**Auditoría global** (`/audit`, solo ADMIN) tiene tres pestañas, todas paginadas en el servidor:
+
+- **Movimientos de inventario:** todos los movimientos del sistema con quién los hizo, cuándo, en qué sucursal y desde
+  qué documento, con filtros por sucursal, responsable, tipo, motivo y fechas, y el detalle de cada movimiento.
+- **Inicios de sesión:** cada intento de entrar (exitoso, credenciales inválidas, cuenta desactivada o bloqueado) con el
+  correo, la persona y la IP.
+- **Cambios del catálogo:** cada campo que cambió en un producto (precio de venta, costo promedio, estado, proveedores
+  con su precio pactado y si es preferido, y el stock mínimo de cada sucursal) o en un usuario (creación, rol, sucursal y
+  estado), con el antes, el después, quién y cuándo. Se guarda en la tabla `cambio_catalogo` (migración V11) dentro de la
+  misma transacción que el cambio: si el cambio se revierte, su registro también. El nombre del producto o usuario y el
+  de quien hizo el cambio se guardan como estaban en ese momento. El costo que recalcula una compra al recibirse no se
+  registra aquí (ya queda en el kardex).
+
+Además, cada paso de un traslado (solicitó, autorizó, despachó, recibió, resolvió) y de una compra guarda su usuario y su
+fecha.
 
 ### 7.4 Datos de demostración
 
@@ -681,19 +692,19 @@ Los datos de demostración se reconocen por su dominio de correo y sus ids fijos
 
 ### 8.1 Pruebas
 
-En total: **334 pruebas de backend** (41 archivos), **1.367 de frontend** (107 archivos) y **45 E2E** (12 archivos).
+En total: **432 pruebas de backend** (59 archivos), **1.419 de frontend** (112 archivos) y **49 E2E** (13 archivos).
 De la más aislada a la más completa:
 
 | Tipo | Qué prueba | Herramienta | En el proyecto |
 |---|---|---|---|
-| Unitaria de dominio | Reglas de negocio puras, sin base de datos ni framework: venta, traslado, pagos, bloqueo de login | JUnit 5 | 11 archivos |
+| Unitaria de dominio | Reglas de negocio puras, sin base de datos ni framework: venta, traslado, pagos, bloqueo de login, «te toca» de compras y traslados, qué cambió en un producto o usuario | JUnit 5 | 15 archivos |
 | Unitaria de servicio | Un servicio aislado; sus dependencias (repositorios) se reemplazan por objetos simulados | JUnit 5 + Mockito | 12 archivos |
-| Integración web | Solo la capa web de Spring: rutas, JSON, seguridad y permisos por rol | `@WebMvcTest` | 17 controladores |
-| Integración con base real | El SQL de analítica contra un PostgreSQL 16 en Docker con las migraciones de Flyway | `@JdbcTest` + Testcontainers | Consultas de analítica |
-| Componentes (frontend) | Cada pantalla usada como una persona: busca por etiqueta y rol, hace clic, escribe | Vitest + Testing Library | 107 archivos |
-| Integración HTTP (frontend) | El cliente HTTP real contra respuestas simuladas de la API | MSW | 9 archivos |
-| Accesibilidad | Contraste, etiquetas y roles de cada pantalla | axe | 20 archivos |
-| End-to-end | Flujos completos en un navegador real contra el backend real: venta, compra, ajuste de stock, analítica, kardex y auditoría, además de login, roles y diseño adaptable | Playwright | 45 pruebas |
+| Integración web | Solo la capa web de Spring: rutas, JSON, seguridad y permisos por rol | `@WebMvcTest` | 20 controladores |
+| Integración con base real | El SQL directo contra un PostgreSQL 16 en Docker con las migraciones de Flyway: analítica y las búsquedas paginadas (movimientos, inicios de sesión, cambios del catálogo, compras y traslados), incluida la prueba de que el saldo y «te toca» en SQL coinciden con el dominio en todos los estados y roles | `@JdbcTest` + Testcontainers | 6 archivos |
+| Componentes (frontend) | Cada pantalla usada como una persona: busca por etiqueta y rol, hace clic, escribe | Vitest + Testing Library | 112 archivos |
+| Integración HTTP (frontend) | El cliente HTTP real contra respuestas simuladas de la API | MSW | 10 archivos |
+| Accesibilidad | Contraste, etiquetas y roles de cada pantalla | axe | 22 archivos |
+| End-to-end | Flujos completos en un navegador real contra el backend real: venta, compra, ajuste de stock, analítica, kardex, auditoría y cambios del catálogo, además de login, roles y diseño adaptable | Playwright | 49 pruebas |
 
 **Regla:** no se escribe una prueba que no pueda fallar por un error real. Cada prueba nueva se comprueba rompiendo el
 código a propósito: sin el arreglo debe fallar (p. ej. la de rotación recibía 110 unidades en vez de 3).
