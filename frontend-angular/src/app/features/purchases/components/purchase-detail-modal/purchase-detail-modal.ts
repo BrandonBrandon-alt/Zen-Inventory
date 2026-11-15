@@ -42,6 +42,10 @@ export class PurchaseDetailModal {
 
   readonly open = model(false);
   readonly purchase = input<Purchase | null>(null);
+  /** La orden que se abrió, aunque su detalle todavía no haya llegado (para el título). */
+  readonly openedId = input<number | null>(null);
+  /** El detalle no se pudo cargar: se muestra el error en vez de la orden. */
+  readonly loadError = input<string | null>(null);
   readonly role = input<Role | null>(null);
   readonly supplierName = input('');
   readonly branchName = input('');
@@ -108,8 +112,8 @@ export class PurchaseDetailModal {
   }
 
   protected title(): string {
-    const purchase = this.purchase();
-    return purchase ? `Orden de compra #${purchase.id}` : 'Orden de compra';
+    const id = this.purchase()?.id ?? this.openedId();
+    return id !== null ? `Orden de compra #${id}` : 'Orden de compra';
   }
 
   protected productName(id: number): string {

@@ -4,8 +4,8 @@ import { choose, loginReal, requireBackend } from '../support/backend';
 requireBackend();
 
 test('compra: se crea, se envía, se recibe en dos partes y la segunda propone solo lo que falta', async ({ page }) => {
-  // Con los datos de demostración (~2.400 órdenes) la lista se descarga entera en cada paso: 30 s no alcanzan.
-  test.setTimeout(120_000);
+  // Son muchos pasos contra el backend real (la lista llega por páginas desde el servidor).
+  test.setTimeout(90_000);
   await loginReal(page);
   await page.goto('/purchases');
   await page.getByRole('button', { name: /Nueva orden de compra/ }).click();
@@ -73,6 +73,10 @@ test('compra: se crea, se envía, se recibe en dos partes y la segunda propone s
   await expect(detail.getByText(/Recepción registrada/)).toBeVisible();
   await detail.getByRole('button', { name: 'Listo' }).click();
 
+  // Recibida por completo ya no está «En curso»: se busca entre todas.
+  await page.getByRole('combobox', { name: 'Estado de la orden' }).click();
+  await page.getByRole('option', { name: 'Todas' }).click();
+  await page.getByLabel('Buscar orden').fill(id!);
   await page.getByRole('button', { name: `Ver orden ${id}` }).click();
-  await expect(detail.getByText('Recibida', { exact: true })).toBeVisible();
+  await expect(detail.getByText('Recibida', { exact: true }).first()).toBeVisible();
 });

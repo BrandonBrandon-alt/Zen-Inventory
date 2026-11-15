@@ -73,9 +73,79 @@ function useSession(rol: string, sucursalId?: number) {
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ token: 't', email: 'e@z.co', nombre: 'Yo', rol, id: 1, sucursalId }));
 }
 
+type Order = ReturnType<typeof order>;
+const OPEN = ['AWAITING_APPROVAL', 'PENDING', 'IN_TRANSIT', 'RECEIVED_PARTIAL'];
+/** Lo que el servidor decide con `PurchaseActionPolicy` (aquí, con el rol de la sesión de la prueba). */
+function awaitsMe(o: Order): boolean {
+  const rol = JSON.parse(localStorage.getItem(SESSION_STORAGE_KEY) ?? '{}').rol as string;
+  const manager = rol === 'ADMIN' || rol === 'MANAGER';
+  return (o.receptionStatus === 'AWAITING_APPROVAL' && manager) || (o.receptionStatus === 'IN_TRANSIT' && (manager || rol === 'OPERADOR_INVENTARIO'));
+}
+const supplierName = (id: number) => SUPPLIERS.find((s) => s.id === id)?.nombre ?? '';
+const listRow = (o: Order) => ({
+  id: o.id,
+  reception: o.receptionStatus,
+  payment: o.paymentStatus,
+  supplierId: o.supplierId,
+  supplierName: supplierName(o.supplierId),
+  branchId: o.branchId,
+  branchName: BRANCHES.find((b) => b.id === o.branchId)?.nombre ?? '',
+  total: o.total,
+  balance: o.balance,
+  overdue: o.overdue,
+  requestDate: o.requestDate,
+  awaitsMe: awaitsMe(o),
+});
+
+const listRowOf = (o: unknown) => listRow(o as Order);
+
+/** Cada búsqueda que llegó al servidor falso (la última es la que se ve). */
+let searches: URLSearchParams[] = [];
+const lastSearch = () => searches.at(-1)!;
+
+/**
+ * Un servidor falso de compras: filtra, ordena por número y pagina como el real, resume lo visible y devuelve cada
+ * orden por id. `orders` se puede cambiar después con `setOrders` (lo que el servidor «tiene ahora»).
+ */
+let current: Order[] = [];
+const setOrders = (orders: unknown[]) => (current = orders as Order[]);
 function stub(orders: unknown[] = ORDERS) {
+  setOrders(orders);
+  searches = [];
   server.use(
-    http.get(URL_P, () => HttpResponse.json(orders)),
+    http.get(`${URL_P}/search`, ({ request }) => {
+      const q = new URL(request.url).searchParams;
+      searches.push(q);
+      const status = q.get('status') ?? 'open';
+      const text = (q.get('q') ?? '').toLowerCase();
+      const num = (key: string) => (q.has(key) ? Number(q.get(key)) : null);
+      const [min, max, supplier, product, page, size] = [num('minTotal'), num('maxTotal'), num('supplierId'), num('productId'), num('page') ?? 0, num('size') ?? 25];
+      const rows = current
+        .filter((o) => (status === 'open' ? OPEN.includes(o.receptionStatus) : status === 'all' || o.receptionStatus === status))
+        .filter((o) => !q.has('payment') || o.paymentStatus === q.get('payment'))
+        .filter((o) => supplier === null || o.supplierId === supplier)
+        .filter((o) => product === null || o.details.some((d) => d.productId === product))
+        .filter((o) => (min === null || o.total >= min) && (max === null || o.total <= max))
+        .filter((o) => q.get('onlyMine') !== 'true' || awaitsMe(o))
+        .filter((o) => !text || String(o.id).includes(text) || supplierName(o.supplierId).toLowerCase().includes(text))
+        .sort((a, b) => b.id - a.id)
+        .map(listRow);
+      return HttpResponse.json({ content: rows.slice(page * size, page * size + size), totalElements: rows.length, page, size, totalPages: Math.ceil(rows.length / size) });
+    }),
+    http.get(`${URL_P}/summary`, () => {
+      const owed = current.filter((o) => o.balance > 0);
+      return HttpResponse.json({
+        open: current.filter((o) => OPEN.includes(o.receptionStatus)).length,
+        awaitingMe: current.filter(awaitsMe).length,
+        owed: owed.reduce((sum, o) => sum + o.balance, 0),
+        owedCount: owed.length,
+        overdue: owed.filter((o) => o.overdue).length,
+      });
+    }),
+    http.get(`${URL_P}/:id`, ({ params }) => {
+      const found = current.find((o) => String(o.id) === params['id']);
+      return found ? HttpResponse.json(found) : HttpResponse.json(apiErrorBody(404, 'NOT_FOUND', 'Orden no encontrada'), { status: 404 });
+    }),
     http.get(`${TEST_API}/api/catalog/suppliers`, () => HttpResponse.json(SUPPLIERS)),
     http.get(`${TEST_API}/api/catalog/products`, () => HttpResponse.json(PRODUCTS)),
     http.get(`${TEST_API}/api/branches`, () => HttpResponse.json(BRANCHES)),
@@ -97,9 +167,12 @@ const renderPage = (query: Record<string, string> = {}) =>
 
 const ids = () => screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell')[0]?.textContent?.trim());
 
+/** Abre el detalle y espera a que llegue la orden pedida por id. */
 async function openDetail(id: number) {
   await userEvent.click(await screen.findByRole('button', { name: `Ver orden ${id}` }));
-  return screen.getByRole('dialog', { name: `Orden de compra #${id}` });
+  const dialog = screen.getByRole('dialog', { name: `Orden de compra #${id}` });
+  await vi.waitFor(() => expect(within(dialog).queryByText('Cargando la orden…')).not.toBeInTheDocument());
+  return dialog;
 }
 
 describe('PurchasesPage', () => {
@@ -135,10 +208,13 @@ describe('PurchasesPage', () => {
       stub();
       await renderPage();
       await screen.findByText('#1');
+      expect(lastSearch().get('status')).toBe('open');
       await chooseOption('Estado de la orden', 'Todas');
-      expect(ids()).toHaveLength(6);
+      await vi.waitFor(() => expect(ids()).toHaveLength(6));
+      expect(lastSearch().get('status')).toBe('all');
       await chooseOption('Estado de la orden', 'Cancelada');
-      expect(ids()).toEqual(['#6']);
+      await vi.waitFor(() => expect(ids()).toEqual(['#6']));
+      expect(lastSearch().get('status')).toBe('CANCELLED');
     });
 
     it('solo el administrador ve la columna de sucursal', async () => {
@@ -177,6 +253,75 @@ describe('PurchasesPage', () => {
       expect(within(screen.getByRole('row', { name: /#3\b/ })).getByText('Te toca')).toBeInTheDocument();
     });
 
+    it('pide al servidor la primera página en curso, de la más nueva a la más vieja', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      await renderPage();
+      await screen.findByText('#1');
+      const q = lastSearch();
+      expect(Object.fromEntries(q)).toEqual({ page: '0', size: '10', sortBy: 'id', direction: 'desc', status: 'open' });
+    });
+
+    it('con más órdenes que una página, «Página siguiente» pide la siguiente', async () => {
+      useSession('MANAGER', 10);
+      stub(Array.from({ length: 13 }, (_, i) => order(i + 1, 'PENDING')));
+      await renderPage();
+      await screen.findByText('#13');
+      expect(ids()).toHaveLength(10);
+      await userEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+      await vi.waitFor(() => expect(ids()).toEqual(['#3', '#2', '#1']));
+      expect(lastSearch().get('page')).toBe('1');
+    });
+
+    it('ordenar por una columna lo pide al servidor', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      await renderPage();
+      await screen.findByText('#1');
+      await userEvent.click(screen.getByRole('button', { name: /Saldo/ }));
+      await vi.waitFor(() => expect(lastSearch().get('sortBy')).toBe('balance'));
+      expect(lastSearch().get('direction')).toBe('asc');
+    });
+
+    it('«Te toca» lo decide el servidor, no la pantalla', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      server.use(
+        http.get(`${URL_P}/search`, () =>
+          HttpResponse.json({ content: [{ ...listRowOf(order(2, 'PENDING')), awaitsMe: true }, { ...listRowOf(order(1, 'AWAITING_APPROVAL')), awaitsMe: false }], totalElements: 2 }),
+        ),
+      );
+      await renderPage();
+      await screen.findByText('#1');
+      expect(within(screen.getByRole('row', { name: /#2\b/ })).getByText('Te toca')).toBeInTheDocument();
+      expect(within(screen.getByRole('row', { name: /#1\b/ })).queryByText('Te toca')).not.toBeInTheDocument();
+    });
+
+    it('el encabezado viene de /summary: cuenta todo lo visible, no solo la página', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      server.use(http.get(`${URL_P}/summary`, () => HttpResponse.json({ open: 42, awaitingMe: 7, owed: 1500000, owedCount: 12, overdue: 3 })));
+      await renderPage();
+      expect(await screen.findByText(/42 órdenes en curso, 7 esperan tu acción/)).toBeInTheDocument();
+      expect(screen.getByText(/en 12 órdenes/)).toHaveTextContent('1.500.000');
+      expect(screen.getByText('3 vencidas')).toBeInTheDocument();
+    });
+
+    it('exportar trae del servidor todo lo filtrado, no solo la página', async () => {
+      useSession('MANAGER', 10);
+      stub(Array.from({ length: 13 }, (_, i) => order(i + 1, 'PENDING')));
+      let csv = '';
+      vi.spyOn(URL, 'createObjectURL').mockImplementation((blob: Blob | MediaSource) => (void (blob as Blob).text().then((t) => (csv = t)), 'blob:csv'));
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+      await renderPage();
+      await screen.findByText('#13');
+      await userEvent.click(screen.getByRole('button', { name: /Exportar CSV/ }));
+      await vi.waitFor(() => expect(csv.trim().split('\n')).toHaveLength(14)); // encabezado + 13 órdenes
+      expect(lastSearch().get('size')).toBe('100');
+      vi.restoreAllMocks();
+    });
+
     it('sin órdenes invita a crear la primera', async () => {
       useSession('MANAGER', 10);
       stub([]);
@@ -187,7 +332,7 @@ describe('PurchasesPage', () => {
     it('si falla la carga muestra el error en la tabla, sin aviso global', async () => {
       useSession('MANAGER', 10);
       stub();
-      server.use(http.get(URL_P, () => HttpResponse.json(apiErrorBody(500, 'INTERNAL_ERROR', 'Falla de prueba'), { status: 500 })));
+      server.use(http.get(`${URL_P}/search`, () => HttpResponse.json(apiErrorBody(500, 'INTERNAL_ERROR', 'Falla de prueba'), { status: 500 })));
       await renderPage();
       expect(await screen.findByRole('alert')).toHaveTextContent('Falla de prueba');
       expect(TestBed.inject(NotificationService).items()).toEqual([]);
@@ -206,19 +351,41 @@ describe('PurchasesPage', () => {
       expect(within(dialog).getByRole('row', { name: /Total/ })).toHaveTextContent('1.200');
     });
 
+    it('abrir una orden pide su detalle completo al servidor', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      const asked: string[] = [];
+      server.use(http.get(`${URL_P}/4`, () => (asked.push('4'), HttpResponse.json(ORDERS[3]))));
+      await renderPage();
+      const dialog = await openDetail(4);
+      expect(asked).toEqual(['4']);
+      expect(within(dialog).getByRole('row', { name: /Tuerca/ })).toBeInTheDocument();
+    });
+
+    it('si el detalle no carga, el diálogo muestra el error y la lista sigue', async () => {
+      useSession('MANAGER', 10);
+      stub();
+      server.use(http.get(`${URL_P}/2`, () => HttpResponse.json(apiErrorBody(500, 'INTERNAL_ERROR', 'No se pudo leer la orden'), { status: 500 })));
+      await renderPage();
+      await userEvent.click(await screen.findByRole('button', { name: 'Ver orden 2' }));
+      const dialog = screen.getByRole('dialog', { name: 'Orden de compra #2' });
+      expect(await within(dialog).findByText('No se pudo leer la orden')).toBeInTheDocument();
+      expect(TestBed.inject(NotificationService).items()).toEqual([]);
+      expect(ids()).toHaveLength(4);
+    });
+
     it('aprobar una orden llama al servidor, avisa y recarga la lista', async () => {
       useSession('MANAGER', 10);
       stub();
-      let lists = 0;
       let approved = '';
       server.use(
-        http.get(URL_P, () => (lists++, HttpResponse.json(ORDERS))),
         http.post(`${URL_P}/:id/approve`, ({ params }) => ((approved = String(params['id'])), HttpResponse.json(order(1, 'PENDING')))),
       );
       await renderPage();
       const dialog = await openDetail(1);
+      const before = searches.length;
       await userEvent.click(within(dialog).getByRole('button', { name: 'Aprobar' }));
-      await vi.waitFor(() => expect(lists).toBe(2));
+      await vi.waitFor(() => expect(searches.length).toBe(before + 1));
       expect(approved).toBe('1');
       await vi.waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
       expect(TestBed.inject(NotificationService).confirmation()).toMatchObject({
@@ -455,18 +622,18 @@ describe('PurchasesPage', () => {
   });
 
   describe('recibir', () => {
-    it('si la lista llega tarde tras reabrir la orden, la recepción se rehace con lo que falta ahora', async () => {
+    it('si el detalle llega tarde tras reabrir la orden, la recepción se rehace con lo que falta ahora', async () => {
       useSession('OPERADOR_INVENTARIO', 10);
       stub();
-      // Tras recibir 3 Tornillos (ya iban 6 de 10) y las 4 Tuercas, la lista nueva tarda en llegar.
-      const after = ORDERS.map((o) => (o.id === 4 ? { ...o, details: [detail(41, 1, 10, 100, 0, 9), detail(42, 2, 4, 50, 0, 4)] } : o));
+      // Tras recibir 3 Tornillos (ya iban 6 de 10) y las 4 Tuercas, el detalle nuevo tarda en llegar.
+      const after = { ...ORDERS[3]!, details: [detail(41, 1, 10, 100, 0, 9), detail(42, 2, 4, 50, 0, 4)] };
       let release: () => void = () => undefined;
       const late = new Promise<void>((resolve) => (release = resolve));
-      let lists = 0;
+      let details = 0;
       server.use(
-        http.get(URL_P, async () => {
-          lists++;
-          if (lists === 1) return HttpResponse.json(ORDERS);
+        http.get(`${URL_P}/4`, async () => {
+          details++;
+          if (details === 1) return HttpResponse.json(ORDERS[3]);
           await late;
           return HttpResponse.json(after);
         }),
@@ -482,8 +649,9 @@ describe('PurchasesPage', () => {
       await within(dialog).findByText(/Recepción registrada/);
       await userEvent.click(within(dialog).getByRole('button', { name: 'Listo' }));
 
-      // Se reabre antes de que llegue la lista: todavía se ve lo de antes.
-      dialog = await openDetail(4);
+      // Se reabre antes de que llegue el detalle: todavía se ve lo de antes.
+      await userEvent.click(await screen.findByRole('button', { name: 'Ver orden 4' }));
+      dialog = screen.getByRole('dialog', { name: 'Orden de compra #4' });
       await userEvent.click(within(dialog).getByRole('button', { name: 'Recibir mercancía' }));
       expect(within(dialog).getByLabelText('Tornillo (faltan 4 de 10)')).toHaveValue(4);
       release();
@@ -495,9 +663,7 @@ describe('PurchasesPage', () => {
       useSession('OPERADOR_INVENTARIO', 10);
       stub();
       let body: unknown;
-      let lists = 0;
       server.use(
-        http.get(URL_P, () => (lists++, HttpResponse.json(ORDERS))),
         http.post(`${URL_P}/4/receive`, async ({ request }) => {
           body = await request.json();
           return HttpResponse.json({
@@ -509,6 +675,7 @@ describe('PurchasesPage', () => {
       );
       await renderPage();
       const dialog = await openDetail(4);
+      const before = searches.length;
       await userEvent.click(within(dialog).getByRole('button', { name: 'Recibir mercancía' }));
       // Ya llegaron 6 de 10: el formulario propone y limita a lo que falta, no a lo pedido.
       const tornillo = within(dialog).getByLabelText('Tornillo (faltan 4 de 10)');
@@ -519,7 +686,7 @@ describe('PurchasesPage', () => {
       await vi.waitFor(() => expect(body).toEqual({ items: [{ detailId: 41, quantityReceived: 3 }, { detailId: 42, quantityReceived: 4 }] }));
       expect(await within(dialog).findByText(/Recepción registrada/)).toBeInTheDocument();
       expect(within(dialog).getByRole('row', { name: /Tornillo/ })).toHaveTextContent('Tornillo4$ 100$ 90');
-      await vi.waitFor(() => expect(lists).toBe(2)); // la lista se actualiza aunque el diálogo siga abierto
+      await vi.waitFor(() => expect(searches.length).toBe(before + 1)); // la lista se actualiza aunque el diálogo siga abierto
       await userEvent.click(within(dialog).getByRole('button', { name: 'Listo' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
@@ -583,11 +750,14 @@ describe('PurchasesPage', () => {
       stub();
       await renderPage();
       await screen.findByText('#1');
+      const before = searches.length;
       await userEvent.type(screen.getByLabelText('Buscar orden'), 'aceros');
-      expect(ids()).toEqual(['1']); // Aceros del Sur
+      await vi.waitFor(() => expect(ids()).toEqual(['1'])); // Aceros del Sur
+      expect(searches.length).toBe(before + 1); // una sola búsqueda, al dejar de escribir
+      expect(lastSearch().get('q')).toBe('aceros');
       await userEvent.clear(screen.getByLabelText('Buscar orden'));
       await userEvent.type(screen.getByLabelText('Buscar orden'), '3');
-      expect(ids()).toEqual(['3']);
+      await vi.waitFor(() => expect(ids()).toEqual(['3']));
     });
 
     it('filtra por proveedor, por producto, por rango de total y por «solo las que esperan mi acción»', async () => {
@@ -598,15 +768,19 @@ describe('PurchasesPage', () => {
       expect(ids().sort()).toEqual(['1', '2', '3', '4']); // en curso
       await openAdvanced();
       await chooseOption('Proveedor', 'Ferretería Central');
-      expect(ids().sort()).toEqual(['2', '3', '4']);
+      await vi.waitFor(() => expect(ids().sort()).toEqual(['2', '3', '4']));
+      expect(lastSearch().get('supplierId')).toBe('100');
       await chooseOption('Producto', 'Tuerca');
-      expect(ids()).toEqual(['4']);
+      await vi.waitFor(() => expect(ids()).toEqual(['4']));
+      expect(lastSearch().get('productId')).toBe('2'); // por id, no por nombre
       await chooseOption('Producto', 'Todos los productos');
       await userEvent.type(screen.getByLabelText('Total desde'), '1100');
-      expect(ids()).toEqual(['4']); // total 1200
+      await vi.waitFor(() => expect(ids()).toEqual(['4'])); // total 1200
+      expect(lastSearch().get('minTotal')).toBe('1100');
       await userEvent.clear(screen.getByLabelText('Total desde'));
       await userEvent.click(screen.getByRole('checkbox', { name: 'Solo las que esperan mi acción' }));
-      expect(ids()).toEqual(['3']); // al gerente le toca recibir la que va en camino (la #4 ya tiene recepción parcial)
+      await vi.waitFor(() => expect(ids()).toEqual(['3'])); // al gerente le toca recibir la que va en camino (la #4 ya tiene recepción parcial)
+      expect(lastSearch().get('onlyMine')).toBe('true');
     });
 
     it('filtra por estado del pago y lo dice cuando nada coincide', async () => {
@@ -616,8 +790,9 @@ describe('PurchasesPage', () => {
       await screen.findByText('#1');
       await chooseOption('Estado del pago', 'Pagada');
       expect(await screen.findByText('Ninguna orden coincide')).toBeInTheDocument();
+      expect(lastSearch().get('payment')).toBe('PAGADO');
       await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro Pago: Pagada' }));
-      expect(ids().length).toBe(4);
+      await vi.waitFor(() => expect(ids().length).toBe(4));
     });
 
     it('el estado «En curso» es el de siempre: no sale como etiqueta; otro estado sí y se quita', async () => {
@@ -649,7 +824,17 @@ describe('PurchasesPage', () => {
       await vi.waitFor(() => expect(screen.getByRole('combobox', { name: 'Proveedor' })).toHaveTextContent('Aceros del Sur'));
       expect(screen.getByRole('combobox', { name: 'Estado de la orden' })).toHaveTextContent('Todas');
       expect(screen.getByLabelText('Buscar orden')).toHaveValue('');
-      expect(ids()).toEqual(['1']);
+      await vi.waitFor(() => expect(ids()).toEqual(['1']));
+    });
+
+    it('un filtro de producto guardado por nombre (formato anterior) se descarta', async () => {
+      useSession('MANAGER', 10);
+      localStorage.setItem(STORE, JSON.stringify({ product: 'Tuerca' }));
+      stub();
+      await renderPage();
+      await screen.findByText('#1');
+      expect(lastSearch().has('productId')).toBe(false);
+      expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
     });
 
     it('un valor guardado dañado se ignora', async () => {

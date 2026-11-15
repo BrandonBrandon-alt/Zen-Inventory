@@ -1,14 +1,14 @@
 <header class="mb-6 flex animate-enter flex-wrap items-start justify-between gap-4">
   <div>
     <h1 class="font-title text-[28px] font-bold tracking-tight text-fg">Compras</h1>
-    @if (!loading() && !error()) {
+    @if (headline()) {
       <p class="mt-1 text-sm text-fg-subtle">
         {{ summary() }}@if (pending() > 0) {, {{ pending() === 1 ? '1 espera tu acción' : pending() + ' esperan tu acción' }}}
       </p>
-      @if (payables(); as owed) {
-        @if (owed.count > 0) {
+      @if (headline(); as owed) {
+        @if (owed.owedCount > 0) {
           <p class="mt-0.5 text-sm text-fg-subtle">
-            Por pagar a proveedores: <span class="font-medium tabular-nums text-fg">{{ formatMoney(owed.total) }}</span> en {{ owed.count === 1 ? '1 orden' : owed.count + ' órdenes' }}@if (owed.overdue > 0) {, <span class="font-medium text-danger">{{ owed.overdue === 1 ? '1 vencida' : owed.overdue + ' vencidas' }}</span>}
+            Por pagar a proveedores: <span class="font-medium tabular-nums text-fg">{{ formatMoney(owed.owed) }}</span> en {{ owed.owedCount === 1 ? '1 orden' : owed.owedCount + ' órdenes' }}@if (owed.overdue > 0) {, <span class="font-medium text-danger">{{ owed.overdue === 1 ? '1 vencida' : owed.overdue + ' vencidas' }}</span>}
           </p>
         }
       }
@@ -57,18 +57,22 @@
   [rowKey]="rowKey"
   [loading]="loading()"
   [error]="error()"
-  [pageSize]="10"
+  [pageSize]="pageSize"
+  [total]="total()"
+  [(page)]="page"
+  [exportAll]="exportAll"
   [clickableRows]="true"
   [emptyTitle]="activeFilters().length === 0 ? 'No hay órdenes en curso' : 'Ninguna orden coincide'"
   [emptyDescription]="activeFilters().length === 0 ? 'Crea una orden para pedir mercancía a un proveedor.' : 'Prueba quitando algún filtro.'"
   minWidth="54rem"
   (rowClick)="openDetail($event)"
+  (sortChange)="sort.set($event)"
   (retry)="load()"
 >
   <ng-template appCell="receptionLabel" let-p>
     <span class="inline-flex items-center gap-2">
       <app-badge [variant]="receptionVariant(p)" dot>{{ p.receptionLabel }}</app-badge>
-      @if (p.needsMe) {
+      @if (p.awaitsMe) {
         <span class="rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-brand">Te toca</span>
       }
     </span>
@@ -101,9 +105,11 @@
 <app-purchase-detail-modal
   [(open)]="detailOpen"
   [purchase]="selected()"
+  [openedId]="selectedRow()?.id ?? null"
+  [loadError]="detailError()"
   [role]="role()"
   [supplierName]="selectedSupplier()"
   [branchName]="selectedBranch()"
   [productNames]="productNames()"
-  (changed)="load(true)"
+  (changed)="onChanged()"
 />
