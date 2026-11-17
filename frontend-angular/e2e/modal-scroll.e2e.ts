@@ -82,10 +82,35 @@ test.describe('punto de venta', () => {
     expect((await panel.boundingBox())!.height).toBeLessThanOrEqual(640);
 
     // Las líneas se desplazan dentro del panel, no empujan el botón fuera de la pantalla.
-    const list = panel.getByRole('list', { name: 'Productos de la venta' });
-    const { scrollHeight, clientHeight } = await list.evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
+    const scroller = panel.getByRole('group', { name: 'Productos y datos de la venta' });
+    const { scrollHeight, clientHeight } = await scroller.evaluate((el) => ({ scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
     expect(scrollHeight).toBeGreaterThan(clientHeight);
     // Y queda un espacio útil para ver los productos (al menos unas tres líneas), no una rendija.
     expect(clientHeight).toBeGreaterThanOrEqual(180);
+  });
+
+  test('con los datos opcionales abiertos en una pantalla baja, el total se ve entero y la barra de desplazamiento no tapa nada', async ({ page }) => {
+    await page.route('**/api/catalog/products*', (route) => route.fulfill({ json: products }));
+    await page.route('**/api/v1/inventory/branches/*', (route) => route.fulfill({ json: stock }));
+    await page.route('**/api/v1/price-lists*', (route) => route.fulfill({ json: [] }));
+    await page.setViewportSize({ width: 1366, height: 640 });
+    await page.goto('/sales/pos');
+    for (let i = 1; i <= 4; i++) await page.getByRole('button', { name: new RegExp(`Producto ${i}\\b`) }).first().click();
+
+    const panel = page.getByRole('region', { name: 'Venta actual' });
+    await panel.getByText('Cliente, lista de precios y descuento').click();
+
+    // Una sola zona se desplaza: el total y «Registrar venta» quedan fuera de ella, enteros y a la vista.
+    const scroller = panel.getByRole('group', { name: 'Productos y datos de la venta' });
+    const total = panel.locator('dd[aria-live]');
+    await expect(total).toBeInViewport({ ratio: 1 });
+    await expect(panel.getByRole('button', { name: 'Registrar venta' })).toBeInViewport({ ratio: 1 });
+    expect(await scroller.evaluate((el, node) => el.contains(node), await total.elementHandle())).toBe(false);
+    // La barra queda en el margen de la tarjeta: entre el contenido y el borde de la zona hay espacio para ella.
+    const gap = await scroller.evaluate((el) => {
+      const content = el.firstElementChild!.getBoundingClientRect().right;
+      return el.getBoundingClientRect().right - content;
+    });
+    expect(gap).toBeGreaterThanOrEqual(12);
   });
 });
