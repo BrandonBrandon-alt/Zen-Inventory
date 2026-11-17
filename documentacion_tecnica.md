@@ -752,7 +752,7 @@ La imagen del backend limita el heap al 70 % de la memoria del contenedor y usa 
 
 ```mermaid
 flowchart LR
-    U[Navegador] --> N[Netlify<br/>Angular estático]
+    U[Navegador] --> N[Render Static Site<br/>Angular]
     N -- "/api/* (proxy)" --> R[Render<br/>API Spring Boot en Docker]
     R --> DB[(Neon<br/>PostgreSQL)]
 ```
@@ -761,8 +761,9 @@ flowchart LR
   bloqueos que PgBouncer en modo transacción no da.
 - **Render:** Web Service con `backend/Dockerfile`, perfil `prod` (sin Swagger, cuentas de ejemplo desactivadas por
   `DefaultAccountsGuard`), secreto JWT propio y administrador inicial por variables de entorno.
-- **Netlify:** construye `frontend-angular` y, con `netlify.toml`, reenvía `/api/*` a Render (el navegador solo habla
-  con un dominio) y manda las demás rutas a `index.html` para que las resuelva Angular.
+- **Render Static Site:** construye `frontend-angular` y, con `render.yaml`, reenvía `/api/*` a la API (el navegador
+  solo habla con un dominio) y manda las demás rutas a `index.html` para que las resuelva Angular. Reemplazó a Netlify,
+  cuyo plan gratuito deja de publicar al agotar los créditos de deploy (`netlify.toml` queda como alternativa).
 
 Pasos, variables y lista de comprobación en `DEPLOY.md`. Limitación del plan gratuito: Render duerme la API tras
 ~15 minutos sin tráfico, y el primer request después tarda entre 30 y 90 s. Para evitarlo se la llama periódicamente

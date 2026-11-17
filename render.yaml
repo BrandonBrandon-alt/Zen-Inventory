@@ -1,0 +1,31 @@
+# Frontend Angular como Static Site de Render (ver DEPLOY.md, paso 3). Reemplaza a Netlify: hace lo mismo que
+# frontend-angular/netlify.toml. La API sigue siendo el Web Service creado a mano (paso 2); este Blueprint no la toca.
+services:
+  - type: web
+    runtime: static
+    name: zen-inventory-web
+    branch: BEMA_DES
+    # Se construye desde la raíz del repositorio: por eso las rutas incluyen frontend-angular/.
+    buildCommand: cd frontend-angular && npm ci && npm run build
+    staticPublishPath: frontend-angular/dist/frontend-angular/browser
+    # Solo se reconstruye cuando cambia el frontend (un cambio del backend no gasta minutos de build).
+    buildFilter:
+      paths:
+        - frontend-angular/**
+      ignoredPaths:
+        - frontend-angular/e2e/**
+        - frontend-angular/**/*.spec.ts
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+    routes:
+      # La API: el navegador llama a /api/... en el mismo sitio y Render lo reenvía al backend (como nginx en Docker),
+      # así no hay CORS entre dominios. CAMBIA la URL si tu servicio de la API tiene otro nombre.
+      - type: rewrite
+        source: /api/*
+        destination: https://zen-inventory-api.onrender.com/api/*
+      # Rutas de la SPA (/login, /inventory…): las resuelve Angular. Los archivos que existen (JS, CSS, imágenes) se
+      # sirven tal cual; esta regla solo atrapa lo demás.
+      - type: rewrite
+        source: /*
+        destination: /index.html

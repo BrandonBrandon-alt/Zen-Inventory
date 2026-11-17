@@ -204,7 +204,7 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 ## 6. Restricciones
 
 - **Tecnología:** Java con Spring Boot y PostgreSQL en el backend; Angular en el frontend.
-- **Despliegue gratuito:** Netlify (frontend), Render (API) y Neon (base de datos). El plan gratuito de Render
+- **Despliegue gratuito:** Render (frontend como sitio estático y API) y Neon (base de datos). El plan gratuito de Render
   duerme la API tras unos 15 minutos sin uso, y el primer arranque en frío tarda alrededor de 3 minutos.
 - **Plazo:** inicio el 21 de septiembre de 2026, hito del 100 % el 9 de noviembre y sustentación el 16 de noviembre.
 - **Equipo:** una persona.
