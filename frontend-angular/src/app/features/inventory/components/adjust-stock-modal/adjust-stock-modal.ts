@@ -4,7 +4,7 @@ import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angula
 import { Router } from '@angular/router';
 import { LucideArrowDownToLine, LucideArrowRight, LucideArrowUpFromLine, LucideDynamicIcon, LucideTriangleAlert } from '@lucide/angular';
 import { toApiError } from '@core/api/api-error';
-import { NotificationService } from '@core/notifications/notification.service';
+import { type ConfirmationInput, NotificationService } from '@core/notifications/notification.service';
 import { formatQuantity } from '@shared/format/format';
 import { applyServerErrors } from '@shared/forms/apply-server-errors';
 import { controlError } from '@shared/forms/control-error';
@@ -219,6 +219,14 @@ export class AdjustStockModal {
 
     const value = this.form.getRawValue();
     const type = this.type();
+    // Se arma antes de enviar: al terminar, el formulario ya no tiene la cantidad.
+    const unit = product.unit ? ` ${product.unit}` : '';
+    const kind = type === 'INGRESO' ? 'ingreso' : 'retiro';
+    const confirmation: ConfirmationInput = {
+      title: `${type === 'INGRESO' ? 'Ingreso' : 'Retiro'} de ${formatQuantity(value.quantity)}${unit} registrado`,
+      summary: `El ${kind} de ${product.nombre} se registró correctamente.`,
+      detail: `El stock en esta sucursal pasó de ${formatQuantity(product.stock)} a ${formatQuantity(this.resulting())}${unit}. El movimiento quedó en el kardex.`,
+    };
     this.saving.set(true);
     this.form.disable({ emitEvent: false });
     this.api
@@ -234,7 +242,7 @@ export class AdjustStockModal {
         next: () => {
           this.saving.set(false);
           this.form.enable({ emitEvent: false });
-          this.notifications.success(type === 'INGRESO' ? 'Ingreso registrado correctamente.' : 'Retiro registrado correctamente.');
+          this.notifications.confirm(confirmation);
           this.saved.emit();
           this.open.set(false);
         },

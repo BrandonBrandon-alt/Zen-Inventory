@@ -8,6 +8,23 @@ export interface AppNotification {
   readonly message: string;
 }
 
+/**
+ * Confirmación destacada de una acción importante (crear o cambiar un documento, mover stock). Se muestra en un modal
+ * que hay que cerrar, en vez de un toast que pasa solo.
+ */
+export interface ConfirmationInput {
+  /** Qué documento y qué pasó, corto: «Traslado #5 despachado». Va como título del modal. */
+  readonly title: string;
+  /** La confirmación en una frase: «El traslado se despachó correctamente.». */
+  readonly summary: string;
+  /** Qué implica o qué sigue: «La sucursal de destino debe confirmar lo recibido cuando llegue.». */
+  readonly detail?: string;
+}
+
+export interface Confirmation extends ConfirmationInput {
+  readonly id: number;
+}
+
 /** Cuánto permanece visible cada tipo de aviso (ms). Los errores duran más: hay que poder leerlos. */
 const DURATION_MS: Record<NotificationKind, number> = {
   error: 8_000,
@@ -19,7 +36,10 @@ const DURATION_MS: Record<NotificationKind, number> = {
 /** Máximo de avisos a la vez; al superarlo se descarta el más antiguo. */
 const MAX_VISIBLE = 4;
 
-/** Avisos globales (toasts): errores de red/servidor, permisos, sesión vencida, confirmaciones. */
+/**
+ * Avisos globales. Toasts para errores de red/servidor, permisos, sesión vencida y confirmaciones secundarias (catálogo,
+ * perfil, configuración); un modal (`confirm`) para confirmar las acciones de negocio importantes.
+ */
 @Injectable({ providedIn: 'root' })
 export class NotificationService {
   private readonly state = signal<readonly AppNotification[]>([]);
@@ -27,6 +47,10 @@ export class NotificationService {
   private nextId = 1;
 
   readonly items = this.state.asReadonly();
+
+  private readonly confirmationState = signal<Confirmation | null>(null);
+  /** La confirmación que se está mostrando en el modal, o `null`. */
+  readonly confirmation = this.confirmationState.asReadonly();
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.timers.forEach((timer) => clearTimeout(timer)));
@@ -57,6 +81,18 @@ export class NotificationService {
 
   info(message: string): void {
     this.show('info', message);
+  }
+
+  /**
+   * Confirma en un modal una acción importante: qué pasó (título), la confirmación en una frase (resumen) y qué implica
+   * o qué sigue (detalle). Si ya había una abierta, la reemplaza.
+   */
+  confirm(input: ConfirmationInput): void {
+    this.confirmationState.set({ ...input, id: this.nextId++ });
+  }
+
+  dismissConfirmation(): void {
+    this.confirmationState.set(null);
   }
 
   dismiss(id: number): void {

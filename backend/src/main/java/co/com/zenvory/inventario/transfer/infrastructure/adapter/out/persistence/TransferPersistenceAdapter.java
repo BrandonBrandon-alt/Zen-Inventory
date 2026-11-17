@@ -99,6 +99,10 @@ public class TransferPersistenceAdapter implements TransferRepositoryPort {
             paymentEntity.setMethod(p.getMethod().name());
             paymentEntity.setReference(p.getReference());
             paymentEntity.setNotes(p.getNotes());
+            paymentEntity.setVoidedAt(p.getVoidedAt());
+            paymentEntity.setVoidedByUserId(p.getVoidedByUserId());
+            paymentEntity.setVoidedByUserName(p.getVoidedByUserName());
+            paymentEntity.setVoidReason(p.getVoidReason());
             entity.addPayment(paymentEntity);
         }
         return entity;
@@ -145,7 +149,8 @@ public class TransferPersistenceAdapter implements TransferRepositoryPort {
                 entity.getPayments().stream().map(p -> new co.com.zenvory.inventario.transfer.domain.model.TransferPayment(
                         p.getId(), p.getAmount(), p.getDate(), p.getUserId(), p.getUserName(),
                         co.com.zenvory.inventario.transfer.domain.model.TransferPaymentMethod.valueOf(p.getMethod()),
-                        p.getReference(), p.getNotes())).collect(Collectors.toList())
+                        p.getReference(), p.getNotes(), p.getVoidedAt(), p.getVoidedByUserId(), p.getVoidedByUserName(),
+                        p.getVoidReason())).collect(Collectors.toList())
         );
     }
 }

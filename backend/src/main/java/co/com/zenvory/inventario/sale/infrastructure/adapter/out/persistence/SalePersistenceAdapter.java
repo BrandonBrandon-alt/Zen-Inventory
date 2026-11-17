@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.text.Normalizer;
+import co.com.zenvory.inventario.shared.infrastructure.persistence.SqlText;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
@@ -117,7 +117,7 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
                 predicates.add(c.registeredCustomer() ? hasName : cb.not(hasName));
             }
             if (c.text() != null && !c.text().isBlank()) {
-                String like = "%" + escapeLike(normalize(c.text())) + "%";
+                String like = SqlText.containsPattern(SqlText.normalize(c.text()));
                 predicates.add(cb.or(
                         cb.like(root.get("id").as(String.class), like, '\\'),
                         cb.like(unaccented(cb, root.get("customerName")), like, '\\'),
@@ -128,20 +128,8 @@ public class SalePersistenceAdapter implements SaleRepositoryPort {
         };
     }
 
-    private static final String ACCENTED = "áéíóúüñàèìòùâêîôû";
-    private static final String PLAIN = "aeiouunaeiouaeiou";
-
-    /** Minúsculas y sin tildes, igual que el buscador de la pantalla (así «rios» encuentra «Ríos»). */
-    private static String normalize(String text) {
-        return Normalizer.normalize(text.trim().toLowerCase(), Normalizer.Form.NFD).replaceAll("\\p{M}", "");
-    }
-
     private static Expression<String> unaccented(CriteriaBuilder cb, Expression<String> column) {
-        return cb.function("translate", String.class, cb.lower(column), cb.literal(ACCENTED), cb.literal(PLAIN));
-    }
-
-    private static String escapeLike(String text) {
-        return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        return cb.function("translate", String.class, cb.lower(column), cb.literal(SqlText.ACCENTED), cb.literal(SqlText.UNACCENTED));
     }
 
     @Override

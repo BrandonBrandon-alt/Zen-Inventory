@@ -22,6 +22,11 @@ WORKDIR /app
 # Copiar el .jar compilado desde la etapa anterior
 COPY --from=builder /app/target/*.jar app.jar
 
+# Las fechas se guardan sin zona con la hora de este proceso y el navegador filtra por su día local: en UTC, una venta
+# hecha desde las 7 p. m. en Colombia quedaba con fecha del día siguiente y no salía en «Hoy». La JVM trae su propia
+# base de zonas, así que basta con TZ (se puede cambiar con la variable de entorno del servicio).
+ENV TZ=America/Bogota
+
 # Exponer el puerto
 EXPOSE 8080
 

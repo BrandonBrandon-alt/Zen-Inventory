@@ -1,5 +1,8 @@
 package co.com.zenvory.inventario.auth.application.service;
 
+import co.com.zenvory.inventario.audit.application.port.in.CatalogAuditUseCase;
+import co.com.zenvory.inventario.audit.domain.model.ChangedEntity;
+import co.com.zenvory.inventario.audit.domain.service.UserChanges;
 import co.com.zenvory.inventario.auth.application.port.in.UserUseCase;
 import co.com.zenvory.inventario.auth.application.port.out.UserRepositoryPort;
 import co.com.zenvory.inventario.auth.domain.exception.DuplicateEmailException;
@@ -11,6 +14,7 @@ import co.com.zenvory.inventario.auth.domain.model.User;
 import co.com.zenvory.inventario.branch.application.port.in.BranchUseCase;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -35,6 +39,7 @@ public class UserService implements UserUseCase {
     private final UserRepositoryPort userRepositoryPort;
     private final PasswordEncoder passwordEncoder;
     private final BranchUseCase branchUseCase;
+    private final CatalogAuditUseCase catalogAudit;
 
     /**
      * Constructor con inyección de dependencias.
@@ -42,11 +47,14 @@ public class UserService implements UserUseCase {
      * @param userRepositoryPort Puerto de salida para persistencia de usuarios.
      * @param passwordEncoder Componente para el hash de contraseñas.
      * @param branchUseCase Para comprobar que la sucursal asignada existe.
+     * @param catalogAudit Auditoría del catálogo (rol, sucursal y estado de cada cuenta).
      */
-    public UserService(UserRepositoryPort userRepositoryPort, PasswordEncoder passwordEncoder, BranchUseCase branchUseCase) {
+    public UserService(UserRepositoryPort userRepositoryPort, PasswordEncoder passwordEncoder, BranchUseCase branchUseCase,
+                       CatalogAuditUseCase catalogAudit) {
         this.userRepositoryPort = userRepositoryPort;
         this.passwordEncoder = passwordEncoder;
         this.branchUseCase = branchUseCase;
+        this.catalogAudit = catalogAudit;
     }
 
     @Override
@@ -74,6 +82,7 @@ public class UserService implements UserUseCase {
      * <p>Cifra la contraseña antes de guardar. Un MANAGER crea siempre en su propia sucursal.</p>
      */
     @Override
+    @Transactional
     public User createUser(User user, String plainPassword, String actorEmail) {
         User actor = actor(actorEmail);
         if (plainPassword == null || plainPassword.isBlank()) {
@@ -93,7 +102,9 @@ public class UserService implements UserUseCase {
         user.setActive(true);
         user.setCreatedAt(LocalDateTime.now());
         user.setRole(role);
-        return userRepositoryPort.save(user);
+        User saved = userRepositoryPort.save(user);
+        catalogAudit.record(ChangedEntity.USUARIO, saved.getId(), saved.getNombre(), List.of(UserChanges.created(saved)));
+        return saved;
     }
 
     /**
@@ -102,9 +113,11 @@ public class UserService implements UserUseCase {
      * puede editar usuarios de su sucursal con rol inferior, y no puede moverlos de sucursal ni ascenderlos.</p>
      */
     @Override
+    @Transactional
     public User updateUser(Long id, User updated, String plainPassword, String actorEmail) {
         User actor = actor(actorEmail);
         User existing = find(id);
+        User before = UserChanges.snapshot(existing);
         Role newRole = updated.getRole() != null && updated.getRole().getId() != null
                 ? findRole(updated.getRole().getId())
                 : null;
@@ -139,7 +152,9 @@ public class UserService implements UserUseCase {
         if (updated.getActive() != null) {
             existing.setActive(updated.getActive());
         }
-        return userRepositoryPort.save(existing);
+        User saved = userRepositoryPort.save(existing);
+        audit(before, existing);
+        return saved;
     }
 
     /**
@@ -147,6 +162,7 @@ public class UserService implements UserUseCase {
      * <p>Desactivación lógica para preservar la trazabilidad de auditoría.</p>
      */
     @Override
+    @Transactional
     public void deactivateUser(Long id, String actorEmail) {
         User actor = actor(actorEmail);
         User existing = find(id);
@@ -156,8 +172,16 @@ public class UserService implements UserUseCase {
         if (!isAdmin(actor)) {
             requireManageable(actor, existing);
         }
+        User before = UserChanges.snapshot(existing);
         existing.setActive(false);
         userRepositoryPort.save(existing);
+        audit(before, existing);
+    }
+
+    /** Deja en la auditoría del catálogo el rol, la sucursal o el estado que cambiaron (misma transacción). */
+    private void audit(User before, User after) {
+        catalogAudit.record(ChangedEntity.USUARIO, after.getId(), after.getNombre(),
+                UserChanges.diff(before, after, branchId -> branchUseCase.getBranchById(branchId).getName()));
     }
 
     /**

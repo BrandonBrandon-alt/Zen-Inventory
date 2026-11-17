@@ -240,7 +240,11 @@ describe('AdjustStockModal', () => {
       await vi.waitFor(() => expect(host.onSaved).toHaveBeenCalledTimes(1));
       expect(body).toEqual({ quantity: 4, reason: 'AJUSTE_POSITIVO', userId: 5, observations: LONG_TEXT, unitCost: 2.5 });
       expect(host.open).toBe(false);
-      expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ kind: 'success', message: 'Ingreso registrado correctamente.' });
+      expect(TestBed.inject(NotificationService).confirmation()).toMatchObject({
+        title: 'Ingreso de 4 UND registrado',
+        summary: 'El ingreso de Tornillo se registró correctamente.',
+        detail: 'El stock en esta sucursal pasó de 12 a 16 UND. El movimiento quedó en el kardex.',
+      });
     });
 
     it('retiro por merma: llama a /withdraw con la categoría y sin costo', async () => {
@@ -255,7 +259,11 @@ describe('AdjustStockModal', () => {
 
       await vi.waitFor(() => expect(host.onSaved).toHaveBeenCalledTimes(1));
       expect(body).toEqual({ quantity: 2, reason: 'MERMA', userId: 5, observations: LONG_TEXT, subReason: 'DAÑO_FISICO' });
-      expect(TestBed.inject(NotificationService).items()[0]).toMatchObject({ message: 'Retiro registrado correctamente.' });
+      expect(TestBed.inject(NotificationService).confirmation()).toMatchObject({
+        title: 'Retiro de 2 UND registrado',
+        summary: 'El retiro de Tornillo se registró correctamente.',
+        detail: 'El stock en esta sucursal pasó de 12 a 10 UND. El movimiento quedó en el kardex.',
+      });
     });
 
     it('una devolución de cliente se registra sin justificación ni costo', async () => {

@@ -1,5 +1,8 @@
 package co.com.zenvory.inventario.transfer.application.service;
 
+import co.com.zenvory.inventario.transfer.application.port.out.TransferSearchPort;
+import co.com.zenvory.inventario.shared.domain.Viewer;
+import co.com.zenvory.inventario.shared.infrastructure.web.PageParams;
 import co.com.zenvory.inventario.inventory.application.port.in.InventoryUseCase;
 import co.com.zenvory.inventario.inventory.domain.model.MovementReason;
 import co.com.zenvory.inventario.catalog.application.port.in.ProductUseCase;
@@ -33,6 +36,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 @Service
 public class TransferService implements TransferUseCase {
 
+    private final TransferSearchPort searchPort;
     private final TransferRepositoryPort transferRepositoryPort;
     private final InventoryUseCase inventoryUseCase;
     private final ProductUseCase productUseCase;
@@ -45,8 +49,10 @@ public class TransferService implements TransferUseCase {
                            ProductUseCase productUseCase,
                            BranchUseCase branchUseCase,
                            UserRepositoryPort userRepositoryPort,
-                           ApplicationEventPublisher eventPublisher) {
+                           ApplicationEventPublisher eventPublisher,
+                           TransferSearchPort searchPort) {
         this.transferRepositoryPort = transferRepositoryPort;
+        this.searchPort = searchPort;
         this.inventoryUseCase = inventoryUseCase;
         this.productUseCase = productUseCase;
         this.branchUseCase = branchUseCase;
@@ -184,6 +190,17 @@ public class TransferService implements TransferUseCase {
         // Paga el flete quien contrató el envío: la sucursal de origen (la que despacha).
         requireSide(transfer, user, Side.ORIGIN);
         transfer.registerFreightPayment(amount, method, reference, notes, user.getId(), user.getNombre());
+        return transferRepositoryPort.save(transfer);
+    }
+
+    @Override
+    @Transactional
+    public Transfer voidFreightPayment(Long transferId, Long paymentId, String reason) {
+        Transfer transfer = getTransferById(transferId);
+        User user = getCurrentUser();
+        // Anula quien puede pagar: la sucursal de origen.
+        requireSide(transfer, user, Side.ORIGIN);
+        transfer.voidFreightPayment(paymentId, reason, user.getId(), user.getNombre());
         return transferRepositoryPort.save(transfer);
     }
 
@@ -474,6 +491,16 @@ public class TransferService implements TransferUseCase {
     @Override
     public List<Transfer> getTransfersByBranch(Long branchId) {
         return transferRepositoryPort.findByBranch(branchId);
+    }
+
+    @Override
+    public TransferSearchPort.Page search(TransferSearchPort.Criteria criteria, PageParams page, String sortBy, boolean ascending) {
+        return searchPort.search(criteria, page, sortBy, ascending);
+    }
+
+    @Override
+    public TransferSearchPort.Summary summary(Viewer viewer) {
+        return searchPort.summary(viewer);
     }
 
     @Override

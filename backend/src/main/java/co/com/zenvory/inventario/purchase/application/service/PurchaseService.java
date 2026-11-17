@@ -1,5 +1,8 @@
 package co.com.zenvory.inventario.purchase.application.service;
 
+import co.com.zenvory.inventario.purchase.application.port.out.PurchaseSearchPort;
+import co.com.zenvory.inventario.shared.domain.Viewer;
+import co.com.zenvory.inventario.shared.infrastructure.web.PageParams;
 import co.com.zenvory.inventario.purchase.application.port.in.PurchaseReceiptResult;
 import co.com.zenvory.inventario.catalog.application.port.in.ProductUseCase;
 import co.com.zenvory.inventario.catalog.domain.model.Product;
@@ -34,6 +37,7 @@ import java.util.Map;
 public class PurchaseService implements PurchaseUseCase {
 
     /** Puerto de persistencia para órdenes de compra. */
+    private final PurchaseSearchPort searchPort;
     private final PurchaseRepositoryPort repository;
     
     /** Puerto para actualizaciones de stock y movimientos de almacén. */
@@ -52,8 +56,10 @@ public class PurchaseService implements PurchaseUseCase {
      */
     public PurchaseService(PurchaseRepositoryPort repository, 
                            InventoryUseCase inventoryUseCase,
-                           ProductUseCase productUseCase) {
+                           ProductUseCase productUseCase,
+                           PurchaseSearchPort searchPort) {
         this.repository = repository;
+        this.searchPort = searchPort;
         this.inventoryUseCase = inventoryUseCase;
         this.productUseCase = productUseCase;
     }
@@ -210,6 +216,14 @@ public class PurchaseService implements PurchaseUseCase {
 
     @Override
     @Transactional
+    public PurchaseOrder voidPayment(Long orderId, Long paymentId, String reason, Long userId, String userName) {
+        PurchaseOrder order = getOrderById(orderId);
+        order.voidPayment(paymentId, reason, userId, userName);
+        return repository.save(order);
+    }
+
+    @Override
+    @Transactional
     public void cancelPurchase(Long orderId, String reason, Long userId) {
         PurchaseOrder order = getOrderById(orderId);
         order.cancel(reason, userId);
@@ -230,5 +244,15 @@ public class PurchaseService implements PurchaseUseCase {
     @Override
     public List<PurchaseOrder> getOrdersByBranch(Long branchId) {
         return repository.findByBranchId(branchId);
+    }
+
+    @Override
+    public PurchaseSearchPort.Page search(PurchaseSearchPort.Criteria criteria, PageParams page, String sortBy, boolean ascending) {
+        return searchPort.search(criteria, page, sortBy, ascending);
+    }
+
+    @Override
+    public PurchaseSearchPort.Summary summary(Long branchId, Viewer viewer) {
+        return searchPort.summary(branchId, viewer);
     }
 }

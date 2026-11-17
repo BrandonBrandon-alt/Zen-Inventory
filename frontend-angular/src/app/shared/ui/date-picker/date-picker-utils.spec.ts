@@ -102,7 +102,11 @@ describe('date-picker-utils', () => {
   describe('texto', () => {
     it('formatTrigger: día, mes corto y año; con hora la agrega', () => {
       expect(formatTrigger(d(2026, 10, 15), false)).toBe('15 oct 2026');
-      expect(formatTrigger(d(2026, 10, 5, 9, 5), true)).toBe('5 oct 2026, 09:05');
+      expect(formatTrigger(d(2026, 10, 5, 9, 5), true)).toBe('5 oct 2026, 9:05 a. m.');
+      expect(formatTrigger(d(2026, 10, 5, 14, 45), true)).toBe('5 oct 2026, 2:45 p. m.');
+      // Reloj de 12 horas: la medianoche es 12 a. m. y el mediodía 12 p. m.
+      expect(formatTrigger(d(2026, 10, 5, 0, 0), true)).toBe('5 oct 2026, 12:00 a. m.');
+      expect(formatTrigger(d(2026, 10, 5, 12, 30), true)).toBe('5 oct 2026, 12:30 p. m.');
     });
 
     it('monthLabel y dayLabel están en español', () => {

@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal, untracked } from '@angular/core';
+import { firstValueFrom, map } from 'rxjs';
 import { LucideArrowUpDown, LucideCalendar, LucideHash, LucideInfo, LucideListFilter, LucideMessageSquareText, LucidePackage, LucideScale, LucideSearch } from '@lucide/angular';
-import { toApiError } from '@core/api/api-error';
-import { formatDateTime, formatQuantity, normalizeText } from '@shared/format/format';
-import { inDateRange } from '@shared/filters/filter-helpers';
+import { type MovementQuery, type MovementRecord, MovementSearchApi } from '@core/inventory/movement-search-api';
+import { debouncedText } from '@shared/data/debounced-text';
+import { type PagedQuery, serverPagedList } from '@shared/data/server-paged-list';
+import { formatDateTime, formatQuantity } from '@shared/format/format';
 import { Badge } from '@shared/ui/badge/badge';
 import { DataTable, DataTableCell, type TableColumn } from '@shared/ui/data-table/data-table';
 import { DatePicker } from '@shared/ui/date-picker/date-picker';
@@ -11,16 +13,18 @@ import { FormField, InputDirective } from '@shared/ui/form-field/form-field';
 import { MultiSelect } from '@shared/ui/multi-select/multi-select';
 import { Segmented, type SegmentedOption } from '@shared/ui/segmented/segmented';
 import type { SelectOption } from '@shared/ui/select/select';
-import { type InventoryItem, InventoryApi, type Movement, type MovementReason, type MovementType } from '../../data-access/inventory-api';
+import type { InventoryItem, MovementReason, MovementType } from '../../data-access/inventory-api';
 import { REASON_LABELS, subReasonLabel } from '../../data-access/inventory-labels';
 
-/** Fila del kardex: el movimiento con el nombre de su producto. */
-interface MovementRow extends Movement {
-  readonly productName: string;
-}
+/** Fila del kardex: el movimiento tal como lo manda el servidor (ya trae el nombre del producto y el saldo). */
+type MovementRow = MovementRecord;
 
-/** Movimientos con signo: los retiros restan, para mostrarlos y ordenarlos como "+5" / "−3". */
-const signed = (row: Movement): number => (row.type === 'INGRESO' ? row.quantity : -row.quantity);
+/** Movimientos con signo: los retiros restan, para mostrarlos y exportarlos como "+5" / "−3". */
+const signed = (row: MovementRow): number => (row.type === 'INGRESO' ? row.quantity : -row.quantity);
+
+/** Columna de la tabla → campo de orden del servidor. */
+const SORT_KEYS: Readonly<Record<string, string>> = { date: 'date', productName: 'product', type: 'type', reason: 'reason', quantity: 'quantity' };
+const PAGE_SIZE = 15;
 
 const COLUMNS: readonly TableColumn<MovementRow>[] = [
   { key: 'date', header: 'Fecha', icon: LucideCalendar.icon, sortable: true, nowrap: true, width: '11.5rem', value: (r) => r.date, display: (r) => formatDateTime(r.date) },
@@ -81,6 +85,9 @@ function summarize(names: readonly string[]): string {
       <div class="w-34"><app-date-picker [(value)]="to" [min]="from()" placeholder="Hasta" ariaLabel="Hasta" /></div>
     </div>
     <app-active-filters class="mb-4" [filters]="activeFilters()" (removed)="removeFilter($event)" (cleared)="clearFilters()" />
+    @if (!error() && total() > 0) {
+      <p class="mb-3 text-sm text-fg-subtle">{{ summary() }}</p>
+    }
 
     <app-data-table
       caption="Historial de movimientos"
@@ -90,11 +97,15 @@ function summarize(names: readonly string[]): string {
       [rowKey]="rowKey"
       [loading]="loading()"
       [error]="error()"
-      [pageSize]="15"
+      [pageSize]="pageSize"
+      [total]="total()"
+      [(page)]="page"
+      [exportAll]="exportAll"
       minWidth="56rem"
       [emptyTitle]="activeFilters().length === 0 ? 'Sin movimientos' : 'Ningún movimiento coincide'"
       [emptyDescription]="activeFilters().length === 0 ? 'Los ingresos y retiros de existencias aparecerán aquí.' : 'Prueba quitando algún filtro.'"
       (retry)="load()"
+      (sortChange)="sort.set($event)"
     >
       <ng-template appCell="type" let-row>
         <app-badge [variant]="row.type === 'INGRESO' ? 'success' : 'danger'">{{ row.type === 'INGRESO' ? 'Ingreso' : 'Retiro' }}</app-badge>
@@ -114,14 +125,15 @@ function summarize(names: readonly string[]): string {
   `,
 })
 export class KardexPanel {
-  private readonly api = inject(InventoryApi);
+  private readonly api = inject(MovementSearchApi);
 
   readonly branchId = input.required<number>();
-  /** Productos de la sucursal: sirven para el filtro y para nombrar cada movimiento. */
+  /** Productos de la sucursal: son las opciones del filtro de producto. */
   readonly products = input.required<readonly InventoryItem[]>();
 
   protected readonly columns = COLUMNS;
   protected readonly rowKey = rowKey;
+  protected readonly pageSize = PAGE_SIZE;
   protected readonly packageIcon = LucidePackage.icon;
   protected readonly filterIcon = LucideListFilter.icon;
   protected readonly typeOptions = TYPE_OPTIONS;
@@ -129,37 +141,50 @@ export class KardexPanel {
   protected readonly formatQuantity = formatQuantity;
 
   protected readonly productIds = signal<readonly number[]>([]);
-  protected readonly search = signal('');
+  private readonly searchBox = debouncedText();
+  protected readonly search = this.searchBox.text;
   protected readonly typeFilter = signal<TypeFilter>('all');
   protected readonly reasonFilter = signal<readonly MovementReason[]>([]);
   protected readonly from = signal<Date | null>(null);
   protected readonly to = signal<Date | null>(null);
-  /** Con un solo producto se pide su kardex al servidor; con ninguno o con varios se pide el general y se filtra aquí. */
-  private readonly serverProductId = computed(() => (this.productIds().length === 1 ? this.productIds()[0] : null));
-  private readonly movements = signal<readonly Movement[]>([]);
-  protected readonly loading = signal(true);
-  protected readonly error = signal<string | null>(null);
+  protected readonly sort = signal<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   protected readonly productOptions = computed<SelectOption<number>[]>(() =>
     this.products().map((product) => ({ value: product.productId, label: product.nombre, description: product.sku || undefined })),
   );
 
-  protected readonly rows = computed<MovementRow[]>(() => {
-    const names = new Map(this.products().map((product) => [product.productId, product.nombre]));
-    const chosen = new Set(this.productIds());
-    const reasons = new Set(this.reasonFilter());
-    const type = this.typeFilter();
-    const from = this.from();
-    const to = this.to();
-    const needle = normalizeText(this.search().trim());
-    return this.movements()
-      .filter((movement) => chosen.size < 2 || chosen.has(movement.productId))
-      .filter((movement) => type === 'all' || movement.type === type)
-      .filter((movement) => reasons.size === 0 || reasons.has(movement.reason))
-      .filter((movement) => inDateRange(movement.date, from, to))
-      .map((movement) => ({ ...movement, productName: names.get(movement.productId) ?? `Producto ${movement.productId}` }))
-      .filter((row) => needle === '' || normalizeText(`${row.productName} ${this.reasonLabel(row)} ${row.observations}`).includes(needle));
+  /** Lo que se filtra en el servidor; la sucursal es siempre la elegida en Inventario. */
+  private readonly filters = computed(() => ({
+    branchId: this.branchId(),
+    productIds: this.productIds(),
+    type: this.typeFilter() === 'all' ? null : (this.typeFilter() as MovementType),
+    reasons: this.reasonFilter(),
+    from: this.from(),
+    to: this.to(),
+    text: this.searchBox.term(),
+  }));
+
+  private readonly list = serverPagedList({
+    filters: this.filters,
+    sort: this.sort,
+    size: PAGE_SIZE,
+    fetch: (query) => this.api.search(toMovementQuery(query)).pipe(map((page) => ({ ...page, rows: page.movements }))),
   });
+  protected readonly rows = this.list.rows;
+  protected readonly total = this.list.total;
+  protected readonly loading = this.list.loading;
+  protected readonly error = this.list.error;
+  protected readonly page = this.list.page;
+
+  /** Resumen de todo lo filtrado (lo suma el servidor), no solo de la página. */
+  protected readonly summary = computed(() => {
+    const total = this.total();
+    const label = total === 1 ? '1 movimiento' : `${formatQuantity(total)} movimientos`;
+    return `${label}: entraron ${formatQuantity(this.list.last()?.totalIn ?? 0)} unidades y salieron ${formatQuantity(this.list.last()?.totalOut ?? 0)}`;
+  });
+
+  /** Para el CSV: todo lo filtrado, en el orden elegido. */
+  protected readonly exportAll = (): Promise<readonly MovementRow[]> => firstValueFrom(this.api.exportAll(toMovementQuery(untracked(this.list.query))));
 
   /** Los filtros aplicados, como etiquetas que se quitan una a una. */
   protected readonly activeFilters = computed<ActiveFilter[]>(() => {
@@ -174,19 +199,12 @@ export class KardexPanel {
     return list;
   });
 
-  /** Para descartar la respuesta de una consulta anterior si el usuario cambió de sucursal o de producto mientras llegaba. */
-  private requestId = 0;
-
-  constructor() {
-    effect(() => {
-      this.branchId();
-      this.serverProductId();
-      untracked(() => this.load());
-    });
+  protected load(): Promise<void> {
+    return this.list.reload();
   }
 
   protected onSearch(event: Event): void {
-    this.search.set((event.target as HTMLInputElement).value);
+    this.searchBox.set((event.target as HTMLInputElement).value);
   }
 
   protected removeFilter(id: string): void {
@@ -196,7 +214,7 @@ export class KardexPanel {
       case 'reasons': this.reasonFilter.set([]); break;
       case 'from': this.from.set(null); break;
       case 'to': this.to.set(null); break;
-      case 'search': this.search.set(''); break;
+      case 'search': this.searchBox.clear(); break;
     }
   }
 
@@ -204,26 +222,21 @@ export class KardexPanel {
     for (const filter of this.activeFilters()) this.removeFilter(filter.id);
   }
 
-  protected reasonLabel(row: Movement): string {
+  protected reasonLabel(row: MovementRow): string {
     const label = REASON_LABELS[row.reason];
     return row.subReason ? `${label} · ${subReasonLabel(row.subReason)}` : label;
   }
+}
 
-  protected load(): void {
-    const id = ++this.requestId;
-    this.loading.set(true);
-    this.error.set(null);
-    this.api.movements(this.branchId(), this.serverProductId()).subscribe({
-      next: (movements) => {
-        if (id !== this.requestId) return;
-        this.movements.set(movements);
-        this.loading.set(false);
-      },
-      error: (error: unknown) => {
-        if (id !== this.requestId) return;
-        this.error.set(toApiError(error).message);
-        this.loading.set(false);
-      },
-    });
-  }
+/** Filtros del kardex → consulta de la búsqueda de movimientos (del más reciente, si no se eligió otro orden). */
+function toMovementQuery({ sort, ...query }: PagedQuery<{ branchId: number; productIds: readonly number[]; type: MovementType | null; reasons: readonly MovementReason[]; from: Date | null; to: Date | null; text: string }>): MovementQuery {
+  return {
+    ...query,
+    userId: null,
+    minQuantity: null,
+    maxQuantity: null,
+    onlyObserved: false,
+    sortBy: sort ? (SORT_KEYS[sort.key] ?? 'date') : 'date',
+    ascending: sort ? sort.direction === 'asc' : false,
+  };
 }

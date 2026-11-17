@@ -1,5 +1,11 @@
 package co.com.zenvory.inventario.inventory.application.service;
 
+import java.util.List;
+import co.com.zenvory.inventario.branch.domain.model.Branch;
+import co.com.zenvory.inventario.branch.application.port.in.BranchUseCase;
+import co.com.zenvory.inventario.audit.domain.model.FieldChange;
+import co.com.zenvory.inventario.audit.domain.model.ChangedEntity;
+import co.com.zenvory.inventario.audit.application.port.in.CatalogAuditUseCase;
 import co.com.zenvory.inventario.catalog.application.port.in.ProductUseCase;
 import co.com.zenvory.inventario.catalog.application.port.in.UnitOfMeasureUseCase;
 import co.com.zenvory.inventario.inventory.application.port.out.InventoryMovementRepositoryPort;
@@ -33,6 +39,7 @@ class InventoryServiceTest {
     private UnitOfMeasureUseCase units;
     private ApplicationEventPublisher publisher;
     private LocalInventory row;
+    private CatalogAuditUseCase audit;
 
     @BeforeEach
     void setUp() {
@@ -40,7 +47,10 @@ class InventoryServiceTest {
         products = mock(ProductUseCase.class);
         units = mock(UnitOfMeasureUseCase.class);
         publisher = mock(ApplicationEventPublisher.class);
-        service = new InventoryService(repo, mock(InventoryMovementRepositoryPort.class), products, units, publisher);
+        audit = mock(CatalogAuditUseCase.class);
+        BranchUseCase branches = mock(BranchUseCase.class);
+        when(branches.getBranchById(1L)).thenReturn(Branch.builder().id(1L).name("Sucursal Norte").build());
+        service = new InventoryService(repo, mock(InventoryMovementRepositoryPort.class), products, units, publisher, branches, audit);
         row = LocalInventory.builder().branchId(1L).productId(2L).currentQuantity(new BigDecimal("5"))
                 .committedQuantity(BigDecimal.ZERO).minimumStock(BigDecimal.ZERO).build();
         when(repo.findByBranchAndProductForUpdate(1L, 2L)).thenReturn(Optional.of(row));
@@ -206,5 +216,21 @@ class InventoryServiceTest {
         when(products.getAllProducts()).thenReturn(java.util.List.of(co.com.zenvory.inventario.catalog.domain.model.Product.builder().id(2L).name("P").build()));
         assertThat(service.getEnrichedInventoryByBranch(1L)).hasSize(1);
         verify(products, never()).getProductById(77L);
+    }
+
+    @Test
+    @DisplayName("cambiar el mínimo lo registra en la auditoría del catálogo, con la sucursal")
+    void updateMinimumStock_registraElMinimo() {
+        service.updateMinimumStock(1L, 2L, new BigDecimal("4"));
+
+        verify(audit).record(ChangedEntity.PRODUCTO, 2L, "P", List.of(new FieldChange("Stock mínimo (Sucursal Norte)", "0", "4")));
+    }
+
+    @Test
+    @DisplayName("guardar el mismo mínimo no registra nada")
+    void updateMinimumStock_igual_noRegistra() {
+        service.updateMinimumStock(1L, 2L, new BigDecimal("0.00"));
+
+        verify(audit).record(ChangedEntity.PRODUCTO, 2L, "P", List.of());
     }
 }

@@ -151,7 +151,11 @@ export class ReturnFormModal {
       next: (request) => {
         this.saving.set(false);
         this.form.enable({ emitEvent: false });
-        this.notifications.success(`Devolución #${request.id} solicitada: espera la decisión de un gerente.`);
+        this.notifications.confirm({
+          title: `Devolución #${request.id} solicitada`,
+          summary: 'La solicitud de devolución se registró correctamente.',
+          detail: 'Un gerente debe aprobarla. Al aprobarla, las unidades vuelven al stock de la sucursal.',
+        });
         this.saved.emit(request);
         this.open.set(false);
       },

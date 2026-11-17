@@ -27,4 +27,20 @@ describe('App', () => {
     TestBed.inject(NotificationService).warning('Tu sesión expiró. Inicia sesión de nuevo.');
     expect(await screen.findByText('Tu sesión expiró. Inicia sesión de nuevo.')).toBeInTheDocument();
   });
+
+  it('confirma las acciones importantes en un modal, que se carga recién cuando hace falta', async () => {
+    await render(App, { providers: [provideRouter([])] });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    TestBed.inject(NotificationService).confirm({ title: 'Orden #12 creada', summary: 'La orden de compra se registró correctamente.', detail: 'Espera la aprobación de un gerente.' });
+    expect(await screen.findByRole('dialog', { name: 'Orden #12 creada' })).toBeInTheDocument();
+    expect(screen.getByText('Espera la aprobación de un gerente.')).toBeInTheDocument();
+  });
+
+  it('al destruirse la app, el modal de confirmación no queda suelto en el documento', async () => {
+    const { fixture } = await render(App, { providers: [provideRouter([])] });
+    TestBed.inject(NotificationService).confirm({ title: 'Orden #1 aprobada', summary: 'La orden de compra se aprobó correctamente.' });
+    await screen.findByRole('dialog', { name: 'Orden #1 aprobada' });
+    fixture.destroy();
+    expect(document.body.querySelector('app-success-dialog')).toBeNull();
+  });
 });

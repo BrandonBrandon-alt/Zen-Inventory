@@ -234,4 +234,101 @@ class PurchaseControllerTest {
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any());
     }
+
+    @Test
+    @DisplayName("anular un pago lo hace a nombre del usuario de la sesión, con el motivo, y devuelve el pago anulado")
+    void voidPayment_forwardsReasonAndShowsVoid() throws Exception {
+        actAsManagerOfBranch(1L);
+        PurchaseOrder order = orderForPayment();
+        co.com.zenvory.inventario.purchase.domain.model.PurchasePayment voided = new co.com.zenvory.inventario.purchase.domain.model.PurchasePayment(
+                3L, new java.math.BigDecimal("400"), java.time.LocalDateTime.of(2026, 10, 1, 9, 0), 2L, "Ana",
+                co.com.zenvory.inventario.purchase.domain.model.PaymentMethod.TRANSFERENCIA, "TR-1", null,
+                java.time.LocalDateTime.of(2026, 10, 2, 9, 0), 5L, "Gerente", "Duplicado");
+        when(order.getPayments()).thenReturn(List.of(voided));
+        when(purchaseUseCase.voidPayment(1L, 3L, "Duplicado", 5L, "Gerente")).thenReturn(order);
+
+        mockMvc.perform(post("/api/v1/purchases/1/payments/3/void").contentType("application/json").content("{\"reason\":\"Duplicado\",\"userId\":99}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.payments[0].voidReason").value("Duplicado"))
+                .andExpect(jsonPath("$.payments[0].voidedByUserName").value("Gerente"));
+        org.mockito.Mockito.verify(purchaseUseCase).voidPayment(1L, 3L, "Duplicado", 5L, "Gerente");
+    }
+
+    @Test
+    @DisplayName("anular un pago sin motivo es 400 y no anula nada")
+    void voidPayment_requiresReason() throws Exception {
+        actAsManagerOfBranch(1L);
+        orderForPayment();
+        mockMvc.perform(post("/api/v1/purchases/1/payments/3/void").contentType("application/json").content("{\"reason\":\" \"}"))
+                .andExpect(status().isBadRequest());
+        org.mockito.Mockito.verify(purchaseUseCase, org.mockito.Mockito.never()).voidPayment(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("GET /search: los parámetros llegan al criterio, con quién mira, y responde la página")
+    void search_pasaLosParametros() throws Exception {
+        var row = new co.com.zenvory.inventario.purchase.application.port.out.PurchaseSearchPort.Row(41L,
+                co.com.zenvory.inventario.purchase.domain.model.ReceptionStatus.IN_TRANSIT,
+                co.com.zenvory.inventario.purchase.domain.model.PaymentStatus.PAGO_PARCIAL, 1L, "Argos", 2L, "Norte",
+                new java.math.BigDecimal("50000"), new java.math.BigDecimal("30000"), true, java.time.LocalDateTime.of(2026, 10, 11, 9, 0), true);
+        when(purchaseUseCase.search(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenReturn(new co.com.zenvory.inventario.purchase.application.port.out.PurchaseSearchPort.Page(List.of(row), 30));
+
+        mockMvc.perform(get("/api/v1/purchases/search?page=1&size=25&sortBy=total&direction=asc&status=IN_TRANSIT&payment=PAGO_PARCIAL"
+                        + "&from=2026-10-01&to=2026-10-31&supplierId=1&branchId=2&productId=3&minTotal=10&maxTotal=90000&onlyMine=true").param("q", " argos "))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(41))
+                .andExpect(jsonPath("$.content[0].supplierName").value("Argos"))
+                .andExpect(jsonPath("$.content[0].balance").value(30000))
+                .andExpect(jsonPath("$.content[0].overdue").value(true))
+                .andExpect(jsonPath("$.content[0].awaitsMe").value(true))
+                .andExpect(jsonPath("$.totalElements").value(30))
+                .andExpect(jsonPath("$.totalPages").value(2));
+
+        var criteria = org.mockito.ArgumentCaptor.forClass(co.com.zenvory.inventario.purchase.application.port.out.PurchaseSearchPort.Criteria.class);
+        org.mockito.Mockito.verify(purchaseUseCase).search(criteria.capture(), org.mockito.ArgumentMatchers.eq(new co.com.zenvory.inventario.shared.infrastructure.web.PageParams(1, 25)),
+                org.mockito.ArgumentMatchers.eq("total"), org.mockito.ArgumentMatchers.eq(true));
+        org.assertj.core.api.Assertions.assertThat(criteria.getValue()).isEqualTo(new co.com.zenvory.inventario.purchase.application.port.out.PurchaseSearchPort.Criteria(
+                "IN_TRANSIT", co.com.zenvory.inventario.purchase.domain.model.PaymentStatus.PAGO_PARCIAL, java.time.LocalDate.of(2026, 10, 1), java.time.LocalDate.of(2026, 10, 31),
+                1L, 2L, 3L, new java.math.BigDecimal("10"), new java.math.BigDecimal("90000"), true, "argos", new co.com.zenvory.inventario.shared.domain.Viewer(true, true, true, null)));
+    }
+
+    @Test
+    @DisplayName("GET /search y /summary: un gerente no ve otra sucursal aunque la pida")
+    void gerente_no_ve_otra_sucursal_aunque_la_pida() throws Exception {
+        actAsManagerOfBranch(1L);
+        when(purchaseUseCase.search(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenReturn(new co.com.zenvory.inventario.purchase.application.port.out.PurchaseSearchPort.Page(List.of(), 0));
+        when(purchaseUseCase.summary(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new co.com.zenvory.inventario.purchase.application.port.out.PurchaseSearchPort.Summary(1, 2, new java.math.BigDecimal("5"), 3, 4));
+
+        mockMvc.perform(get("/api/v1/purchases/search?branchId=2")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/purchases/summary?branchId=2")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.open").value(1))
+                .andExpect(jsonPath("$.awaitingMe").value(2))
+                .andExpect(jsonPath("$.owed").value(5))
+                .andExpect(jsonPath("$.owedCount").value(3))
+                .andExpect(jsonPath("$.overdue").value(4));
+
+        var criteria = org.mockito.ArgumentCaptor.forClass(co.com.zenvory.inventario.purchase.application.port.out.PurchaseSearchPort.Criteria.class);
+        org.mockito.Mockito.verify(purchaseUseCase).search(criteria.capture(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean());
+        org.assertj.core.api.Assertions.assertThat(criteria.getValue().branchId()).isEqualTo(1L);
+        org.assertj.core.api.Assertions.assertThat(criteria.getValue().viewer()).isEqualTo(new co.com.zenvory.inventario.shared.domain.Viewer(false, true, true, 1L));
+        org.mockito.Mockito.verify(purchaseUseCase).summary(1L, new co.com.zenvory.inventario.shared.domain.Viewer(false, true, true, 1L));
+    }
+
+    @Test
+    @DisplayName("GET /search sin parámetros: en curso, primera página, de la más nueva a la más vieja")
+    void search_porDefecto() throws Exception {
+        when(purchaseUseCase.search(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenReturn(new co.com.zenvory.inventario.purchase.application.port.out.PurchaseSearchPort.Page(List.of(), 0));
+        mockMvc.perform(get("/api/v1/purchases/search")).andExpect(status().isOk());
+        var criteria = org.mockito.ArgumentCaptor.forClass(co.com.zenvory.inventario.purchase.application.port.out.PurchaseSearchPort.Criteria.class);
+        org.mockito.Mockito.verify(purchaseUseCase).search(criteria.capture(), org.mockito.ArgumentMatchers.eq(new co.com.zenvory.inventario.shared.infrastructure.web.PageParams(0, 25)),
+                org.mockito.ArgumentMatchers.eq("id"), org.mockito.ArgumentMatchers.eq(false));
+        org.assertj.core.api.Assertions.assertThat(criteria.getValue().status()).isEqualTo("open");
+        org.assertj.core.api.Assertions.assertThat(criteria.getValue().text()).isNull();
+    }
 }

@@ -1,5 +1,9 @@
 package co.com.zenvory.inventario.inventory.application.service;
 
+import co.com.zenvory.inventario.audit.application.port.in.CatalogAuditUseCase;
+import co.com.zenvory.inventario.audit.domain.model.ChangedEntity;
+import co.com.zenvory.inventario.audit.domain.service.ProductChanges;
+import co.com.zenvory.inventario.branch.application.port.in.BranchUseCase;
 import co.com.zenvory.inventario.inventory.application.port.in.InventoryUseCase;
 import co.com.zenvory.inventario.inventory.application.port.out.InventoryMovementRepositoryPort;
 import co.com.zenvory.inventario.inventory.application.port.out.LocalInventoryRepositoryPort;
@@ -47,6 +51,8 @@ public class InventoryService implements InventoryUseCase {
     private final UnitOfMeasureUseCase unitOfMeasureUseCase;
 
     /** Publicador de eventos para notificaciones transversales (e.g., Alertas de stock bajo). */
+    private final BranchUseCase branchUseCase;
+    private final CatalogAuditUseCase catalogAudit;
     private final ApplicationEventPublisher eventPublisher;
 
     /**
@@ -57,17 +63,23 @@ public class InventoryService implements InventoryUseCase {
      * @param productUseCase Servicio de productos.
      * @param unitOfMeasureUseCase Servicio de unidades de medida.
      * @param eventPublisher Publicador de eventos de aplicación.
+     * @param branchUseCase Servicio de sucursales (el nombre de la sucursal en la auditoría del mínimo).
+     * @param catalogAudit Auditoría del catálogo.
      */
     public InventoryService(LocalInventoryRepositoryPort localInventoryRepository,
                             InventoryMovementRepositoryPort inventoryMovementRepository,
                             ProductUseCase productUseCase,
                             UnitOfMeasureUseCase unitOfMeasureUseCase,
-                            ApplicationEventPublisher eventPublisher) {
+                            ApplicationEventPublisher eventPublisher,
+                            BranchUseCase branchUseCase,
+                            CatalogAuditUseCase catalogAudit) {
         this.localInventoryRepository = localInventoryRepository;
         this.inventoryMovementRepository = inventoryMovementRepository;
         this.productUseCase = productUseCase;
         this.unitOfMeasureUseCase = unitOfMeasureUseCase;
         this.eventPublisher = eventPublisher;
+        this.branchUseCase = branchUseCase;
+        this.catalogAudit = catalogAudit;
     }
 
 
@@ -345,12 +357,15 @@ public class InventoryService implements InventoryUseCase {
         if (minimumStock == null || minimumStock.signum() < 0) {
             throw new IllegalArgumentException("El stock mínimo no puede ser negativo.");
         }
-        requireProduct(productId);
+        Product product = productUseCase.getProductById(productId);
         LocalInventory inventory = lockedInventory(branchId, productId);
+        BigDecimal previous = inventory.getMinimumStock();
 
         inventory.setMinimumStock(minimumStock);
         inventory.setLastUpdated(LocalDateTime.now());
         LocalInventory saved = localInventoryRepository.save(inventory);
+        catalogAudit.record(ChangedEntity.PRODUCTO, productId, product.getName(),
+                ProductChanges.minimumStock(previous, minimumStock, branchUseCase.getBranchById(branchId).getName()).stream().toList());
 
         // Si el nuevo mínimo pone al producto en estado crítico, avisar
         if (isBelowMinimum(saved)) {

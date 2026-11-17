@@ -48,7 +48,11 @@ public record TransferResponse(
             String userName,
             String method,
             String reference,
-            String notes
+            String notes,
+            /** Anulación: todos nulos si el pago está vigente; un pago anulado no cuenta en lo pagado. */
+            LocalDateTime voidedAt,
+            String voidedByUserName,
+            String voidReason
     ) {}
 
     public record TransferDetailResponse(
@@ -82,7 +86,8 @@ public record TransferResponse(
                 transfer.freightBalance(),
                 transfer.freightPaymentStatus().name(),
                 transfer.getPayments().stream().map(p -> new FreightPaymentResponse(p.getId(), p.getAmount(), p.getDate(),
-                        p.getUserId(), p.getUserName(), p.getMethod().name(), p.getReference(), p.getNotes())).toList(),
+                        p.getUserId(), p.getUserName(), p.getMethod().name(), p.getReference(), p.getNotes(),
+                        p.getVoidedAt(), p.getVoidedByUserName(), p.getVoidReason())).toList(),
                 transfer.getTrackingNumber(),
                 transfer.getReasonResolution(),
                 transfer.getSolicitanteId(),

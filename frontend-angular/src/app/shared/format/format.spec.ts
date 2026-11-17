@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { formatDateTime, formatMoney, formatMoneyCompact, formatQuantity, formatShortDate, formatShortMonth, normalizeText, parseDate } from './format';
+import { formatDateTime, formatMoney, formatMoneyCompact, formatQuantity, formatShortDate, formatShortMonth, normalizeText, parseDate, toIsoDay } from './format';
 
 // Intl separa el símbolo con un espacio duro (U+00A0): se normaliza para comparar.
 const NBSP = String.fromCharCode(160);
 const plain = (text: string) => text.split(NBSP).join(' ');
 
 describe('format', () => {
+  it('toIsoDay: el día local como AAAA-MM-DD (de noche no salta al día siguiente)', () => {
+    expect(toIsoDay(new Date(2026, 9, 5, 23, 30))).toBe('2026-10-05');
+  });
+
   it('formatMoney: pesos con separador de miles; con centavos siempre dos decimales, para que las columnas alineen', () => {
     expect(plain(formatMoney(1250))).toBe('$ 1.250');
     expect(plain(formatMoney(1250.5))).toBe('$ 1.250,50');

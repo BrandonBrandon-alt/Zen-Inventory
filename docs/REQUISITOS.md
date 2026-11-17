@@ -149,6 +149,9 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 | RF-49 | Rotación de inventario, productos sin movimiento y sugerencias de reabastecimiento | ADMIN, MANAGER, OPERADOR | M | Implementado |
 | RF-50 | Reporte de cierre de caja y de ventas por vendedor, con lo cobrado por forma de pago, para imprimir o guardar como PDF | ADMIN, MANAGER | M | Implementado |
 | RF-51 | Consultar la auditoría global: todos los movimientos de inventario del sistema, con quién y cuándo | ADMIN | M | Implementado |
+| RF-64 | Registrar cada intento de inicio de sesión (exitoso, credenciales inválidas, cuenta desactivada o bloqueado) con el correo, la persona, la fecha y la IP, y consultarlos en la auditoría global | ADMIN | M | Implementado |
+| RF-65 | Anular un pago equivocado a un proveedor o del flete con un motivo: queda en el historial con quién y cuándo, y deja de contar en lo pagado | ADMIN, MANAGER | M | Implementado |
+| RF-66 | Registrar y consultar los cambios de precio, costo, estado, proveedores y mínimo de los productos, y de rol, sucursal y estado de los usuarios: qué cambió, de qué a qué, quién y cuándo (pestaña «Cambios del catálogo» de la auditoría global) | ADMIN | M | Implementado |
 
 ### 3.10 Interfaz
 
@@ -173,9 +176,9 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 | RN-08 | Una venta con devoluciones aprobadas no puede anularse, ni una anulada puede devolverse: se repondría el stock dos veces. |
 | RN-09 | Reponer stock por anulación o devolución no es una compra y no modifica el costo promedio. |
 | RN-10 | Despachar un traslado exige la cantidad enviada de cada producto; si todo es cero se rechaza. |
-| RN-11 | Un pago a proveedor es inmutable y no puede exceder el saldo de la orden; el estado de pago se deduce de lo pagado y una orden cancelada no genera deuda. |
+| RN-11 | Un pago a proveedor no se edita ni se borra y no puede exceder el saldo de la orden; un pago equivocado se anula con motivo (contra-asiento): queda en el historial con quién y cuándo, y deja de contar en lo pagado; el estado de pago se deduce de lo pagado y una orden cancelada no genera deuda. |
 | RN-12 | Una venta no se registra sin forma de pago. Las ventas anteriores a su registro quedan «Sin registrar»: no se inventa cómo se pagaron. |
-| RN-13 | El flete de un traslado es el costo de envío anotado al despachar. Se paga a quien contrata el envío (la sucursal de origen); un pago es inmutable y no puede exceder el saldo. Un traslado cancelado en tránsito conserva su deuda: el transportista ya hizo el viaje. Los traslados anteriores al registro de pagos quedan «por pagar»: no se inventan pagos. |
+| RN-13 | El flete de un traslado es el costo de envío anotado al despachar. Se paga a quien contrata el envío (la sucursal de origen); un pago no se edita ni se borra, se anula con motivo, y no puede exceder el saldo. Un traslado cancelado en tránsito conserva su deuda: el transportista ya hizo el viaje. Los traslados anteriores al registro de pagos quedan «por pagar»: no se inventan pagos. |
 
 ## 5. Requisitos no funcionales
 
@@ -188,7 +191,7 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 | RNF-05 | Seguridad | Autorización por rol en cada endpoint y por sucursal en los datos | `@PreAuthorize`, `CurrentUser` |
 | RNF-06 | Seguridad | Las cuentas de ejemplo se desactivan fuera de desarrollo | `DefaultAccountsGuard` |
 | RNF-07 | Seguridad | El HTML que se imprime escapa los textos que vienen de la API | `escapeHtml` en factura y reporte |
-| RNF-08 | Rendimiento | El historial de ventas no descarga todo: pagina, filtra y ordena en el servidor (máximo 100 por página) | `GET /api/v1/sales/search` |
+| RNF-08 | Rendimiento | El historial de ventas, la auditoría global (movimientos, inicios de sesión y cambios del catálogo), el kardex y las listas de compras y traslados no descargan todo: paginan, filtran y ordenan en el servidor (máximo 100 por página); los totales del encabezado y «te toca» también los calcula el servidor | `GET /api/v1/sales/search`, `/inventory/movements/search`, `/audit/catalog-changes`, `/purchases/search` y `/summary`, `/transfers/search` y `/summary` |
 | RNF-09 | Integridad | Cada operación de negocio es transaccional: si un paso falla, nada queda a medias | Servicios `@Transactional` |
 | RNF-10 | Integridad | El esquema de base de datos se versiona y el arranque lo valida | Flyway y `ddl-auto: validate` |
 | RNF-11 | Trazabilidad | Cada movimiento de stock y cada paso de traslado y compra queda con usuario y fecha | Kardex, campos de auditoría |
@@ -217,14 +220,12 @@ Prioridad: **A** = esencial para el funcionamiento, **M** = importante, **B** = 
 
 Se declara para no presentar como hecho lo que no lo está:
 
-- La paginación en el servidor existe solo en el historial de ventas. Auditoría Global (que lista los movimientos de
-  inventario), el kardex por producto y Reportes descargan todas sus filas; la auditoría las pagina en el navegador.
+- Reportes es la única pantalla que todavía descarga todas sus filas y las pagina en el navegador; el resto de las listas
+  largas (ventas, auditoría, kardex, compras y traslados) paginan en el servidor.
 - No hay tablas virtualizadas.
-- Los pagos de compras no se pueden anular ni editar (son inmutables); un pago equivocado no tiene todavía un contra-asiento.
-- Los pagos del flete no se pueden anular ni editar (son inmutables), igual que los de compras.
 - La exportación a CSV del historial de ventas no está disponible (se retiró al paginar en el servidor).
 - La API gratuita de Render se mantiene despierta con llamadas periódicas (monitor externo y `keep-alive.yml`); si fallan, el primer request tras una pausa tarda 30–90 s.
-- La auditoría solo registra movimientos de inventario, no cualquier acción del sistema (por ejemplo, no registra inicios de sesión).
+- La auditoría registra los movimientos de inventario, los inicios de sesión y los cambios de productos y usuarios, pero no cualquier acción: no audita proveedores, unidades, sucursales ni listas de precios, ni cambios de nombre, SKU o contraseña.
 
 ## 9. Trazabilidad con las pantallas
 
@@ -241,6 +242,6 @@ Se declara para no presentar como hecho lo que no lo está:
 | Reportes (`/reports`) | ADMIN, MANAGER | RF-49, RF-50 |
 | Sucursales (`/branches`) | ADMIN | RF-06 |
 | Usuarios (`/users`) | ADMIN, MANAGER | RF-02 a RF-04 |
-| Auditoría Global (`/audit`) | ADMIN | RF-51 |
+| Auditoría Global (`/audit`) | ADMIN | RF-51, RF-64, RF-66 |
 | Productos, Proveedores, Unidades (`/catalog/*`) | ADMIN | RF-07 a RF-11 |
 | Mi perfil (`/profile`) | Todos | RF-05 |

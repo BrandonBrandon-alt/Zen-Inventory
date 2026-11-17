@@ -59,7 +59,13 @@ export function clampDay(day: Date, min: Date | null, max: Date | null): Date {
 /** `15 oct 2026`, o con hora: `15 oct 2026, 14:30`. */
 export function formatTrigger(date: Date, withTime: boolean): string {
   const text = DAY_SHORT.format(date).replace(/ de /g, ' ').replace(/\./g, '');
-  return withTime ? `${text}, ${toTimeValue(date)}` : text;
+  return withTime ? `${text}, ${formatTime12(date)}` : text;
+}
+
+/** `2:45 p. m.`: la hora con reloj de 12 horas. */
+export function formatTime12(date: Date): string {
+  const hours = date.getHours();
+  return `${hours % 12 || 12}:${String(date.getMinutes()).padStart(2, '0')} ${hours < 12 ? 'a. m.' : 'p. m.'}`;
 }
 
 /** `octubre de 2026`. */

@@ -178,8 +178,10 @@ flowchart TD
 ### Prerrequisitos
 
 - Docker y Docker Compose instalados.
-- Java 21+ (si se corre fuera de Docker).
-- Node.js 20+ (si se corre fuera de Docker).
+- Java 21 (si se corre fuera de Docker). Sirve hasta el 25; con uno más nuevo el backend no compila (Lombok aún no
+  lo soporta) y Maven lo avisa al empezar.
+- Node.js 24 (si se corre fuera de Docker), la versión de la integración continua.
+- Con [mise](https://mise.jdx.dev), `mise install` en la raíz instala ambas versiones (`mise.toml`).
 
 ### 1. Clonar el Repositorio
 

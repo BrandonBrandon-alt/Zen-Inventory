@@ -39,6 +39,18 @@ public class TransferPaymentEntity {
     @Column(name = "notas")
     private String notes;
 
+    @Column(name = "anulado_en")
+    private java.time.LocalDateTime voidedAt;
+
+    @Column(name = "anulado_por_id")
+    private Long voidedByUserId;
+
+    @Column(name = "anulado_por_nombre")
+    private String voidedByUserName;
+
+    @Column(name = "motivo_anulacion")
+    private String voidReason;
+
     public TransferPaymentEntity() {}
 
     public Long getId() { return id; }
@@ -59,4 +71,13 @@ public class TransferPaymentEntity {
     public void setReference(String reference) { this.reference = reference; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public java.time.LocalDateTime getVoidedAt() { return voidedAt; }
+    public void setVoidedAt(java.time.LocalDateTime voidedAt) { this.voidedAt = voidedAt; }
+    public Long getVoidedByUserId() { return voidedByUserId; }
+    public void setVoidedByUserId(Long voidedByUserId) { this.voidedByUserId = voidedByUserId; }
+    public String getVoidedByUserName() { return voidedByUserName; }
+    public void setVoidedByUserName(String voidedByUserName) { this.voidedByUserName = voidedByUserName; }
+    public String getVoidReason() { return voidReason; }
+    public void setVoidReason(String voidReason) { this.voidReason = voidReason; }
 }

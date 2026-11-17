@@ -23,7 +23,7 @@
 
   @if (showExport()) {
     <div class="flex items-center justify-start border-b border-line px-3 py-2">
-      <button appButton variant="ghost" size="sm" type="button" (click)="exportCsv()">
+      <button appButton variant="ghost" size="sm" type="button" [loading]="exporting()" (click)="exportCsv()">
         <svg lucideDownload [size]="15" aria-hidden="true"></svg>
         Exportar CSV
       </button>

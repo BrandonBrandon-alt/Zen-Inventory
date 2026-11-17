@@ -4,6 +4,7 @@ import co.com.zenvory.inventario.auth.application.port.in.AuthUseCase;
 import co.com.zenvory.inventario.auth.domain.model.LoginResult;
 import co.com.zenvory.inventario.auth.infrastructure.adapter.in.web.dto.LoginRequest;
 import co.com.zenvory.inventario.auth.infrastructure.adapter.in.web.dto.LoginResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -47,8 +48,8 @@ public class AuthController {
      * }</pre>
      */
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        LoginResult result = authUseCase.login(request.email(), request.password());
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
+        LoginResult result = authUseCase.login(request.email(), request.password(), clientIp(http));
         return ResponseEntity.ok(new LoginResponse(
             result.token(), 
             result.user().getEmail(),
@@ -58,5 +59,17 @@ public class AuthController {
             result.user().getId(),
             result.user().getAvatarUpdatedAt()
         ));
+    }
+
+    /**
+     * IP de quien inicia sesión. En la nube la petición llega por proxies (Netlify, Render), que ponen la del cliente
+     * primera en {@code X-Forwarded-For}; sin esa cabecera, la de la conexión. Solo se usa para la auditoría.
+     */
+    static String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

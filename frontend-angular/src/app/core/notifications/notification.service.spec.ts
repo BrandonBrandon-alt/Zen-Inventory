@@ -82,4 +82,21 @@ describe('NotificationService', () => {
     ['a', 'b', 'c', 'd', 'e'].forEach((m) => service.error(m));
     expect(vi.getTimerCount()).toBe(4);
   });
+  describe('confirm (modal de confirmación)', () => {
+    const ORDER = { title: 'Orden #12 creada', summary: 'La orden de compra se registró correctamente.', detail: 'Espera la aprobación de un gerente.' };
+
+    it('guarda título, resumen y detalle para el modal, sin usar un toast', () => {
+      service.confirm(ORDER);
+      expect(service.confirmation()).toMatchObject(ORDER);
+      expect(service.items()).toEqual([]);
+    });
+
+    it('una nueva reemplaza a la anterior y se puede cerrar', () => {
+      service.confirm(ORDER);
+      service.confirm({ title: 'Orden #13 creada', summary: 'Otra.' });
+      expect(service.confirmation()?.title).toBe('Orden #13 creada');
+      service.dismissConfirmation();
+      expect(service.confirmation()).toBeNull();
+    });
+  });
 });

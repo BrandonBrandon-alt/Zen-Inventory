@@ -53,7 +53,7 @@ class TransferServiceTest {
         branches = mock(BranchUseCase.class);
         publisher = mock(ApplicationEventPublisher.class);
         when(branches.getBranchById(any())).thenAnswer(i -> Branch.builder().id(i.getArgument(0)).name("Sede").active(true).build());
-        service = new TransferService(repo, inventory, products, branches, users, publisher);
+        service = new TransferService(repo, inventory, products, branches, users, publisher, org.mockito.Mockito.mock(co.com.zenvory.inventario.transfer.application.port.out.TransferSearchPort.class));
 
         User manager = User.builder().id(9L).nombre("Ana").email("ana@x.co").sucursalId(1L)
                 .role(Role.builder().id(2L).nombre("MANAGER").build()).build();

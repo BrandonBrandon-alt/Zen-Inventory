@@ -35,10 +35,10 @@ const origin = (role: Actor['role']): Actor => ({ role, branchId: 10 });
 const destination = (role: Actor['role']): Actor => ({ role, branchId: 20 });
 const outsider: Actor = { role: 'MANAGER', branchId: 99 };
 
-/** Acciones permitidas, solo las verdaderas, para comparar de un vistazo. */
+/** Acciones permitidas, solo las verdaderas, para comparar de un vistazo (anular un pago del flete es por pago: aparte). */
 const allowed = (status: TransferStatus, actor: Actor) =>
   Object.entries(transferActions(transfer(status), actor))
-    .filter(([, on]) => on)
+    .filter(([name, on]) => on && name !== 'voidFreightPayment')
     .map(([name]) => name);
 
 describe('transferActions', () => {
@@ -79,6 +79,14 @@ describe('transferActions', () => {
     expect(allowed('WITH_ISSUE', origin('MANAGER'))).toEqual(['resolve']);
     expect(allowed('WITH_ISSUE', destination('MANAGER'))).toEqual(['resolve']);
     expect(allowed('WITH_ISSUE', origin('OPERADOR_INVENTARIO'))).toEqual([]);
+  });
+
+  it('anula un pago del flete quien puede pagarlo: la gerencia de la sucursal de origen', () => {
+    expect(transferActions(transfer('DELIVERED'), origin('MANAGER')).voidFreightPayment).toBe(true);
+    expect(transferActions(transfer('DELIVERED'), admin).voidFreightPayment).toBe(true);
+    expect(transferActions(transfer('DELIVERED'), destination('MANAGER')).voidFreightPayment).toBe(false);
+    expect(transferActions(transfer('DELIVERED'), origin('OPERADOR_INVENTARIO')).voidFreightPayment).toBe(false);
+    expect(transferActions(transfer('DELIVERED'), outsider).voidFreightPayment).toBe(false);
   });
 
   it('el flete se paga desde la sucursal de origen (gerencia) y solo mientras haya saldo', () => {

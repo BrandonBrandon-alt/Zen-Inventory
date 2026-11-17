@@ -15,7 +15,7 @@ luego se **despacha** (sale de verdad) y por último se **recibe** (entra al des
 | Tabla | Qué guarda |
 |---|---|
 | `transferencias` | `estado`, `prioridad` (HIGH/NORMAL/LOW), `sucursal_origen_id`, `sucursal_destino_id`, `transportista`, `numero_guia`, `costo_envio`, fechas (solicitud, despacho, estimada y real de llegada), `notas_recepcion`, `parent_transfer_id` (traslado del que viene un reenvío), `version`, y la auditoría de **quién hizo cada paso**: solicitante, autorizador, despachador, recibidor, resolutor (id + nombre) |
-| `pagos_traslado` | **Un pago o abono del flete por fila** (migración V7): `traslado_id`, `monto`, `fecha`, `usuario_id` + `usuario_nombre`, `metodo`, `referencia`, `notas`. Inmutable. Los traslados anteriores quedan «por pagar» |
+| `pagos_traslado` | **Un pago o abono del flete por fila** (migración V7): `traslado_id`, `monto`, `fecha`, `usuario_id` + `usuario_nombre`, `metodo`, `referencia`, `notas`. No se edita: un pago equivocado se anula (V9) y deja de contar. Los traslados anteriores quedan «por pagar» |
 | `detalles_transferencia` | `producto_id`, `producto_nombre`, `cantidad_solicitada`, `cantidad_enviada`, `cantidad_recibida`, `faltantes` |
 
 FKs: origen y destino → `sucursal` (la base exige que sean distintas); `parent_transfer_id` → `transferencias`

@@ -4,8 +4,8 @@ import { choose, loginReal, requireBackend } from '../support/backend';
 requireBackend();
 
 test('compra: se crea, se envía, se recibe en dos partes y la segunda propone solo lo que falta', async ({ page }) => {
-  // Con los datos de demostración (~2.400 órdenes) la lista se descarga entera en cada paso: 30 s no alcanzan.
-  test.setTimeout(120_000);
+  // Son muchos pasos contra el backend real (la lista llega por páginas desde el servidor).
+  test.setTimeout(90_000);
   await loginReal(page);
   await page.goto('/purchases');
   await page.getByRole('button', { name: /Nueva orden de compra/ }).click();
@@ -19,10 +19,13 @@ test('compra: se crea, se envía, se recibe en dos partes y la segunda propone s
   await form.getByLabel('Cantidad').fill('4');
   await form.getByRole('button', { name: 'Crear orden' }).click();
 
-  const created = page.getByText(/Orden #\d+ creada\./);
-  await expect(created).toBeVisible();
-  const id = /#(\d+)/.exec((await created.textContent()) ?? '')?.[1];
+  // Las acciones importantes se confirman en un modal que hay que cerrar.
+  const confirmed = page.getByRole('dialog', { name: /^Orden #\d+ creada/ });
+  await expect(confirmed).toBeVisible();
+  const id = /#(\d+)/.exec((await confirmed.getByRole('heading').textContent()) ?? '')?.[1];
   expect(id).toBeTruthy();
+  await confirmed.getByRole('button', { name: 'Entendido' }).click();
+  await expect(confirmed).toBeHidden();
 
   const detail = page.getByRole('dialog', { name: `Orden de compra #${id}` });
   // Las acciones de un paso (aprobar, marcar como enviada) cierran el detalle: se vuelve a abrir después de cada una.
@@ -33,13 +36,19 @@ test('compra: se crea, se envía, se recibe en dos partes y la segunda propone s
   await openDetail();
   // Un ADMIN la crea ya aprobada; si no, se aprueba.
   const approve = detail.getByRole('button', { name: 'Aprobar' });
+  const acknowledge = async (title: string) => {
+    const done = page.getByRole('dialog', { name: title });
+    await expect(done).toBeVisible();
+    await done.getByRole('button', { name: 'Entendido' }).click();
+    await expect(done).toBeHidden();
+  };
   if (await approve.isVisible()) {
     await approve.click();
-    await expect(detail).toBeHidden();
+    await acknowledge(`Orden #${id} aprobada`);
     await openDetail();
   }
   await detail.getByRole('button', { name: 'Marcar como enviada' }).click();
-  await expect(detail).toBeHidden();
+  await acknowledge(`Orden #${id} en camino`);
   await openDetail();
 
   await detail.getByRole('button', { name: 'Recibir mercancía' }).click();
@@ -64,6 +73,10 @@ test('compra: se crea, se envía, se recibe en dos partes y la segunda propone s
   await expect(detail.getByText(/Recepción registrada/)).toBeVisible();
   await detail.getByRole('button', { name: 'Listo' }).click();
 
+  // Recibida por completo ya no está «En curso»: se busca entre todas.
+  await page.getByRole('combobox', { name: 'Estado de la orden' }).click();
+  await page.getByRole('option', { name: 'Todas' }).click();
+  await page.getByLabel('Buscar orden').fill(id!);
   await page.getByRole('button', { name: `Ver orden ${id}` }).click();
-  await expect(detail.getByText('Recibida', { exact: true })).toBeVisible();
+  await expect(detail.getByText('Recibida', { exact: true }).first()).toBeVisible();
 });

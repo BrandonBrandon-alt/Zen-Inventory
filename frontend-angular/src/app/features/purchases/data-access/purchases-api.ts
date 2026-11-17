@@ -1,14 +1,17 @@
-import { HttpClient, HttpContext } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { type Observable, map } from 'rxjs';
+import { EMPTY, type Observable, expand, map, reduce } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api-base-url';
 import { SKIP_ERROR_NOTIFICATION } from '@core/api/error.interceptor';
 import { PAYMENT_METHODS, type PaymentMethod, isPaymentMethod } from '@core/payments/payment-method';
 import type { components } from '@core/api/schema';
-import { parseDate } from '@shared/format/format';
+import { parseDate, toIsoDay } from '@shared/format/format';
 
 type PurchaseResponse = components['schemas']['PurchaseResponse'];
 type PurchaseReceiptResponse = components['schemas']['PurchaseReceiptResponse'];
+type PurchaseRowResponse = components['schemas']['PurchaseRowResponse'];
+type PurchasePageResponse = components['schemas']['PurchasePageResponse'];
+type PurchaseSummaryResponse = components['schemas']['PurchaseSummaryResponse'];
 
 export const RECEPTION_STATUSES = ['AWAITING_APPROVAL', 'PENDING', 'IN_TRANSIT', 'RECEIVED_PARTIAL', 'RECEIVED_TOTAL', 'CANCELLED'] as const;
 export type ReceptionStatus = (typeof RECEPTION_STATUSES)[number];
@@ -41,6 +44,8 @@ export interface PurchasePayment {
   readonly method: PaymentMethod;
   readonly reference: string;
   readonly notes: string;
+  /** Si se anuló (contra-asiento): cuándo, quién y por qué. Un pago anulado no cuenta en lo pagado. */
+  readonly voided: { readonly date: Date | null; readonly by: string; readonly reason: string } | null;
 }
 
 /** Lo que se envía para registrar un pago; sin `amount` se paga todo el saldo. */
@@ -118,7 +123,18 @@ function toPurchase(raw: PurchaseResponse): Purchase | null {
     overdue: raw.overdue ?? false,
     payments: (raw.payments ?? []).flatMap((p) =>
       typeof p.id === 'number'
-        ? [{ id: p.id, amount: p.amount ?? 0, date: parseDate(p.date), userName: p.userName?.trim() || 'Desconocido', method: isMethod(p.method) ? p.method : 'OTRO', reference: p.reference?.trim() ?? '', notes: p.notes?.trim() ?? '' }]
+        ? [
+            {
+              id: p.id,
+              amount: p.amount ?? 0,
+              date: parseDate(p.date),
+              userName: p.userName?.trim() || 'Desconocido',
+              method: isMethod(p.method) ? p.method : 'OTRO',
+              reference: p.reference?.trim() ?? '',
+              notes: p.notes?.trim() ?? '',
+              voided: p.voidedAt ? { date: parseDate(p.voidedAt), by: p.voidedByUserName?.trim() || 'Desconocido', reason: p.voidReason?.trim() ?? '' } : null,
+            },
+          ]
         : [],
     ),
     reason: raw.reasonResolution?.trim() ?? '',
@@ -128,6 +144,101 @@ function toPurchase(raw: PurchaseResponse): Purchase | null {
         : [],
     ),
   };
+}
+
+/** Una fila de la lista de compras: lo que muestra la tabla, sin líneas ni pagos (el detalle se pide al abrirla). */
+export interface PurchaseListRow {
+  readonly id: number;
+  readonly reception: ReceptionStatus;
+  readonly payment: PaymentStatus;
+  readonly supplierId: number;
+  readonly supplierName: string;
+  readonly branchId: number;
+  readonly branchName: string;
+  readonly total: number;
+  readonly balance: number;
+  readonly overdue: boolean;
+  readonly requestDate: Date | null;
+  /** Espera una acción de quien mira (lo decide el servidor). */
+  readonly awaitsMe: boolean;
+}
+
+/** Campos por los que el servidor sabe ordenar. */
+export type PurchaseSortField = 'id' | 'reception' | 'supplier' | 'branch' | 'total' | 'balance' | 'payment' | 'requestDate';
+
+export interface PurchaseQuery {
+  /** Desde 1, como en la tabla. */
+  readonly page: number;
+  readonly size: number;
+  readonly sortBy: PurchaseSortField;
+  readonly ascending: boolean;
+  readonly status: 'open' | 'all' | ReceptionStatus;
+  readonly payment: PaymentStatus | null;
+  readonly from: Date | null;
+  readonly to: Date | null;
+  readonly supplierId: number | null;
+  readonly branchId: number | null;
+  readonly productId: number | null;
+  readonly minTotal: number | null;
+  readonly maxTotal: number | null;
+  readonly onlyMine: boolean;
+  readonly text: string;
+}
+
+export interface PurchaseListPage {
+  readonly purchases: PurchaseListRow[];
+  readonly total: number;
+}
+
+/** Los totales del encabezado, sobre todo lo que ve quien mira. */
+export interface PurchaseSummary {
+  readonly open: number;
+  readonly awaitingMe: number;
+  readonly owed: number;
+  readonly owedCount: number;
+  readonly overdue: number;
+}
+
+/** Filas por petición al exportar (el máximo del servidor) y tope de páginas. */
+const EXPORT_PAGE_SIZE = 100;
+const EXPORT_MAX_PAGES = 200;
+
+function toListRow(raw: PurchaseRowResponse): PurchaseListRow | null {
+  if (typeof raw.id !== 'number' || typeof raw.supplierId !== 'number' || typeof raw.branchId !== 'number' || !isReception(raw.reception)) return null;
+  return {
+    id: raw.id,
+    reception: raw.reception,
+    payment: isPayment(raw.payment) ? raw.payment : 'POR_PAGAR',
+    supplierId: raw.supplierId,
+    supplierName: raw.supplierName?.trim() || `Proveedor ${raw.supplierId}`,
+    branchId: raw.branchId,
+    branchName: raw.branchName?.trim() || `Sede ${raw.branchId}`,
+    total: raw.total ?? 0,
+    balance: raw.balance ?? 0,
+    overdue: raw.overdue ?? false,
+    requestDate: parseDate(raw.requestDate),
+    awaitsMe: raw.awaitsMe ?? false,
+  };
+}
+
+function searchParams(query: PurchaseQuery): HttpParams {
+  let params = new HttpParams()
+    .set('page', String(Math.max(0, query.page - 1)))
+    .set('size', String(query.size))
+    .set('sortBy', query.sortBy)
+    .set('direction', query.ascending ? 'asc' : 'desc')
+    .set('status', query.status);
+  if (query.payment) params = params.set('payment', query.payment);
+  if (query.from) params = params.set('from', toIsoDay(query.from));
+  if (query.to) params = params.set('to', toIsoDay(query.to));
+  if (query.supplierId !== null) params = params.set('supplierId', String(query.supplierId));
+  if (query.branchId !== null) params = params.set('branchId', String(query.branchId));
+  if (query.productId !== null) params = params.set('productId', String(query.productId));
+  if (query.minTotal !== null) params = params.set('minTotal', String(query.minTotal));
+  if (query.maxTotal !== null) params = params.set('maxTotal', String(query.maxTotal));
+  if (query.onlyMine) params = params.set('onlyMine', 'true');
+  if (query.text.trim()) params = params.set('q', query.text.trim());
+  return params;
 }
 
 function requirePurchase(raw: PurchaseResponse): Purchase {
@@ -147,16 +258,37 @@ export class PurchasesApi {
     return { context: new HttpContext().set(SKIP_ERROR_NOTIFICATION, true) };
   }
 
-  /** Órdenes visibles para quien consulta (ADMIN: todas; el resto: las de su sucursal), la más reciente primero. */
-  list(): Observable<Purchase[]> {
-    return this.http.get<PurchaseResponse[]>(this.url, this.options).pipe(
-      map((items) =>
-        items
-          .map(toPurchase)
-          .filter((p): p is Purchase => p !== null)
-          .sort((a, b) => b.id - a.id),
-      ),
+  /** Una página de la lista de compras (ADMIN: todas las sucursales o la que elija; el resto: la suya). */
+  search(query: PurchaseQuery): Observable<PurchaseListPage> {
+    return this.http.get<PurchasePageResponse>(`${this.url}/search`, { ...this.options, params: searchParams(query) }).pipe(
+      map((page) => ({
+        purchases: (page.content ?? []).map(toListRow).filter((p): p is PurchaseListRow => p !== null),
+        total: page.totalElements ?? 0,
+      })),
     );
+  }
+
+  /** Todo lo filtrado, página a página, para exportar (no solo la página que se ve). */
+  searchAll(query: PurchaseQuery): Observable<PurchaseListRow[]> {
+    const pageOf = (page: number) => this.search({ ...query, page, size: EXPORT_PAGE_SIZE }).pipe(map((result) => ({ page, result })));
+    return pageOf(1).pipe(
+      expand(({ page, result }) =>
+        page * EXPORT_PAGE_SIZE < result.total && page < EXPORT_MAX_PAGES && result.purchases.length > 0 ? pageOf(page + 1) : EMPTY,
+      ),
+      reduce((all, { result }) => [...all, ...result.purchases], [] as PurchaseListRow[]),
+    );
+  }
+
+  /** Los totales del encabezado de compras. */
+  summary(): Observable<PurchaseSummary> {
+    return this.http.get<PurchaseSummaryResponse>(`${this.url}/summary`, this.options).pipe(
+      map((s) => ({ open: s.open ?? 0, awaitingMe: s.awaitingMe ?? 0, owed: s.owed ?? 0, owedCount: s.owedCount ?? 0, overdue: s.overdue ?? 0 })),
+    );
+  }
+
+  /** Una orden completa, con sus líneas y pagos (al abrir su detalle). */
+  get(id: number): Observable<Purchase> {
+    return this.http.get<PurchaseResponse>(`${this.url}/${id}`, this.options).pipe(map(requirePurchase));
   }
 
   create(input: PurchaseInput): Observable<Purchase> {
@@ -209,6 +341,11 @@ export class PurchasesApi {
   }
 
   /** Registra un pago o abono: la orden queda con pago parcial mientras haya saldo y pagada al cubrir el total. */
+  /** Anula un pago equivocado (queda en el historial, deja de contar en lo pagado). */
+  voidPayment(id: number, paymentId: number, reason: string): Observable<Purchase> {
+    return this.http.post<PurchaseResponse>(`${this.url}/${id}/payments/${paymentId}/void`, { reason: reason.trim() }, this.options).pipe(map(requirePurchase));
+  }
+
   pay(id: number, input: PaymentInput): Observable<Purchase> {
     const body = {
       ...(input.amount !== null ? { amount: input.amount } : {}),

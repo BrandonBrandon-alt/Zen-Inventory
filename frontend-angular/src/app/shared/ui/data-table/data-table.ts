@@ -127,6 +127,14 @@ export class DataTable<T> {
   readonly persistKey = input<string | null>(null);
   /** Columnas del CSV cuando difieren de las de la pantalla (p. ej. para agregar observaciones largas). */
   readonly exportColumns = input<readonly TableColumn<T>[] | null>(null);
+  /**
+   * Con paginación en el servidor, de dónde salen TODAS las filas filtradas para el CSV (la tabla solo tiene la página
+   * que se ve). Sin esto, una tabla paginada en el servidor no ofrece exportar.
+   */
+  readonly exportAll = input<(() => Promise<readonly T[]>) | null>(null);
+  /** Error al pedir las filas para exportar. */
+  readonly exportFailed = output<unknown>();
+  protected readonly exporting = signal(false);
 
   readonly rowClick = output<T>();
   /** El orden elegido (`null`: el original). Solo se usa con paginación en el servidor. */
@@ -175,7 +183,9 @@ export class DataTable<T> {
   });
 
   /** Hay datos que exportar: el botón va sobre la tabla (no cuando se carga, falla o no hay filas). */
-  protected readonly showExport = computed(() => !!this.exportName() && !this.serverSide() && !this.skeleton() && !this.error() && this.rows().length > 0);
+  protected readonly showExport = computed(
+    () => !!this.exportName() && (!this.serverSide() || this.exportAll() !== null) && !this.skeleton() && !this.error() && this.rows().length > 0,
+  );
 
   /** Paginación bajo la tabla. */
   protected readonly showFooter = computed(() => !this.skeleton() && !this.error() && this.rows().length > 0 && !!this.pageSize());
@@ -253,12 +263,27 @@ export class DataTable<T> {
   }
 
   /** Descarga el CSV con todas las filas y las columnas exportables, en el orden actual. */
-  protected exportCsv(): void {
+  protected async exportCsv(): Promise<void> {
     const name = this.exportName();
-    if (!name || this.rows().length === 0) return;
+    if (!name || this.rows().length === 0 || this.exporting()) return;
+    let rows: readonly T[];
+    const all = this.exportAll();
+    if (this.serverSide() && all) {
+      this.exporting.set(true);
+      try {
+        rows = await all();
+      } catch (error) {
+        this.exportFailed.emit(error);
+        return;
+      } finally {
+        this.exporting.set(false);
+      }
+    } else {
+      rows = this.sortedRows();
+    }
     const columns = (this.exportColumns() ?? this.columns()).filter((c) => c.export !== false && c.key !== 'acciones');
     const header = columns.map((c) => c.header);
-    const body = this.sortedRows().map((row) => columns.map((c) => this.exportValue(c, row)));
+    const body = rows.map((row) => columns.map((c) => this.exportValue(c, row)));
     // Fecha local (no UTC): de noche el día del archivo no debe saltar al siguiente.
     const now = new Date();
     const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;

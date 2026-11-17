@@ -1,9 +1,9 @@
 -- ===================================================================================
 -- Migración: Datos de inicialización (Seed Data) Consolidado - Zen Inventory
 -- NOTA: Las contraseñas son BCrypt de "admin123", "gerente123" y "operador123"
+-- Sin BEGIN/COMMIT propios: Flyway ya corre cada migración en una transacción (un COMMIT aquí la cortaría a la mitad).
 -- ===================================================================================
 
-BEGIN;
 
 -- --------------------------------------------------------
 -- 1. Roles
@@ -148,4 +148,3 @@ SELECT setval('precio_por_lista_id_seq', (SELECT MAX(id) FROM precio_por_lista))
 SELECT setval('inventario_local_id_seq', (SELECT MAX(id) FROM inventario_local));
 SELECT setval('rutas_logisticas_id_seq', (SELECT MAX(id) FROM rutas_logisticas));
 
-COMMIT;

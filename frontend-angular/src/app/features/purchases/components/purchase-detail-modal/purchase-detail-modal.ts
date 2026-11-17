@@ -3,7 +3,7 @@ import { FormArray, FormControl, NonNullableFormBuilder, ReactiveFormsModule, Va
 import { firstValueFrom, type Observable } from 'rxjs';
 import type { Role } from '@core/auth/roles/role';
 import { toApiError } from '@core/api/api-error';
-import { NotificationService } from '@core/notifications/notification.service';
+import { type ConfirmationInput, NotificationService } from '@core/notifications/notification.service';
 import { formatDateTime, formatMoney, formatQuantity } from '@shared/format/format';
 import { controlError } from '@shared/forms/control-error';
 import { Alert } from '@shared/ui/alert/alert';
@@ -14,9 +14,9 @@ import { Modal } from '@shared/ui/modal/modal';
 import { Select, type SelectOption } from '@shared/ui/select/select';
 import { PAYMENT_INFO, PAYMENT_METHOD_LABELS, RECEPTION_INFO } from '../../data-access/purchase-labels';
 import { purchaseActions } from '../../data-access/purchase-permissions';
-import { PAYMENT_METHODS, type PaymentMethod, type Purchase, type PurchaseLine, PurchasesApi, type Receipt } from '../../data-access/purchases-api';
+import { PAYMENT_METHODS, type PaymentMethod, type Purchase, type PurchaseLine, type PurchasePayment, PurchasesApi, type Receipt } from '../../data-access/purchases-api';
 
-type Mode = 'view' | 'receive' | 'cancel' | 'receipt' | 'pay';
+type Mode = 'view' | 'receive' | 'cancel' | 'receipt' | 'pay' | 'void';
 
 /** Lo que falta por recibir de una línea (una orden parcialmente recibida ya trae parte). */
 export const pendingOf = (line: PurchaseLine): number => Math.max(0, line.quantity - line.received);
@@ -42,6 +42,10 @@ export class PurchaseDetailModal {
 
   readonly open = model(false);
   readonly purchase = input<Purchase | null>(null);
+  /** La orden que se abrió, aunque su detalle todavía no haya llegado (para el título). */
+  readonly openedId = input<number | null>(null);
+  /** El detalle no se pudo cargar: se muestra el error en vez de la orden. */
+  readonly loadError = input<string | null>(null);
   readonly role = input<Role | null>(null);
   readonly supplierName = input('');
   readonly branchName = input('');
@@ -108,8 +112,8 @@ export class PurchaseDetailModal {
   }
 
   protected title(): string {
-    const purchase = this.purchase();
-    return purchase ? `Orden de compra #${purchase.id}` : 'Orden de compra';
+    const id = this.purchase()?.id ?? this.openedId();
+    return id !== null ? `Orden de compra #${id}` : 'Orden de compra';
   }
 
   protected productName(id: number): string {
@@ -133,25 +137,49 @@ export class PurchaseDetailModal {
     this.mode.set(mode);
   }
 
+  /** El pago que se está por anular (en el modo `void`). */
+  protected readonly voiding = signal<PurchasePayment | null>(null);
+
+  protected startVoid(payment: PurchasePayment): void {
+    this.voiding.set(payment);
+    this.reasonForm.reset({ reason: '' }, { emitEvent: false });
+    this.goto('void');
+  }
+
   protected submitLabel(): string {
     const mode = this.mode();
-    return mode === 'receive' ? 'Registrar recepción' : mode === 'pay' ? 'Registrar pago' : 'Cancelar orden';
+    return mode === 'receive' ? 'Registrar recepción' : mode === 'pay' ? 'Registrar pago' : mode === 'void' ? 'Anular pago' : 'Cancelar orden';
   }
 
   // ---- Acciones directas ----
   protected approve(): void {
     const p = this.purchase();
-    if (p) void this.run(this.api.approve(p.id), `Orden #${p.id} aprobada.`);
+    if (p)
+      void this.run(this.api.approve(p.id), {
+        title: `Orden #${p.id} aprobada`,
+        summary: 'La orden de compra se aprobó correctamente.',
+        detail: 'Cuando el proveedor despache la mercancía, márcala como enviada.',
+      });
   }
 
   protected dispatch(): void {
     const p = this.purchase();
-    if (p) void this.run(this.api.dispatch(p.id), `Orden #${p.id} marcada como enviada.`);
+    if (p)
+      void this.run(this.api.dispatch(p.id), {
+        title: `Orden #${p.id} en camino`,
+        summary: 'La orden se marcó como enviada correctamente.',
+        detail: 'Cuando llegue la mercancía, regístrala con «Recibir mercancía»: ahí se suma al stock y se actualiza el costo promedio.',
+      });
   }
 
   protected closeShortfall(): void {
     const p = this.purchase();
-    if (p) void this.run(this.api.closeShortfall(p.id), `Orden #${p.id} cerrada con faltante.`);
+    if (p)
+      void this.run(this.api.closeShortfall(p.id), {
+        title: `Orden #${p.id} cerrada con faltante`,
+        summary: 'La orden se cerró correctamente con lo que se recibió.',
+        detail: 'Lo que no llegó ya no se espera: el stock solo incluye lo recibido.',
+      });
   }
 
   // ---- Con formulario ----
@@ -176,12 +204,32 @@ export class PurchaseDetailModal {
       const full = paid >= p.balance;
       void this.run(
         this.api.pay(p.id, { amount: paid, method, reference, notes }),
-        full ? `Orden #${p.id} pagada por completo.` : `Abono de ${formatMoney(paid)} registrado en la orden #${p.id}.`,
+        full
+          ? { title: `Orden #${p.id} pagada`, summary: `El pago de ${formatMoney(paid)} se registró correctamente.`, detail: 'La orden quedó pagada por completo: no tiene saldo pendiente con el proveedor.' }
+          : {
+              title: `Abono a la orden #${p.id}`,
+              summary: `El abono de ${formatMoney(paid)} se registró correctamente.`,
+              detail: `Queda un saldo de ${formatMoney(p.balance - paid)} por pagar al proveedor.`,
+            },
       );
+    } else if (this.mode() === 'void') {
+      const payment = this.voiding();
+      this.reasonForm.markAllAsTouched();
+      if (!payment || this.reasonForm.invalid) return;
+      const balance = p.reception === 'CANCELLED' ? p.balance : Math.min(p.total, p.balance + payment.amount);
+      void this.run(this.api.voidPayment(p.id, payment.id, this.reasonForm.getRawValue().reason), {
+        title: `Pago anulado en la orden #${p.id}`,
+        summary: `El pago de ${formatMoney(payment.amount)} se anuló correctamente.`,
+        detail: `Queda en el historial como anulado y ya no cuenta en lo pagado: el saldo con el proveedor vuelve a ser ${formatMoney(balance)}.`,
+      });
     } else if (this.mode() === 'cancel') {
       this.reasonForm.markAllAsTouched();
       if (this.reasonForm.invalid) return;
-      void this.run(this.api.cancel(p.id, this.reasonForm.getRawValue().reason), `Orden #${p.id} cancelada.`);
+      void this.run(this.api.cancel(p.id, this.reasonForm.getRawValue().reason), {
+        title: `Orden #${p.id} cancelada`,
+        summary: 'La orden de compra se canceló correctamente.',
+        detail: 'Ya no se espera mercancía de esta orden y no genera deuda con el proveedor.',
+      });
     }
   }
 
@@ -200,12 +248,12 @@ export class PurchaseDetailModal {
     }
   }
 
-  private async run(request: Observable<unknown>, message: string): Promise<void> {
+  private async run(request: Observable<unknown>, confirmation: ConfirmationInput): Promise<void> {
     this.busy.set(true);
     this.error.set(null);
     try {
       await firstValueFrom(request);
-      this.notifications.success(message);
+      this.notifications.confirm(confirmation);
       this.changed.emit();
       this.open.set(false);
     } catch (error) {

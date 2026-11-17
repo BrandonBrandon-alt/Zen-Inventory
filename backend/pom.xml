@@ -127,6 +127,28 @@
 
 	<build>
 		<plugins>
+			<!-- Falla al empezar, con un mensaje claro, si el JDK no sirve: con uno más nuevo de lo que Lombok soporta
+			     la compilación se rompe con un error confuso dentro de javac (p. ej. JDK 27). -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-enforcer-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>jdk-soportado</id>
+						<goals>
+							<goal>enforce</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<requireJavaVersion>
+									<version>[21,26)</version>
+									<message>El backend necesita un JDK entre 21 y 25 (el proyecto usa Java 21; Lombok aún no soporta versiones más nuevas). Con mise: «mise install» en la raíz del repositorio.</message>
+								</requireJavaVersion>
+							</rules>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
