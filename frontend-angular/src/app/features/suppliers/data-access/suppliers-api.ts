@@ -1,3 +1,4 @@
+import { newestFirst } from '@shared/data/newest-first';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, map } from 'rxjs';
@@ -62,7 +63,7 @@ export class SuppliersApi {
   list(): Observable<Supplier[]> {
     return this.http
       .get<SupplierResponse[]>(`${this.baseUrl}/api/catalog/suppliers`, this.options)
-      .pipe(map((items) => items.map(toSupplier).filter((supplier): supplier is Supplier => supplier !== null)));
+      .pipe(map((items) => newestFirst(items.map(toSupplier).filter((supplier): supplier is Supplier => supplier !== null))));
   }
 
   create(input: SupplierInput): Observable<Supplier> {

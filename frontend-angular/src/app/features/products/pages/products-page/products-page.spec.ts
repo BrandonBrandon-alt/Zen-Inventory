@@ -70,7 +70,7 @@ describe('ProductsPage', () => {
       await chooseOption('Estado del producto', 'Solo inactivos');
       expect(skus()).toEqual(['ARA-003']);
       await chooseOption('Estado del producto', 'Solo activos');
-      expect(skus()).toEqual(['TOR-001', 'TUE-002']);
+      expect(skus()).toEqual(['TUE-002', 'TOR-001']);
       await chooseOption('Estado del producto', 'Activos e inactivos');
       await chooseOption('Unidad de medida', 'Kilogramo');
       expect(skus()).toEqual(['ARA-003']);
@@ -90,7 +90,7 @@ describe('ProductsPage', () => {
       await userEvent.clear(screen.getByLabelText('Precio desde'));
       await userEvent.clear(screen.getByLabelText('Precio hasta'));
       await userEvent.click(screen.getByRole('checkbox', { name: 'Solo sin proveedores' }));
-      expect(skus()).toEqual(['TUE-002', 'ARA-003']);
+      expect(skus()).toEqual(['ARA-003', 'TUE-002']);
       expect(screen.getByLabelText('1 filtro activo')).toBeInTheDocument();
     });
 

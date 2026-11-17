@@ -1,3 +1,4 @@
+import { newestFirst } from '@shared/data/newest-first';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, map } from 'rxjs';
@@ -69,7 +70,7 @@ export class BranchesApi {
       .get<BranchResponse[]>(`${this.baseUrl}/api/branches`, {
         context: new HttpContext().set(SKIP_ERROR_NOTIFICATION, true),
       })
-      .pipe(map((items) => items.map(toBranch).filter((branch): branch is Branch => branch !== null)));
+      .pipe(map((items) => newestFirst(items.map(toBranch).filter((branch): branch is Branch => branch !== null))));
   }
 
   create(input: BranchInput): Observable<Branch> {

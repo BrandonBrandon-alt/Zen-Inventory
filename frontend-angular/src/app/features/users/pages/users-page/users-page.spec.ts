@@ -322,7 +322,7 @@ describe('UsersPage', () => {
       await chooseOption('Estado del usuario', 'Solo activos');
       await vi.waitFor(() => expect(screen.getByRole('combobox', { name: 'Sucursal del usuario' })).toBeEnabled());
       await chooseOption('Sucursal del usuario', 'Sede Central');
-      expect(names()).toEqual(['Mario Gerente', 'Sofia Vendedora']);
+      expect(names()).toEqual(['Sofia Vendedora', 'Mario Gerente']);
       await chooseOption('Sucursal del usuario', 'Sucursal Norte');
       expect(screen.getByText('Ningún usuario coincide')).toBeInTheDocument();
     });
@@ -376,7 +376,7 @@ describe('UsersPage', () => {
       await renderPage();
       await screen.findByText('Sofia Vendedora');
       expect(screen.queryByRole('combobox', { name: 'Sucursal del usuario' })).not.toBeInTheDocument();
-      expect(names()).toEqual(['Mario Gerente', 'Sofia Vendedora']);
+      expect(names()).toEqual(['Sofia Vendedora', 'Mario Gerente']);
       expect(screen.queryByRole('group', { name: 'Filtros aplicados' })).not.toBeInTheDocument();
     });
   });

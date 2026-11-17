@@ -1,3 +1,4 @@
+import { newestFirst } from '@shared/data/newest-first';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, map } from 'rxjs';
@@ -117,7 +118,7 @@ export class ProductsApi {
   list(): Observable<Product[]> {
     return this.http
       .get<ProductResponse[]>(`${this.baseUrl}/api/catalog/products`, this.options)
-      .pipe(map((items) => items.map(toProduct).filter((product): product is Product => product !== null)));
+      .pipe(map((items) => newestFirst(items.map(toProduct).filter((product): product is Product => product !== null))));
   }
 
   create(input: ProductInput): Observable<Product> {

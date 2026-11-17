@@ -1,3 +1,4 @@
+import { newestFirst } from '@shared/data/newest-first';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, map } from 'rxjs';
@@ -49,7 +50,7 @@ export class UnitsApi {
   list(): Observable<Unit[]> {
     return this.http
       .get<UnitResponse[]>(`${this.baseUrl}/api/catalog/units`, this.options)
-      .pipe(map((items) => items.map(toUnit).filter((unit): unit is Unit => unit !== null)));
+      .pipe(map((items) => newestFirst(items.map(toUnit).filter((unit): unit is Unit => unit !== null))));
   }
 
   create(input: UnitInput): Observable<Unit> {

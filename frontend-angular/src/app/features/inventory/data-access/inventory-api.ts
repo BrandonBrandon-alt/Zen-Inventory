@@ -66,7 +66,10 @@ export class InventoryApi {
     }).pipe(
       map(({ products, inventory }) => {
         const byProduct = new Map(inventory.filter((row) => typeof row.productId === 'number').map((row) => [row.productId as number, row]));
-        return products.flatMap((product): InventoryItem[] => {
+        // Arriba lo que se movió último; lo que nunca se movió va después, del producto más nuevo al más viejo.
+        const movedAt = (id: number | undefined) => (id === undefined ? '' : (byProduct.get(id)?.lastUpdated ?? ''));
+        const ordered = [...products].sort((a, b) => movedAt(b.id).localeCompare(movedAt(a.id)) || (b.id ?? 0) - (a.id ?? 0));
+        return ordered.flatMap((product): InventoryItem[] => {
           if (typeof product.id !== 'number' || !product.nombre?.trim() || product.activo === false) return [];
           const row = byProduct.get(product.id);
           return [

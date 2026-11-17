@@ -34,8 +34,8 @@ describe('InventoryApi (contrato HTTP con MSW)', () => {
         http.get(inventoryUrl(3), () => HttpResponse.json([{ productId: 1, stockActual: 12, stockMinimo: 5 }])),
       );
       expect(await firstValueFrom(api.list(3))).toEqual([
-        { productId: 1, sku: 'A-1', nombre: 'Tornillo', unit: 'UND', stock: 12, minimum: 5, price: 5, cost: 2 },
         { productId: 2, sku: 'B-2', nombre: 'Tuerca', unit: 'KG', stock: 0, minimum: 0, price: 1, cost: 0.5 },
+        { productId: 1, sku: 'A-1', nombre: 'Tornillo', unit: 'UND', stock: 12, minimum: 5, price: 5, cost: 2 },
       ]);
     });
 

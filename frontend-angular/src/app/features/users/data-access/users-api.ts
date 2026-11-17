@@ -1,3 +1,4 @@
+import { newestFirst } from '@shared/data/newest-first';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, map } from 'rxjs';
@@ -87,7 +88,7 @@ export class UsersApi {
   list(): Observable<AppUser[]> {
     return this.http
       .get<UserResponse[]>(`${this.baseUrl}/api/users`, this.options)
-      .pipe(map((items) => items.map(toUser).filter((user): user is AppUser => user !== null)));
+      .pipe(map((items) => newestFirst(items.map(toUser).filter((user): user is AppUser => user !== null))));
   }
 
   create(input: UserInput): Observable<AppUser> {

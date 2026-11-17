@@ -37,7 +37,7 @@ describe('UnitsPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Unidades de medida' })).toBeInTheDocument();
     expect(screen.getByText('2 unidades')).toBeInTheDocument();
     expect(screen.getByText('KG')).toBeInTheDocument();
-    expect(names()).toEqual(['Unidad', 'Kilogramo']);
+    expect(names()).toEqual(['Kilogramo', 'Unidad']);
   });
 
   it('sin unidades explica cómo seguir', async () => {
@@ -178,7 +178,7 @@ describe('UnitsPage', () => {
       expect(screen.getByText('Ninguna unidad coincide')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro Búsqueda: zzz' }));
       expect(screen.getByLabelText('Buscar unidad')).toHaveValue('');
-      expect(names()).toEqual(['Unidad', 'Kilogramo']);
+      expect(names()).toEqual(['Kilogramo', 'Unidad']);
     });
   });
 });

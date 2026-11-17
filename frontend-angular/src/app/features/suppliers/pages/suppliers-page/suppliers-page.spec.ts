@@ -42,7 +42,7 @@ describe('SuppliersPage', () => {
     expect(screen.getByText('1 día')).toBeInTheDocument();
     // Sin contacto ni días: ambas celdas muestran un guion.
     expect(within(screen.getByRole('row', { name: /Sin datos/ })).getAllByText('—')).toHaveLength(2);
-    expect(names()).toEqual(['Ferretería Central', 'Aceros del Sur', 'Sin datos']);
+    expect(names()).toEqual(['Sin datos', 'Aceros del Sur', 'Ferretería Central']);
   });
 
   it('sin proveedores muestra un estado vacío', async () => {
@@ -173,7 +173,7 @@ describe('SuppliersPage', () => {
       await renderPage();
       await screen.findByText('Ferretería Central');
       await chooseOption('Plazo de entrega', 'Entrega en 3 días o menos');
-      expect(names()).toEqual(['Ferretería Central', 'Aceros del Sur']);
+      expect(names()).toEqual(['Aceros del Sur', 'Ferretería Central']);
       await chooseOption('Plazo de entrega', 'Entrega en más de 7 días');
       expect(names()).toEqual(['Importadora Lejana']);
       await chooseOption('Plazo de entrega', 'Sin plazo registrado');

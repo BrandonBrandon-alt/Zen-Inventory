@@ -40,7 +40,7 @@ describe('BranchesPage', () => {
     await renderPage();
     expect(await screen.findByText('Sede Central')).toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(names()).toEqual(['Sede Central', 'Sucursal Norte', 'Sucursal Sur']);
+    expect(names()).toEqual(['Sucursal Sur', 'Sucursal Norte', 'Sede Central']);
   });
 
   it('muestra título, resumen y el estado de cada sucursal con texto (no solo color)', async () => {
@@ -258,7 +258,7 @@ describe('BranchesPage', () => {
       await chooseOption('Estado de la sucursal', 'Solo inactivas');
       expect(names()).toEqual(['Sucursal Sur']);
       await chooseOption('Estado de la sucursal', 'Solo activas');
-      expect(names()).toEqual(['Sede Central', 'Sucursal Norte']);
+      expect(names()).toEqual(['Sucursal Norte', 'Sede Central']);
       await chooseOption('Gerente de la sucursal', 'Sin gerente');
       expect(names()).toEqual(['Sucursal Norte']);
       await chooseOption('Gerente de la sucursal', 'Con gerente');
