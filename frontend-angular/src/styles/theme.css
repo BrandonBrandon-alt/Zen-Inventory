@@ -251,6 +251,33 @@
     }
   }
 
+  /* Logo del login: flota despacio, sin cargar la pantalla (≈8 px en un ciclo de 6 s). Solo se anima transform (y la
+     opacidad de la sombra), que no repintan. La sombra va aparte: se encoge y se aclara cuando el logo sube. */
+  --animate-levitate: levitate 6s ease-in-out infinite;
+  --animate-levitate-shadow: levitateShadow 6s ease-in-out infinite;
+
+  @keyframes levitate {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+
+  @keyframes levitateShadow {
+    0%,
+    100% {
+      transform: scaleX(1);
+      opacity: 0.55;
+    }
+    50% {
+      transform: scaleX(0.78);
+      opacity: 0.3;
+    }
+  }
+
   @keyframes fadeInUp {
     from {
       opacity: 0;

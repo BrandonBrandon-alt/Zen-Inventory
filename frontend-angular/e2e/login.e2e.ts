@@ -47,10 +47,11 @@ test('el tema elegido se conserva al recargar', async ({ page }) => {
   await stubLogin(page);
   await page.goto('/login');
   await login(page);
-  await page.getByRole('button', { name: 'Modo claro' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  // La app arranca en claro: se elige el oscuro y debe seguir así tras recargar.
+  await page.getByRole('button', { name: 'Modo oscuro' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
 
 test('el menú del sidebar navega entre pantallas', async ({ page }) => {

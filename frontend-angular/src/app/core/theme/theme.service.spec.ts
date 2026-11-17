@@ -112,7 +112,7 @@ describe('ThemeService', () => {
       delete (window as { matchMedia?: unknown }).matchMedia;
       document.documentElement.removeAttribute('data-theme-switching');
       document.documentElement.style.removeProperty('--theme-x');
-      for (const name of ['--theme-y', '--theme-max', '--theme-feather', '--theme-duration']) document.documentElement.style.removeProperty(name);
+      for (const name of ['--theme-y', '--theme-max', '--theme-duration']) document.documentElement.style.removeProperty(name);
     });
 
     it('con origen y navegador compatible anima: el cambio llega dentro de la transición, no antes', async () => {
@@ -136,20 +136,20 @@ describe('ThemeService', () => {
       expect(document.documentElement.style.getPropertyValue('--theme-y')).toBe('');
     });
 
-    it('calcula hasta dónde debe llegar el revelado (la esquina más lejana más el borde difuminado) y cuánto dura', async () => {
+    it('calcula hasta dónde debe llegar el círculo (justo la esquina más lejana) y cuánto dura', async () => {
       vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(1000);
       vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(600);
       const service = createService();
       service.toggle({ x: 100, y: 50 });
       const root = document.documentElement.style;
-      // Esquina más lejana de (100, 50) en 1000×600: (1000, 600) → 900 y 550.
+      // Esquina más lejana de (100, 50) en 1000×600: (1000, 600) → 900 y 550. Borde nítido: sin margen de difuminado.
       const farthest = Math.hypot(900, 550);
-      expect(Number.parseInt(root.getPropertyValue('--theme-max'))).toBe(Math.ceil(farthest + 140));
-      expect(root.getPropertyValue('--theme-feather')).toBe('140px');
-      // Más lejos, más tiempo, pero siempre entre 650 y 950 ms.
+      expect(Number.parseInt(root.getPropertyValue('--theme-max'))).toBe(Math.ceil(farthest));
+      expect(root.getPropertyValue('--theme-feather')).toBe('');
+      // Más lejos, más tiempo, pero siempre entre 450 y 650 ms: rápido, sin hacer esperar.
       const duration = Number.parseInt(root.getPropertyValue('--theme-duration'));
-      expect(duration).toBeGreaterThanOrEqual(650);
-      expect(duration).toBeLessThanOrEqual(950);
+      expect(duration).toBeGreaterThanOrEqual(450);
+      expect(duration).toBeLessThanOrEqual(650);
       await vi.waitFor(() => expect(document.documentElement).not.toHaveAttribute('data-theme-switching'));
       expect(root.getPropertyValue('--theme-max')).toBe('');
       expect(root.getPropertyValue('--theme-duration')).toBe('');

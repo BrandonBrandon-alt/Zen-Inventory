@@ -33,12 +33,12 @@ const calls = (page: Page) =>
 test('el cambio de tema se revela desde el botón pulsado y deja el estado limpio', async ({ page }) => {
   await spyOnViewTransitions(page);
   await page.goto('/login');
-  const button = page.getByRole('button', { name: 'Modo claro' });
+  const button = page.getByRole('button', { name: 'Modo oscuro' });
   const box = (await button.boundingBox())!;
 
   await button.click();
 
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   const [call] = await calls(page);
   expect(await calls(page)).toHaveLength(1);
   expect(call.switching).toBe(true);
@@ -58,25 +58,30 @@ test('mientras dura, se ejecuta la animación de revelado sobre la pantalla nuev
       for (const a of document.getAnimations()) {
         const name = (a as CSSAnimation).animationName;
         const pseudo = (a.effect as KeyframeEffect | null)?.pseudoElement;
-        if (name === 'theme-reveal') (window as unknown as { __seen: string[] }).__seen.push(String(pseudo));
+        if (name === 'theme-reveal') {
+          const [first] = (a.effect as KeyframeEffect).getKeyframes();
+          (window as unknown as { __seen: string[] }).__seen.push(`${String(pseudo)} ${String(first?.['clipPath'])}`);
+        }
       }
       requestAnimationFrame(watch);
     };
     watch();
   });
-  await page.getByRole('button', { name: 'Modo claro' }).click();
+  await page.getByRole('button', { name: 'Modo oscuro' }).click();
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { __seen: string[] }).__seen.length))
     .toBeGreaterThan(0);
-  expect(await page.evaluate(() => (window as unknown as { __seen: string[] }).__seen[0])).toBe('::view-transition-new(root)');
+  // Sobre la pantalla nueva, un círculo de borde nítido que nace en el botón (radio 0).
+  const [seen] = await page.evaluate(() => (window as unknown as { __seen: string[] }).__seen);
+  expect(seen).toMatch(/^::view-transition-new\(root\) circle\(0px at /);
 });
 
 test('quien pide menos movimiento recibe el cambio al instante, sin transición', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await spyOnViewTransitions(page);
   await page.goto('/login');
-  await page.getByRole('button', { name: 'Modo claro' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.getByRole('button', { name: 'Modo oscuro' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   expect(await calls(page)).toHaveLength(0);
 });
 
@@ -87,12 +92,12 @@ test('también anima desde el botón del menú lateral, y dos cambios seguidos t
   await login(page);
   await expect(page.getByRole('navigation', { name: 'Principal' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Modo claro' }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await page.getByRole('button', { name: 'Modo oscuro' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.getByRole('button', { name: 'Modo claro' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   expect(await calls(page)).toHaveLength(2);
   // La preferencia final queda guardada.
   await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 });

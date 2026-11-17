@@ -65,3 +65,35 @@ test('sin "reducir movimiento" el botón sí tiene transición', async ({ page }
   const transition = await page.locator('button[type=submit]').evaluate((el) => getComputedStyle(el).transitionDuration);
   expect(transition).toBe('0.2s');
 });
+
+test.describe('logo del login', () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test('flota con una animación suave y su sombra la acompaña', async ({ page }) => {
+    await page.goto('/login');
+    const box = page.getByTestId('login-logo');
+    const logo = box.locator('app-logo');
+    const shadow = box.locator('span').last();
+    expect(await logo.evaluate((el) => getComputedStyle(el).animationName)).toBe('levitate');
+    expect(await shadow.evaluate((el) => getComputedStyle(el).animationName)).toBe('levitateShadow');
+    // Sutil: un ciclo lento (no un rebote) y un recorrido corto.
+    expect(await logo.evaluate((el) => getComputedStyle(el).animationDuration)).toBe('6s');
+    const lift = await page.evaluate(() => {
+      const el = document.querySelector('[data-testid="login-logo"] app-logo')!;
+      const [anim] = el.getAnimations();
+      anim.pause();
+      anim.currentTime = 3000; // la mitad del ciclo: el punto más alto
+      return new DOMMatrix(getComputedStyle(el).transform).m42;
+    });
+    expect(lift).toBeLessThan(-4);
+    expect(lift).toBeGreaterThanOrEqual(-10);
+  });
+
+  test('con «reducir movimiento» el logo queda quieto', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/login');
+    const box = page.getByTestId('login-logo');
+    expect(await box.locator('app-logo').evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
+    expect(await box.locator('span').last().evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
+  });
+});
